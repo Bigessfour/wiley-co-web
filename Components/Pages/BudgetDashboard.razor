@@ -1,0 +1,259 @@
+@page "/budget-dashboard"
+
+@inherits WileyCoWeb.Components.Pages.BudgetDashboardBase
+
+@using Syncfusion.Blazor
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.Spreadsheet
+
+<PageTitle>Budget Dashboard | Wiley.co</PageTitle>
+
+<div class="budget-dashboard min-h-screen bg-slate-50 px-4 py-6 md:px-6 lg:px-8">
+    <div class="mx-auto flex max-w-7xl flex-col gap-4">
+        <div
+            class="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-6 py-5 text-white shadow-lg shadow-slate-200/60">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley.co Finance</p>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Budget Dashboard</h1>
+                    <p class="mt-2 max-w-3xl text-sm text-slate-300 md:text-base">
+                        Review allocation, variance, and line-item detail in one responsive workspace.
+                    </p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
+                    <div>
+                        <div class="text-slate-400">Fiscal Year</div>
+                        <div class="font-semibold text-white">FY 2026</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-400">Version</div>
+                        <div class="font-semibold text-white">Budget v1</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-400">Status</div>
+                        <div class="font-semibold text-emerald-300">On Track</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-400">Updated</div>
+                        <div class="font-semibold text-white">Today</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 16, 16 })" AllowDragging="true"
+                           AllowResizing="true" Width="100%">
+            <DashboardLayoutPanels>
+                <DashboardLayoutPanel Id="kpi-panel" Row="0" Column="0" SizeX="6" SizeY="1">
+                    <HeaderTemplate>
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Snapshot</p>
+                                <h2 class="text-lg font-semibold text-slate-900">KPI Summary</h2>
+                            </div>
+                            <div class="text-sm text-slate-500">Core budget metrics at a glance</div>
+                        </div>
+                    </HeaderTemplate>
+                    <ContentTemplate>
+                        <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div class="h-full">
+                                <SfCard>
+                                    <CardHeader Title="Total Budget" SubTitle="@TotalBudgetDisplay" />
+                                    <CardContent Content="Approved allocation for the current fiscal year." />
+                                </SfCard>
+                            </div>
+
+                            <div class="h-full">
+                                <SfCard>
+                                    <CardHeader Title="Actual Spend" SubTitle="@ActualSpendDisplay" />
+                                    <CardContent Content="Spend recorded from the current planning workbook." />
+                                </SfCard>
+                            </div>
+
+                            <div class="h-full">
+                                <SfCard>
+                                    <CardHeader Title="Variance" SubTitle="@VarianceDisplay" />
+                                    <CardContent Content="Negative values indicate savings against budget." />
+                                </SfCard>
+                            </div>
+
+                            <div class="h-full">
+                                <SfCard>
+                                    <CardHeader Title="Remaining" SubTitle="@RemainingDisplay" />
+                                    <CardContent Content="Uncommitted budget available for the rest of the year." />
+                                </SfCard>
+                            </div>
+                        </div>
+                    </ContentTemplate>
+                </DashboardLayoutPanel>
+
+                <DashboardLayoutPanel Id="spreadsheet-panel" Row="1" Column="0" SizeX="4" SizeY="3">
+                    <HeaderTemplate>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Planning</p>
+                            <h2 class="text-lg font-semibold text-slate-900">Editable Budget Table</h2>
+                        </div>
+                    </HeaderTemplate>
+                    <ContentTemplate>
+                        <div
+                            class="h-full min-h-[28rem] overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                            <SfSpreadsheet DataSource="@SpreadsheetBytes" Width="100%" Height="100%">
+                                <SpreadsheetRibbon></SpreadsheetRibbon>
+                            </SfSpreadsheet>
+                        </div>
+                    </ContentTemplate>
+                </DashboardLayoutPanel>
+
+                <DashboardLayoutPanel Id="waterfall-panel" Row="1" Column="4" SizeX="2" SizeY="3">
+                    <HeaderTemplate>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Analysis</p>
+                            <h2 class="text-lg font-semibold text-slate-900">Budget vs Actual</h2>
+                        </div>
+                    </HeaderTemplate>
+                    <ContentTemplate>
+                        <div class="h-full min-h-[28rem] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                            <SfChart Title="Variance Waterfall" SubTitle="How the budget moved from plan to spend"
+                                     Width="100%" Height="100%">
+                                <ChartTitleStyle TextOverflow="TextOverflow.Wrap"></ChartTitleStyle>
+                                <ChartSubTitleStyle TextOverflow="TextOverflow.Wrap"></ChartSubTitleStyle>
+                                <ChartArea>
+                                    <ChartAreaBorder Width="0"></ChartAreaBorder>
+                                </ChartArea>
+                                <ChartMargin Bottom="12"></ChartMargin>
+                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category"
+                                                   LabelIntersectAction="LabelIntersectAction.Rotate45">
+                                    <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+                                    <ChartAxisMajorTickLines Width="0"></ChartAxisMajorTickLines>
+                                </ChartPrimaryXAxis>
+                                <ChartPrimaryYAxis Title="USD">
+                                    <ChartAxisMajorGridLines Width="1"></ChartAxisMajorGridLines>
+                                    <ChartAxisMajorTickLines Width="0"></ChartAxisMajorTickLines>
+                                    <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                                </ChartPrimaryYAxis>
+                                <ChartLegendSettings Visible="false"></ChartLegendSettings>
+                                <ChartTooltipSettings Enable="true" Header=""
+                                                      Format="<b>${point.x}</b><br/>Value: <b>${point.y}</b>"></ChartTooltipSettings>
+                                <ChartSeriesCollection>
+                                    <ChartSeries DataSource="@WaterfallPoints" Name="Budget Movement" XName="Stage"
+                                                 YName="Amount" Type="ChartSeriesType.Waterfall" ColumnWidth="0.5"
+                                                 NegativeFillColor="#ef4444" IntermediateSumIndexes="@IntermediateSumIndexes"
+                                                 SumIndexes="@SumIndexes" Width="2">
+                                        <ChartCornerRadius TopLeft="3" TopRight="3" BottomLeft="3" BottomRight="3" />
+                                        <ChartSeriesAnimation Enable="true"></ChartSeriesAnimation>
+                                        <ChartSeriesConnector Color="#64748b" Width="0.8" DashArray="1,2">
+                                        </ChartSeriesConnector>
+                                        <ChartSeriesBorder Width="0.2" Color="#0f172a"></ChartSeriesBorder>
+                                        <ChartMarker>
+                                            <ChartDataLabel Visible="true" Position="LabelPosition.Top">
+                                                <ChartDataLabelFont Size="11px"></ChartDataLabelFont>
+                                            </ChartDataLabel>
+                                        </ChartMarker>
+                                    </ChartSeries>
+                                </ChartSeriesCollection>
+                            </SfChart>
+                        </div>
+                    </ContentTemplate>
+                </DashboardLayoutPanel>
+
+                <DashboardLayoutPanel Id="grid-panel" Row="4" Column="0" SizeX="6" SizeY="2">
+                    <HeaderTemplate>
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Operations
+                                </p>
+                                <h2 class="text-lg font-semibold text-slate-900">Detailed Line Items</h2>
+                            </div>
+                            <div class="text-sm text-slate-500">Filter, sort, and export to Excel</div>
+                        </div>
+                    </HeaderTemplate>
+                    <ContentTemplate>
+                        <div
+                            class="h-full min-h-[24rem] overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                            <SfGrid TValue="BudgetLineItem" DataSource="@LineItems" Toolbar="@GridToolbarItems"
+                                    AllowFiltering="true" AllowSorting="true" AllowPaging="true" AllowExcelExport="true"
+                                    Height="100%" Width="100%">
+                                <GridFilterSettings Type="FilterType.Menu"></GridFilterSettings>
+                                <GridPageSettings PageSize="6"></GridPageSettings>
+                                <GridColumns>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Category) HeaderText="Category"
+                                                Width="150"></GridColumn>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Department) HeaderText="Department"
+                                                Width="140"></GridColumn>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Owner) HeaderText="Owner" Width="130">
+                                    </GridColumn>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Budget) HeaderText="Budget" Format="C0"
+                                                TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120"></GridColumn>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Actual) HeaderText="Actual" Format="C0"
+                                                TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120"></GridColumn>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Variance) HeaderText="Variance" Format="C0"
+                                                TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120"></GridColumn>
+                                    <GridColumn Field=@nameof(BudgetLineItem.Status) HeaderText="Status" Width="120">
+                                    </GridColumn>
+                                </GridColumns>
+                            </SfGrid>
+                        </div>
+                    </ContentTemplate>
+                </DashboardLayoutPanel>
+            </DashboardLayoutPanels>
+        </SfDashboardLayout>
+    </div>
+</div>
+
+<style>
+    .budget-dashboard .e-dashboardlayout {
+        background: transparent;
+        border: 0;
+    }
+
+    .budget-dashboard .e-panel {
+        border-radius: 1.25rem;
+        overflow: hidden;
+    }
+
+    .budget-dashboard .e-panel-header {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 0.92));
+        padding: 1rem 1.125rem;
+    }
+
+    .budget-dashboard .e-panel-content {
+        background: transparent;
+        padding: 1rem 1.125rem 1.125rem;
+    }
+
+    .budget-dashboard .e-card {
+        height: 100%;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 1rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .budget-dashboard .e-card-header-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .budget-dashboard .e-card-header-sub-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #111827;
+        margin-top: 0.4rem;
+    }
+
+    .budget-dashboard .e-card-content {
+        color: #475569;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .budget-dashboard .e-chart,
+    .budget-dashboard .e-spreadsheet,
+    .budget-dashboard .e-grid {
+        border-radius: 1rem;
+    }
+</style>

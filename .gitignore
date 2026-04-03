@@ -1,0 +1,7 @@
+*.key
+bin/
+obj/
+.vscode/mcp.json
+wwwroot/appsettings.json
+__blazor_dryrun__/
+__remote_check__/

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.*" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
+    <PackageReference Include="Syncfusion.Blazor.Cards" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.Grid" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.Layouts" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.Spreadsheet" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" Version="33.1.44" />
+    <PackageReference Include="Syncfusion.Blazor.WordProcessor" Version="33.1.44" />
+  </ItemGroup>
+
+  <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">
+    <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
+      <_SyncfusionAppSettingsLines Include='{"SyncfusionLicenseKey":"$(SYNCFUSION_LICENSE_KEY)"}' />
+    </ItemGroup>
+    <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' == ''">
+      <_SyncfusionAppSettingsLines Include='{}' />
+    </ItemGroup>
+
+    <WriteLinesToFile File="$(ProjectDir)wwwroot\appsettings.json"
+                      Lines="@(_SyncfusionAppSettingsLines)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+</Project>
