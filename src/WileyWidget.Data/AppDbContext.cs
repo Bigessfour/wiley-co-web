@@ -1,0 +1,851 @@
+#nullable enable
+
+using System;
+using Microsoft.EntityFrameworkCore;
+using WileyWidget.Models.Amplify;
+using WileyWidget.Models;
+using WileyWidget.Models.Entities;
+
+namespace WileyWidget.Data
+{
+    public class AppDbContext : DbContext, IAppDbContext
+    {
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        {
+            // DbSets are now auto-initialized properties - no manual initialization needed
+        }
+
+        // Global conventions
+        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+        {
+            if (configurationBuilder is null)
+                throw new ArgumentNullException(nameof(configurationBuilder));
+
+            // Apply a global precision for decimal columns unless explicitly overridden
+            configurationBuilder.Properties<decimal>().HavePrecision(19, 4);
+        }
+
+        // OnConfiguring removed: All configuration is handled via DI in DatabaseConfiguration.cs
+        // This prevents EF Core 9.0 ArgumentException: "At least one object must implement IComparable"
+        // which occurs when trying to modify already-configured DbContextOptions
+
+        public DbSet<MunicipalAccount> MunicipalAccounts { get; set; } = null!;
+        public DbSet<Department> Departments { get; set; } = null!;
+        public DbSet<BudgetEntry> BudgetEntries { get; set; } = null!;
+        public DbSet<Fund> Funds { get; set; } = null!;
+        public DbSet<Transaction> Transactions { get; set; } = null!;
+        public DbSet<Enterprise> Enterprises { get; set; } = null!;
+        public DbSet<AppSettings> AppSettings { get; set; } = null!;
+        public DbSet<FiscalYearSettings> FiscalYearSettings { get; set; } = null!;
+        public DbSet<UtilityCustomer> UtilityCustomers { get; set; } = null!;
+        public DbSet<UtilityBill> UtilityBills { get; set; } = null!;
+        public DbSet<Charge> Charges { get; set; } = null!;
+        public DbSet<BudgetPeriod> BudgetPeriods { get; set; } = null!;
+        public DbSet<Invoice> Invoices { get; set; } = null!;
+        public DbSet<Vendor> Vendors { get; set; } = null!;
+        public DbSet<Payment> Payments { get; set; } = null!;
+        public DbSet<AuditEntry> AuditEntries { get; set; } = null!;
+        public DbSet<TaxRevenueSummary> TaxRevenueSummaries { get; set; } = null!;
+        public DbSet<ActivityLog> ActivityLogs { get; set; } = null!;
+        public DbSet<DepartmentCurrentCharge> DepartmentCurrentCharges { get; set; } = null!;
+        public DbSet<DepartmentGoal> DepartmentGoals { get; set; } = null!;
+        public DbSet<TelemetryLog> TelemetryLogs { get; set; } = null!;
+        public DbSet<SavedScenarioSnapshot> SavedScenarioSnapshots { get; set; } = null!;
+        public DbSet<global::WileyWidget.Services.Abstractions.ConversationHistory> ConversationHistories { get; set; } = null!;
+        public DbSet<TownOfWileyBudget2026> TownOfWileyBudgetData { get; set; } = null!;
+        public DbSet<ImportBatch> ImportBatches { get; set; } = null!;
+        public DbSet<SourceFileVariant> SourceFileVariants { get; set; } = null!;
+        public DbSet<SourceFile> SourceFiles { get; set; } = null!;
+        public DbSet<ChartOfAccount> ChartOfAccounts { get; set; } = null!;
+        public DbSet<AmplifyCustomer> AmplifyCustomers { get; set; } = null!;
+        public DbSet<AmplifyVendor> AmplifyVendors { get; set; } = null!;
+        public DbSet<LedgerEntry> LedgerEntries { get; set; } = null!;
+        public DbSet<LedgerEntryLine> LedgerEntryLines { get; set; } = null!;
+        public DbSet<TrialBalanceLine> TrialBalanceLines { get; set; } = null!;
+        public DbSet<ProfitLossMonthlyLine> ProfitLossMonthlyLines { get; set; } = null!;
+        public DbSet<BudgetSnapshot> BudgetSnapshots { get; set; } = null!;
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            if (modelBuilder is null)
+            {
+                throw new ArgumentNullException(nameof(modelBuilder));
+            }
+
+            base.OnModelCreating(modelBuilder);
+
+            // Constants for seed data dates to reduce repetition
+            var fy2026Start = new DateTime(2025, 7, 1);
+            var fy2026End = new DateTime(2026, 6, 30);
+            var seedTimestamp = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Static timestamp for seed data (prevents migration warnings)
+
+            // EF Core 10: Enable named default constraints for better migration control
+            // modelBuilder.UseNamedDefaultConstraints(); // Commented out - requires EF Core 10+
+
+            // BudgetEntry (updated)
+            modelBuilder.Entity<BudgetEntry>(entity =>
+            {
+                entity.HasOne(e => e.Parent)
+                    .WithMany(e => e.Children)
+                    .HasForeignKey(e => e.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.MunicipalAccount)
+                    .WithMany(m => m.BudgetEntries)
+                    .HasForeignKey(e => e.MunicipalAccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.ParentId);
+                entity.HasIndex(e => new { e.AccountNumber, e.FiscalYear }).IsUnique();
+                entity.HasIndex(e => e.FiscalYear);
+                entity.HasIndex(e => e.DepartmentId);
+                entity.HasIndex(e => e.FundId);
+                entity.HasIndex(e => e.MunicipalAccountId);
+                entity.HasIndex(e => e.SourceRowNumber); // New: Excel import queries
+                entity.HasIndex(e => e.ActivityCode); // New: GASB reporting
+                entity.Property(e => e.BudgetedAmount).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(e => e.ActualAmount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.EncumbranceAmount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.SourceFilePath).HasMaxLength(500);
+                entity.Property(e => e.ActivityCode).HasMaxLength(10);
+                entity.ToTable(t => t.HasCheckConstraint("CK_Budget_Positive", "[BudgetedAmount] > 0"));
+            });
+
+            // Department hierarchy
+            modelBuilder.Entity<Department>(entity =>
+            {
+                entity.HasOne(e => e.Parent)
+                      .WithMany(e => e.Children)
+                      .HasForeignKey(e => e.ParentId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.DepartmentCode).IsUnique(); // New: Unique code
+            });
+
+            // BudgetPeriod configuration
+            modelBuilder.Entity<BudgetPeriod>(entity =>
+            {
+                entity.HasIndex(e => e.Year);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasIndex(e => new { e.Year, e.Status });
+            });
+
+            // MunicipalAccount configuration
+            modelBuilder.Entity<MunicipalAccount>(entity =>
+            {
+                entity.OwnsOne(e => e.AccountNumber, owned =>
+                {
+                    owned.Property(a => a.Value).HasColumnName("AccountNumber").HasMaxLength(20).IsRequired();
+                });
+                entity.Property(e => e.AccountNumber_Value)
+                      .HasComputedColumnSql("[AccountNumber]");
+                entity.HasOne(e => e.Department)
+                      .WithMany()
+                      .HasForeignKey(e => e.DepartmentId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.BudgetPeriod)
+                      .WithMany(bp => bp.Accounts)
+                      .HasForeignKey(e => e.BudgetPeriodId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.ParentAccount)
+                    .WithMany(e => e.ChildAccounts)
+                    .HasForeignKey(e => e.ParentAccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.DepartmentId);
+                entity.HasIndex(e => e.BudgetPeriodId);
+                entity.HasIndex(e => e.ParentAccountId);
+                entity.HasIndex(e => new { e.FundType, e.Type });
+                entity.Property(e => e.Balance).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.BudgetAmount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.RowVersion)
+                      .IsRowVersion()
+                      .HasDefaultValue(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
+                // Optional Fund relationship (navigation property)
+                entity.HasOne(e => e.Fund)
+                      .WithMany()
+                      .HasForeignKey(e => e.FundId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // Fund relations
+            modelBuilder.Entity<Fund>(entity =>
+            {
+                entity.HasMany(f => f.BudgetEntries)
+                      .WithOne(be => be.Fund)
+                      .HasForeignKey(be => be.FundId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // New: Transaction
+            modelBuilder.Entity<Transaction>(entity =>
+            {
+                entity.HasOne(t => t.BudgetEntry)
+                      .WithMany(be => be.Transactions)
+                      .HasForeignKey(t => t.BudgetEntryId)
+                .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(t => t.TransactionDate);
+                entity.Property(t => t.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(t => t.Type).HasMaxLength(50);
+                entity.Property(t => t.Description).HasMaxLength(200);
+                entity.ToTable(t => t.HasCheckConstraint("CK_Transaction_NonZero", "[Amount] != 0"));
+            });
+
+            // New: Invoice
+            modelBuilder.Entity<Invoice>(entity =>
+            {
+                entity.HasOne(i => i.Vendor)
+                      .WithMany(v => v.Invoices)
+                      .HasForeignKey(i => i.VendorId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(i => i.MunicipalAccount)
+                      .WithMany(ma => ma.Invoices)
+                      .HasForeignKey(i => i.MunicipalAccountId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(i => i.VendorId);
+                entity.HasIndex(i => i.MunicipalAccountId);
+                entity.HasIndex(i => i.InvoiceDate);
+                entity.Property(i => i.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.InvoiceNumber).HasMaxLength(50);
+                entity.Property(i => i.Status).HasMaxLength(50).HasDefaultValue("Pending");
+            });
+
+            // Payment configuration
+            modelBuilder.Entity<Payment>(entity =>
+            {
+                entity.HasOne(p => p.MunicipalAccount)
+                      .WithMany()
+                      .HasForeignKey(p => p.MunicipalAccountId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(p => p.Vendor)
+                      .WithMany()
+                      .HasForeignKey(p => p.VendorId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(p => p.Invoice)
+                      .WithMany()
+                      .HasForeignKey(p => p.InvoiceId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(p => p.CheckNumber);
+                entity.HasIndex(p => p.PaymentDate);
+                entity.HasIndex(p => p.Payee);
+                entity.HasIndex(p => p.Status);
+                entity.HasIndex(p => p.MunicipalAccountId);
+                entity.HasIndex(p => p.VendorId);
+                entity.Property(p => p.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(p => p.CheckNumber).HasMaxLength(20).IsRequired();
+                entity.Property(p => p.Payee).HasMaxLength(200).IsRequired();
+                entity.Property(p => p.Description).HasMaxLength(500).IsRequired();
+                entity.Property(p => p.Status).HasMaxLength(50).HasDefaultValue("Cleared");
+                entity.Property(p => p.Memo).HasMaxLength(1000);
+            });
+
+            // ActivityLog configuration
+            modelBuilder.Entity<ActivityLog>(entity =>
+            {
+                entity.ToTable("ActivityLog");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Timestamp);
+                entity.Property(e => e.Activity).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.Details).HasMaxLength(500);
+                entity.Property(e => e.User).HasMaxLength(100);
+                entity.Property(e => e.Category).HasMaxLength(100);
+                entity.Property(e => e.Icon).HasMaxLength(100);
+                entity.Property(e => e.Timestamp).HasColumnType("timestamp with time zone");
+            });
+
+            modelBuilder.Entity<SavedScenarioSnapshot>(entity =>
+            {
+                entity.ToTable("SavedScenarioSnapshots");
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.CreatedAtUtc);
+
+                entity.Property(e => e.Name)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(e => e.Description)
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.RateIncreasePercent).HasColumnType("decimal(19,4)");
+                entity.Property(e => e.ExpenseIncreasePercent).HasColumnType("decimal(19,4)");
+                entity.Property(e => e.RevenueTarget).HasColumnType("decimal(19,4)");
+                entity.Property(e => e.ProjectedValue).HasColumnType("decimal(19,4)");
+                entity.Property(e => e.Variance).HasColumnType("decimal(19,4)");
+
+                entity.Property(e => e.CreatedAtUtc)
+                    .HasColumnType("timestamp with time zone")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.Property(e => e.UpdatedAtUtc)
+                    .HasColumnType("timestamp with time zone");
+            });
+
+            // AI chat conversation persistence
+            modelBuilder.Entity<global::WileyWidget.Services.Abstractions.ConversationHistory>(entity =>
+            {
+                entity.ToTable("ConversationHistories");
+                entity.HasKey(e => e.ConversationId);
+
+                entity.Property(e => e.ConversationId)
+                    .HasMaxLength(128)
+                    .IsRequired();
+
+                entity.Property(e => e.Title)
+                    .HasMaxLength(200)
+                    .IsRequired();
+
+                entity.Property(e => e.MessagesJson)
+                    .IsRequired();
+
+                entity.HasIndex(e => e.UpdatedAt);
+
+                // Legacy/unused property - ConversationId is the canonical key
+                entity.Ignore(e => e.Id);
+            });
+
+            // New: Vendor configuration
+            modelBuilder.Entity<Vendor>(entity =>
+            {
+                entity.ToTable("Vendor"); // Match existing database table name
+                entity.HasIndex(v => v.Name);
+                entity.HasIndex(v => v.IsActive);
+                entity.Property(v => v.Name).HasMaxLength(100).IsRequired();
+                entity.Property(v => v.ContactInfo).HasMaxLength(200);
+                entity.Property(v => v.Email).HasMaxLength(200);
+                entity.Property(v => v.Phone).HasMaxLength(50);
+                entity.Property(v => v.MailingAddressLine1).HasMaxLength(200);
+                entity.Property(v => v.MailingAddressLine2).HasMaxLength(200);
+                entity.Property(v => v.MailingAddressCity).HasMaxLength(100);
+                entity.Property(v => v.MailingAddressState).HasMaxLength(50);
+                entity.Property(v => v.MailingAddressPostalCode).HasMaxLength(20);
+                entity.Property(v => v.MailingAddressCountry).HasMaxLength(100);
+                entity.Property(v => v.QuickBooksId).HasMaxLength(50);
+            });
+
+            // Amplify schema pipeline
+            modelBuilder.Entity<ImportBatch>(entity =>
+            {
+                entity.ToTable("import_batches");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.BatchName).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.SourceSystem).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.Property(e => e.StartedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.CompletedAt).HasColumnType("timestamp with time zone");
+            });
+
+            modelBuilder.Entity<SourceFileVariant>(entity =>
+            {
+                entity.ToTable("source_file_variants");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.VariantCode).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(500);
+            });
+
+            modelBuilder.Entity<SourceFile>(entity =>
+            {
+                entity.ToTable("source_files");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.Batch)
+                      .WithMany(b => b.SourceFiles)
+                      .HasForeignKey(e => e.BatchId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.SourceFileVariant)
+                      .WithMany(v => v.SourceFiles)
+                      .HasForeignKey(e => e.SourceFileVariantId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.Property(e => e.CanonicalEntity).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.OriginalFileName).HasMaxLength(260).IsRequired();
+                entity.Property(e => e.NormalizedFileName).HasMaxLength(260);
+                entity.Property(e => e.SheetName).HasMaxLength(100);
+                entity.Property(e => e.FileHash).HasMaxLength(128).IsRequired();
+                entity.Property(e => e.ImportedAt).HasColumnType("timestamp with time zone");
+                entity.HasIndex(e => e.BatchId);
+                entity.HasIndex(e => e.CanonicalEntity);
+                entity.HasIndex(e => e.FileHash);
+            });
+
+            modelBuilder.Entity<ChartOfAccount>(entity =>
+            {
+                entity.ToTable("chart_of_accounts");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.ChartOfAccounts)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.AccountName).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.AccountType).HasMaxLength(100);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.AccountNumber).HasMaxLength(50);
+                entity.Property(e => e.TaxLine).HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<AmplifyCustomer>(entity =>
+            {
+                entity.ToTable("customers");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.Customers)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.CustomerName).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.BillTo).HasMaxLength(200);
+                entity.Property(e => e.PrimaryContact).HasMaxLength(200);
+                entity.Property(e => e.MainPhone).HasMaxLength(50);
+                entity.Property(e => e.Fax).HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<AmplifyVendor>(entity =>
+            {
+                entity.ToTable("vendors");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.Vendors)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.VendorName).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.AccountNumber).HasMaxLength(50);
+                entity.Property(e => e.BillFrom).HasMaxLength(200);
+                entity.Property(e => e.PrimaryContact).HasMaxLength(200);
+                entity.Property(e => e.MainPhone).HasMaxLength(50);
+                entity.Property(e => e.Fax).HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<LedgerEntry>(entity =>
+            {
+                entity.ToTable("ledger_entries");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.LedgerEntries)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.EntryScope).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.EntryType).HasMaxLength(100);
+                entity.Property(e => e.TransactionNumber).HasMaxLength(100);
+                entity.Property(e => e.Name).HasMaxLength(200);
+                entity.Property(e => e.Memo).HasMaxLength(1000);
+                entity.Property(e => e.AccountName).HasMaxLength(200);
+                entity.Property(e => e.SplitAccount).HasMaxLength(200);
+                entity.Property(e => e.ClearedFlag).HasMaxLength(20);
+                entity.Property(e => e.EntryDate).HasColumnType("date");
+            });
+
+            modelBuilder.Entity<LedgerEntryLine>(entity =>
+            {
+                entity.ToTable("ledger_entry_lines");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.LedgerEntry)
+                      .WithMany(e => e.Lines)
+                      .HasForeignKey(e => e.LedgerEntryId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.AccountName).HasMaxLength(200);
+                entity.Property(e => e.Memo).HasMaxLength(1000);
+                entity.Property(e => e.SplitAccount).HasMaxLength(200);
+            });
+
+            modelBuilder.Entity<TrialBalanceLine>(entity =>
+            {
+                entity.ToTable("trial_balance_lines");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.TrialBalanceLines)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.AccountName).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.AsOfDate).HasColumnType("date");
+            });
+
+            modelBuilder.Entity<ProfitLossMonthlyLine>(entity =>
+            {
+                entity.ToTable("profit_loss_monthly_lines");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.ProfitLossMonthlyLines)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.Property(e => e.LineLabel).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.LineType).HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<BudgetSnapshot>(entity =>
+            {
+                entity.ToTable("budget_snapshots");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.SourceFile)
+                      .WithMany(f => f.BudgetSnapshots)
+                      .HasForeignKey(e => e.SourceFileId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.Property(e => e.SnapshotName).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.SnapshotDate).HasColumnType("date");
+                entity.Property(e => e.Payload).HasColumnType("jsonb");
+            });
+
+            // Precision for TaxRevenueSummary decimal columns to prevent truncation/rounding issues
+            modelBuilder.Entity<TaxRevenueSummary>(entity =>
+            {
+                entity.Property(e => e.PriorYearLevy).HasPrecision(19, 4);
+                entity.Property(e => e.PriorYearAmount).HasPrecision(19, 4);
+                entity.Property(e => e.CurrentYearLevy).HasPrecision(19, 4);
+                entity.Property(e => e.CurrentYearAmount).HasPrecision(19, 4);
+                entity.Property(e => e.BudgetYearLevy).HasPrecision(19, 4);
+                entity.Property(e => e.BudgetYearAmount).HasPrecision(19, 4);
+                entity.Property(e => e.IncDecLevy).HasPrecision(19, 4);
+                entity.Property(e => e.IncDecAmount).HasPrecision(19, 4);
+            });
+
+            // TownOfWileyBudget2026 configuration
+            modelBuilder.Entity<TownOfWileyBudget2026>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.SourceFile).HasMaxLength(500);
+                entity.Property(e => e.FundOrDepartment).HasMaxLength(100);
+                entity.Property(e => e.AccountCode).HasMaxLength(20);
+                entity.Property(e => e.Description).HasMaxLength(200);
+                entity.Property(e => e.Category).HasMaxLength(50);
+                entity.Property(e => e.MappedDepartment).HasMaxLength(50);
+                entity.HasIndex(e => e.AccountCode);
+                entity.HasIndex(e => e.FundOrDepartment);
+                entity.HasIndex(e => e.MappedDepartment);
+            });
+
+            // New: BudgetInteraction relationships
+            modelBuilder.Entity<BudgetInteraction>(entity =>
+            {
+                entity.HasOne(bi => bi.PrimaryEnterprise)
+                      .WithMany()
+                      .HasForeignKey(bi => bi.PrimaryEnterpriseId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(bi => bi.SecondaryEnterprise)
+                      .WithMany()
+                      .HasForeignKey(bi => bi.SecondaryEnterpriseId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(bi => bi.PrimaryEnterpriseId);
+                entity.HasIndex(bi => bi.SecondaryEnterpriseId);
+                entity.Property(bi => bi.MonthlyAmount).HasColumnType("decimal(18,2)");
+                entity.Property(bi => bi.InteractionType).HasMaxLength(50);
+                entity.Property(bi => bi.Description).HasMaxLength(200);
+                entity.Property(bi => bi.Notes).HasMaxLength(300);
+            });
+
+            // UtilityBill configuration
+            modelBuilder.Entity<UtilityBill>(entity =>
+            {
+                entity.HasKey(ub => ub.Id);
+                entity.HasOne(ub => ub.Customer)
+                      .WithMany()
+                      .HasForeignKey(ub => ub.CustomerId)
+                      .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(ub => ub.CustomerId);
+                entity.HasIndex(ub => ub.BillNumber).IsUnique();
+                entity.HasIndex(ub => ub.BillDate);
+                entity.HasIndex(ub => ub.DueDate);
+                entity.HasIndex(ub => ub.Status);
+                entity.Property(ub => ub.BillNumber).HasMaxLength(50).IsRequired();
+                entity.Property(ub => ub.WaterCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.SewerCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.GarbageCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.StormwaterCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.LateFees).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.OtherCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.AmountPaid).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.RowVersion)
+                      .IsRowVersion()
+                      .HasDefaultValue(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
+            });
+
+            // UtilityCustomer configuration
+            modelBuilder.Entity<UtilityCustomer>(entity =>
+            {
+                entity.Property(uc => uc.RowVersion)
+                      .IsRowVersion()
+                      .HasDefaultValue(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
+            });
+
+            // Charge configuration
+            modelBuilder.Entity<Charge>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+                entity.HasOne(c => c.Bill)
+                      .WithMany()
+                      .HasForeignKey(c => c.BillId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(c => c.BillId);
+                entity.HasIndex(c => c.ChargeType);
+                entity.Property(c => c.ChargeType).HasMaxLength(50).IsRequired();
+                entity.Property(c => c.Description).HasMaxLength(200).IsRequired();
+                entity.Property(c => c.Amount).HasColumnType("decimal(18,2)").IsRequired();
+            });
+
+            // DepartmentCurrentCharge configuration
+            modelBuilder.Entity<DepartmentCurrentCharge>(entity =>
+            {
+                entity.HasKey(dcc => dcc.Id);
+                entity.HasIndex(dcc => dcc.Department).IsUnique();
+                entity.HasIndex(dcc => dcc.IsActive);
+                entity.Property(dcc => dcc.Department).HasMaxLength(50).IsRequired();
+                entity.Property(dcc => dcc.CurrentCharge).HasColumnType("decimal(18,2)").IsRequired();
+                entity.Property(dcc => dcc.CustomerCount).IsRequired();
+                entity.Property(dcc => dcc.LastUpdated).HasColumnType("timestamp with time zone");
+                entity.Property(dcc => dcc.UpdatedBy).HasMaxLength(100);
+                entity.Property(dcc => dcc.Notes).HasMaxLength(500);
+            });
+
+            // DepartmentGoal configuration
+            modelBuilder.Entity<DepartmentGoal>(entity =>
+            {
+                entity.HasKey(dg => dg.Id);
+                entity.HasIndex(dg => new { dg.Department, dg.IsActive });
+                entity.Property(dg => dg.Department).HasMaxLength(50).IsRequired();
+                entity.Property(dg => dg.AdjustmentFactor).HasColumnType("decimal(18,4)").HasDefaultValue(1.0m);
+                entity.Property(dg => dg.TargetProfitMarginPercent).HasColumnType("decimal(18,4)");
+                entity.Property(dg => dg.RecommendationText).HasMaxLength(1000);
+                entity.Property(dg => dg.GeneratedAt).HasColumnType("timestamp with time zone");
+                entity.Property(dg => dg.Source).HasMaxLength(100);
+            });
+
+            // Auditing
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes()
+                .Where(e => typeof(WileyWidget.Models.Entities.IAuditable).IsAssignableFrom(e.ClrType)))
+            {
+                modelBuilder.Entity(entityType.ClrType).Property("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                modelBuilder.Entity(entityType.ClrType).Property("UpdatedAt").ValueGeneratedOnAddOrUpdate();
+            }
+
+            // Set all foreign keys to Restrict to avoid cascade path issues in Aurora PostgreSQL
+            foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
+            {
+                relationship.DeleteBehavior = DeleteBehavior.Restrict;
+            }
+            // Do NOT override with Cascade anywhere. All FKs are Restrict for PostgreSQL safety.
+
+            // Seed: BudgetPeriod required for MunicipalAccount FK
+            modelBuilder.Entity<BudgetPeriod>().HasData(
+                new BudgetPeriod
+                {
+                    Id = 1,
+                    Year = 2025,
+                    Name = "2025 Adopted",
+                    CreatedDate = new DateTime(2025, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+                    Status = BudgetStatus.Adopted,
+                    StartDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EndDate = new DateTime(2025, 12, 31, 23, 59, 59, DateTimeKind.Utc),
+                    IsActive = true
+                }
+            );
+
+            // Seed: Departments already have Id=1 (Public Works) from prior migration
+
+            // Seed: Core Departments (ensure ids exist for FK references)
+            modelBuilder.Entity<Department>().HasData(
+                new Department { Id = 1, Name = "Administration", DepartmentCode = "ADMIN" },
+                new Department { Id = 2, Name = "Public Works", DepartmentCode = "DPW" },
+                new Department { Id = 3, Name = "Culture and Recreation", DepartmentCode = "CULT" },
+                new Department { Id = 4, Name = "Sanitation", DepartmentCode = "SAN", ParentId = 2 },
+                new Department { Id = 5, Name = "Utilities", DepartmentCode = "UTIL" },
+                new Department { Id = 6, Name = "Community Center", DepartmentCode = "COMM" },
+                new Department { Id = 7, Name = "Conservation", DepartmentCode = "CONS" },
+                new Department { Id = 8, Name = "Recreation", DepartmentCode = "REC" }
+            );
+
+            // Seed: Funds (lookup)
+            modelBuilder.Entity<Fund>().HasData(
+                new Fund { Id = 1, FundCode = "100-GEN", Name = "General Fund", Type = FundType.GeneralFund },
+                new Fund { Id = 2, FundCode = "200-ENT", Name = "Enterprise Fund", Type = FundType.EnterpriseFund },
+                new Fund { Id = 3, FundCode = "300-UTIL", Name = "Utility Fund", Type = FundType.EnterpriseFund },
+                new Fund { Id = 4, FundCode = "400-COMM", Name = "Community Center Fund", Type = FundType.SpecialRevenue },
+                new Fund { Id = 5, FundCode = "500-CONS", Name = "Conservation Trust Fund", Type = FundType.PermanentFund },
+                new Fund { Id = 6, FundCode = "600-REC", Name = "Recreation Fund", Type = FundType.SpecialRevenue },
+                new Fund { Id = 7, FundCode = "700-WSD", Name = "Wiley Sanitation District", Type = FundType.EnterpriseFund }
+            );
+
+            // Seed: A few common vendors to make invoices and testing easier
+            modelBuilder.Entity<Vendor>().HasData(
+                new Vendor { Id = 1, Name = "Acme Supplies", ContactInfo = "contact@acmesupplies.example.com", IsActive = true },
+                new Vendor { Id = 2, Name = "Municipal Services Co.", ContactInfo = "info@muniservices.example.com", IsActive = true },
+                new Vendor { Id = 3, Name = "Trail Builders LLC", ContactInfo = "projects@trailbuilders.example.com", IsActive = true }
+            );
+
+            // Seed: FY 26 Proposed Budget - Property Tax Revenues Summary
+            modelBuilder.Entity<TaxRevenueSummary>().HasData(
+                new TaxRevenueSummary { Id = 1, Description = "ASSESSED VALUATION-COUNTY FUND", PriorYearLevy = 1069780m, PriorYearAmount = 1069780m, CurrentYearLevy = 1072691m, CurrentYearAmount = 1072691m, BudgetYearLevy = 1880448m, BudgetYearAmount = 1880448m, IncDecLevy = 807757m, IncDecAmount = 807757m },
+                new TaxRevenueSummary { Id = 2, Description = "GENERAL", PriorYearLevy = 45.570m, PriorYearAmount = 48750m, CurrentYearLevy = 45.570m, CurrentYearAmount = 48883m, BudgetYearLevy = 45.570m, BudgetYearAmount = 85692m, IncDecLevy = 0m, IncDecAmount = 36809m },
+                new TaxRevenueSummary { Id = 3, Description = "UTILITY", PriorYearLevy = 0m, PriorYearAmount = 0m, CurrentYearLevy = 0m, CurrentYearAmount = 0m, BudgetYearLevy = 0m, BudgetYearAmount = 0m, IncDecLevy = 0m, IncDecAmount = 0m },
+                new TaxRevenueSummary { Id = 4, Description = "COMMUNITY CENTER", PriorYearLevy = 0m, PriorYearAmount = 0m, CurrentYearLevy = 0m, CurrentYearAmount = 0m, BudgetYearLevy = 0m, BudgetYearAmount = 0m, IncDecLevy = 0m, IncDecAmount = 0m },
+                new TaxRevenueSummary { Id = 5, Description = "CONSERVATION TRUST FUND", PriorYearLevy = 0m, PriorYearAmount = 0m, CurrentYearLevy = 0m, CurrentYearAmount = 0m, BudgetYearLevy = 0m, BudgetYearAmount = 0m, IncDecLevy = 0m, IncDecAmount = 0m },
+                new TaxRevenueSummary { Id = 6, Description = "TEMPORARY MILL LEVY CREDIT", PriorYearLevy = 0m, PriorYearAmount = 0m, CurrentYearLevy = 0m, CurrentYearAmount = 0m, BudgetYearLevy = 0m, BudgetYearAmount = 0m, IncDecLevy = 0m, IncDecAmount = 0m },
+                new TaxRevenueSummary { Id = 7, Description = "TOTAL", PriorYearLevy = 45.570m, PriorYearAmount = 48750m, CurrentYearLevy = 45.570m, CurrentYearAmount = 48883m, BudgetYearLevy = 45.570m, BudgetYearAmount = 85692m, IncDecLevy = 0m, IncDecAmount = 36810m }
+            );
+
+            // Seed: BudgetPeriod for FY 2026
+            modelBuilder.Entity<BudgetPeriod>().HasData(
+                new BudgetPeriod
+                {
+                    Id = 2,
+                    Year = 2026,
+                    Name = "2026 Proposed",
+                    CreatedDate = new DateTime(2025, 10, 28, 0, 0, 0, DateTimeKind.Utc),
+                    Status = BudgetStatus.Proposed,
+                    StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EndDate = new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc),
+                    IsActive = false
+                }
+            );
+
+            // Seed: FY 26 Proposed Budget - General Fund Revenues
+            // Note: FY 2026 runs from July 1, 2025 to June 30, 2026
+            modelBuilder.Entity<BudgetEntry>().HasData(
+                // Intergovernmental Revenue
+                new BudgetEntry { Id = 1, AccountNumber = "332.1", Description = "Federal: Mineral Lease", FiscalYear = 2026, BudgetedAmount = 360m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = seedTimestamp, UpdatedAt = seedTimestamp, MunicipalAccountId = null, StartPeriod = fy2026Start, EndPeriod = fy2026End },
+                new BudgetEntry { Id = 2, AccountNumber = "333.00", Description = "State: Cigarette Taxes", FiscalYear = 2026, BudgetedAmount = 240m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 3, AccountNumber = "334.31", Description = "Highways Users", FiscalYear = 2026, BudgetedAmount = 18153m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 4, AccountNumber = "313.00", Description = "Additional MV", FiscalYear = 2026, BudgetedAmount = 1775m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 5, AccountNumber = "337.17", Description = "County Road & Bridge", FiscalYear = 2026, BudgetedAmount = 1460m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                // Other Revenue
+                new BudgetEntry { Id = 6, AccountNumber = "311.20", Description = "Senior Homestead Exemption", FiscalYear = 2026, BudgetedAmount = 1500m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 7, AccountNumber = "312.00", Description = "Specific Ownership Taxes", FiscalYear = 2026, BudgetedAmount = 5100m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 8, AccountNumber = "314.00", Description = "Tax A", FiscalYear = 2026, BudgetedAmount = 2500m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 9, AccountNumber = "319.00", Description = "Penalties & Interest on Delinquent Taxes", FiscalYear = 2026, BudgetedAmount = 35m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 10, AccountNumber = "336.00", Description = "Sales Tax", FiscalYear = 2026, BudgetedAmount = 120000m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 11, AccountNumber = "318.20", Description = "Franchise Fee", FiscalYear = 2026, BudgetedAmount = 7058m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 12, AccountNumber = "322.70", Description = "Animal Licenses", FiscalYear = 2026, BudgetedAmount = 50m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 13, AccountNumber = "310.00", Description = "Charges for Services: WSD Collection Fee", FiscalYear = 2026, BudgetedAmount = 6000m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 14, AccountNumber = "370.00", Description = "Housing Authority Mgt Fee", FiscalYear = 2026, BudgetedAmount = 12000m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 15, AccountNumber = "373.00", Description = "Pickup Usage Fee", FiscalYear = 2026, BudgetedAmount = 2400m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 16, AccountNumber = "361.00", Description = "Miscellaneous Receipts: Interest Earnings", FiscalYear = 2026, BudgetedAmount = 325m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 17, AccountNumber = "365.00", Description = "Dividends", FiscalYear = 2026, BudgetedAmount = 100m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 18, AccountNumber = "363.00", Description = "Lease", FiscalYear = 2026, BudgetedAmount = 1100m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 19, AccountNumber = "350.00", Description = "Wiley Hay Days Donations", FiscalYear = 2026, BudgetedAmount = 10000m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) },
+                new BudgetEntry { Id = 20, AccountNumber = "362.00", Description = "Donations", FiscalYear = 2026, BudgetedAmount = 2500m, DepartmentId = 1, FundId = 1, FundType = FundType.GeneralFund, IsGASBCompliant = true, CreatedAt = new DateTime(2025, 10, 28), UpdatedAt = new DateTime(2025, 10, 28), MunicipalAccountId = null, StartPeriod = new DateTime(2025, 7, 1), EndPeriod = new DateTime(2026, 6, 30) }
+            );
+
+            // Seed: Default AppSettings row so code that expects Id=1 has a baseline
+            modelBuilder.Entity<AppSettings>().HasData(
+                new AppSettings
+                {
+                    Id = 1,
+                    Theme = "FluentDark",
+                    EnableDataCaching = true,
+                    CacheExpirationMinutes = 30,
+                    SelectedLogLevel = "Information",
+                    EnableFileLogging = true,
+                    LogFilePath = "logs/wiley-widget.log",
+                    QuickBooksEnvironment = "sandbox",
+                    QboTokenExpiry = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    LastSelectedEnterpriseId = 1
+                }
+            );
+
+            // Seed: Conservation Trust Fund Chart of Accounts (MunicipalAccount)
+            modelBuilder.Entity<MunicipalAccount>().HasData(
+                // Assets / Cash & equivalents
+                new MunicipalAccount { Id = 1, Name = "CASH IN BANK", Type = AccountType.Cash, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 2, Name = "CASH-BASEBALL FIELD PROJECT", Type = AccountType.Cash, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 3, Name = "INVESTMENTS", Type = AccountType.Investments, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 4, Name = "INTERGOVERNMENTAL RECEIVABLE", Type = AccountType.Receivables, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 5, Name = "GRANT RECEIVABLE", Type = AccountType.Receivables, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+
+                // Liabilities
+                new MunicipalAccount { Id = 6, Name = "ACCOUNTS PAYABLE", Type = AccountType.Payables, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 7, Name = "BASEBALL FIELD PROJECT LOAN", Type = AccountType.Debt, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 8, Name = "WALKING TRAIL LOAN", Type = AccountType.Debt, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 9, Name = "DUE TO/FROM TOW GENERAL FUND", Type = AccountType.AccruedLiabilities, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 10, Name = "DUE TO/FROM TOW UTILITY FUND", Type = AccountType.AccruedLiabilities, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+
+                // Equity / Fund Balance
+                new MunicipalAccount { Id = 11, Name = "FUND BALANCE", Type = AccountType.FundBalance, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 12, Name = "Opening Bal Equity", Type = AccountType.RetainedEarnings, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 13, Name = "Retained Earnings", Type = AccountType.RetainedEarnings, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+
+                // Revenues (Income)
+                new MunicipalAccount { Id = 14, Name = "STATE APPORTIONMENT", Type = AccountType.Revenue, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 15, Name = "WALKING TRAIL DONATION", Type = AccountType.Grants, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 16, Name = "BASEBALL FIELD DONATIONS", Type = AccountType.Grants, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 17, Name = "GRANT REVENUES", Type = AccountType.Grants, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 18, Name = "MISC REVENUE", Type = AccountType.Revenue, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 19, Name = "WALKING TRAIL REVENUE", Type = AccountType.Revenue, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 20, Name = "INTEREST ON INVESTMENTS", Type = AccountType.Interest, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 21, Name = "TRANSFER FROM REC FUND", Type = AccountType.Transfers, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+
+                // Expenses
+                new MunicipalAccount { Id = 22, Name = "BALLFIELD ACCRUED INTEREST", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 23, Name = "WALKING TRAIL ACCRUED INTEREST", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 24, Name = "CAPITAL IMP - BALL COMPLEX", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+                new MunicipalAccount { Id = 25, Name = "PARKS - DEVELOPMENT", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
+
+                // Additional expenses to complete updated chart (31 total)
+                new MunicipalAccount { Id = 26, Name = "MISC EXPENSE", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
+                new MunicipalAccount { Id = 27, Name = "TRAIL MAINTENANCE", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
+                new MunicipalAccount { Id = 28, Name = "PARK IMPROVEMENTS", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
+                new MunicipalAccount { Id = 29, Name = "EQUIPMENT PURCHASES", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
+                new MunicipalAccount { Id = 30, Name = "PROJECTS - SMALL", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
+                new MunicipalAccount { Id = 31, Name = "RESERVES ALLOCATION", Type = AccountType.Transfers, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" }
+            );
+
+            // Seed: Owned type values for AccountNumber on MunicipalAccounts
+            modelBuilder.Entity<MunicipalAccount>()
+                .OwnsOne(e => e.AccountNumber)
+                .HasData(
+                    new { MunicipalAccountId = 1, Value = "110" },
+                    new { MunicipalAccountId = 2, Value = "110.1" },
+                    new { MunicipalAccountId = 3, Value = "120" },
+                    new { MunicipalAccountId = 4, Value = "130" },
+                    new { MunicipalAccountId = 5, Value = "140" },
+                    new { MunicipalAccountId = 6, Value = "210" },
+                    new { MunicipalAccountId = 7, Value = "211" },
+                    new { MunicipalAccountId = 8, Value = "212" },
+                    new { MunicipalAccountId = 9, Value = "230" },
+                    new { MunicipalAccountId = 10, Value = "240" },
+                    new { MunicipalAccountId = 11, Value = "290" },
+                    new { MunicipalAccountId = 12, Value = "3000" },
+                    new { MunicipalAccountId = 13, Value = "33000" },
+                    new { MunicipalAccountId = 14, Value = "310" },
+                    new { MunicipalAccountId = 15, Value = "314" },
+                    new { MunicipalAccountId = 16, Value = "315" },
+                    new { MunicipalAccountId = 17, Value = "320" },
+                    new { MunicipalAccountId = 18, Value = "323" },
+                    new { MunicipalAccountId = 19, Value = "325" },
+                    new { MunicipalAccountId = 20, Value = "360" },
+                    new { MunicipalAccountId = 21, Value = "370" },
+                    new { MunicipalAccountId = 22, Value = "2111" },
+                    new { MunicipalAccountId = 23, Value = "2112" },
+                    new { MunicipalAccountId = 24, Value = "410" },
+                    new { MunicipalAccountId = 25, Value = "420" },
+                    new { MunicipalAccountId = 26, Value = "425" },
+                    new { MunicipalAccountId = 27, Value = "430" },
+                    new { MunicipalAccountId = 28, Value = "435" },
+                    new { MunicipalAccountId = 29, Value = "440" },
+                    new { MunicipalAccountId = 30, Value = "445" },
+                    new { MunicipalAccountId = 31, Value = "450" }
+                );
+        }
+
+        // Hierarchy query for UI (e.g., BudgetView SfTreeGrid)
+        public IQueryable<BudgetEntry> GetBudgetHierarchy(int fiscalYear)
+        {
+            return BudgetEntries
+                .Include(be => be.Parent)
+                .Include(be => be.Children)
+                .Include(be => be.Department)
+                .Include(be => be.Fund)
+                .Where(be => be.FiscalYear == fiscalYear)
+                .AsNoTracking();
+        }
+
+        // New: Transaction query for UI (e.g., MunicipalAccountView)
+        public IQueryable<Transaction> GetTransactionsForBudget(int budgetEntryId)
+        {
+            return Transactions
+                .Include(t => t.BudgetEntry)
+                .Where(t => t.BudgetEntryId == budgetEntryId)
+                .OrderByDescending(t => t.TransactionDate)
+                .AsNoTracking();
+        }
+
+        // New: Excel import validation query
+        public IQueryable<BudgetEntry> GetBudgetEntriesBySource(string sourceFilePath, int? rowNumber = null)
+        {
+            return BudgetEntries
+                .Where(be => be.SourceFilePath == sourceFilePath && (rowNumber == null || be.SourceRowNumber == rowNumber))
+                .AsNoTracking();
+        }
+    }
+}

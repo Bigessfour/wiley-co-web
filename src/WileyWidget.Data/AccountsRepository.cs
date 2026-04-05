@@ -1,0 +1,239 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using WileyWidget.Business.Interfaces;
+using WileyWidget.Business.Models;
+using WileyWidget.Models;
+
+namespace WileyWidget.Data;
+
+/// <summary>
+/// Repository implementation for municipal account data operations.
+/// Encapsulates data access logic for MunicipalAccount entities.
+/// </summary>
+public class AccountsRepository : IAccountsRepository
+{
+    private static readonly ActivitySource ActivitySource = new("WileyWidget.Data.AccountsRepository");
+
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<AccountsRepository> _logger;
+
+    public AccountsRepository(
+        IServiceScopeFactory scopeFactory,
+        ILogger<AccountsRepository> logger)
+    {
+        _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task<IReadOnlyList<MunicipalAccount>> GetAllAccountsAsync(CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("AccountsRepository.GetAllAccounts");
+        activity?.SetTag("operation.type", "query");
+
+        try
+        {
+            _logger.LogDebug("Retrieving all municipal accounts");
+
+            using var scope = _scopeFactory.CreateScope();
+
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var result = await context.Set<MunicipalAccount>()
+                .AsNoTracking()
+                .OrderBy(a => a.AccountNumber_Value)
+                .ToListAsync(cancellationToken);
+
+            activity?.SetTag("result.count", result.Count);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            _logger.LogInformation("Retrieved {Count} municipal accounts", result.Count);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            _logger.LogError(ex, "Error retrieving all municipal accounts");
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<MunicipalAccount>> GetAccountsByFundAsync(
+        MunicipalFundType fundType,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("AccountsRepository.GetAccountsByFund");
+        activity?.SetTag("fund_type", fundType.ToString());
+        activity?.SetTag("operation.type", "query");
+
+        try
+        {
+            _logger.LogDebug("Retrieving accounts for fund type: {FundType}", fundType);
+
+            using var scope = _scopeFactory.CreateScope();
+
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var result = await context.Set<MunicipalAccount>()
+                .AsNoTracking()
+                .Where(a => a.FundType == fundType)
+                .OrderBy(a => a.AccountNumber_Value)
+                .ToListAsync(cancellationToken);
+
+            activity?.SetTag("result.count", result.Count);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            _logger.LogInformation("Retrieved {Count} accounts for fund type {FundType}", result.Count, fundType);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            _logger.LogError(ex, "Error retrieving accounts for fund type {FundType}", fundType);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<MunicipalAccount>> GetAccountsByTypeAsync(
+        AccountType accountType,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving accounts for account type: {AccountType}", accountType);
+
+        using var scope = _scopeFactory.CreateScope();
+
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Set<MunicipalAccount>()
+            .AsNoTracking()
+            .Where(a => a.Type == accountType)
+            .OrderBy(a => a.AccountNumber_Value)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MunicipalAccount>> GetAccountsByFundAndTypeAsync(
+        MunicipalFundType fundType,
+        AccountType accountType,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving accounts for fund type: {FundType} and account type: {AccountType}",
+            fundType, accountType);
+
+        using var scope = _scopeFactory.CreateScope();
+
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Set<MunicipalAccount>()
+            .AsNoTracking()
+            .Where(a => a.FundType == fundType && a.Type == accountType)
+            .OrderBy(a => a.AccountNumber_Value)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<MunicipalAccount?> GetAccountByIdAsync(
+        int accountId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving account with ID: {AccountId}", accountId);
+
+        using var scope = _scopeFactory.CreateScope();
+
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Set<MunicipalAccount>()
+            .AsNoTracking()
+            .OrderByDescending(a => a.Id)
+            .FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MunicipalAccount>> SearchAccountsAsync(
+        string searchTerm,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            _logger.LogDebug("Empty search term - returning all accounts");
+            return await GetAllAccountsAsync(cancellationToken);
+        }
+
+        _logger.LogDebug("Searching accounts for term: {SearchTerm}", searchTerm);
+
+        var normalizedSearch = searchTerm.Trim();
+        var searchPattern = $"%{normalizedSearch}%";
+
+        using var scope = _scopeFactory.CreateScope();
+
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await context.Set<MunicipalAccount>()
+            .AsNoTracking()
+            .Where(a =>
+                EF.Functions.Like(a.Name, searchPattern) ||
+                (a.AccountNumber_Value != null && EF.Functions.Like(a.AccountNumber_Value, searchPattern)) ||
+                (a.FundDescription != null && EF.Functions.Like(a.FundDescription, searchPattern)))
+            .OrderBy(a => a.AccountNumber_Value)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns aggregated revenue per calendar month within the supplied date range.
+    /// Aggregates transaction amounts for revenue accounts (positive amounts).
+    /// </summary>
+    public async Task<IReadOnlyList<MonthlyRevenueAggregate>> GetMonthlyRevenueAsync(
+        DateTime startDate,
+        DateTime endDate,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ActivitySource.StartActivity("AccountsRepository.GetMonthlyRevenue");
+        activity?.SetTag("operation.type", "aggregation");
+        activity?.SetTag("start_date", startDate.ToString("yyyy-MM-dd"));
+        activity?.SetTag("end_date", endDate.ToString("yyyy-MM-dd"));
+
+        try
+        {
+            _logger.LogDebug("Aggregating monthly revenue from {StartDate} to {EndDate}", startDate, endDate);
+
+            using var scope = _scopeFactory.CreateScope();
+
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // Aggregate transactions by month for revenue (assuming positive amounts are revenue)
+            var monthlyRows = await context.Set<Models.Transaction>()
+                .AsNoTracking()
+                .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate && t.Amount > 0)
+                .GroupBy(t => new { t.TransactionDate.Year, t.TransactionDate.Month })
+                .Select(g => new
+                {
+                    g.Key.Year,
+                    g.Key.Month,
+                    Amount = g.Sum(t => t.Amount),
+                    TransactionCount = g.Count()
+                })
+                .OrderBy(a => a.Year)
+                .ThenBy(a => a.Month)
+                .ToListAsync(cancellationToken);
+
+            var aggregates = monthlyRows
+                .Select(row => new MonthlyRevenueAggregate
+                {
+                    Month = new DateTime(row.Year, row.Month, 1),
+                    Amount = row.Amount,
+                    TransactionCount = row.TransactionCount
+                })
+                .ToList();
+
+            activity?.SetTag("result.count", aggregates.Count);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            _logger.LogInformation("Aggregated {Count} monthly revenue records", aggregates.Count);
+
+            return aggregates;
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            _logger.LogError(ex, "Error aggregating monthly revenue");
+            throw;
+        }
+    }
+}

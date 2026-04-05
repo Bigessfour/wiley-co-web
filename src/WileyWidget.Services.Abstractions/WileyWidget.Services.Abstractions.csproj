@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Align TFM with solution-wide Windows target to avoid project compatibility (NU1201) -->
+    <TargetFramework>net9.0</TargetFramework>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <GenerateWinMD>false</GenerateWinMD>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <NoWarn>NU1902;NU1903;NU1601;NU1701</NoWarn>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Enable APIs (DispatcherPriority etc.) used by some abstractions -->
+    <!-- .NET 10 Runtime Performance Optimizations -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Package versions managed centrally in Directory.Packages.props -->
+    <PackageReference Include="Microsoft.Extensions.Primitives" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Abstractions need model types (Enterprise, BudgetData, ServiceChargeRecommendation, etc.) -->
+    <ProjectReference Include="..\WileyWidget.Models\WileyWidget.Models.csproj" />
+  </ItemGroup>
+
+</Project>

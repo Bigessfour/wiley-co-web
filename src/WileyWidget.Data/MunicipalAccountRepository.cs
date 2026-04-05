@@ -1,0 +1,495 @@
+#nullable enable
+using System;
+using System.Runtime;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using WileyWidget.Models;
+// Clean Architecture: Interfaces defined in Business layer, implemented in Data layer
+using WileyWidget.Business.Interfaces;
+
+namespace WileyWidget.Data
+{
+    /// <summary>
+    /// Repository implementation for MunicipalAccount data operations
+    /// Scoped repository that uses injected singleton IMemoryCache for performance.
+    /// Never disposes the cache singleton - follows pattern in UtilityCustomerRepository.
+    /// </summary>
+    public sealed class MunicipalAccountRepository : IMunicipalAccountRepository, IDisposable
+    {
+        // For single row lookups, compiled sync query is the most efficient form
+        private static readonly Func<AppDbContext, int, MunicipalAccount?> CQ_GetById_NoTracking =
+            EF.CompileQuery((AppDbContext ctx, int id) =>
+                ctx.MunicipalAccounts
+                    .AsNoTracking()
+                    .Where(ma => ma.Id == id)
+                    .OrderByDescending(ma => ma.Id)
+                    .SingleOrDefault());
+
+        private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly IMemoryCache _cache;
+        private readonly ILogger<MunicipalAccountRepository>? _logger;
+        private readonly bool _ownsCache;
+
+        // Primary constructor for DI with IDbContextFactory
+        [ActivatorUtilitiesConstructor]
+        public MunicipalAccountRepository(IDbContextFactory<AppDbContext> contextFactory, IMemoryCache cache, ILogger<MunicipalAccountRepository>? logger = null)
+        {
+            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+            _logger = logger;
+            // We do not own the injected cache (do not dispose shared singleton)
+            _ownsCache = false;
+        }
+
+        // Convenience constructor for unit tests that supply DbContextOptions
+        internal MunicipalAccountRepository(DbContextOptions<AppDbContext> options)
+        {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+
+            // Use a simple test factory to create contexts from options
+            _contextFactory = new TestDbContextFactory(options);
+            _cache = new MemoryCache(new MemoryCacheOptions());
+            // In test mode we created the cache and therefore own it
+            _ownsCache = true;
+        }
+
+        private class TestDbContextFactory : IDbContextFactory<AppDbContext>
+        {
+            private readonly DbContextOptions<AppDbContext> _options;
+
+            public TestDbContextFactory(DbContextOptions<AppDbContext> options)
+            {
+                _options = options;
+            }
+
+            public AppDbContext CreateDbContext()
+            {
+                return new AppDbContext(_options);
+            }
+
+            public Task<AppDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(new AppDbContext(_options));
+            }
+        }
+
+        /// <summary>
+        /// Retrieves all municipal accounts, with caching for performance.
+        /// Falls back to database if cache is disposed.
+        /// </summary>
+        public async Task<IEnumerable<MunicipalAccount>> GetAllAsync(CancellationToken cancellationToken = default)
+        {
+            const string cacheKey = "MunicipalAccounts";
+            const int cacheExpirationMinutes = 10;
+
+            try
+            {
+                if (_cache.TryGetValue(cacheKey, out var cachedAccounts))
+                {
+                    return (IEnumerable<MunicipalAccount>)cachedAccounts!;
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // Cache is disposed; log and proceed to DB fetch
+                _logger?.LogWarning("MemoryCache is disposed; fetching municipal accounts directly from database.");
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+            var accounts = await context.MunicipalAccounts
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+            try
+            {
+                var options = new MemoryCacheEntryOptions()
+                    .SetAbsoluteExpiration(TimeSpan.FromMinutes(cacheExpirationMinutes));
+
+                // Required when SizeLimit is configured: assign logical size
+                // Use collection count if applicable, else 1
+                long size = accounts switch
+                {
+                    System.Collections.ICollection collection => collection.Count,
+                    _ => 1
+                };
+                options.SetSize(size);
+
+                _cache.Set(cacheKey, accounts, options);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Cache is disposed; skip caching but don't fail
+                _logger?.LogWarning("MemoryCache is disposed; skipping cache update for municipal accounts.");
+            }
+
+            return accounts;
+        }
+
+        /// <summary>
+        /// Gets paged municipal accounts with sorting support
+        /// </summary>
+        public async Task<(IEnumerable<MunicipalAccount> Items, int TotalCount)> GetPagedAsync(
+            int pageNumber = 1,
+            int pageSize = 50,
+            string? sortBy = null,
+            bool sortDescending = false,
+            CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+            var query = context.MunicipalAccounts.AsNoTracking().AsQueryable();
+
+            // Apply sorting
+            query = ApplySorting(query, sortBy, sortDescending);
+
+            // Get total count
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            // Apply paging (dynamic shapes are not compiled; keep as is)
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (items, totalCount);
+        }
+
+        /// <summary>
+        /// Gets an IQueryable for flexible querying and paging
+        /// NOTE: This returns an IQueryable tied to a DbContext created here; caller is responsible for materializing results promptly.
+        /// </summary>
+        public Task<IQueryable<MunicipalAccount>> GetQueryableAsync(CancellationToken cancellationToken = default)
+        {
+            var context = _contextFactory.CreateDbContext();
+            return Task.FromResult(context.MunicipalAccounts.AsQueryable());
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetAllWithRelatedAsync(CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Include(ma => ma.Department)
+                .Include(ma => ma.BudgetEntries)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetAllAsync(string typeFilter, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(CancellationToken.None);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(a => a.TypeDescription == typeFilter)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetActiveAsync(CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetByFundAsync(MunicipalFundType fund, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.FundType == fund && ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetByTypeAsync(AccountType type, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.Type == type && ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<MunicipalAccount?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            // Compiled + NoTracking for fast first-hit performance
+            var entity = CQ_GetById_NoTracking(context, id);
+            return await Task.FromResult(entity);
+        }
+
+        public async Task<MunicipalAccount?> GetByAccountNumberAsync(string accountNumber, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .OrderByDescending(ma => ma.LastSyncDate)
+                .ThenByDescending(ma => ma.Id)
+                .FirstOrDefaultAsync(ma => ma.AccountNumber!.Value == accountNumber, cancellationToken);
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetByDepartmentAsync(int departmentId, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.DepartmentId == departmentId && ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetByFundClassAsync(FundClass fundClass, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(CancellationToken.None);
+
+            IQueryable<MunicipalAccount> query = fundClass switch
+            {
+                FundClass.Governmental => context.MunicipalAccounts.AsNoTracking().Where(ma =>
+                    (ma.FundType == MunicipalFundType.General ||
+                     ma.FundType == MunicipalFundType.SpecialRevenue ||
+                     ma.FundType == MunicipalFundType.CapitalProjects ||
+                     ma.FundType == MunicipalFundType.DebtService) && ma.IsActive),
+
+                FundClass.Proprietary => context.MunicipalAccounts.AsNoTracking().Where(ma =>
+                    (ma.FundType == MunicipalFundType.Enterprise ||
+                     ma.FundType == MunicipalFundType.InternalService) && ma.IsActive),
+
+                FundClass.Fiduciary => context.MunicipalAccounts.AsNoTracking().Where(ma =>
+                    (ma.FundType == MunicipalFundType.Trust ||
+                     ma.FundType == MunicipalFundType.Agency) && ma.IsActive),
+
+                _ => context.MunicipalAccounts.AsNoTracking().Where(ma => false)
+            };
+
+            var accounts = await query.ToListAsync();
+            return accounts.OrderBy(ma => ma.AccountNumber?.Value).ToList();
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetByAccountTypeAsync(AccountType accountType, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(CancellationToken.None);
+            var accounts = await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.Type == accountType && ma.IsActive)
+                .ToListAsync();
+
+            return accounts.OrderBy(ma => ma.AccountNumber?.Value).ToList();
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetChildAccountsAsync(int parentAccountId, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.ParentAccountId == parentAccountId && ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> GetAccountHierarchyAsync(int rootAccountId, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(CancellationToken.None);
+
+            var rootAccount = await context.MunicipalAccounts.FindAsync(rootAccountId);
+            if (rootAccount == null)
+                return new List<MunicipalAccount>();
+
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.AccountNumber!.Value.StartsWith(rootAccount.AccountNumber!.Value) && ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<MunicipalAccount>> SearchByNameAsync(string searchTerm, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(CancellationToken.None);
+            return await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.Name.Contains(searchTerm) && ma.IsActive)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync();
+        }
+
+        public async Task<bool> AccountNumberExistsAsync(string accountNumber, int? excludeId = null, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(CancellationToken.None);
+            var query = context.MunicipalAccounts.Where(ma => ma.AccountNumber!.Value == accountNumber);
+
+            if (excludeId.HasValue)
+                query = query.Where(ma => ma.Id != excludeId.Value);
+
+            return await query.AnyAsync();
+        }
+
+        /// <summary>
+        /// Gets the total count of municipal accounts.
+        /// </summary>
+        public async Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.MunicipalAccounts.CountAsync(cancellationToken);
+        }
+
+        public async Task<MunicipalAccount> AddAsync(MunicipalAccount account, CancellationToken cancellationToken = default)
+        {
+            if (account == null)
+            {
+                throw new ArgumentNullException(nameof(account));
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+            // Check for duplicate account number
+            var existingAccount = await context.MunicipalAccounts
+                .OrderByDescending(a => a.LastSyncDate)
+                .ThenByDescending(a => a.Id)
+                .FirstOrDefaultAsync(a => a.AccountNumber != null && account.AccountNumber != null && a.AccountNumber.Value == account.AccountNumber.Value, cancellationToken);
+
+            if (existingAccount != null)
+            {
+                throw new InvalidOperationException($"An account with number '{account.AccountNumber?.Value ?? "null"}' already exists.");
+            }
+
+            context.MunicipalAccounts.Add(account);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await RepositoryConcurrencyHelper.HandleAsync(ex, nameof(MunicipalAccount)).ConfigureAwait(false);
+            }
+
+            return account;
+        }
+
+        public async Task<MunicipalAccount> UpdateAsync(MunicipalAccount account, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            context.MunicipalAccounts.Update(account);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await RepositoryConcurrencyHelper.HandleAsync(ex, nameof(MunicipalAccount)).ConfigureAwait(false);
+            }
+
+            return account;
+        }
+
+        public async Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var account = await context.MunicipalAccounts
+                .Include(a => a.AccountNumber)
+                .OrderByDescending(a => a.Id)
+                .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+
+            if (account != null)
+            {
+                // Set navigation property to null before deleting to avoid FK constraint issues
+                account.AccountNumber = null;
+
+                context.MunicipalAccounts.Remove(account);
+                try
+                {
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException ex)
+                {
+                    await RepositoryConcurrencyHelper.HandleAsync(ex, nameof(MunicipalAccount)).ConfigureAwait(false);
+                }
+                catch (DbUpdateException ex)
+                {
+                    // Handle other update exceptions (e.g., FK constraints)
+                    throw new InvalidOperationException($"Failed to delete MunicipalAccount with ID {id}: {ex.Message}", ex);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private IQueryable<MunicipalAccount> ApplySorting(IQueryable<MunicipalAccount> query, string? sortBy, bool sortDescending)
+        {
+            if (string.IsNullOrEmpty(sortBy))
+            {
+                return sortDescending
+                    ? query.OrderByDescending(ma => ma.AccountNumber!.Value)
+                    : query.OrderBy(ma => ma.AccountNumber!.Value);
+            }
+
+            return sortBy.ToLowerInvariant() switch
+            {
+                "name" => sortDescending
+                    ? query.OrderByDescending(ma => ma.Name)
+                    : query.OrderBy(ma => ma.Name),
+                "balance" => sortDescending
+                    ? query.OrderByDescending(ma => ma.Balance)
+                    : query.OrderBy(ma => ma.Balance),
+                "type" => sortDescending
+                    ? query.OrderByDescending(ma => ma.Type)
+                    : query.OrderBy(ma => ma.Type),
+                "fund" => sortDescending
+                    ? query.OrderByDescending(ma => ma.Fund)
+                    : query.OrderBy(ma => ma.Fund),
+                _ => sortDescending
+                    ? query.OrderByDescending(ma => ma.AccountNumber!.Value)
+                    : query.OrderBy(ma => ma.AccountNumber!.Value)
+            };
+        }
+
+        public async Task<object> GetBudgetAnalysisAsync(int periodId, CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var accounts = await context.MunicipalAccounts
+                .AsNoTracking()
+                .Where(ma => ma.IsActive && ma.BudgetAmount != 0)
+                .OrderBy(ma => ma.AccountNumber!.Value)
+                .ToListAsync(cancellationToken);
+            return accounts;
+        }
+
+        public async Task<BudgetPeriod?> GetCurrentActiveBudgetPeriodAsync(CancellationToken cancellationToken = default)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            return await context.BudgetPeriods
+                .AsNoTracking()
+                .OrderByDescending(bp => bp.Year)
+                .ThenByDescending(bp => bp.CreatedDate)
+                .ThenByDescending(bp => bp.Id)
+                .FirstOrDefaultAsync(bp => bp.IsActive, cancellationToken);
+        }
+
+        // Repository implements IDisposable to allow disposing caches created by the test constructor.
+        // For DI-injected caches we do not dispose (we set _ownsCache = false in normal constructor).
+        public void Dispose()
+        {
+            if (_ownsCache)
+            {
+                try
+                {
+                    (_cache as IDisposable)?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "MunicipalAccountRepository.Dispose: error disposing owned cache");
+                }
+            }
+        }
+    }
+}

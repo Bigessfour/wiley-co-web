@@ -1,0 +1,54 @@
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Buttons
+
+<div class="jarvis-chat-panel">
+    <SfCard>
+        <CardHeader Title="JARVIS AI" SubTitle="Secure-rate guidance scaffold" />
+        <CardContent>
+            <div class="flex flex-col gap-4">
+                <div class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <div class="font-semibold text-slate-700">Theme-aware chat</div>
+                    <div>@StatusText</div>
+                </div>
+
+                <div class="max-h-[420px] space-y-3 overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    @foreach (var message in Messages)
+                    {
+                        <div class="flex @(message.IsUser ? "justify-end" : "justify-start")">
+                            <div class="max-w-[90%] rounded-2xl px-3 py-2 text-sm shadow-sm @(message.IsUser ? "bg-sky-600 text-white" : "bg-white text-slate-800")">
+                                <div class="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] @(message.IsUser ? "text-sky-100" : "text-slate-500")">
+                                    @message.Author
+                                </div>
+                                <div>@message.Text</div>
+                                <div class="mt-1 text-[10px] opacity-70">@message.Timestamp.ToLocalTime().ToString("g")</div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (IsTyping)
+                    {
+                        <div class="flex justify-start">
+                            <div class="rounded-2xl bg-white px-3 py-2 text-sm text-slate-500 shadow-sm">
+                                JARVIS is analyzing the rates...
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="space-y-3">
+                    <SfTextBox Placeholder="Ask about break-even, scenarios, or a rate change" FloatLabelType="FloatLabelType.Auto" @bind-Value="DraftMessage" />
+                    <div class="flex flex-wrap gap-2">
+                        <SfButton CssClass="e-primary" IsPrimary="true" OnClick="SendMessageAsync">Ask JARVIS</SfButton>
+                        <SfButton OnClick="ClearConversationAsync">Clear</SfButton>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                    <div class="font-semibold text-slate-700">Suggested prompt</div>
+                    <div class="mt-1">@SuggestedPrompt</div>
+                </div>
+            </div>
+        </CardContent>
+    </SfCard>
+</div>

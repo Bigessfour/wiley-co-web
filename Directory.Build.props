@@ -1,0 +1,25 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj_validate/**;**/bin_validate/**</DefaultItemExcludes>
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)NuGet.Config</RestoreConfigFile>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+
+    <!-- Web-focused settings only -->
+    <EnableWindowsTargeting>false</EnableWindowsTargeting>  <!-- Disable for pure web build -->
+    <NoWarn>$(NoWarn);NETSDK1206;NU1904;CA1303;CA2213;CA2000;NU1601;NU1603;NU1608</NoWarn>
+  </PropertyGroup>
+
+  <!-- Remove or condition the entire desktop WinForms Syncfusion + FastReport + Intuit block -->
+  <!-- Do NOT include Syncfusion.Chart.Windows, FastReport, IppDotNetSdkForQuickBooksApiV3, etc.
+  here for web projects -->
+
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <RunAnalyzers>true</RunAnalyzers>
+  </PropertyGroup>
+</Project>

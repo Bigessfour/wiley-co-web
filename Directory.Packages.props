@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <!-- Enables central package version management (.NET 6+) -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageFloatingVersionsEnabled>false</CentralPackageFloatingVersionsEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="CsvHelper" Version="33.1.0" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="ExcelDataReader" Version="3.8.0" />
+    <PackageVersion Include="ExcelDataReader.DataSet" Version="3.8.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.14" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.14" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.14" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Common" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.ResourceUtilization" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Primitives" Version="10.0.5" />
+    <PackageVersion Include="Microsoft.Extensions.Resilience" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel" Version="1.74.0" />
+    <PackageVersion Include="Microsoft.SemanticKernel.Connectors.OpenAI" Version="1.74.0" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageVersion Include="OpenAI" Version="2.10.0" />
+    <PackageVersion Include="OpenTelemetry" Version="1.13.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.13.1" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.13.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.13.1" />
+    <PackageVersion Include="Serilog" Version="4.3.1" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="Serilog.Enrichers.Process" Version="3.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Async" Version="2.1.0" />
+    <PackageVersion Include="Serilog.Sinks.Email" Version="4.2.0" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageVersion Include="System.Management" Version="10.0.5" />
+    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.5" />
+    <PackageVersion Include="Syncfusion.Blazor.Buttons" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Cards" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Charts" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.CircularGauge" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.DropDowns" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Grid" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Inputs" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Layouts" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Navigations" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.SfPdfViewer" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Spreadsheet" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Themes" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.WordProcessor" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Pdf.Net.Core" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.XlsIO.Net.Core" Version="33.1.44" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <PackageVersion Include="bunit" Version="1.38.4" />
+    <PackageVersion Include="bunit.web" Version="1.38.4" />
+    <PackageVersion Include="bunit.core" Version="1.38.4" />
+    <PackageVersion Include="bunit.generators" Version="1.38.4" />
+    <PackageVersion Include="Syncfusion.Blazor.Core" Version="33.1.44" />
+    <PackageVersion Include="Microsoft.Playwright.xunit" Version="1.48.0" />
+  </ItemGroup>
+</Project>

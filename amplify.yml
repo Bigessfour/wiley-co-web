@@ -1,0 +1,21 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+        - bash dotnet-install.sh --channel 9.0 --install-dir $HOME/.dotnet
+        - export PATH="$HOME/.dotnet:$PATH"
+        - dotnet --version
+        - dotnet restore WileyCoWeb.slnx
+    build:
+      commands:
+        - export PATH="$HOME/.dotnet:$PATH"
+        - dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore
+  artifacts:
+    baseDirectory: publish_output/wwwroot
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - $HOME/.nuget/packages/**/*

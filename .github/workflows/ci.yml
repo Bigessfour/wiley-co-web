@@ -2,35 +2,47 @@ name: Wiley.co CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: wiley-co-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
     runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET 9
+      - name: Setup .NET 9.0.312
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 9.0.312
 
       - name: Restore dependencies
-        run: dotnet restore WileyCoWeb.slnx
+        run: dotnet restore WileyCoWeb.slnx --locked-mode
 
       - name: Build
-        run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore
+        run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Run tests (when you add them)
+      - name: Run tests
         run: dotnet test WileyCoWeb.slnx --configuration Release --no-build --verbosity normal
-        continue-on-error: true
 
       - name: Publish for Amplify
-        run: dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore
+        run: dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Upload build artifact for Amplify
         uses: actions/upload-artifact@v4

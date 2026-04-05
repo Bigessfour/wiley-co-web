@@ -2,23 +2,38 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.*" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
-    <PackageReference Include="Syncfusion.Blazor.Cards" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.Charts" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.Grid" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.Layouts" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.Spreadsheet" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.Themes" Version="33.1.44" />
-    <PackageReference Include="Syncfusion.Blazor.WordProcessor" Version="33.1.44" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer"
+      PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Syncfusion.Blazor.Buttons" />
+    <PackageReference Include="Syncfusion.Blazor.Cards" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" />
+    <PackageReference Include="Syncfusion.Blazor.CircularGauge" />
+    <PackageReference Include="Syncfusion.Blazor.DropDowns" />
+    <PackageReference Include="Syncfusion.Blazor.Grid" />
+    <PackageReference Include="Syncfusion.Blazor.Layouts" />
+    <PackageReference Include="Syncfusion.Blazor.Navigations" />
+    <PackageReference Include="Syncfusion.Blazor.Inputs" />
+    <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" />
+    <PackageReference Include="Syncfusion.Blazor.Spreadsheet" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" />
+    <PackageReference Include="Syncfusion.Blazor.WordProcessor" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude the standalone class library sources under src/ so the Blazor app does not compile
+    them directly. -->
+    <Compile Remove="src/**/*.cs" />
+    <Compile Remove="WileyCoWeb.Api/**/*.cs" />
+    <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
 
   <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">

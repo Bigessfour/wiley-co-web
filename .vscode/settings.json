@@ -1,19 +1,30 @@
 {
   "dotnet.defaultSolution": "WileyCoWeb.slnx",
-  "chat.mcp.autostart": true,
+  "chat.mcp.autostart": "never",
   "chat.mcp.discovery.enabled": {
-    "claude-desktop": true,
-    "windsurf": true,
-    "cursor-global": true,
-    "cursor-workspace": true
+    "claude-desktop": false,
+    "windsurf": false,
+    "cursor-global": false,
+    "cursor-workspace": false
   },
   "editor.formatOnSave": true,
   "files.exclude": {
     "**/bin": true,
-    "**/obj": true
+    "**/obj": true,
+    "__remote_check__": true
   },
   "search.exclude": {
     "**/bin": true,
-    "**/obj": true
-  }
+    "**/obj": true,
+    "__remote_check__": true
+  },
+  "csharp-dev-tools.roslyn.projectOrSolutionFiles": [
+    "c:\\Users\\biges\\Desktop\\WW AWS\\WileyCoWeb.slnx"
+  ],
+  "chat.tools.terminal.autoApprove": {
+    "rg": true,
+    "rg --files": true,
+    "where rg": true
+  },
+  "github.copilot.chat.agentDebugLog.fileLogging.enabled": false
 }

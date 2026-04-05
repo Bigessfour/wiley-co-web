@@ -1,0 +1,13 @@
+<Project>
+  <!-- ============================================================
+       DIRECTORY.BUILD.TARGETS - SIMPLIFIED
+       Industry best practice: Keep this minimal, let NuGet handle imports.
+       Most customizations belong in project .csproj files, not here.
+       ============================================================ -->
+
+  <PropertyGroup>
+    <!-- Suppress NETSDK1206 from legacy Azure DocumentDB.Core win7-x64 RID -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);NETSDK1206</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+</Project>
