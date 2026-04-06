@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace WileyWidget.Models;
@@ -11,19 +10,14 @@ namespace WileyWidget.Models;
 /// <summary>
 /// Represents the overall municipal budget summary
 /// </summary>
-public class OverallBudget : INotifyPropertyChanged, IValidatableObject
+public class OverallBudget : IValidatableObject
 {
     /// <summary>
-    /// Property changed event for data binding
-    /// </summary>
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     /// <summary>
-    /// Raises the PropertyChanged event
+    /// Preserved for setter compatibility.
     /// </summary>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     /// <summary>
@@ -37,6 +31,10 @@ public class OverallBudget : INotifyPropertyChanged, IValidatableObject
         {
             OnPropertyChanged(propertyName);
         }
+    }
+
+    public OverallBudget()
+    {
     }
     /// <summary>
     /// Unique identifier for the budget snapshot
@@ -149,7 +147,7 @@ public class OverallBudget : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _notes = string.Empty;
+    private string? _notes;
 
     /// <summary>
     /// Notes about this budget snapshot

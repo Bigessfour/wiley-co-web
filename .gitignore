@@ -10,3 +10,4 @@ amplify/.config/local-*
 amplify/team-provider-info.json
 account-info.json
 /Blazor Documentation/
+.fake

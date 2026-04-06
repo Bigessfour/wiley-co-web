@@ -82,6 +82,7 @@ This file is the always-on instruction source for the Wiley.co Blazor project. F
 
 ## Agent Search Tooling
 
+- Treat ripgrep (`rg`) as the default search tool for content search and file discovery.
 - Ripgrep (`rg`) is installed and approved for agent use in this repository.
 - Prefer `rg` for content search and `rg --files` for fast file discovery.
 - Use PowerShell and avoid `grep`/`findstr` unless `rg` is unavailable.

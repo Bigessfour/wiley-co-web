@@ -10,10 +10,10 @@ namespace WileyWidget.Services.HealthChecks;
 public class SyncfusionLicenseHealthCheck : IHealthCheck
 {
     private readonly ILogger<SyncfusionLicenseHealthCheck> _logger;
-    private static string? _cachedVersion;
-    private static DateTime _lastCheck = DateTime.MinValue;
-    private static HealthCheckResult? _cachedResult;
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+    private string? _cachedVersion;
+    private DateTime _lastCheck = DateTime.MinValue;
+    private HealthCheckResult? _cachedResult;
+    private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(5);
 
     public SyncfusionLicenseHealthCheck(ILogger<SyncfusionLicenseHealthCheck> logger)
     {
@@ -27,7 +27,7 @@ public class SyncfusionLicenseHealthCheck : IHealthCheck
         try
         {
             // Use cached result if recent
-            if (_cachedResult != null && DateTime.UtcNow - _lastCheck < CacheDuration)
+            if (_cachedResult != null && DateTime.UtcNow - _lastCheck < _cacheDuration)
             {
                 return Task.FromResult(_cachedResult.Value);
             }
@@ -36,6 +36,7 @@ public class SyncfusionLicenseHealthCheck : IHealthCheck
 
             // Check environment variable for license key
             var licenseKey = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
+                           ?? Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY")
                            ?? Environment.GetEnvironmentVariable("Syncfusion__LicenseKey");
 
             var hasLicense = !string.IsNullOrWhiteSpace(licenseKey);

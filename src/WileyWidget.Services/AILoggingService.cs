@@ -23,7 +23,7 @@ namespace WileyWidget.Services
     public class AILoggingService : IAILoggingService
     {
         private readonly ILogger<AILoggingService> _logger;
-        private readonly Logger _aiUsageLogger;
+        private readonly Logger _log;
         private readonly ConcurrentBag<AILogEntry> _logEntries;
         private readonly object _metricsLock = new object();
 #if !NET10_0
@@ -58,7 +58,7 @@ namespace WileyWidget.Services
             // Create dedicated Serilog logger for AI usage (workspace logs folder)
             var logsDirectory = LogPathResolver.GetLogsDirectory();
 
-            _aiUsageLogger = new LoggerConfiguration()
+            _log = new LoggerConfiguration()
                 .WriteTo.File(
                     Path.Combine(logsDirectory, "ai-usage.log"),
                     rollingInterval: RollingInterval.Day,
@@ -97,7 +97,7 @@ namespace WileyWidget.Services
 
                 _logEntries.Add(entry);
 
-                _aiUsageLogger.Information(
+                _log.Information(
                     "AI Query | Model: {Model} | Query Length: {QueryLength} | Context Length: {ContextLength} | Query: {Query}",
                     model, query?.Length ?? 0, context?.Length ?? 0, TruncateForLog(query, 200));
 
@@ -149,7 +149,7 @@ namespace WileyWidget.Services
 
                 _logEntries.Add(entry);
 
-                _aiUsageLogger.Information(
+                _log.Information(
                     "AI Response | Response Time: {ResponseTime}ms | Tokens: {Tokens} | Response Length: {ResponseLength} | Query: {Query} | Response: {Response}",
                     responseTimeMs, tokensUsed, response?.Length ?? 0,
                     TruncateForLog(query, 100), TruncateForLog(response, 300));
@@ -194,7 +194,7 @@ namespace WileyWidget.Services
 
                 _logEntries.Add(entry);
 
-                _aiUsageLogger.Information("AI Info | Message: {Message}", TruncateForLog(message, 500));
+                _log.Information("AI Info | Message: {Message}", TruncateForLog(message, 500));
 
                 _logger.LogInformation("Logged AI information: {Message}", message);
             }
@@ -227,7 +227,7 @@ namespace WileyWidget.Services
 
                 _logEntries.Add(entry);
 
-                _aiUsageLogger.Error(
+                _log.Error(
                     "AI Error | Type: {ErrorType} | Query: {Query} | Error: {Error}",
                     errorType, TruncateForLog(query, 200), error);
 
@@ -266,7 +266,7 @@ namespace WileyWidget.Services
 
                 LogError(query, errorMessage, errorType);
 
-                _aiUsageLogger.Error(exception,
+                _log.Error(exception,
                     "AI Exception | Query: {Query} | Exception Type: {ExceptionType}",
                     TruncateForLog(query, 200), errorType);
             }
@@ -296,7 +296,7 @@ namespace WileyWidget.Services
 
                 var metadataJson = metadata != null ? JsonSerializer.Serialize(metadata) : "{}";
 
-                _aiUsageLogger.Information(
+                _log.Information(
                     "AI Metric | Name: {MetricName} | Value: {MetricValue} | Metadata: {Metadata}",
                     metricName, metricValue, metadataJson);
 
@@ -407,7 +407,7 @@ namespace WileyWidget.Services
                 await File.WriteAllTextAsync(filePath, json);
 
                 _logger.LogInformation("Exported {Count} AI log entries to {FilePath}", entriesInRange.Count, filePath);
-                _aiUsageLogger.Information("Log Export | File: {FilePath} | Entries: {Count} | Date Range: {Start} to {End}",
+                _log.Information("Log Export | File: {FilePath} | Entries: {Count} | Date Range: {Start} to {End}",
                     filePath, entriesInRange.Count, startDate, endDate);
             }
             catch (Exception ex)
@@ -437,7 +437,7 @@ namespace WileyWidget.Services
         /// <summary>
         /// Truncates text for logging to avoid excessive log file size.
         /// </summary>
-        private string TruncateForLog(string text, int maxLength)
+        private static string TruncateForLog(string text, int maxLength)
         {
             if (string.IsNullOrEmpty(text))
                 return string.Empty;
@@ -448,7 +448,7 @@ namespace WileyWidget.Services
         /// <summary>
         /// Internal class representing an AI log entry.
         /// </summary>
-        private class AILogEntry
+        private sealed class AILogEntry
         {
             public DateTime Timestamp { get; set; }
             public string EntryType { get; set; }

@@ -10,7 +10,7 @@ namespace WileyWidget.Business.Configuration;
 /// <summary>
 /// Validator for account types according to GASB standards
 /// </summary>
-public class AccountTypeValidator
+public static class AccountTypeValidator
 {
     // Account number ranges for different types (GASB compliant)
     private static readonly Dictionary<AccountType, (int Min, int Max)[]> AccountRanges = new()
@@ -102,7 +102,7 @@ public class AccountTypeValidator
     /// <param name="accountType">The account type to validate</param>
     /// <param name="accountNumber">The account number</param>
     /// <returns>True if the account type is valid for the account number, false otherwise</returns>
-    public bool ValidateAccountTypeForNumber(AccountType accountType, string accountNumber)
+    public static bool ValidateAccountTypeForNumber(AccountType accountType, string accountNumber)
     {
         if (!TryGetAccountRootValue(accountNumber, out var accountRoot))
             return false;
@@ -119,7 +119,7 @@ public class AccountTypeValidator
     /// <param name="accountType">The account type to validate</param>
     /// <param name="fundClass">The fund class</param>
     /// <returns>True if the account type is allowed in the fund class, false otherwise</returns>
-    public bool ValidateAccountTypeForFund(AccountType accountType, FundClass fundClass)
+    public static bool ValidateAccountTypeForFund(AccountType accountType, FundClass fundClass)
     {
         if (!AllowedFundClasses.TryGetValue(accountType, out var allowedFunds))
             return false;
@@ -132,7 +132,7 @@ public class AccountTypeValidator
     /// </summary>
     /// <param name="accountNumber">The account number</param>
     /// <returns>A collection of valid account types</returns>
-    public IEnumerable<AccountType> GetValidAccountTypesForNumber(string accountNumber)
+    public static IEnumerable<AccountType> GetValidAccountTypesForNumber(string accountNumber)
     {
         if (!TryGetAccountRootValue(accountNumber, out var accountRoot))
             return Enumerable.Empty<AccountType>();
@@ -147,7 +147,7 @@ public class AccountTypeValidator
     /// </summary>
     /// <param name="fundClass">The fund class</param>
     /// <returns>A collection of valid account types</returns>
-    public IEnumerable<AccountType> GetValidAccountTypesForFund(FundClass fundClass)
+    public static IEnumerable<AccountType> GetValidAccountTypesForFund(FundClass fundClass)
     {
         return AllowedFundClasses
             .Where(kvp => kvp.Value.Contains(fundClass))
@@ -159,7 +159,7 @@ public class AccountTypeValidator
     /// </summary>
     /// <param name="account">The municipal account to validate</param>
     /// <returns>A list of validation errors, empty if valid</returns>
-    public List<string> ValidateAccount(MunicipalAccount account)
+    public static List<string> ValidateAccount(MunicipalAccount account)
     {
         var errors = new List<string>();
 
@@ -195,7 +195,7 @@ public class AccountTypeValidator
     /// </summary>
     /// <param name="accounts">The accounts to validate</param>
     /// <returns>Validation result with success status and any errors</returns>
-    public ValidationResult ValidateAccountTypeCompliance(IEnumerable<MunicipalAccount> accounts)
+    public static ValidationResult ValidateAccountTypeCompliance(IEnumerable<MunicipalAccount> accounts)
     {
         if (accounts == null) throw new ArgumentNullException(nameof(accounts));
 

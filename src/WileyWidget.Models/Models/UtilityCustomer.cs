@@ -1,8 +1,8 @@
 #nullable enable
 using System;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
@@ -13,19 +13,14 @@ namespace WileyWidget.Models;
 /// <summary>
 /// Represents a municipal utility customer for billing and service management
 /// </summary>
-public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
+public class UtilityCustomer : IValidatableObject
 {
     /// <summary>
-    /// Property changed event for data binding
-    /// </summary>
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     /// <summary>
-    /// Raises the PropertyChanged event
+    /// Preserved for setter compatibility.
     /// </summary>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     /// <summary>
@@ -82,7 +77,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
     [Timestamp]
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
-    private string _accountNumber = string.Empty;
+    private string _accountNumber;
 
     /// <summary>
     /// Customer account number (unique identifier for billing)
@@ -102,7 +97,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string _firstName = string.Empty;
+    private string _firstName;
 
     /// <summary>
     /// Customer's first name
@@ -122,7 +117,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string _lastName = string.Empty;
+    private string _lastName;
 
     /// <summary>
     /// Customer's last name
@@ -142,7 +137,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _companyName = string.Empty;
+    private string? _companyName;
 
     /// <summary>
     /// Company/business name (for commercial accounts)
@@ -208,7 +203,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         _ => "Unknown"
     };
 
-    private string _serviceAddress = string.Empty;
+    private string _serviceAddress;
 
     /// <summary>
     /// Physical service address
@@ -228,7 +223,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string _serviceCity = string.Empty;
+    private string _serviceCity;
 
     /// <summary>
     /// Service address city
@@ -248,7 +243,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string _serviceState = string.Empty;
+    private string _serviceState;
 
     /// <summary>
     /// Service address state/province
@@ -268,7 +263,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string _serviceZipCode = string.Empty;
+    private string _serviceZipCode;
 
     /// <summary>
     /// Service address ZIP/postal code
@@ -288,7 +283,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _mailingAddress = string.Empty;
+    private string? _mailingAddress;
 
     /// <summary>
     /// Mailing address (if different from service address)
@@ -308,7 +303,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _mailingCity = string.Empty;
+    private string? _mailingCity;
 
     /// <summary>
     /// Mailing address city
@@ -328,7 +323,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _mailingState = string.Empty;
+    private string? _mailingState;
 
     /// <summary>
     /// Mailing address state/province
@@ -348,7 +343,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _mailingZipCode = string.Empty;
+    private string? _mailingZipCode;
 
     /// <summary>
     /// Mailing address ZIP/postal code
@@ -368,7 +363,7 @@ public class UtilityCustomer : INotifyPropertyChanged, IValidatableObject
         }
     }
 
-    private string? _phoneNumber = string.Empty;
+    private string? _phoneNumber;
 
     /// <summary>
     /// Primary phone number

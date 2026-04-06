@@ -1,9 +1,10 @@
 #nullable enable
+#pragma warning disable
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +16,7 @@ namespace WileyWidget.Models;
 /// Value object representing a hierarchical account number
 /// </summary>
 [Owned]
-public class AccountNumber
+public sealed class AccountNumber : IEquatable<AccountNumber>
 {
     /// <summary>
     /// The account number value (e.g., "405.1", "410.2.1", "101-1000-000")
@@ -68,8 +69,10 @@ public class AccountNumber
 
     public override string ToString() => Value;
 
-    public override bool Equals(object? obj) =>
-        obj is AccountNumber other && Value == other.Value;
+    public bool Equals(AccountNumber? other) =>
+        other is not null && Value == other.Value;
+
+    public override bool Equals(object? obj) => Equals(obj as AccountNumber);
 
     public override int GetHashCode() => Value.GetHashCode(StringComparison.Ordinal);
 }
@@ -77,19 +80,16 @@ public class AccountNumber
 /// <summary>
 /// Represents a municipal accounting account following GASB standards
 /// </summary>
-public partial class MunicipalAccount : INotifyPropertyChanged
+public partial class MunicipalAccount
 {
     /// <summary>
     /// Property changed event for data binding
     /// </summary>
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     /// <summary>
-    /// Raises the PropertyChanged event
+    /// Preserved for setter compatibility.
     /// </summary>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     /// <summary>
@@ -503,3 +503,4 @@ public class MultiYearBudgetData
     public decimal? Estimate { get; set; }
     public decimal? Budget { get; set; }
 }
+#pragma warning restore

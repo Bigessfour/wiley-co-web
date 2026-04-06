@@ -10,6 +10,11 @@ namespace WileyWidget.Data
 {
     public class AppDbContext : DbContext, IAppDbContext
     {
+        private const string Decimal18_2 = "decimal(18,2)";
+        private const string Decimal19_4 = "decimal(19,4)";
+        private const string TimestampWithTimeZone = "timestamp with time zone";
+        private const string ConservationTrustFundName = "Conservation Trust Fund";
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
             // DbSets are now auto-initialized properties - no manual initialization needed
@@ -101,9 +106,9 @@ namespace WileyWidget.Data
                 entity.HasIndex(e => e.MunicipalAccountId);
                 entity.HasIndex(e => e.SourceRowNumber); // New: Excel import queries
                 entity.HasIndex(e => e.ActivityCode); // New: GASB reporting
-                entity.Property(e => e.BudgetedAmount).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(e => e.ActualAmount).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.EncumbranceAmount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.BudgetedAmount).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(e => e.ActualAmount).HasColumnType(Decimal18_2);
+                entity.Property(e => e.EncumbranceAmount).HasColumnType(Decimal18_2);
                 entity.Property(e => e.SourceFilePath).HasMaxLength(500);
                 entity.Property(e => e.ActivityCode).HasMaxLength(10);
                 entity.ToTable(t => t.HasCheckConstraint("CK_Budget_Positive", "[BudgetedAmount] > 0"));
@@ -152,8 +157,8 @@ namespace WileyWidget.Data
                 entity.HasIndex(e => e.BudgetPeriodId);
                 entity.HasIndex(e => e.ParentAccountId);
                 entity.HasIndex(e => new { e.FundType, e.Type });
-                entity.Property(e => e.Balance).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.BudgetAmount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Balance).HasColumnType(Decimal18_2);
+                entity.Property(e => e.BudgetAmount).HasColumnType(Decimal18_2);
                 entity.Property(e => e.RowVersion)
                       .IsRowVersion()
                       .HasDefaultValue(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
@@ -181,7 +186,7 @@ namespace WileyWidget.Data
                       .HasForeignKey(t => t.BudgetEntryId)
                 .OnDelete(DeleteBehavior.Restrict);
                 entity.HasIndex(t => t.TransactionDate);
-                entity.Property(t => t.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(t => t.Amount).HasColumnType(Decimal18_2);
                 entity.Property(t => t.Type).HasMaxLength(50);
                 entity.Property(t => t.Description).HasMaxLength(200);
                 entity.ToTable(t => t.HasCheckConstraint("CK_Transaction_NonZero", "[Amount] != 0"));
@@ -201,7 +206,7 @@ namespace WileyWidget.Data
                 entity.HasIndex(i => i.VendorId);
                 entity.HasIndex(i => i.MunicipalAccountId);
                 entity.HasIndex(i => i.InvoiceDate);
-                entity.Property(i => i.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.Amount).HasColumnType(Decimal18_2);
                 entity.Property(i => i.InvoiceNumber).HasMaxLength(50);
                 entity.Property(i => i.Status).HasMaxLength(50).HasDefaultValue("Pending");
             });
@@ -227,7 +232,7 @@ namespace WileyWidget.Data
                 entity.HasIndex(p => p.Status);
                 entity.HasIndex(p => p.MunicipalAccountId);
                 entity.HasIndex(p => p.VendorId);
-                entity.Property(p => p.Amount).HasColumnType("decimal(18,2)");
+                entity.Property(p => p.Amount).HasColumnType(Decimal18_2);
                 entity.Property(p => p.CheckNumber).HasMaxLength(20).IsRequired();
                 entity.Property(p => p.Payee).HasMaxLength(200).IsRequired();
                 entity.Property(p => p.Description).HasMaxLength(500).IsRequired();
@@ -246,7 +251,7 @@ namespace WileyWidget.Data
                 entity.Property(e => e.User).HasMaxLength(100);
                 entity.Property(e => e.Category).HasMaxLength(100);
                 entity.Property(e => e.Icon).HasMaxLength(100);
-                entity.Property(e => e.Timestamp).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.Timestamp).HasColumnType(TimestampWithTimeZone);
             });
 
             modelBuilder.Entity<SavedScenarioSnapshot>(entity =>
@@ -262,18 +267,18 @@ namespace WileyWidget.Data
                 entity.Property(e => e.Description)
                     .HasMaxLength(500);
 
-                entity.Property(e => e.RateIncreasePercent).HasColumnType("decimal(19,4)");
-                entity.Property(e => e.ExpenseIncreasePercent).HasColumnType("decimal(19,4)");
-                entity.Property(e => e.RevenueTarget).HasColumnType("decimal(19,4)");
-                entity.Property(e => e.ProjectedValue).HasColumnType("decimal(19,4)");
-                entity.Property(e => e.Variance).HasColumnType("decimal(19,4)");
+                entity.Property(e => e.RateIncreasePercent).HasColumnType(Decimal19_4);
+                entity.Property(e => e.ExpenseIncreasePercent).HasColumnType(Decimal19_4);
+                entity.Property(e => e.RevenueTarget).HasColumnType(Decimal19_4);
+                entity.Property(e => e.ProjectedValue).HasColumnType(Decimal19_4);
+                entity.Property(e => e.Variance).HasColumnType(Decimal19_4);
 
                 entity.Property(e => e.CreatedAtUtc)
-                    .HasColumnType("timestamp with time zone")
+                    .HasColumnType(TimestampWithTimeZone)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.Property(e => e.UpdatedAtUtc)
-                    .HasColumnType("timestamp with time zone");
+                    .HasColumnType(TimestampWithTimeZone);
             });
 
             // AI chat conversation persistence
@@ -327,8 +332,8 @@ namespace WileyWidget.Data
                 entity.Property(e => e.SourceSystem).HasMaxLength(100).IsRequired();
                 entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
                 entity.Property(e => e.Notes).HasMaxLength(1000);
-                entity.Property(e => e.StartedAt).HasColumnType("timestamp with time zone");
-                entity.Property(e => e.CompletedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.StartedAt).HasColumnType(TimestampWithTimeZone);
+                entity.Property(e => e.CompletedAt).HasColumnType(TimestampWithTimeZone);
             });
 
             modelBuilder.Entity<SourceFileVariant>(entity =>
@@ -356,7 +361,7 @@ namespace WileyWidget.Data
                 entity.Property(e => e.NormalizedFileName).HasMaxLength(260);
                 entity.Property(e => e.SheetName).HasMaxLength(100);
                 entity.Property(e => e.FileHash).HasMaxLength(128).IsRequired();
-                entity.Property(e => e.ImportedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.ImportedAt).HasColumnType(TimestampWithTimeZone);
                 entity.HasIndex(e => e.BatchId);
                 entity.HasIndex(e => e.CanonicalEntity);
                 entity.HasIndex(e => e.FileHash);
@@ -474,7 +479,7 @@ namespace WileyWidget.Data
                       .OnDelete(DeleteBehavior.SetNull);
                 entity.Property(e => e.SnapshotName).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.Notes).HasMaxLength(1000);
-                entity.Property(e => e.CreatedAt).HasColumnType("timestamp with time zone");
+                entity.Property(e => e.CreatedAt).HasColumnType(TimestampWithTimeZone);
                 entity.Property(e => e.SnapshotDate).HasColumnType("date");
                 entity.Property(e => e.Payload).HasColumnType("jsonb");
             });
@@ -520,7 +525,7 @@ namespace WileyWidget.Data
                       .OnDelete(DeleteBehavior.Restrict);
                 entity.HasIndex(bi => bi.PrimaryEnterpriseId);
                 entity.HasIndex(bi => bi.SecondaryEnterpriseId);
-                entity.Property(bi => bi.MonthlyAmount).HasColumnType("decimal(18,2)");
+                entity.Property(bi => bi.MonthlyAmount).HasColumnType(Decimal18_2);
                 entity.Property(bi => bi.InteractionType).HasMaxLength(50);
                 entity.Property(bi => bi.Description).HasMaxLength(200);
                 entity.Property(bi => bi.Notes).HasMaxLength(300);
@@ -540,13 +545,13 @@ namespace WileyWidget.Data
                 entity.HasIndex(ub => ub.DueDate);
                 entity.HasIndex(ub => ub.Status);
                 entity.Property(ub => ub.BillNumber).HasMaxLength(50).IsRequired();
-                entity.Property(ub => ub.WaterCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(ub => ub.SewerCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(ub => ub.GarbageCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(ub => ub.StormwaterCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(ub => ub.LateFees).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(ub => ub.OtherCharges).HasColumnType("decimal(18,2)").HasDefaultValue(0);
-                entity.Property(ub => ub.AmountPaid).HasColumnType("decimal(18,2)").HasDefaultValue(0);
+                entity.Property(ub => ub.WaterCharges).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(ub => ub.SewerCharges).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(ub => ub.GarbageCharges).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(ub => ub.StormwaterCharges).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(ub => ub.LateFees).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(ub => ub.OtherCharges).HasColumnType(Decimal18_2).HasDefaultValue(0);
+                entity.Property(ub => ub.AmountPaid).HasColumnType(Decimal18_2).HasDefaultValue(0);
                 entity.Property(ub => ub.RowVersion)
                       .IsRowVersion()
                       .HasDefaultValue(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
@@ -572,7 +577,7 @@ namespace WileyWidget.Data
                 entity.HasIndex(c => c.ChargeType);
                 entity.Property(c => c.ChargeType).HasMaxLength(50).IsRequired();
                 entity.Property(c => c.Description).HasMaxLength(200).IsRequired();
-                entity.Property(c => c.Amount).HasColumnType("decimal(18,2)").IsRequired();
+                entity.Property(c => c.Amount).HasColumnType(Decimal18_2).IsRequired();
             });
 
             // DepartmentCurrentCharge configuration
@@ -582,9 +587,9 @@ namespace WileyWidget.Data
                 entity.HasIndex(dcc => dcc.Department).IsUnique();
                 entity.HasIndex(dcc => dcc.IsActive);
                 entity.Property(dcc => dcc.Department).HasMaxLength(50).IsRequired();
-                entity.Property(dcc => dcc.CurrentCharge).HasColumnType("decimal(18,2)").IsRequired();
+                entity.Property(dcc => dcc.CurrentCharge).HasColumnType(Decimal18_2).IsRequired();
                 entity.Property(dcc => dcc.CustomerCount).IsRequired();
-                entity.Property(dcc => dcc.LastUpdated).HasColumnType("timestamp with time zone");
+                entity.Property(dcc => dcc.LastUpdated).HasColumnType(TimestampWithTimeZone);
                 entity.Property(dcc => dcc.UpdatedBy).HasMaxLength(100);
                 entity.Property(dcc => dcc.Notes).HasMaxLength(500);
             });
@@ -598,7 +603,7 @@ namespace WileyWidget.Data
                 entity.Property(dg => dg.AdjustmentFactor).HasColumnType("decimal(18,4)").HasDefaultValue(1.0m);
                 entity.Property(dg => dg.TargetProfitMarginPercent).HasColumnType("decimal(18,4)");
                 entity.Property(dg => dg.RecommendationText).HasMaxLength(1000);
-                entity.Property(dg => dg.GeneratedAt).HasColumnType("timestamp with time zone");
+                entity.Property(dg => dg.GeneratedAt).HasColumnType(TimestampWithTimeZone);
                 entity.Property(dg => dg.Source).HasMaxLength(100);
             });
 
@@ -652,7 +657,7 @@ namespace WileyWidget.Data
                 new Fund { Id = 2, FundCode = "200-ENT", Name = "Enterprise Fund", Type = FundType.EnterpriseFund },
                 new Fund { Id = 3, FundCode = "300-UTIL", Name = "Utility Fund", Type = FundType.EnterpriseFund },
                 new Fund { Id = 4, FundCode = "400-COMM", Name = "Community Center Fund", Type = FundType.SpecialRevenue },
-                new Fund { Id = 5, FundCode = "500-CONS", Name = "Conservation Trust Fund", Type = FundType.PermanentFund },
+                new Fund { Id = 5, FundCode = "500-CONS", Name = ConservationTrustFundName, Type = FundType.PermanentFund },
                 new Fund { Id = 6, FundCode = "600-REC", Name = "Recreation Fund", Type = FundType.SpecialRevenue },
                 new Fund { Id = 7, FundCode = "700-WSD", Name = "Wiley Sanitation District", Type = FundType.EnterpriseFund }
             );
@@ -772,12 +777,12 @@ namespace WileyWidget.Data
                 new MunicipalAccount { Id = 25, Name = "PARKS - DEVELOPMENT", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true },
 
                 // Additional expenses to complete updated chart (31 total)
-                new MunicipalAccount { Id = 26, Name = "MISC EXPENSE", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
-                new MunicipalAccount { Id = 27, Name = "TRAIL MAINTENANCE", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
-                new MunicipalAccount { Id = 28, Name = "PARK IMPROVEMENTS", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
-                new MunicipalAccount { Id = 29, Name = "EQUIPMENT PURCHASES", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
-                new MunicipalAccount { Id = 30, Name = "PROJECTS - SMALL", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" },
-                new MunicipalAccount { Id = 31, Name = "RESERVES ALLOCATION", Type = AccountType.Transfers, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = "Conservation Trust Fund" }
+                new MunicipalAccount { Id = 26, Name = "MISC EXPENSE", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = ConservationTrustFundName },
+                new MunicipalAccount { Id = 27, Name = "TRAIL MAINTENANCE", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = ConservationTrustFundName },
+                new MunicipalAccount { Id = 28, Name = "PARK IMPROVEMENTS", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = ConservationTrustFundName },
+                new MunicipalAccount { Id = 29, Name = "EQUIPMENT PURCHASES", Type = AccountType.CapitalOutlay, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = ConservationTrustFundName },
+                new MunicipalAccount { Id = 30, Name = "PROJECTS - SMALL", Type = AccountType.Expense, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = ConservationTrustFundName },
+                new MunicipalAccount { Id = 31, Name = "RESERVES ALLOCATION", Type = AccountType.Transfers, FundType = MunicipalFundType.ConservationTrust, DepartmentId = 1, BudgetPeriodId = 1, IsActive = true, FundDescription = ConservationTrustFundName }
             );
 
             // Seed: Owned type values for AccountNumber on MunicipalAccounts

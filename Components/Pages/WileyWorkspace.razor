@@ -3,6 +3,7 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
@@ -67,7 +68,7 @@
         </div>
 
         <div id="center-pane" class="space-y-4">
-            <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 16, 16 })" AllowDragging="true" AllowResizing="true" Width="100%">
+            <SfDashboardLayout Columns="6" CellSpacing="@(new double[] { 16, 16 })" AllowDragging="true" AllowResizing="true">
                 <DashboardLayoutPanels>
                     <DashboardLayoutPanel Id="break-even-panel" Row="0" Column="0" SizeX="3" SizeY="2">
                         <HeaderTemplate>
@@ -204,6 +205,23 @@
                                         <GridColumn Field=@nameof(ScenarioItem.Cost) HeaderText="Cost" Format="C0" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
                                     </GridColumns>
                                 </SfGrid>
+                            </div>
+                            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-900">Scenario snapshot</p>
+                                        <p class="text-xs text-slate-500">Save the current workspace state to Aurora and reload the latest snapshot for this enterprise and fiscal year.</p>
+                                    </div>
+                                    <div class="flex flex-col gap-2 sm:flex-row">
+                                        <SfButton CssClass="e-primary" IsPrimary="true" OnClick="SaveRateSnapshotAsync" Disabled="@IsScenarioSnapshotBusy">
+                                            @(IsSavingSnapshot ? "Saving..." : "Save scenario")
+                                        </SfButton>
+                                        <SfButton OnClick="LoadScenarioSnapshotAsync" Disabled="@IsScenarioSnapshotBusy">
+                                            @(IsLoadingSnapshot ? "Loading..." : "Load scenario")
+                                        </SfButton>
+                                    </div>
+                                </div>
+                                <p class="mt-3 text-xs text-slate-500">@SnapshotSaveStatus</p>
                             </div>
                         </ContentTemplate>
                     </DashboardLayoutPanel>

@@ -37,10 +37,15 @@
   </ItemGroup>
 
   <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">
-    <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
-      <_SyncfusionAppSettingsLines Include='{"SyncfusionLicenseKey":"$(SYNCFUSION_LICENSE_KEY)"}' />
+    <PropertyGroup>
+      <_SyncfusionLicenseKey Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">$(SYNCFUSION_LICENSE_KEY)</_SyncfusionLicenseKey>
+      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKey)' == '' and '$(SYNCUSION_LICENSE_KEY)' != ''">$(SYNCUSION_LICENSE_KEY)</_SyncfusionLicenseKey>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(_SyncfusionLicenseKey)' != ''">
+      <_SyncfusionAppSettingsLines Include='{"SyncfusionLicenseKey":"$(_SyncfusionLicenseKey)"}' />
     </ItemGroup>
-    <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' == ''">
+    <ItemGroup Condition="'$(_SyncfusionLicenseKey)' == ''">
       <_SyncfusionAppSettingsLines Include='{}' />
     </ItemGroup>
 

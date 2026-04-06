@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.Extensions.Logging;
 using Syncfusion.Blazor;
 using Syncfusion.Licensing;
 using WileyCoWeb.Components;
@@ -10,6 +9,19 @@ using WileyCoWeb.State;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
+
+var syncfusionLicenseKey = builder.Configuration["SyncfusionLicenseKey"]
+    ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
+    ?? Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY");
+
+if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
+{
+    SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
+}
+else
+{
+    Console.WriteLine("WARNING: Syncfusion license key was not found in configuration or environment variables.");
+}
 
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
@@ -36,18 +48,6 @@ builder.Services.AddScoped<WorkspacePersistenceService>();
 builder.Services.AddScoped<WorkspaceSnapshotApiService>();
 
 builder.Services.AddSyncfusionBlazor();
-
-var syncfusionLicenseKey = builder.Configuration["SyncfusionLicenseKey"]
-    ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
-    ?? Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY");
-if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
-{
-    SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
-}
-else
-{
-    Console.WriteLine("WARNING: Syncfusion license key was not found in configuration or environment variables.");
-}
 
 var host = builder.Build();
 await host.Services.GetRequiredService<WorkspaceBootstrapService>().LoadAsync();

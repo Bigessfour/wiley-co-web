@@ -45,6 +45,7 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 - **AI**: `XAIService`, `ChatBridgeService`, `AIMemoryService`. Prompts are built from the same `WorkspaceSnapshot` the UI sees -> consistent answers.
 
 **State Management**:
+
 - Central `WorkspaceState` service (singleton in Blazor WASM) holds the current enterprise, fiscal year, and active scenario.
 - Cascading parameters or `StateHasChanged` triggered by `WorkspaceState.OnChange` for reactive panels.
 - Scenario changes are saved via API -> snapshot is reloaded.
@@ -103,15 +104,17 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 
 1. [x] Wire enterprise selector & fiscal-year picker (dropdowns bound to `WorkspaceState`).
 2. [x] Build **Break-Even Panel**:
-	- Total costs, projected volume, current rate (editable), calculated break-even rate, delta.
-	- Instant recalc on any input change (use `OnValueChange` + `WorkspaceState`).
-	- Gauge + card layout with `SfGauge` and `SfChart`.
+
+   - Total costs, projected volume, current rate (editable), calculated break-even rate, delta.
+   - Instant recalc on any input change (use `OnValueChange` + `WorkspaceState`).
+   - Gauge + card layout with `SfGauge` and `SfChart`.
 3. [x] Build **Rates Panel** (adjacent tile):
-	- Manual current-rate entry (`SfTextBox` + validation).
-	- Visual current vs. recommended + break-even (`SfChart` column or bullet chart).
+
+   - Manual current-rate entry (`SfTextBox` + validation).
+   - Visual current vs. recommended + break-even (`SfChart` column or bullet chart).
 4. [x] Save rate snapshot to Aurora via thin API.
 
-	- Implemented as a POST to the thin snapshot host. The workspace now archives the current rate and scenario payload to Aurora-backed storage from the rates panel.
+   - Implemented as a POST to the thin snapshot host. The workspace now archives the current rate and scenario payload to Aurora-backed storage from the rates panel.
 
 **Acceptance**: Met for the live-data gate. Break-even interactions are live, and the page now hydrates customers and projections from the thin API workspace snapshot instead of seeded client-side sample collections.
 
@@ -143,6 +146,7 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 - Secure thin API endpoint for Grok requests.
 
 **UI Build Order Summary**:
+
 1. Workspace shell + context rail
 2. Break-even + Rates panels
 3. Scenario planner
@@ -151,6 +155,7 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 6. JARVIS chat (last, because it consumes the full snapshot)
 
 **Syncfusion Component Map**:
+
 - DashboardLayout -> main tiles
 - Sidebar + Splitter -> rails
 - Grid -> scenario costs & customers

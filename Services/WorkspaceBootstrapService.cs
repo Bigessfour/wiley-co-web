@@ -23,13 +23,18 @@ public sealed class WorkspaceBootstrapService
         this.workspaceState = workspaceState ?? throw new ArgumentNullException(nameof(workspaceState));
     }
 
-    public async Task LoadAsync(CancellationToken cancellationToken = default)
+    public Task LoadAsync(CancellationToken cancellationToken = default)
+    {
+        return LoadAsync(null, null, cancellationToken);
+    }
+
+    public async Task LoadAsync(string? enterprise, int? fiscalYear, CancellationToken cancellationToken = default)
     {
         WorkspaceBootstrapData? bootstrapData = null;
 
         try
         {
-            bootstrapData = await httpClient.GetFromJsonAsync<WorkspaceBootstrapData>("api/workspace/snapshot", JsonOptions, cancellationToken);
+            bootstrapData = await httpClient.GetFromJsonAsync<WorkspaceBootstrapData>(BuildSnapshotRequestUri(enterprise, fiscalYear), JsonOptions, cancellationToken);
         }
         catch (HttpRequestException)
         {
@@ -43,5 +48,31 @@ public sealed class WorkspaceBootstrapService
         }
 
         workspaceState.ApplyBootstrap(bootstrapData);
+    }
+
+    private static string BuildSnapshotRequestUri(string? enterprise, int? fiscalYear)
+    {
+        var requestUri = "api/workspace/snapshot";
+        var hasEnterprise = !string.IsNullOrWhiteSpace(enterprise);
+        var hasFiscalYear = fiscalYear is > 0;
+
+        if (!hasEnterprise && !hasFiscalYear)
+        {
+            return requestUri;
+        }
+
+        var queryParts = new List<string>(2);
+
+        if (hasEnterprise)
+        {
+            queryParts.Add($"enterprise={Uri.EscapeDataString(enterprise!.Trim())}");
+        }
+
+        if (hasFiscalYear)
+        {
+            queryParts.Add($"fiscalYear={fiscalYear}");
+        }
+
+        return $"{requestUri}?{string.Join('&', queryParts)}";
     }
 }

@@ -1,16 +1,8 @@
-using System.Threading;
-using System;
-using System.Threading.Tasks;
 using Serilog;
 using Serilog.Events;
-using System.Collections.Generic;
-using System.Linq;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using WileyWidget.Services.Abstractions;
-using WileyWidget.Services.Telemetry;
 
 namespace WileyWidget.Services;
 
@@ -21,7 +13,11 @@ namespace WileyWidget.Services;
 /// </summary>
 public class ErrorReportingService
 {
-    private readonly Dictionary<string, ErrorRecoveryStrategy> _recoveryStrategies = new();
+    private const string UnknownValue = "Unknown";
+    private const string CorrelationIdKey = "CorrelationId";
+    private const string ContextKey = "Context";
+
+    private readonly Dictionary<string, IErrorRecoveryStrategy> _recoveryStrategies = new();
     private readonly ConcurrentDictionary<string, long> _counters = new();
     private readonly ConcurrentDictionary<string, TelemetryEvent> _telemetryEvents = new();
     private readonly ILogger<ErrorReportingService> _logger;
@@ -59,7 +55,7 @@ public class ErrorReportingService
         // Log service initialization
         TrackEvent("ErrorReportingService_Initialized", new Dictionary<string, object>
         {
-            ["ServiceVersion"] = GetType().Assembly.GetName().Version?.ToString() ?? "Unknown",
+            ["ServiceVersion"] = GetType().Assembly.GetName().Version?.ToString() ?? UnknownValue,
             ["Timestamp"] = DateTime.UtcNow
         });
     }
@@ -84,8 +80,8 @@ public class ErrorReportingService
         correlationId ??= Guid.NewGuid().ToString();
 
         // Structured logging with context
-        var logContext = Log.ForContext("CorrelationId", correlationId)
-                           .ForContext("Context", context ?? "Unknown")
+        var logContext = Log.ForContext(CorrelationIdKey, correlationId)
+                   .ForContext(ContextKey, context ?? UnknownValue)
                            .ForContext("ExceptionType", exception.GetType().Name)
                            .ForContext("ExceptionMessage", exception.Message);
 
@@ -105,14 +101,22 @@ public class ErrorReportingService
         {
             ["ExceptionType"] = exception.GetType().Name,
             ["ExceptionMessage"] = exception.Message,
-            ["Context"] = context ?? "Unknown",
-            ["CorrelationId"] = correlationId,
+            ["Context"] = context ?? UnknownValue,
+            [CorrelationIdKey] = correlationId,
             ["StackTrace"] = exception.StackTrace,
             ["InnerException"] = exception.InnerException?.Message
         });
 
         // Notify subscribers (tests, telemetry listeners)
-        try { ErrorReported?.Invoke(exception, context); } catch { /* do not fail reporting */ }
+        try
+        {
+            var errorReported = ErrorReported;
+            errorReported?.Invoke(exception, context);
+        }
+        catch
+        {
+            /* do not fail reporting */
+        }
 
         // Show user-friendly dialog if requested and not suppressed
         if (showToUser && !SuppressUserDialogs)
@@ -148,7 +152,15 @@ public class ErrorReportingService
             _telemetryEvents[eventName] = telemetryEvent;
 
             // Notify subscribers
-            try { TelemetryCollected?.Invoke(telemetryEvent); } catch { /* do not fail telemetry */ }
+            try
+            {
+                var telemetryCollected = TelemetryCollected;
+                telemetryCollected?.Invoke(telemetryEvent);
+            }
+            catch
+            {
+                /* do not fail telemetry */
+            }
 
             // OpenTelemetry span tracking
             if (_telemetryService != null)
@@ -206,7 +218,15 @@ public class ErrorReportingService
             _telemetryEvents[telemetryEvent.EventName] = telemetryEvent;
 
             // Notify subscribers
-            try { TelemetryCollected?.Invoke(telemetryEvent); } catch { /* do not fail telemetry */ }
+            try
+            {
+                var telemetryCollected = TelemetryCollected;
+                telemetryCollected?.Invoke(telemetryEvent);
+            }
+            catch
+            {
+                /* do not fail telemetry */
+            }
 
             var logger = Log.ForContext("TelemetryMetric", metricName)
                            .ForContext("Value", value);
@@ -250,7 +270,15 @@ public class ErrorReportingService
             _telemetryEvents[telemetryEvent.EventName] = telemetryEvent;
 
             // Notify subscribers
-            try { TelemetryCollected?.Invoke(telemetryEvent); } catch { /* do not fail telemetry */ }
+            try
+            {
+                var telemetryCollected = TelemetryCollected;
+                telemetryCollected?.Invoke(telemetryEvent);
+            }
+            catch
+            {
+                /* do not fail telemetry */
+            }
 
             var logger = Log.ForContext("DependencyName", dependencyName)
                            .ForContext("CommandName", commandName)
@@ -298,7 +326,7 @@ public class ErrorReportingService
         return JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
     }
 
-    private string GetSessionId()
+    private static string GetSessionId()
     {
         // Generate a session ID based on process start time for this application instance
         return $"session_{Process.GetCurrentProcess().StartTime.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture)}";
@@ -331,13 +359,13 @@ public class ErrorReportingService
     /// <summary>
     /// Reports a warning with structured logging.
     /// </summary>
-    public void ReportWarning(string message, string context = null, string correlationId = null)
+    public static void ReportWarning(string message, string context = null, string correlationId = null)
     {
         if (message is null) throw new ArgumentNullException(nameof(message));
         correlationId ??= Guid.NewGuid().ToString();
 
-        Log.ForContext("CorrelationId", correlationId)
-            .ForContext("Context", context ?? "Unknown")
+        Log.ForContext(CorrelationIdKey, correlationId)
+            .ForContext(ContextKey, context ?? UnknownValue)
             .Warning("Warning in {Context}: {Message}", context, message);
     }
 
@@ -348,8 +376,8 @@ public class ErrorReportingService
     {
         var correlationId = Guid.NewGuid().ToString();
 
-        Log.ForContext("CorrelationId", correlationId)
-           .ForContext("Context", context)
+          Log.ForContext(CorrelationIdKey, correlationId)
+              .ForContext(ContextKey, context)
            .Information("Attempting error recovery for {Context}", context);
 
         if (recoveryAction is null) throw new ArgumentNullException(nameof(recoveryAction));
@@ -358,22 +386,22 @@ public class ErrorReportingService
         {
             try
             {
-                var success = await strategy.ExecuteAsync(recoveryAction);
+                var success = await strategy.ExecuteAsync(recoveryAction, cancellationToken);
                 if (success)
                 {
-                    Log.ForContext("CorrelationId", correlationId)
+                    Log.ForContext(CorrelationIdKey, correlationId)
                        .Information("Successfully recovered from error in {Context}", context);
                     return true;
                 }
             }
             catch (Exception recoveryEx)
             {
-                Log.ForContext("CorrelationId", correlationId)
+                Log.ForContext(CorrelationIdKey, correlationId)
                    .Error(recoveryEx, "Recovery failed for {Context}", context);
             }
         }
 
-        Log.ForContext("CorrelationId", correlationId)
+        Log.ForContext(CorrelationIdKey, correlationId)
            .Warning("No recovery strategy available or recovery failed for {Context}", context);
         return false;
     }
@@ -381,7 +409,7 @@ public class ErrorReportingService
     /// <summary>
     /// Registers a recovery strategy for a specific error context.
     /// </summary>
-    public void RegisterRecoveryStrategy(string context, ErrorRecoveryStrategy strategy)
+    public void RegisterRecoveryStrategy(string context, IErrorRecoveryStrategy strategy)
     {
         if (string.IsNullOrWhiteSpace(context)) throw new ArgumentException("Context is required", nameof(context));
         if (strategy is null) throw new ArgumentNullException(nameof(strategy));
@@ -461,19 +489,14 @@ public class ErrorReportingService
         }
     }
 
-    private void ShowErrorDialog(Exception exception, string context, string correlationId)
-    {
-        // Note: UI dialog removed for library compatibility
-        _logger.LogError("Error dialog would be shown for correlation ID {CorrelationId}: {Message}", correlationId, exception.Message);
-    }
 }
 
 /// <summary>
 /// Base class for error recovery strategies.
 /// </summary>
-public abstract class ErrorRecoveryStrategy
+public interface IErrorRecoveryStrategy
 {
-    public abstract Task<bool> ExecuteAsync(Func<Task<bool>> action, CancellationToken cancellationToken = default);
+    Task<bool> ExecuteAsync(Func<Task<bool>> action, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -499,11 +522,16 @@ public class TelemetryEvent
 /// <summary>
 /// Single-attempt recovery strategy.
 /// </summary>
-public class SingleAttemptRecoveryStrategy : ErrorRecoveryStrategy
+public sealed class SingleAttemptRecoveryStrategy : IErrorRecoveryStrategy
 {
-    public override async Task<bool> ExecuteAsync(Func<Task<bool>> action, CancellationToken cancellationToken = default)
+    public async Task<bool> ExecuteAsync(Func<Task<bool>> action, CancellationToken cancellationToken = default)
     {
         if (action == null) throw new ArgumentNullException(nameof(action));
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return await Task.FromCanceled<bool>(cancellationToken);
+        }
 
         try
         {

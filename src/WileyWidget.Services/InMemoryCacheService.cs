@@ -44,20 +44,6 @@ namespace WileyWidget.Services
             return Task.FromResult<T?>(null);
         }
 
-        public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null) where T : class
-        {
-            if (key == null) return Task.CompletedTask;
-            DateTime? expires = null;
-            if (ttl.HasValue)
-            {
-                expires = DateTime.UtcNow.Add(ttl.Value);
-            }
-
-            _store[key] = (value!, expires);
-            _logger?.Debug("InMemoryCacheService: Set key {Key} with TTL {Ttl}", key, ttl);
-            return Task.CompletedTask;
-        }
-
         public async Task<T> GetOrCreateAsync<T>(string key, Func<Task<T>> factory, CacheEntryOptions? options = null) where T : class
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
@@ -86,6 +72,21 @@ namespace WileyWidget.Services
             }
 
             _store[key] = (value!, expires);
+            return Task.CompletedTask;
+        }
+
+        public Task SetAsync<T>(string key, T value, TimeSpan? ttl = null) where T : class
+        {
+            if (key == null) return Task.CompletedTask;
+
+            DateTime? expires = null;
+            if (ttl.HasValue)
+            {
+                expires = DateTime.UtcNow.Add(ttl.Value);
+            }
+
+            _store[key] = (value!, expires);
+            _logger?.Debug("InMemoryCacheService: Set key {Key} with TTL {Ttl}", key, ttl);
             return Task.CompletedTask;
         }
 

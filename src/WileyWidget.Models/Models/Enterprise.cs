@@ -2,7 +2,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 // using WileyWidget.Attributes; (same namespace now)
 // using WileyWidget.Data; (interfaces moved to Models)
@@ -20,19 +19,14 @@ public enum EnterpriseStatus
 /// Represents a municipal enterprise (Water, Sewer, Trash, Apartments)
 /// Implements audit tracking and soft delete for compliance
 /// </summary>
-public class Enterprise : INotifyPropertyChanged, ISoftDeletable
+public class Enterprise : ISoftDeletable
 {
     /// <summary>
-    /// Property changed event for data binding
-    /// </summary>
-    public event PropertyChangedEventHandler? PropertyChanged;
-
     /// <summary>
-    /// Raises the PropertyChanged event
+    /// Preserved for setter compatibility.
     /// </summary>
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     /// <summary>
@@ -72,7 +66,7 @@ public class Enterprise : INotifyPropertyChanged, ISoftDeletable
     [Timestamp]
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
-    private string _name = string.Empty;
+    private string _name;
 
     /// <summary>
     /// Name of the enterprise (Water, Sewer, Trash, Apartments)
@@ -229,7 +223,7 @@ public class Enterprise : INotifyPropertyChanged, ISoftDeletable
     /// </summary>
     public DateTime? LastModified { get; set; }
 
-    private string? _type = string.Empty;
+    private string? _type;
 
     /// <summary>
     /// Type of enterprise (Water, Sewer, etc.)
@@ -249,7 +243,7 @@ public class Enterprise : INotifyPropertyChanged, ISoftDeletable
         }
     }
 
-    private string? _notes = string.Empty;
+    private string? _notes;
 
     /// <summary>
     /// Additional notes about the enterprise

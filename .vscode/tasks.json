@@ -300,11 +300,13 @@
 			"dependsOn": [
 				"maintenance: Kill Test Processes"
 			],
-			"command": "dotnet",
+			"command": "pwsh",
 			"args": [
-				"test",
-				"WileyCoWeb.slnx",
-				"--collect:XPlat Code Coverage"
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/Scripts/test-coverage.ps1"
 			],
 			"type": "shell",
 			"group": "test",
@@ -383,7 +385,7 @@
 		},
 		{
 			"label": "📊 Collect CPU Trace (dotnet-trace)",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
@@ -401,7 +403,7 @@
 		},
 		{
 			"label": "💾 Capture Process Dump (dotnet-dump)",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
@@ -419,7 +421,7 @@
 		},
 		{
 			"label": "🧠 Monitor Memory & GC (dotnet-counters)",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
@@ -438,7 +440,7 @@
 		},
 		{
 			"label": "📈 Collect Heap Dump (dotnet-gcdump)",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
@@ -456,7 +458,7 @@
 		},
 		{
 			"label": "⏱️ Analyze Startup Timeline",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -476,7 +478,7 @@
 		},
 		{
 			"label": "🔍 Profile DI Validation (Full)",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -496,7 +498,7 @@
 		},
 		{
 			"label": "⚠️ Monitor Timeouts & Cancellations",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -517,7 +519,7 @@
 		},
 		{
 			"label": "📋 Generate Performance Report",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -537,7 +539,7 @@
 		},
 		{
 			"label": "🔬 Auto-Dump on Crash",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -606,7 +608,7 @@
 		},
 		{
 			"label": "📊 Compare Performance (Baseline vs Current)",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -626,11 +628,11 @@
 		},
 		{
 			"label": "📁 Open Diagnostics Folder",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"if (-not (Test-Path ./diagnostics)) { mkdir ./diagnostics }; explorer ./diagnostics"
+				"if (-not (Test-Path ./diagnostics)) { mkdir ./diagnostics }; open ./diagnostics"
 			],
 			"type": "shell",
 			"group": "test",
@@ -726,7 +728,7 @@
 		{
 			"label": "🔌 Setup MSSQL MCP (Windows Auth)",
 			"type": "shell",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -752,7 +754,7 @@
 		{
 			"label": "🔌 Setup MSSQL MCP (SQL Auth)",
 			"type": "process",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -777,7 +779,7 @@
 		{
 			"label": "🧪 Test MSSQL Connection",
 			"type": "shell",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-ExecutionPolicy",
@@ -797,7 +799,7 @@
 		{
 			"label": "📊 View MSSQL MCP Setup Guide",
 			"type": "shell",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
@@ -907,11 +909,11 @@
 		{
 			"label": "📂 Open WarRoom Test Logs",
 			"type": "shell",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
-				"$logDir = '${workspaceFolder}/tools/WileyWidget.Paneltest/Logs'; if (Test-Path $logDir) { explorer $logDir; Write-Host 'Opened: ' $logDir } else { Write-Host 'Log directory not found: ' $logDir }"
+				"$logDir = '${workspaceFolder}/tools/WileyWidget.Paneltest/Logs'; if (Test-Path $logDir) { open $logDir; Write-Host 'Opened: ' $logDir } else { Write-Host 'Log directory not found: ' $logDir }"
 			],
 			"presentation": {
 				"echo": true,
@@ -925,7 +927,7 @@
 		{
 			"label": "📊 Open WarRoom Test Results",
 			"type": "shell",
-			"command": "powershell",
+			"command": "pwsh",
 			"args": [
 				"-NoProfile",
 				"-Command",
