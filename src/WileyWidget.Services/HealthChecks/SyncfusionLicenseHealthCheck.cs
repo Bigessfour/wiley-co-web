@@ -160,5 +160,5 @@ public class SyncfusionLicenseHealthCheck : IHealthCheck
     /// <summary>
     /// Gets the cached Syncfusion version if available
     /// </summary>
-    public static string? GetCachedVersion() => _cachedVersion;
+    public string? GetCachedVersion() => _cachedVersion;
 }
