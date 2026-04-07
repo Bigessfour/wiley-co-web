@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.JSInterop;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
 
@@ -99,7 +100,8 @@ public sealed class WorkspaceServiceTests
             BaseAddress = new Uri("https://example.test/")
         };
 
-        var service = new WorkspaceBootstrapService(client, state);
+        var snapshotService = new WorkspaceSnapshotApiService(client);
+        var service = new WorkspaceBootstrapService(client, state, snapshotService);
 
         await service.LoadAsync();
 
@@ -140,7 +142,8 @@ public sealed class WorkspaceServiceTests
             BaseAddress = new Uri("https://example.test/")
         };
 
-        var service = new WorkspaceBootstrapService(client, state);
+        var snapshotService = new WorkspaceSnapshotApiService(client);
+        var service = new WorkspaceBootstrapService(client, state, snapshotService);
 
         await service.LoadAsync("Water Utility", 2026);
 
@@ -182,7 +185,8 @@ public sealed class WorkspaceServiceTests
             BaseAddress = new Uri("https://example.test/")
         };
 
-        var service = new WorkspaceBootstrapService(client, state);
+        var snapshotService = new WorkspaceSnapshotApiService(client);
+        var service = new WorkspaceBootstrapService(client, state, snapshotService);
 
         await service.LoadAsync();
 
@@ -203,11 +207,12 @@ public sealed class WorkspaceServiceTests
             BaseAddress = new Uri("https://example.test/")
         };
 
-        var service = new WorkspaceBootstrapService(client, state);
+        var snapshotService = new WorkspaceSnapshotApiService(client);
+        var service = new WorkspaceBootstrapService(client, state, snapshotService);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
 
-        Assert.Contains("could not be loaded", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("workspace snapshot response was empty", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

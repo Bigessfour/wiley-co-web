@@ -1,6 +1,7 @@
 using WileyWidget.Models;
 using WileyWidget.Models.DTOs;
 using WileyWidget.Models.Validators;
+using WileyWidget.Business.Configuration;
 
 namespace WileyCoWeb.IntegrationTests;
 
@@ -78,8 +79,6 @@ public sealed class ModelValidationTests
     [Fact]
     public void AccountTypeValidator_ValidatesAccountAndFundClassRules()
     {
-        var validator = new AccountTypeValidator();
-
         var validAccount = new MunicipalAccount
         {
             Id = 10,
@@ -98,8 +97,8 @@ public sealed class ModelValidationTests
             FundType = MunicipalFundType.General
         };
 
-        var validResult = validator.ValidateAccountTypeCompliance(new[] { validAccount });
-        var invalidResult = validator.ValidateAccountTypeCompliance(new[] { invalidAccount });
+        var validResult = AccountTypeValidator.ValidateAccountTypeCompliance(new[] { validAccount });
+        var invalidResult = AccountTypeValidator.ValidateAccountTypeCompliance(new[] { invalidAccount });
 
         Assert.True(validResult.IsValid);
         Assert.False(invalidResult.IsValid);

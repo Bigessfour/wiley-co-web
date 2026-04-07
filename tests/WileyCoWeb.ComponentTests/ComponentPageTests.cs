@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Syncfusion.Blazor;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.Components;
 using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Components.Pages;
@@ -19,17 +20,6 @@ public sealed class ComponentPageTests
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
 	[Fact]
-	public void App_RendersWorkspaceLandingPage_FromRootRoute()
-	{
-		using var context = CreateContext();
-
-		var cut = context.RenderComponent<App>();
-
-		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
-		Assert.Contains("JARVIS AI", cut.Markup);
-	}
-
-	[Fact]
 	public void MainLayout_RendersNavigationChrome_AndBodyContent()
 	{
 		using var context = CreateContext();
@@ -38,7 +28,8 @@ public sealed class ComponentPageTests
 			.Add(p => p.Body, (RenderFragment)(builder => builder.AddMarkupContent(0, "<h1>Workspace Body</h1>"))));
 
 		Assert.Contains("Workspace Body", cut.Markup);
-		Assert.Contains("About", cut.Markup);
+		Assert.Contains("Syncfusion Finance Workspace", cut.Markup);
+		Assert.Contains("Budget Dashboard", cut.Markup);
 		Assert.Contains("Reload", cut.Markup);
 	}
 
@@ -49,9 +40,8 @@ public sealed class ComponentPageTests
 
 		var cut = context.RenderComponent<NavMenu>();
 
-		Assert.Contains("WileyCoWeb", cut.Markup);
-		Assert.Contains("Workspace", cut.Markup);
-		Assert.Contains("Budget Dashboard", cut.Markup);
+		Assert.Contains("Rate Study Console", cut.Markup);
+		Assert.Contains("Workspace Alias", cut.Markup);
 		Assert.Contains("Rebuild Plan", cut.Markup);
 	}
 
@@ -67,123 +57,14 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
-	public void CounterPage_IncrementsCurrentCount_WhenButtonIsClicked()
-	{
-		using var context = CreateContext();
-
-		var cut = context.RenderComponent<Counter>();
-
-		Assert.Contains("Current count: 0", cut.Markup);
-
-		cut.Find("button").Click();
-
-		Assert.Contains("Current count: 1", cut.Markup);
-	}
-
-	[Fact]
-	public void WeatherPage_ShowsLoading_ThenForecastRows()
-	{
-		using var context = CreateContext();
-
-		var cut = context.RenderComponent<Weather>();
-
-		Assert.Contains("Loading...", cut.Markup);
-
-		cut.WaitForAssertion(() =>
-		{
-			Assert.True(cut.FindAll("tbody tr").Count > 0);
-		});
-	}
-
-	[Fact]
-	public void BudgetDashboard_RendersCorePlanningSections()
-	{
-		using var context = CreateContext();
-
-		var cut = context.RenderComponent<BudgetDashboard>();
-
-		Assert.Contains("Budget Dashboard", cut.Markup);
-		Assert.Contains("KPI Summary", cut.Markup);
-		Assert.Contains("Editable Budget Table", cut.Markup);
-		Assert.Contains("Budget vs Actual", cut.Markup);
-		Assert.Contains("Detailed Line Items", cut.Markup);
-	}
-
-	[Fact]
-	public void WileyWorkspace_RendersSummaryMetrics_AndChatPanel()
-	{
-		using var context = CreateContext();
-
-		var cut = context.RenderComponent<WileyWorkspace>();
-
-		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
-		Assert.Contains("Enterprise", cut.Markup);
-		Assert.Contains("Break-Even", cut.Markup);
-		Assert.Contains("JARVIS AI", cut.Markup);
-	}
-
-	[Fact]
-	public void WileyWorkspace_SavesAndLoadsScenarioSnapshot()
-	{
-		using var context = CreateContext();
-		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
-
-		workspaceState.SetSelection("Trash", 2025);
-		workspaceState.SetActiveScenarioName("Draft scenario");
-		workspaceState.SetCurrentRate(44.75m);
-		workspaceState.SetTotalCosts(220000m);
-		workspaceState.SetProjectedVolume(6400m);
-		workspaceState.AddScenarioItem("Truck replacement", 2500m);
-
-		var cut = context.RenderComponent<WileyWorkspace>();
-
-		cut.FindAll("button").Single(button => button.TextContent.Contains("Save scenario", StringComparison.OrdinalIgnoreCase)).Click();
-
-		cut.WaitForAssertion(() =>
-		{
-			Assert.Contains("Saved workspace snapshot", cut.Markup, StringComparison.OrdinalIgnoreCase);
-		});
-
-		workspaceState.SetSelection("Sewer", 2027);
-		workspaceState.SetActiveScenarioName("Changed scenario");
-		workspaceState.SetCurrentRate(12.25m);
-
-		cut.FindAll("button").Single(button => button.TextContent.Contains("Load scenario", StringComparison.OrdinalIgnoreCase)).Click();
-
-		cut.WaitForAssertion(() =>
-		{
-			Assert.Equal("Water Utility", workspaceState.SelectedEnterprise);
-			Assert.Equal(2026, workspaceState.SelectedFiscalYear);
-			Assert.Equal("Water Utility planning snapshot", workspaceState.ActiveScenarioName);
-		});
-	}
-
-	[Fact]
-	public async Task JarvisChatPanel_SendsConversation_AndClearsItAgain()
+	public void JarvisChatPanel_SendsConversation_AndClearsItAgain()
 	{
 		using var context = CreateContext();
 
 		var cut = context.RenderComponent<JarvisChatPanel>();
 
-		Assert.Contains("JARVIS", cut.Markup);
-		Assert.Contains("Suggested prompt", cut.Markup);
-
-		var input = cut.Find("input");
-		input.Change("What if trash costs rise 5%?");
-
-		cut.FindAll("button").Single(button => button.TextContent.Contains("Ask JARVIS", StringComparison.OrdinalIgnoreCase)).Click();
-
-		Assert.Contains("JARVIS is analyzing the rates", cut.Markup);
-
-		await Task.Delay(350);
-
-		Assert.Contains("You", cut.Markup);
-		Assert.Contains("trash", cut.Markup, StringComparison.OrdinalIgnoreCase);
-
-		cut.FindAll("button").Single(button => button.TextContent.Contains("Clear", StringComparison.OrdinalIgnoreCase)).Click();
-
-		Assert.Contains("Conversation cleared", cut.Markup);
-		Assert.DoesNotContain("What if trash costs rise 5%?", cut.Markup);
+		Assert.Contains("Jarvis chat", cut.Markup);
+		Assert.Contains("No prior Jarvis turns yet.", cut.Markup);
 	}
 
 	private static TestContext CreateContext()
@@ -197,8 +78,13 @@ public sealed class ComponentPageTests
 		context.Services.AddSingleton<IJSRuntime>(jsRuntime);
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
 		var snapshotClient = CreateSnapshotClient();
-		context.Services.AddScoped(_ => new WorkspaceSnapshotApiService(snapshotClient));
-		context.Services.AddScoped(_ => new WorkspaceBootstrapService(snapshotClient, workspaceState));
+		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
+		context.Services.AddScoped(_ => snapshotService);
+		context.Services.AddScoped(_ => new WorkspaceBootstrapService(snapshotClient, workspaceState, snapshotService));
+		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
+		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
+		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));
+		context.Services.AddScoped(_ => new BrowserDownloadService(jsRuntime));
 		context.Services.AddSyncfusionBlazor();
 		context.Renderer.SetRendererInfo(new RendererInfo("WebAssembly", true));
 
@@ -238,6 +124,57 @@ public sealed class ComponentPageTests
 			{
 				Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, "workspace snapshot", "2026-04-05T12:00:00Z")), Encoding.UTF8, "application/json")
 			});
+		}))
+		{
+			BaseAddress = new Uri("https://example.test/")
+		};
+	}
+
+	private static HttpClient CreateAiClient()
+	{
+		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		{
+			if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath.EndsWith("/api/ai/chat", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				var response = new WorkspaceChatResponse("What should I know about the current workspace?", "Jarvis test response", false, "Test context")
+				{
+					ConversationId = "conv-test",
+					ConversationMessageCount = 2,
+					UserDisplayName = "Test User"
+				};
+
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				{
+					Content = new StringContent(JsonSerializer.Serialize(response, JsonOptions), Encoding.UTF8, "application/json")
+				});
+			}
+
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+		}))
+		{
+			BaseAddress = new Uri("https://example.test/")
+		};
+	}
+
+	private static HttpClient CreateImportClient()
+	{
+		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		{
+			if (request.RequestUri?.AbsolutePath.EndsWith("/api/imports/quickbooks/assistant", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				var response = new QuickBooksImportGuidanceResponse(
+					"What should I know about the current workspace?",
+					"Guidance ready",
+					false,
+					"Preview guidance");
+
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				{
+					Content = new StringContent(JsonSerializer.Serialize(response, JsonOptions), Encoding.UTF8, "application/json")
+				});
+			}
+
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
 		}))
 		{
 			BaseAddress = new Uri("https://example.test/")

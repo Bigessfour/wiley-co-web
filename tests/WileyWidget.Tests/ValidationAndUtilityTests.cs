@@ -15,23 +15,19 @@ public sealed class ValidationAndUtilityTests
     [Fact]
     public void AccountTypeValidator_ReturnsExpectedMatches_ForAccountNumberAndFund()
     {
-        var validator = new WileyWidget.Business.Configuration.AccountTypeValidator();
+        Assert.True(AccountTypeValidator.ValidateAccountTypeForNumber(AccountType.Cash, "101.1"));
+        Assert.True(AccountTypeValidator.ValidateAccountTypeForFund(AccountType.Fees, FundClass.Proprietary));
+        Assert.False(AccountTypeValidator.ValidateAccountTypeForFund(AccountType.Taxes, FundClass.Proprietary));
 
-        Assert.True(validator.ValidateAccountTypeForNumber(AccountType.Cash, "101.1"));
-        Assert.True(validator.ValidateAccountTypeForFund(AccountType.Fees, FundClass.Proprietary));
-        Assert.False(validator.ValidateAccountTypeForFund(AccountType.Taxes, FundClass.Proprietary));
-
-        var validTypes = validator.GetValidAccountTypesForNumber("410.2").ToArray();
+        var validTypes = AccountTypeValidator.GetValidAccountTypesForNumber("410.2").ToArray();
         Assert.Contains(AccountType.Revenue, validTypes);
-        Assert.Contains(AccountType.Fees, validator.GetValidAccountTypesForFund(FundClass.Governmental));
+        Assert.Contains(AccountType.Fees, AccountTypeValidator.GetValidAccountTypesForFund(FundClass.Governmental));
     }
 
     [Fact]
     public void AccountTypeValidator_ReportsErrors_ForInvalidAccount()
     {
-        var validator = new WileyWidget.Business.Configuration.AccountTypeValidator();
-
-        var errors = validator.ValidateAccount(new MunicipalAccount
+        var errors = AccountTypeValidator.ValidateAccount(new MunicipalAccount
         {
             Id = 7,
             Name = "Badly Classified",
@@ -47,9 +43,7 @@ public sealed class ValidationAndUtilityTests
     [Fact]
     public void AccountTypeValidator_ComplianceCheck_ReturnsInvalid_ForMixedAccounts()
     {
-        var validator = new WileyWidget.Business.Configuration.AccountTypeValidator();
-
-        var result = validator.ValidateAccountTypeCompliance(new[]
+        var result = AccountTypeValidator.ValidateAccountTypeCompliance(new[]
         {
             new MunicipalAccount
             {

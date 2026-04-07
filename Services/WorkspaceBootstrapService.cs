@@ -25,11 +25,6 @@ public sealed class WorkspaceBootstrapService
         this.workspaceSnapshotApiService = workspaceSnapshotApiService ?? throw new ArgumentNullException(nameof(workspaceSnapshotApiService));
     }
 
-    public Task LoadAsync(CancellationToken cancellationToken = default)
-    {
-        return LoadAsync(null, null, cancellationToken);
-    }
-
     public async Task LoadAsync(string? enterprise = null, int? fiscalYear = null, CancellationToken cancellationToken = default)
     {
         WorkspaceBootstrapData? bootstrapData = null;
