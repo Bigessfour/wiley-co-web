@@ -14,6 +14,17 @@ public sealed class FileImportServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateImportFileAsync_ReturnsFailure_WhenPathIsEmpty()
+    {
+        var service = CreateService();
+
+        var result = await service.ValidateImportFileAsync(string.Empty);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("null or empty", result.ErrorMessage ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ValidateImportFileAsync_ReturnsFailure_WhenFileDoesNotExist()
     {
         var service = CreateService();
@@ -23,6 +34,25 @@ public sealed class FileImportServiceTests : IDisposable
 
         Assert.False(result.IsSuccess);
         Assert.Contains("File not found", result.ErrorMessage ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task ValidateImportFileAsync_ReturnsFailure_WhenFileIsEmpty()
+    {
+        var service = CreateService();
+        var filePath = CreateTempFile(".txt", string.Empty);
+
+        try
+        {
+            var result = await service.ValidateImportFileAsync(filePath);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("File is empty", result.ErrorMessage ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
     }
 
     [Fact]
@@ -57,6 +87,65 @@ public sealed class FileImportServiceTests : IDisposable
             Assert.True(result.IsSuccess);
             Assert.NotNull(result.Data);
             Assert.Equal("Alpha", result.Data!.Name);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportDataAsync_ReturnsFailure_ForInvalidJson()
+    {
+        var service = CreateService();
+        var filePath = CreateTempFile(".json", "{\"name\":");
+
+        try
+        {
+            var result = await service.ImportDataAsync<SamplePayload>(filePath);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("Invalid JSON format", result.ErrorMessage ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportDataAsync_ReturnsFailure_ForUnsupportedCsvFormat()
+    {
+        var service = CreateService();
+        var filePath = CreateTempFile(".csv", "name\nAlpha\n");
+
+        try
+        {
+            var result = await service.ImportDataAsync<SamplePayload>(filePath);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("not yet supported", result.ErrorMessage ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportDataAsync_ReturnsFailure_WhenCancellationIsRequested()
+    {
+        var service = CreateService();
+        var filePath = CreateTempFile(".json", "{\"name\":\"Alpha\"}");
+        using var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.Cancel();
+
+        try
+        {
+            var result = await service.ImportDataAsync<SamplePayload>(filePath, cancellationTokenSource.Token);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("cancelled", result.ErrorMessage ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

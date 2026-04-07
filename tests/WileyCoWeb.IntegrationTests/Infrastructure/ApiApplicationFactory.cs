@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using WileyCoWeb.Api;
 
 namespace WileyCoWeb.IntegrationTests.Infrastructure;
 
-public sealed class ApiApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"WileyCoWebIntegrationTests-{Guid.NewGuid():N}";
 
@@ -28,8 +29,6 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>, IAsy
     {
         await ResetDatabaseAsync();
     }
-
-    Task IAsyncLifetime.DisposeAsync() => Task.CompletedTask;
 
     public async Task ResetDatabaseAsync()
     {

@@ -10,6 +10,11 @@
   <ItemGroup>
     <ProjectReference Include="..\src\WileyWidget.Data\WileyWidget.Data.csproj" />
     <ProjectReference Include="..\src\WileyWidget.Models\WileyWidget.Models.csproj" />
+    <ProjectReference Include="..\src\WileyWidget.Services\WileyWidget.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Contracts\WorkspaceContracts.cs" Link="Contracts\WorkspaceContracts.cs" />
   </ItemGroup>
 
 </Project>

@@ -423,4 +423,41 @@ public class BudgetSnapshot
 
     [Column("payload", TypeName = "jsonb")]
     public string? Payload { get; set; }
+
+    public ICollection<BudgetSnapshotArtifact> ExportArtifacts { get; set; } = new List<BudgetSnapshotArtifact>();
+}
+
+[Table("budget_snapshot_artifacts")]
+public class BudgetSnapshotArtifact
+{
+    [Key]
+    [Column("id")]
+    public long Id { get; set; }
+
+    [Required]
+    [Column("budget_snapshot_id")]
+    public long BudgetSnapshotId { get; set; }
+
+    public BudgetSnapshot BudgetSnapshot { get; set; } = null!;
+
+    [Required]
+    [Column("document_kind")]
+    public string DocumentKind { get; set; } = string.Empty;
+
+    [Required]
+    [Column("file_name")]
+    public string FileName { get; set; } = string.Empty;
+
+    [Required]
+    [Column("content_type")]
+    public string ContentType { get; set; } = string.Empty;
+
+    [Column("size_bytes")]
+    public long SizeBytes { get; set; }
+
+    [Column("created_at")]
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    [Column("payload")]
+    public byte[] Payload { get; set; } = Array.Empty<byte>();
 }

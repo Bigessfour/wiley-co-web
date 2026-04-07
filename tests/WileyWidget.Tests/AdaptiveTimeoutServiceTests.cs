@@ -46,6 +46,50 @@ public sealed class AdaptiveTimeoutServiceTests : IDisposable
     }
 
     [Fact]
+    public void RecordLatency_IgnoresNegativeValues()
+    {
+        var service = CreateService();
+
+        service.RecordLatency(-2);
+        service.RecordLatency(4.5);
+
+        var statistics = service.GetStatistics();
+
+        Assert.Equal(1, statistics.SampleCount);
+        Assert.Equal(4.5, statistics.AverageLatencySeconds);
+    }
+
+    [Fact]
+    public void GetRecommendedTimeoutSeconds_ClampsToMinimum_WhenCalculatedValueIsTooSmall()
+    {
+        var service = CreateService();
+
+        for (var sample = 1; sample <= 10; sample++)
+        {
+            service.RecordLatency(1);
+        }
+
+        var timeout = service.GetRecommendedTimeoutSeconds();
+
+        Assert.Equal(5.0, timeout);
+    }
+
+    [Fact]
+    public void GetRecommendedTimeoutSeconds_ClampsToMaximum_WhenCalculatedValueIsTooLarge()
+    {
+        var service = CreateService();
+
+        for (var sample = 1; sample <= 10; sample++)
+        {
+            service.RecordLatency(100);
+        }
+
+        var timeout = service.GetRecommendedTimeoutSeconds();
+
+        Assert.Equal(60.0, timeout);
+    }
+
+    [Fact]
     public void Reset_ClearsTrackedLatencies()
     {
         var service = CreateService();

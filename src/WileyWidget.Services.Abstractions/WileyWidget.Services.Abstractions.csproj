@@ -26,6 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="IAIAssistantService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Abstractions need model types (Enterprise, BudgetData, ServiceChargeRecommendation, etc.) -->
     <ProjectReference Include="..\WileyWidget.Models\WileyWidget.Models.csproj" />
   </ItemGroup>

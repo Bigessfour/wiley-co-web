@@ -131,7 +131,7 @@ namespace WileyWidget.Services.Abstractions
     }
 
     /// <summary>
-    /// Conversation history model stub.
+    /// Conversation history model used by the EF-backed conversation repository.
     /// </summary>
     public class ConversationHistory
     {

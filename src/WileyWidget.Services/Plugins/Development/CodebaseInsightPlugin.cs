@@ -132,7 +132,7 @@ namespace WileyWidget.Services.Plugins.Development
             var current = AppDomain.CurrentDomain.BaseDirectory;
             while (!string.IsNullOrEmpty(current))
             {
-                if (Directory.GetFiles(current, "*.sln").Any())
+                if (Directory.GetFiles(current, "*.sln").Any() || Directory.GetFiles(current, "*.slnx").Any())
                 {
                     return current;
                 }

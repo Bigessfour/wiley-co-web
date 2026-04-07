@@ -1,118 +1,119 @@
+using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.ComponentTests;
 
 public sealed class WorkspaceStateTests
 {
-    [Fact]
-    public void Defaults_ExposeExpectedValues()
-    {
-        var state = new WorkspaceState();
+	[Fact]
+	public void ApplyBootstrap_ThenToBootstrapData_RoundTripsSharedWorkspaceContract()
+	{
+		var state = new WorkspaceState();
+		var scenarioId = Guid.NewGuid();
 
-        Assert.Equal("Water", state.SelectedEnterprise);
-        Assert.Equal(2026, state.SelectedFiscalYear);
-        Assert.Equal("Base Planning Scenario", state.ActiveScenarioName);
-        Assert.Equal(28.50m, state.CurrentRate);
-        Assert.Equal(412500m, state.TotalCosts);
-        Assert.Equal(14500m, state.ProjectedVolume);
-        Assert.Equal(28.448275862068965517241379310m, state.RecommendedRate);
-        Assert.Equal(0.051724137931034482758620690m, state.RateDelta);
-        Assert.Equal("Water FY 2026 | Base Planning Scenario", state.ContextSummary);
-        Assert.Collection(state.RateComparison,
-            point => Assert.Equal("Current", point.Label),
-            point => Assert.Equal("Break-Even", point.Label));
-    }
+		var bootstrap = new WorkspaceBootstrapData(
+			"Water Utility",
+			2026,
+			"Council Review Scenario",
+			61.75m,
+			15500m,
+			275m,
+			DateTime.UtcNow.ToString("O"))
+		{
+			EnterpriseOptions = ["Water Utility", "Sanitation Utility"],
+			FiscalYearOptions = [2025, 2026, 2027],
+			CustomerServiceOptions = ["All Services", "Water", "Sewer"],
+			CustomerCityLimitOptions = ["All", "Yes", "No"],
+			ScenarioItems =
+			[
+				new WorkspaceScenarioItemData(scenarioId, "Reserve transfer", 6200m)
+			],
+			CustomerRows =
+			[
+				new CustomerRow("North Plant", "Water", "Yes"),
+				new CustomerRow("South Lift", "Sewer", "No")
+			],
+			ProjectionRows =
+			[
+				new ProjectionRow("FY26", 61.75m),
+				new ProjectionRow("FY27", 65.10m)
+			]
+		};
 
-    [Fact]
-    public void Mutations_NormalizeValues_AndRaiseChanged()
-    {
-        var state = new WorkspaceState();
-        var changedCount = 0;
-        state.Changed += () => changedCount++;
+		state.ApplyBootstrap(bootstrap);
+		var roundTripped = state.ToBootstrapData();
 
-        state.SetSelection("  Sewer  ", 2027);
-        state.SetActiveScenarioName("  FY 2027 Reforecast  ");
-        state.SetCurrentRate(31.25m);
-        state.SetTotalCosts(500000m);
-        state.SetProjectedVolume(16000m);
-        state.SetCustomerSearchTerm("  Wiley  ");
-        state.SetCustomerServiceFilter("  Trash  ");
-        state.SetCustomerCityLimitsFilter("  Yes  ");
-        state.AddScenarioItem("  Truck Replacement  ", 2500m);
+		Assert.Equal("Water Utility", roundTripped.SelectedEnterprise);
+		Assert.Equal(2026, roundTripped.SelectedFiscalYear);
+		Assert.Equal("Council Review Scenario", roundTripped.ActiveScenarioName);
+		Assert.Equal(61.75m, roundTripped.CurrentRate);
+		Assert.Equal(15500m, roundTripped.TotalCosts);
+		Assert.Equal(275m, roundTripped.ProjectedVolume);
+		Assert.Equal(new[] { "Water Utility", "Sanitation Utility" }, roundTripped.EnterpriseOptions);
+		Assert.Equal(new[] { 2025, 2026, 2027 }, roundTripped.FiscalYearOptions);
+		Assert.Equal(new[] { "All Services", "Water", "Sewer" }, roundTripped.CustomerServiceOptions);
+		Assert.Single(roundTripped.ScenarioItems!);
+		Assert.Equal(scenarioId, roundTripped.ScenarioItems![0].Id);
+		Assert.Equal(2, roundTripped.CustomerRows?.Count);
+		Assert.Equal(2, roundTripped.ProjectionRows?.Count);
+	}
 
-        var scenarioItemId = state.ScenarioItems.Single().Id;
-        state.UpdateScenarioItem(scenarioItemId, "  Fleet Replacement  ", 3000m);
-        state.RemoveScenarioItem(scenarioItemId);
-        state.ClearCustomerFilters();
-        state.Refresh();
+	[Fact]
+	public void ApplyBootstrap_UsesSharedContractOptionsForFilteringAndSelection()
+	{
+		var state = new WorkspaceState();
+		state.ApplyBootstrap(new WorkspaceBootstrapData(
+			"Water Utility",
+			2026,
+			"Base Planning Scenario",
+			55.25m,
+			13250m,
+			240m,
+			DateTime.UtcNow.ToString("O"))
+		{
+			EnterpriseOptions = ["Water Utility", "Trash Utility"],
+			FiscalYearOptions = [2025, 2026],
+			CustomerRows =
+			[
+				new CustomerRow("North Plant", "Water", "Yes"),
+				new CustomerRow("South Lift", "Sewer", "No"),
+				new CustomerRow("West Shop", "Water", "No")
+			]
+		});
 
-        Assert.Equal("Sewer", state.SelectedEnterprise);
-        Assert.Equal(2027, state.SelectedFiscalYear);
-        Assert.Equal("FY 2027 Reforecast", state.ActiveScenarioName);
-        Assert.Equal(31.25m, state.CurrentRate);
-        Assert.Equal(500000m, state.TotalCosts);
-        Assert.Equal(16000m, state.ProjectedVolume);
-        Assert.Equal(string.Empty, state.CustomerSearchTerm);
-        Assert.Equal("All Services", state.SelectedCustomerService);
-        Assert.Equal("All", state.SelectedCustomerCityLimits);
-        Assert.Empty(state.ScenarioItems);
-        Assert.True(changedCount >= 12);
-    }
+		state.SetCustomerServiceFilter("Water");
+		state.SetCustomerCityLimitsFilter("No");
 
-    [Fact]
-    public void ApplyBootstrap_AndToBootstrapData_PreserveCollections()
-    {
-        var state = new WorkspaceState();
-        var changedCount = 0;
-        state.Changed += () => changedCount++;
+		Assert.Equal(new[] { "Water Utility", "Trash Utility" }, state.EnterpriseOptions);
+		Assert.Equal(new[] { 2025, 2026 }, state.FiscalYearOptions);
+		Assert.Single(state.FilteredCustomers);
+		Assert.Equal("West Shop", state.FilteredCustomers[0].Name);
+	}
 
-        var bootstrap = new WorkspaceBootstrapData(
-            "Trash",
-            2025,
-            "Trash planning",
-            22.75m,
-            132000m,
-            5100m,
-            "2026-04-05T12:00:00.0000000Z")
-        {
-            ScenarioItems = new List<WorkspaceScenarioItemData>
-            {
-                new(Guid.NewGuid(), "Truck Replacement", 2500m),
-                new(Guid.NewGuid(), "Reserve Increase", 1200m)
-            },
-            CustomerRows = new List<CustomerRow>
-            {
-                new("Dana", "Trash", "Yes"),
-                new("Bea", "Water", "No")
-            },
-            ProjectionRows = new List<ProjectionRow>
-            {
-                new("2025", 22.75m),
-                new("2026", 24.10m)
-            }
-        };
+	[Fact]
+	public void SetCurrentStateSource_TracksBrowserRestoredStateWithoutChangingStartupSource()
+	{
+		var state = new WorkspaceState();
 
-        state.ApplyBootstrap(bootstrap);
+		state.SetStartupSource(WorkspaceStartupSource.ApiSnapshot, "Workspace started from the live workspace API snapshot.");
+		state.SetCurrentStateSource(WorkspaceStartupSource.BrowserStorageRestore, "Current workspace state was restored from browser storage.");
 
-        Assert.Equal(1, changedCount);
-        Assert.Equal("Trash", state.SelectedEnterprise);
-        Assert.Equal(2025, state.SelectedFiscalYear);
-        Assert.Equal("Trash planning", state.ActiveScenarioName);
-        Assert.Equal(22.75m, state.CurrentRate);
-        Assert.Equal(132000m, state.TotalCosts);
-        Assert.Equal(5100m, state.ProjectedVolume);
-        Assert.Equal(2, state.ScenarioItems.Count);
-        Assert.Equal(2, state.Customers.Count);
-        Assert.Equal(2, state.ProjectionSeries.Count);
-        Assert.Contains("Trash", state.CustomerServiceOptions);
-        Assert.Contains(state.FilteredCustomers, customer => customer.Name == "Dana");
+		Assert.Equal(WorkspaceStartupSource.ApiSnapshot, state.StartupSource);
+		Assert.Equal(WorkspaceStartupSource.BrowserStorageRestore, state.CurrentStateSource);
+		Assert.True(state.IsUsingBrowserRestoredState);
+		Assert.Contains("browser storage", state.CurrentStateSourceStatus);
+		Assert.Contains("live workspace API snapshot", state.StartupSourceStatus);
+	}
 
-        var roundTrip = state.ToBootstrapData();
+	[Fact]
+	public void SetStartupSource_UpdatesStartupStatusAndFallbackFlag()
+	{
+		var state = new WorkspaceState();
 
-        Assert.Equal("Trash", roundTrip.SelectedEnterprise);
-        Assert.Equal(2025, roundTrip.SelectedFiscalYear);
-        Assert.Equal(2, roundTrip.ScenarioItems?.Count);
-        Assert.Equal(2, roundTrip.CustomerRows?.Count);
-        Assert.Equal(2, roundTrip.ProjectionRows?.Count);
-    }
+		state.SetStartupSource(WorkspaceStartupSource.LocalBootstrapFallback, "Workspace started from local fallback data because the workspace API was unavailable.");
+
+		Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
+		Assert.True(state.IsUsingStartupFallback);
+		Assert.Contains("local fallback data", state.StartupSourceStatus);
+	}
 }

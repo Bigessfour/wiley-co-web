@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+    <UserSecretsId>f6ce628b-59d0-4238-ad1f-5b6f977fd5b9</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,13 +20,18 @@
     <PackageReference Include="Syncfusion.Blazor.CircularGauge" />
     <PackageReference Include="Syncfusion.Blazor.DropDowns" />
     <PackageReference Include="Syncfusion.Blazor.Grid" />
+    <PackageReference Include="Syncfusion.Blazor.Inputs" />
     <PackageReference Include="Syncfusion.Blazor.Layouts" />
     <PackageReference Include="Syncfusion.Blazor.Navigations" />
-    <PackageReference Include="Syncfusion.Blazor.Inputs" />
+    <PackageReference Include="Syncfusion.Blazor.Notifications" />
+    <PackageReference Include="Syncfusion.Blazor.Popups" />
+    <PackageReference Include="Syncfusion.Blazor.ProgressBar" />
     <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" />
     <PackageReference Include="Syncfusion.Blazor.Spreadsheet" />
     <PackageReference Include="Syncfusion.Blazor.Themes" />
     <PackageReference Include="Syncfusion.Blazor.WordProcessor" />
+    <PackageReference Include="Syncfusion.Pdf.Net.Core" />
+    <PackageReference Include="Syncfusion.XlsIO.Net.Core" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,6 +40,18 @@
     <Compile Remove="src/**/*.cs" />
     <Compile Remove="WileyCoWeb.Api/**/*.cs" />
     <Compile Remove="tests/**/*.cs" />
+    <Content Remove="src/**" />
+    <Content Remove="tests/**" />
+    <Content Remove="WileyCoWeb.Api/**" />
+    <Content Remove="publish_output/**" />
+    <Content Remove="bin/**" />
+    <Content Remove="obj/**" />
+    <None Remove="src/**" />
+    <None Remove="tests/**" />
+    <None Remove="WileyCoWeb.Api/**" />
+    <None Remove="publish_output/**" />
+    <None Remove="bin/**" />
+    <None Remove="obj/**" />
   </ItemGroup>
 
   <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">

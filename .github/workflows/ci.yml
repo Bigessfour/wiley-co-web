@@ -15,8 +15,55 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  test:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: component
+            project: tests/WileyCoWeb.ComponentTests/WileyCoWeb.ComponentTests.csproj
+          - name: integration
+            project: tests/WileyCoWeb.IntegrationTests/WileyCoWeb.IntegrationTests.csproj
+          - name: widget
+            project: tests/WileyWidget.Tests/WileyWidget.Tests.csproj
+          - name: e2e
+            project: tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9.0.312
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.312
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ matrix.project }} --locked-mode
+
+      - name: Build
+        run: dotnet build ${{ matrix.project }} --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Run tests with coverage
+        run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }}
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.name }}
+          path: TestResults/${{ matrix.name }}/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+  build-and-publish:
+    runs-on: windows-latest
+    needs: test
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -37,9 +84,6 @@ jobs:
 
       - name: Build
         run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
-
-      - name: Run tests
-        run: dotnet test WileyCoWeb.slnx --configuration Release --no-build --verbosity normal
 
       - name: Publish for Amplify
         run: dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore -p:ContinuousIntegrationBuild=true

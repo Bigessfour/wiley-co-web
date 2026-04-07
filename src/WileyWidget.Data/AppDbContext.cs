@@ -69,6 +69,7 @@ namespace WileyWidget.Data
         public DbSet<TrialBalanceLine> TrialBalanceLines { get; set; } = null!;
         public DbSet<ProfitLossMonthlyLine> ProfitLossMonthlyLines { get; set; } = null!;
         public DbSet<BudgetSnapshot> BudgetSnapshots { get; set; } = null!;
+        public DbSet<BudgetSnapshotArtifact> BudgetSnapshotArtifacts { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -365,6 +366,7 @@ namespace WileyWidget.Data
                 entity.HasIndex(e => e.BatchId);
                 entity.HasIndex(e => e.CanonicalEntity);
                 entity.HasIndex(e => e.FileHash);
+                entity.HasIndex(e => new { e.CanonicalEntity, e.FileHash }).IsUnique();
             });
 
             modelBuilder.Entity<ChartOfAccount>(entity =>
@@ -482,6 +484,22 @@ namespace WileyWidget.Data
                 entity.Property(e => e.CreatedAt).HasColumnType(TimestampWithTimeZone);
                 entity.Property(e => e.SnapshotDate).HasColumnType("date");
                 entity.Property(e => e.Payload).HasColumnType("jsonb");
+            });
+
+            modelBuilder.Entity<BudgetSnapshotArtifact>(entity =>
+            {
+                entity.ToTable("budget_snapshot_artifacts");
+                entity.HasKey(e => e.Id);
+                entity.HasOne(e => e.BudgetSnapshot)
+                      .WithMany(snapshot => snapshot.ExportArtifacts)
+                      .HasForeignKey(e => e.BudgetSnapshotId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => new { e.BudgetSnapshotId, e.DocumentKind });
+                entity.Property(e => e.DocumentKind).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.FileName).HasMaxLength(260).IsRequired();
+                entity.Property(e => e.ContentType).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.CreatedAt).HasColumnType(TimestampWithTimeZone);
+                entity.Property(e => e.Payload).HasColumnType("bytea");
             });
 
             // Precision for TaxRevenueSummary decimal columns to prevent truncation/rounding issues

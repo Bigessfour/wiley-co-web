@@ -11,16 +11,14 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var syncfusionLicenseKey = builder.Configuration["SyncfusionLicenseKey"]
-    ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
-    ?? Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY");
-
+    ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
 if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
 {
     SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
 }
 else
 {
-    Console.WriteLine("WARNING: Syncfusion license key was not found in configuration or environment variables.");
+    Console.WriteLine("WARNING: Syncfusion license key was not found in configuration or the environment. Configure Amplify build secrets or set SYNCFUSION_LICENSE_KEY before starting the app.");
 }
 
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
@@ -46,6 +44,10 @@ builder.Services.AddSingleton<WorkspaceState>();
 builder.Services.AddScoped<WorkspaceBootstrapService>();
 builder.Services.AddScoped<WorkspacePersistenceService>();
 builder.Services.AddScoped<WorkspaceSnapshotApiService>();
+builder.Services.AddScoped<QuickBooksImportApiService>();
+builder.Services.AddScoped<WorkspaceAiApiService>();
+builder.Services.AddScoped<WorkspaceDocumentExportService>();
+builder.Services.AddScoped<BrowserDownloadService>();
 
 builder.Services.AddSyncfusionBlazor();
 

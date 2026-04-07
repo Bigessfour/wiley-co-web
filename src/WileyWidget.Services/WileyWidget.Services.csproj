@@ -71,4 +71,11 @@
     <Compile Remove="PasswordBoxHelper.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="QuickBooksImportService.cs" />
+    <Compile Include="QuickBooksImportAssistantService.cs" />
+    <Compile Include="..\..\Contracts\QuickBooksImportContracts.cs" Link="Contracts\QuickBooksImportContracts.cs" />
+    <Compile Include="..\..\Contracts\WorkspaceChatContracts.cs" Link="Contracts\WorkspaceChatContracts.cs" />
+  </ItemGroup>
+
 </Project>

@@ -10,6 +10,7 @@ namespace WileyWidget.Services
     {
         private static readonly AsyncLocal<string?> _currentUserId = new();
         private static readonly AsyncLocal<string?> _currentUserName = new();
+        private static readonly AsyncLocal<string?> _currentUserEmail = new();
         /// <summary>
         /// Gets the current user ID from the async local storage
         /// </summary>
@@ -19,6 +20,11 @@ namespace WileyWidget.Services
         /// Gets the display name of the current user from the async local storage
         /// </summary>
         public string? DisplayName => _currentUserName.Value;
+
+        /// <summary>
+        /// Gets the email of the current user from the async local storage.
+        /// </summary>
+        public string? Email => _currentUserEmail.Value;
 
         /// <summary>
         /// Backwards-compatible: gets the current user ID
@@ -35,10 +41,12 @@ namespace WileyWidget.Services
         /// </summary>
         /// <param name="userId">The user ID</param>
         /// <param name="userName">The user name</param>
-        public void SetCurrentUser(string? userId, string? userName)
+        /// <param name="userEmail">The user email</param>
+        public void SetCurrentUser(string? userId, string? userName, string? userEmail = null)
         {
             _currentUserId.Value = userId;
             _currentUserName.Value = userName;
+            _currentUserEmail.Value = userEmail;
         }
     }
 }

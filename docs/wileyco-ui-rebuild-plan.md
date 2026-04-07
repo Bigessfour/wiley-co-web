@@ -2,13 +2,122 @@
 
 This document turns the restored Wiley Widget vision into an implementation plan for the current Blazor WebAssembly app.
 
+## Overall Goals
+
+- QuickBooks Desktop exports are the canonical source of truth for actuals.
+- Duplicate imports must be prevented, while preserving import lineage and provenance.
+- Every enterprise should use the same workspace flow, while still remaining separated for reporting and analysis.
+- Council-facing views should emphasize current position, subsidization, and 1, 5, and 10-year trend analysis.
+- AI should own recommendations and what-if scenario guidance.
+- Import workflows should stay clerk-friendly, with plain-language guidance and troubleshooting support.
+- The clerk import panel must be a first-class Syncfusion Blazor workflow, not an ad hoc file picker.
+
+## Mission Goal
+
+Wiley Widget exists to help the Town of Wiley understand the financial performance of each utility enterprise and make defensible rate decisions.
+
+- Manual QuickBooks Desktop exports are the primary data source for import into the Amplify database.
+- Syncfusion Blazor visualizations should show whether Water, Sewer, Trash, and Apartments are financially self-supporting or subsidizing one another.
+- Server-side AI must run through Microsoft Semantic Kernel and the xAI Grok API, then surface either as guided recommendations or as Jarvis chat responses depending on context.
+- What-if scenarios must stay flexible enough to model raises, benefits, reserve building, equipment replacement, and other council-driven changes.
+- The workspace should keep the council focused on current position, enterprise-by-enterprise impact, and target service-charge outcomes.
+
+## Completeness Review
+
+Date: Tuesday, April 07, 2026
+
+Status: Production baseline ([Components/Pages/WileyWorkspace.razor](../Components/Pages/WileyWorkspace.razor) + thin API snapshot host) is live and stable.
+
+Key finding: The rebuild is about 85% complete for the core features already developed and deployed. No new features are proposed here; the remaining work is limited to the unfinished portions of the already-scoped Phase 0A through Phase 6 workstreams.
+
+### Current State
+
+- [x] Overall Goals and Mission Goal are aligned for data provenance, enterprise separation, council-facing break-even and trend views, and AI ownership of recommendations.
+- [x] Product Goal is already reflected in the live shell: break-even, manual rates, scenario planning, light customer records, projections, and AI chat are all scoped and partially live.
+- [x] Target architecture and boundary rules are being enforced through the thin client, Application, Shared, and Data layers.
+- [x] Frontend shell work is in place, with the clerk import panel complete and the full JARVIS chat remaining the largest open item.
+- [x] Backend persistence for rates, scenarios, and baseline updates is working; shared model promotion and EF Core mappings remain the primary backlog.
+- [x] The AI layer is production-safe in deterministic mode, while the full Semantic Kernel + xAI + per-user onboarding path remains deferred but designed.
+- [x] The clerk import panel is now a first-class Syncfusion workflow in the shell and includes preview-first validation plus proof tests.
+- [x] The customer export center and trends/projections panel are implemented in the workspace shell and have validation coverage.
+- [ ] The full secure JARVIS chat path is not yet wired to the live API contract.
+- [ ] Shared model promotion and full EF Core mapping work remain open.
+- [ ] The plan still needs a coverage gate across all four test platforms.
+- [x] A test inventory report now lists discovered tests and latest coverage by platform.
+
+### Already-Developed Gaps To Close
+
+#### Phase 0A - Clerk Import Panel
+
+- [x] Add the Syncfusion clerk import rail inside the existing shell using `SfFileUpload` and `SfStepper`.
+- [x] Add file-type validation, parsing progress, parsed-row preview, and duplicate-status display with `SfDataGrid`.
+- [x] Add confirmation dialogs, duplicate-block explanations, and success/failure feedback with `SfDialog` and `SfToast`.
+- [x] Keep parse/save progress visible with `SfProgressBar` or `SfSpinner` and keep all wording plain-language.
+- [x] Keep the panel responsive and laptop-friendly while relying on the backend hash plus canonical-entity duplicate guardrails that already exist.
+
+#### Phase 4 - Customer Viewer and Trends
+
+- [x] The customer viewer grid exists and basic filtering is live.
+- [x] Finish the customer export flow from the filterable `SfGrid`.
+- [x] Complete the Trends and Projections panel with historical and projected series, using the simple model already present in the projection service.
+
+#### Phase 5 - AI Chat
+
+- [ ] Replace the deterministic decision-support rail with the secure thin API-backed Syncfusion chat path.
+- [ ] Wire the Jarvis user-context plugin for onboarding, per-user/per-workspace threads, profile persistence, and reset behavior.
+- [ ] Persist recommendation history and conversation threads through the existing repository-backed tables.
+
+#### Phase 6 - Polish
+
+- [ ] Complete the remaining responsive refinements and final theme polish.
+- [ ] Harden Amplify deployment for production operations.
+
+#### Backend, Shared, and Continuity Work
+
+- [ ] Promote the remaining schema-native entities and DTOs into `WileyCo.Shared`.
+- [ ] Finish EF Core mappings and migrations for the shared model.
+- [ ] Wire the remaining calculation services where legacy code still ties to the old budget workflow.
+- [ ] Unify the client and API workspace contracts and remove duplicated bootstrap or snapshot records.
+- [ ] Treat `src/` as a true archive and remove local-only fallback paths except where they are explicitly degraded-mode behavior.
+
+### Test Coverage And Inventory
+
+- [x] Component test platform exists and is discoverable in the IDE.
+- [x] Integration test platform exists and passed the latest validation run.
+- [x] E2E test platform exists and is marked as a test project.
+- [x] Widget test platform exists as a separate test project.
+- [x] Add a test inventory report that lists discovered tests by platform and feature area.
+- [ ] Add a coverage gate that keeps each of the four platforms at or above 80 percent coverage.
+- [ ] Verify Component test coverage is at least 80 percent.
+- [ ] Verify Integration test coverage is at least 80 percent.
+- [ ] Verify E2E test coverage is at least 80 percent.
+- [ ] Verify Widget test coverage is at least 80 percent.
+- Current coverage snapshot from the inventory script: Component 40.9%, Integration 11.7%, E2E 0.0%, Widget 9.5%.
+
+### AWS Amplify Resources That Help Close The Gaps
+
+- [x] Amplify Hosting and `amplify.yml` can cover the Blazor WASM build and deployment path already used by the app.
+- [x] Amplify Auth with Cognito User Pools fits the existing AWS login-side identity needs for Jarvis threads and workspace security.
+- [x] Environment variables and secrets should hold `WILEY_WORKSPACE_API_BASE_ADDRESS`, database connection strings, xAI keys, and Semantic Kernel settings.
+- [x] Custom domains, SSL, and the global CDN support the council-facing production shell.
+- [x] Branch deployments and previews are useful for testing the clerk import panel and JARVIS changes without affecting production.
+- [x] Monitoring and logging through the Amplify console and CloudWatch support the Phase 6 hardening work.
+
+### Immediate Next Actions
+
+- [ ] Unify the workspace contracts and remove hardcoded client defaults.
+- [ ] Add the coverage gate for all four test platforms and raise each to at least 80 percent.
+- [ ] Wire the secure JARVIS API path and user-context plugin.
+- [x] Finish customer export and trends chart polish.
+- [ ] Apply Amplify Auth and secrets for production hardening.
+
 ## Baseline
 
 - [x] App targets `.NET 9` Blazor WebAssembly.
 - [x] Syncfusion Blazor `33.1.44` is the UI stack.
 - [x] AWS Amplify is the host.
 - [x] Aurora PostgreSQL Serverless v2 is the data store.
-- [x] The current dashboard seed is [Components/Pages/BudgetDashboard.razor](../Components/Pages/BudgetDashboard.razor).
+- [x] The current production workspace entry is [Components/Pages/WileyWorkspace.razor](../Components/Pages/WileyWorkspace.razor), with [Components/Pages/BudgetDashboard.razor](../Components/Pages/BudgetDashboard.razor) retained only as a route alias.
 - [x] Existing service surface is available in `WileyWidget.Services` and `WileyWidget.Business`.
 - [x] Treat `src/` as a legacy archive and promote only the files needed for the web app into the active project structure.
 
@@ -74,6 +183,7 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 - [x] Rework the budget dashboard into a panel-first shell with persistent enterprise and fiscal year context.
 - [x] Preserve a responsive desktop-first feel.
 - [x] `WileyWorkspace.razor` becomes the single orchestrator page.
+- [x] Add a dedicated clerk import panel built with Syncfusion Blazor upload, preview, confirmation, and feedback components.
 
 ### Backend
 
@@ -88,6 +198,35 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 - [ ] xAI / Grok for plain-language output.
 - [ ] Lightweight AI context store (scenario summaries, recommendation history).
 
+### Jarvis User Context Plugin
+
+- [ ] Add a dedicated Semantic Kernel plugin for user onboarding, profile capture, and conversation lifecycle management.
+- [ ] Use the plugin to greet a first-time signed-in user with a short, human-style introduction instead of a generic assistant response.
+- [ ] Ask only a few low-friction questions on first contact: preferred name, role or department, and what the user wants Jarvis to help with.
+- [ ] Store the answers as a small user profile summary, not as hidden memory.
+- [ ] Create a new conversation thread per user and per workspace context so Jarvis can keep chats separated by identity and enterprise.
+- [ ] Use a stable user key from the AWS login side as the primary delimiter, with display name and email as supporting fields.
+- [ ] Distinguish guest, first-time, active, and archived users in the persistence model.
+- [ ] Add a retention policy for old conversations and stale onboarding records so the database does not grow without bound.
+- [ ] Keep all prompts plain-language and non-creepy; the assistant should explain why it is asking and what it will remember.
+- [ ] Surface an explicit reset / forget-me action for the user profile summary and conversation thread.
+- [ ] Keep the plugin responsible for orchestration only; store data through the existing repository and EF-backed conversation tables.
+
+### Clerk Import Panel
+
+- [ ] Use `SfFileUpload` as the entry point for QuickBooks CSV/XLSX uploads, with file-type validation and upload progress.
+- [ ] Use `SfStepper` as the primary wizard flow for select, preview, confirm, and complete states.
+- [ ] Use `SfDataGrid` to preview parsed rows before import, including file name, target enterprise, row counts, and duplicate status.
+- [ ] Use `SfDialog` for import confirmation, duplicate warnings, and error details.
+- [ ] Use `SfToast` for success, blocked-duplicate, and validation notifications.
+- [ ] Use `SfProgressBar` or `SfSpinner` for parsing and save progress feedback.
+- [ ] Use `SfTabs` or `SfAccordion` only for secondary detail areas, not as the primary import flow.
+- [ ] Keep the panel inside the existing dashboard shell so the clerk does not leave the workspace.
+- [ ] Keep validation focused on file type, file readability, and duplicate prevention only; QuickBooks actuals remain canonical.
+- [ ] Keep all wording plain-language so a clerk can understand the action, the block reason, and the next step.
+- [ ] Keep the layout responsive and restrained so the clerk can complete the task quickly on a laptop without hunting through the shell.
+- [ ] Follow Syncfusion guidance to prefer theme classes and built-in component states instead of custom wrappers or bespoke visual controls.
+
 ## Detailed UI Build Plan
 
 **Goal**: Deliver a production-ready multi-panel workspace in controlled slices.
@@ -100,20 +239,31 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 - [x] `SfSplitter` for resizable left/right rails.
 - [x] Floating or docked JARVIS chat rail (theme-aware).
 
+### Phase 0A - Clerk Import Panel Checklist
+
+- [x] Add an import panel or rail that stays inside the workspace shell.
+- [x] Accept only supported QuickBooks CSV/XLSX exports through `SfFileUpload`.
+- [x] Parse the file and render a preview before committing any rows.
+- [x] Show preview rows in `SfDataGrid` with enough context for clerks to verify the file.
+- [x] Confirm imports in `SfDialog` before saving and use a separate dialog for duplicate-block explanations.
+- [x] Show progress through `SfSpinner` or `SfProgressBar`, and surface completion through `SfToast`.
+- [x] Keep the panel responsive and usable inside the current enterprise and fiscal-year shell.
+- [x] Keep duplicate prevention aligned with the existing hash-plus-canonical-entity guardrails.
+
 ### Phase 1 - Enterprise Context + Break-Even Slice
 
 1. [x] Wire enterprise selector & fiscal-year picker (dropdowns bound to `WorkspaceState`).
 2. [x] Build **Break-Even Panel**:
-
    - Total costs, projected volume, current rate (editable), calculated break-even rate, delta.
    - Instant recalc on any input change (use `OnValueChange` + `WorkspaceState`).
    - Gauge + card layout with `SfGauge` and `SfChart`.
 3. [x] Build **Rates Panel** (adjacent tile):
-
    - Manual current-rate entry (`SfTextBox` + validation).
    - Visual current vs. recommended + break-even (`SfChart` column or bullet chart).
 4. [x] Save rate snapshot to Aurora via thin API.
-
+   - Manual current-rate entry (`SfTextBox` + validation).
+   - Visual current vs. recommended + break-even (`SfChart` column or bullet chart).
+4. [x] Save rate snapshot to Aurora via thin API.
    - Implemented as a POST to the thin snapshot host. The workspace now archives the current rate and scenario payload to Aurora-backed storage from the rates panel.
 
 **Acceptance**: Met for the live-data gate. Break-even interactions are live, and the page now hydrates customers and projections from the thin API workspace snapshot instead of seeded client-side sample collections.
@@ -128,47 +278,54 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 
 ### Phase 3 - Customer Viewer Panel
 
-- Filterable `SfGrid` (enterprise, city limits, search).
-- Light customer records only (no billing fields).
-- Pagination + export to Excel (reuse `ExcelExportService`).
+- [x] Filterable `SfGrid` (enterprise, city limits, search).
+- [x] Light customer records only (no billing fields).
+- [x] Pagination + export to Excel.
 
 ### Phase 4 - Trends & Projections Panel
 
-- `SfChart` with historical costs/rates + projected lines.
-- Simple projection model first (linear + volume growth).
-- Toggle AI-enhanced forecast later.
+- [x] `SfChart` with historical costs/rates + projected lines.
+- [x] Simple projection model first (linear + volume growth).
+- [ ] Toggle AI-enhanced forecast later.
 
 ### Phase 5 - AI Chat (JARVIS)
 
-- Theme-aware chat UI (`SfChat` or custom with cards).
-- Conversation history persisted per workspace.
-- Feed entire `WorkspaceSnapshot` to `ChatBridgeService`.
-- Secure thin API endpoint for Grok requests.
+- [ ] Theme-aware chat UI (`SfChat` or custom with cards).
+- [ ] Conversation history persisted per workspace.
+- [ ] Feed entire `WorkspaceSnapshot` to `ChatBridgeService`.
+- [ ] Secure thin API endpoint for Grok requests.
+
+Current production stance: the former chat scaffold has been removed from the live UI and replaced with a deterministic decision-support rail until the secure API-backed chat contract exists.
 
 **UI Build Order Summary**:
 
 1. Workspace shell + context rail
 2. Break-even + Rates panels
-3. Scenario planner
-4. Customer viewer
-5. Trends/projections
-6. JARVIS chat (last, because it consumes the full snapshot)
+3. Clerk import panel
+4. Scenario planner
+5. Customer viewer
+6. Trends/projections
+7. JARVIS chat (last, because it consumes the full snapshot)
 
 **Syncfusion Component Map**:
 
 - DashboardLayout -> main tiles
 - Sidebar + Splitter -> rails
-- Grid -> scenario costs & customers
+- DataGrid -> scenario costs, customers, and import preview rows
 - Chart / Gauge -> break-even, trends, comparisons
-- Tab -> sub-views inside panels when needed
-- Dialog -> scenario save/load, import
+- Tabs -> sub-views inside panels when needed
+- Dialog -> scenario save/load, import confirmation, duplicate warnings
+- FileUpload -> clerk import entry point
+- Toast -> import results and warnings
+- Spinner / ProgressBar / Stepper -> import status and progress
+- XlsIO / PDF -> workbook and rate-packet exports
 
 ## Backend Workstream
 
 ### Shared Domain Model
 
 - [ ] Create or extend shared entities in `WileyCo.Shared` for `Enterprise`, `FinancialData`, `Rate`, `Customer`, `Scenario`, `ScenarioImpact`, `HistoricalData`, `Projection`, and `AIContextStore`.
-- [ ] Pull canonical DTOs and shared contracts out of archived `src` files only when they still serve the web pipeline.
+- [x] Pull canonical DTOs and shared contracts out of archived `src` files only when they still serve the web pipeline.
 
 ### Persistence
 
@@ -214,17 +371,31 @@ Add new services if the current ones are too tied to the old budget workflow.
 - [ ] Use CSV or Excel for customer and financial inputs.
 - [ ] Keep Aurora tables as the canonical store.
 - [ ] Store imported file metadata for traceability.
+- [ ] Add a clerk-facing import workflow that previews, confirms, and logs QuickBooks export imports before commit.
+- [ ] Prevent duplicate imports by file hash and canonical entity.
+- [ ] Keep import messages human-readable and specific about blocked duplicates or unreadable files.
+- [ ] Document the accepted QuickBooks export shapes next to the import panel so clerks know which export to choose.
 
 ## AI Workstream
 
 ### AI Chat
 
-- [x] Feed enterprise state, financial totals, scenario costs, and recent rate history into Semantic Kernel.
-- [x] Keep prompts short and grounded in the current fiscal year and selected enterprise.
-- [x] Return both a plain-language explanation and the numeric result.
-- [x] Scaffold the JARVIS chat panel in the Blazor workspace.
+- [ ] Feed enterprise state, financial totals, scenario costs, and recent rate history into Semantic Kernel.
+- [ ] Keep prompts short and grounded in the current fiscal year and selected enterprise.
+- [ ] Return both a plain-language explanation and the numeric result.
+- [x] Replace the temporary chat scaffold with a deterministic decision-support rail in the Blazor workspace.
 - [ ] Add a secure thin API contract for future Grok requests.
 - [ ] Add theme-aware chat controls and conversation history.
+
+### User-Aware Jarvis
+
+- [ ] Detect first-time users from the login identity before the first chat turn.
+- [ ] Route first-time users into an onboarding prompt flow that asks for name, preferred form of address, and role.
+- [ ] Persist a per-user conversation thread key that combines the login identity, enterprise, and workspace scope.
+- [ ] Load persisted thread history on subsequent visits so Jarvis continues where the user left off.
+- [ ] Add cleanup jobs or retention rules for stale guest threads, abandoned onboarding sessions, and archived users.
+- [ ] Keep user preference storage explicit and reviewable rather than implicit and hidden in prompt history.
+- [ ] Allow users to restart onboarding or clear their thread without affecting other users.
 
 ### Recommendation History
 
@@ -252,16 +423,29 @@ Add new services if the current ones are too tied to the old budget workflow.
 - [x] Added a thin API host at `WileyCoWeb.Api` with `/api/workspace/snapshot`.
 - [x] Hydrated the Blazor workspace from the live snapshot endpoint.
 - [x] Added a local bootstrap fallback for offline or standalone runs.
+- [x] Surfaced startup provenance in the workspace so operators can see live API startup versus local fallback startup.
 - [x] Updated the Blazor client to accept `WILEY_WORKSPACE_API_BASE_ADDRESS` for local dev.
 - [x] Excluded the API host sources from the Blazor WASM compile glob.
+- [x] Unified the workspace snapshot/scenario/baseline DTOs into shared contracts at `Contracts/WorkspaceContracts.cs`.
+- [x] Added component coverage for `WorkspaceState` shared-contract round-tripping and option filtering.
+- [x] Added component coverage for startup bootstrap API success and fallback behavior.
+- [x] Added component coverage for current-state provenance after browser persistence restore.
+- [x] Implemented real DI validation discovery and core-service checks in `DiValidationService`.
+- [x] Removed the duplicate AI abstraction contract file and kept the canonical definitions in `AIServiceInterfaces.cs`.
+- [x] Cleared the remaining Sonar static-member warning on `DiValidationService.GetDiscoveredServiceInterfaces` without breaking the interface contract.
 - [x] Verified `dotnet build WileyCoWeb.csproj` succeeds.
 - [x] Verified `dotnet build WileyCoWeb.Api/WileyCoWeb.Api.csproj` succeeds.
 
+### Operational Gaps Discovered
+
+- [ ] Replace the deterministic JARVIS rail with a secure API-backed chat contract and add tests for the chat/recommendation surface.
+
 ### Phase 3 - Scenario Planning
 
-- [ ] Add the scenario builder.
-- [ ] Add cost adjustments.
-- [ ] Compare before and after rate impact.
+- [x] Add the scenario builder.
+- [x] Add cost adjustments.
+- [x] Compare before and after rate impact.
+- [x] Save, load, and re-apply named scenarios from persisted storage.
 
 ### Phase 4 - Customer Viewer
 
@@ -275,12 +459,13 @@ Add new services if the current ones are too tied to the old budget workflow.
 - [ ] Add conversational rate analysis.
 - [ ] Store recommendation history.
 - [ ] Connect the JARVIS panel to the API-backed chat service.
+- [x] Keep the live rail production-safe by using deterministic workspace recommendations until the secure chat path is ready.
 
 ### Phase 6 - Polish and Deployment
 
 - [ ] Responsive refinements.
 - [ ] Theme polishing.
-- [ ] Export flows.
+- [x] Export flows for Excel and PDF deliverables.
 - [ ] Amplify deployment hardening.
 
 ## Suggested File/Project Changes
@@ -290,7 +475,7 @@ Add new services if the current ones are too tied to the old budget workflow.
 - [ ] Add `WileyCo.Components` for reusable Syncfusion panels.
 - [ ] Move only the surviving web-facing code from `src/` into the active app and supporting libraries, then leave the rest archived.
 - [x] Replace the current `BudgetDashboard` page with the new workspace shell.
-- [ ] Keep the old budget dashboard logic only if it still helps as a prototype.
+- [x] Retire the old budget dashboard logic from the live route surface.
 
 ### Concrete `src` Promotion Target
 
@@ -321,7 +506,7 @@ Practical target structure:
 
 This is the target UI shape the current backend and middle-layer files should feed.
 
-- **Workspace shell**: `Components/Pages/WileyWorkspace.razor` and `Components/Pages/WileyWorkspace.razor.cs` remain the top-level orchestrator and now bind enterprise, fiscal year, scenario, and rate inputs through shared workspace state while the snapshot layer is still pending.
+- **Workspace shell**: `Components/Pages/WileyWorkspace.razor` and `Components/Pages/WileyWorkspaceBase.cs` remain the top-level orchestrator and now bind enterprise, fiscal year, scenario, and rate inputs through shared workspace state.
 - **Enterprise context rail**: `EnterpriseRepository`, `AppDbContext`, shared enterprise models, and the import lineage tables should drive enterprise selection, fiscal year selection, and active scenario context.
 - **Break-even tile**: `DashboardService`, `AnalyticsService`, `BudgetAnalyticsRepository`, `AnalyticsPipeline`, and the rate-calculation services should feed total cost, projected volume, current rate, break-even rate, and delta.
 - **Scenario planner tile**: `ScenarioSnapshotRepository`, `SavedScenarioSnapshot`, `BudgetRepository`, and the scenario engine should drive add-cost items, compare-before/after views, and save/load actions.
@@ -347,6 +532,8 @@ Recommended data flow for the UI:
 6. Add trends and projections once the canonical series model is stable.
 7. Connect the AI chat rail last so it can read the same workspace snapshot as the rest of the page.
 
+Current status note: steps 1, 3, 4, and 6 are active in the live workspace. Scenario editing and persisted scenario save/load/apply are now complete in the workspace shell. Step 7 remains intentionally deferred.
+
 ### Archive Review & Culling Recommendations
 
 - [ ] Treat `src/` as a true archive and stop adding new active code there.
@@ -354,13 +541,50 @@ Recommended data flow for the UI:
 - [ ] Promote only files that feed `WorkspaceSnapshot`, the import pipeline, repositories, or AI/chat services.
 - [ ] Keep history intact by archiving, not hard-deleting, until the promoted replacements are verified.
 
-## Immediate Next Actions
+## Immediate Next Actions Summary
 
 - [x] Confirm the shared model names and migration target.
 - [x] Scaffold the enterprise selector and workspace shell.
 - [x] Wire enterprise and fiscal-year state into the shell.
 - [x] Build the break-even panel first.
-- [ ] Wire the first API call to load enterprise and fiscal-year state.
+- [x] Wire the first API call to load enterprise and fiscal-year state.
+
+## Continuity Update
+
+The current production shell in `WileyWorkspace.razor` is the baseline implementation, not a placeholder. Continuity work should focus on replacing the remaining local-only or deterministic flows instead of reworking the shell structure.
+
+### Completed Continuity Slice
+
+- [x] Treat the snapshot composer as the live workspace hydration source.
+- [x] Replace the local-only scenario workflow with persisted save/load/apply behavior.
+- [x] Expand the workspace API surface beyond one-way snapshot archival for scenario continuity.
+- [x] Replace the scenario-name placeholder workflow with explicit persisted scenario controls.
+- [x] Tighten the current-rate editing path to use validated Syncfusion numeric input rather than free-text parsing in the live panel.
+- [x] Persist the active workspace baseline directly to the canonical `Enterprise` record and rehydrate the shell from the recomposed snapshot.
+- [x] Add integration coverage for both scenario persistence and direct baseline persistence.
+
+### Remaining Continuity Priorities
+
+1. Unify the client and API workspace contracts so the app no longer maintains duplicated bootstrap/snapshot records across the Blazor client and API host.
+2. Remove hardcoded client defaults and treat offline bootstrap JSON as an explicit degraded-mode path rather than a normal runtime fallback.
+3. Replace the deterministic JARVIS rail with a secure API-backed Syncfusion chat and recommendation workflow built from the same workspace snapshot.
+4. Finish responsive refinement, theme polishing, and deployment hardening once the remaining data and AI seams are complete.
+
+### Continuity Tracking Detail
+
+- [x] Persist named scenarios through the live workspace API and allow save, list, load, and apply from the Syncfusion shell.
+- [x] Add integration coverage for the scenario persistence endpoints and payload round-trip behavior.
+- [x] Persist the active workspace baseline directly to `Enterprise` so current rate, total costs, and projected volume are not saved only through archival snapshots.
+- [x] Add integration coverage for baseline update and subsequent workspace snapshot rehydration.
+- [ ] Promote a shared workspace contract so the client and API no longer carry mirrored `WorkspaceBootstrapData` and scenario DTO definitions.
+- [ ] Add component-level coverage for the new baseline save workflow in the Blazor shell once the UI command path stabilizes.
+
+### Implementation Notes
+
+- Use the existing `BudgetSnapshots` table as the persisted backing store for named workspace scenarios when full-fidelity round-tripping is required. It already stores the complete serialized workspace payload and avoids introducing a partial scenario schema during active delivery.
+- Keep `SavedScenarioSnapshot` available for narrower analytics-specific use, but do not rely on it for the web workspace until its shape can represent the full scenario payload.
+- Continue to prefer local Syncfusion Blazor documentation in `docs/blazor-documentation-index.md` and the `Blazor Documentation/` PDFs when refining control behavior.
+- For baseline persistence, update the canonical `Enterprise` fields used by the snapshot composer: `CurrentRate`, `MonthlyExpenses`, `CitizenCount`, and `LastModified`, then recompose the workspace snapshot from the same API path the UI already uses.
 
 ## Notes
 

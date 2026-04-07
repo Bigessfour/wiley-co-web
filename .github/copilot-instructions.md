@@ -4,7 +4,7 @@
 
 - Use environment variables for all Syncfusion keys.
 - `SYNCUSION_LICENSE_KEY` is the runtime license key for `Program.cs`.
-- `SYNCUSION_API_KEY` is the Syncfusion MCP server key.
+- `SYNCFUSION_API_KEY` is the Syncfusion MCP server key.
 - Never hard-code Syncfusion keys in source files or committed config.
 - Prefer `#sf_blazor_ui_builder` and the Syncfusion MCP tools when generating UI code.
 

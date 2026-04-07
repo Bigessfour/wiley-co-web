@@ -1,16 +1,23 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="app-shell">
+    <aside class="app-sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+    <main class="app-main">
+        <header class="app-header">
+            <div>
+                <p class="app-eyebrow">Wiley.co</p>
+                <h1 class="app-title">Syncfusion Finance Workspace</h1>
+            </div>
+            <nav class="app-header-links" aria-label="Workspace shortcuts">
+                <a href="/">Workspace</a>
+                <a href="/budget-dashboard">Budget Dashboard</a>
+            </nav>
+        </header>
 
-        <article class="content px-4">
+        <article class="app-content">
             @Body
         </article>
     </main>

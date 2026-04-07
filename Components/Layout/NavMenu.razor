@@ -1,30 +1,34 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">WileyCoWeb</a>
-    </div>
+﻿<div class="app-brand">
+    <p class="app-brand-kicker">Wiley Widget</p>
+    <a class="app-brand-link" href="">Rate Study Console</a>
+    <p class="app-brand-copy">Production workspace shell for rate analysis, dashboards, and guided planning.</p>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<nav class="app-nav" aria-label="Primary">
+    <NavLink class="app-nav-link" href="" Match="NavLinkMatch.All">
+        <span aria-hidden="true">01</span>
+        <span>Workspace</span>
+    </NavLink>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-speedometer2-nav-menu" aria-hidden="true"></span> Workspace
-            </NavLink>
-        </div>
+    <NavLink class="app-nav-link" href="budget-dashboard">
+        <span aria-hidden="true">02</span>
+        <span>Workspace Alias</span>
+    </NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="budget-dashboard">
-                <span class="bi bi-graph-up-arrow-nav-menu" aria-hidden="true"></span> Budget Dashboard
-            </NavLink>
-        </div>
+    <a class="app-nav-link" href="docs/wileyco-ui-rebuild-plan.md">
+        <span aria-hidden="true">03</span>
+        <span>Rebuild Plan</span>
+    </a>
+</nav>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="docs/wileyco-ui-rebuild-plan.md">
-                <span class="bi bi-journal-text-nav-menu" aria-hidden="true"></span> Rebuild Plan
-            </NavLink>
-        </div>
-    </nav>
+<div class="app-sidebar-footer">
+    <div class="app-sidebar-stat">
+        <span>UI stack</span>
+        <strong>Syncfusion 33.1.44</strong>
+    </div>
+    <div class="app-sidebar-stat">
+        <span>Host</span>
+        <strong>AWS Amplify</strong>
+    </div>
 </div>
 

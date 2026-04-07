@@ -162,6 +162,36 @@
           "Syncfusion.Blazor.Spinner": "33.1.44"
         }
       },
+      "Syncfusion.Blazor.Notifications": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "TI7teCGZ6AufIlKIxY7b+E/itJ/rFylM+S39cDXLtcGZFoz4ajDLFcPRRHOyUMQwH0GLftbY1pln4N1bBVTcsg==",
+        "dependencies": {
+          "Syncfusion.Blazor.Buttons": "33.1.44",
+          "Syncfusion.Blazor.Core": "33.1.44"
+        }
+      },
+      "Syncfusion.Blazor.Popups": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "J04SPXF5X8gaXdEWT11uwfJWShgK8sM2Uw8OhpyIgiylx1nSmjQTG7vU1fuiVf07hgfttGHOrwzyn+xq28BKHg==",
+        "dependencies": {
+          "Syncfusion.Blazor.Buttons": "33.1.44",
+          "Syncfusion.Blazor.Core": "33.1.44"
+        }
+      },
+      "Syncfusion.Blazor.ProgressBar": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "SiOG6YKa/U3Yju8ekl8zkRkvR+TIHLp8Qg7OKkYBexJyyUG0NQl93zQr//OGL091kZ0pMHjPEkD8sBI4sjLiAQ==",
+        "dependencies": {
+          "Syncfusion.Blazor.Core": "33.1.44",
+          "Syncfusion.Blazor.Data": "33.1.44"
+        }
+      },
       "Syncfusion.Blazor.SfPdfViewer": {
         "type": "Direct",
         "requested": "[33.1.44, )",
@@ -221,6 +251,27 @@
           "Syncfusion.Blazor.DropDowns": "33.1.44",
           "Syncfusion.Blazor.Navigations": "33.1.44",
           "Syncfusion.WordProcessor.AspNet.Core": "33.1.44"
+        }
+      },
+      "Syncfusion.Pdf.Net.Core": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "uBUUwcVMtbEgWaODKqqrHxuuTZTsV1qD8zJ27a+qAZEq3q2hZZUncbBMoo0XmMHXjvcdliH4OqUI01gXRFNDeg==",
+        "dependencies": {
+          "Syncfusion.Compression.Net.Core": "33.1.44",
+          "Syncfusion.Licensing": "33.1.44",
+          "System.Text.Encoding.CodePages": "4.4.0"
+        }
+      },
+      "Syncfusion.XlsIO.Net.Core": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "K8ZLvCqNmZC/yOcAselKy6Tj3VbdBVkhEoHWt3T9A4NsuirLFzFzd60NiH536/clgbFvRyub9r45hVdf1GcogQ==",
+        "dependencies": {
+          "Syncfusion.Compression.Net.Core": "33.1.44",
+          "Syncfusion.Licensing": "33.1.44"
         }
       },
       "BitMiracle.LibTiff.NET": {
@@ -534,24 +585,6 @@
           "Syncfusion.Blazor.Data": "33.1.44"
         }
       },
-      "Syncfusion.Blazor.Notifications": {
-        "type": "Transitive",
-        "resolved": "33.1.44",
-        "contentHash": "TI7teCGZ6AufIlKIxY7b+E/itJ/rFylM+S39cDXLtcGZFoz4ajDLFcPRRHOyUMQwH0GLftbY1pln4N1bBVTcsg==",
-        "dependencies": {
-          "Syncfusion.Blazor.Buttons": "33.1.44",
-          "Syncfusion.Blazor.Core": "33.1.44"
-        }
-      },
-      "Syncfusion.Blazor.Popups": {
-        "type": "Transitive",
-        "resolved": "33.1.44",
-        "contentHash": "J04SPXF5X8gaXdEWT11uwfJWShgK8sM2Uw8OhpyIgiylx1nSmjQTG7vU1fuiVf07hgfttGHOrwzyn+xq28BKHg==",
-        "dependencies": {
-          "Syncfusion.Blazor.Buttons": "33.1.44",
-          "Syncfusion.Blazor.Core": "33.1.44"
-        }
-      },
       "Syncfusion.Blazor.Ribbon": {
         "type": "Transitive",
         "resolved": "33.1.44",
@@ -777,27 +810,6 @@
         "contentHash": "yMUclicPrQ8UWg4X23f2TGeQKj0BQ+Lh9cpzPXufi2SbYPbJAwvN/p2X/Nq7UOfZczL6BVu+3VxJYTmeRtvjSg==",
         "dependencies": {
           "Microsoft.AspNetCore.Components.Web": "9.0.12",
-          "Syncfusion.Licensing": "33.1.44"
-        }
-      },
-      "Syncfusion.Pdf.Net.Core": {
-        "type": "CentralTransitive",
-        "requested": "[33.1.44, )",
-        "resolved": "33.1.44",
-        "contentHash": "uBUUwcVMtbEgWaODKqqrHxuuTZTsV1qD8zJ27a+qAZEq3q2hZZUncbBMoo0XmMHXjvcdliH4OqUI01gXRFNDeg==",
-        "dependencies": {
-          "Syncfusion.Compression.Net.Core": "33.1.44",
-          "Syncfusion.Licensing": "33.1.44",
-          "System.Text.Encoding.CodePages": "4.4.0"
-        }
-      },
-      "Syncfusion.XlsIO.Net.Core": {
-        "type": "CentralTransitive",
-        "requested": "[33.1.44, )",
-        "resolved": "33.1.44",
-        "contentHash": "K8ZLvCqNmZC/yOcAselKy6Tj3VbdBVkhEoHWt3T9A4NsuirLFzFzd60NiH536/clgbFvRyub9r45hVdf1GcogQ==",
-        "dependencies": {
-          "Syncfusion.Compression.Net.Core": "33.1.44",
           "Syncfusion.Licensing": "33.1.44"
         }
       }

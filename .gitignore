@@ -1,4 +1,5 @@
 *.key
+.DS_Store
 bin/
 obj/
 .vscode/mcp.json
@@ -10,4 +11,6 @@ amplify/.config/local-*
 amplify/team-provider-info.json
 account-info.json
 /Blazor Documentation/
+TestResults/
+Scripts/__pycache__/
 .fake

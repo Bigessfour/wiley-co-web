@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using System.Globalization;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
 
@@ -18,17 +18,29 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected WorkspaceSnapshotApiService WorkspaceSnapshotApiService { get; set; } = default!;
 
     [Inject]
-    protected WorkspaceBootstrapService WorkspaceBootstrapService { get; set; } = default!;
+    protected WorkspaceDocumentExportService WorkspaceDocumentExportService { get; set; } = default!;
+
+    [Inject]
+    protected BrowserDownloadService BrowserDownloadService { get; set; } = default!;
 
     private bool persistenceInitialized;
 
     protected bool IsSavingSnapshot { get; set; }
+    protected bool IsSavingScenario { get; set; }
+    protected bool IsSavingBaseline { get; set; }
+    protected bool IsApplyingScenario { get; set; }
+    protected bool IsLoadingWorkspace { get; set; }
+    protected bool IsExportingDocuments { get; set; }
 
-    protected bool IsLoadingSnapshot { get; set; }
+    protected string SnapshotSaveStatus { get; set; } = "Ready to save rate snapshot";
+    protected string BaselineSaveStatus { get; set; } = "Baseline changes are local until you save them.";
+    protected string ScenarioPersistenceStatus { get; set; } = "Saved scenarios load by enterprise and fiscal year.";
+    protected string WorkspaceLoadStatus { get; set; } = "Workspace ready.";
+    protected string DocumentExportStatus { get; set; } = "Excel and PDF exports are ready.";
 
-    protected bool IsScenarioSnapshotBusy => IsSavingSnapshot || IsLoadingSnapshot;
-
-    protected string SnapshotSaveStatus { get; set; } = "Ready to save or load scenario snapshots";
+    protected long? SelectedScenarioSnapshotId { get; set; }
+    protected string ScenarioDescription { get; set; } = string.Empty;
+    protected IReadOnlyList<WorkspaceScenarioSummaryResponse> SavedScenarios { get; set; } = [];
 
     protected string SelectedEnterprise
     {
@@ -65,6 +77,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         get => WorkspaceState.ProjectedVolume;
         set => WorkspaceState.SetProjectedVolume(value);
     }
+
     protected decimal RecommendedRate => WorkspaceState.RecommendedRate;
     protected decimal ScenarioAdjustedRate => WorkspaceState.AdjustedRecommendedRate;
     protected decimal ScenarioAdjustedDelta => WorkspaceState.AdjustedRateDelta;
@@ -81,23 +94,6 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
     protected double GaugeCurrentRateValue => (double)CurrentRate;
 
-    protected string CurrentRateInputText
-    {
-        get => CurrentRate.ToString("0.##", CultureInfo.CurrentCulture);
-        set
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
-
-            if (decimal.TryParse(value, NumberStyles.Currency, CultureInfo.CurrentCulture, out var parsedRate))
-            {
-                WorkspaceState.SetCurrentRate(parsedRate);
-            }
-        }
-    }
-
     protected IEnumerable<string> EnterpriseOptions => WorkspaceState.EnterpriseOptions;
     protected IEnumerable<int> FiscalYearOptions => WorkspaceState.FiscalYearOptions;
     protected IReadOnlyList<string> CustomerServiceOptions => WorkspaceState.CustomerServiceOptions;
@@ -109,6 +105,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected int FilteredCustomerCount => WorkspaceState.FilteredCustomerCount;
     protected string FilteredCustomerCountDisplay => FilteredCustomerCount.ToString();
     protected IReadOnlyList<ProjectionRow> ProjectionSeries => WorkspaceState.ProjectionSeries;
+    protected bool CanApplySelectedScenario => SelectedScenarioSnapshotId is > 0;
+    protected string StartupSourceStatus => WorkspaceState.StartupSourceStatus;
+    protected bool IsUsingStartupFallback => WorkspaceState.IsUsingStartupFallback;
+    protected string CurrentStateSourceStatus => WorkspaceState.CurrentStateSourceStatus;
+    protected bool IsUsingBrowserRestoredState => WorkspaceState.IsUsingBrowserRestoredState;
 
     protected string CustomerSearchTerm
     {
@@ -132,15 +133,151 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected void ClearCustomerFilters() => WorkspaceState.ClearCustomerFilters();
 
+    protected async Task HandleEnterpriseChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args)
+    {
+        await ReloadWorkspaceAsync(args.Value, SelectedFiscalYear);
+    }
+
+    protected async Task HandleFiscalYearChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<int, int> args)
+    {
+        await ReloadWorkspaceAsync(SelectedEnterprise, args.Value);
+    }
+
+    protected Task RefreshWorkspaceAsync()
+    {
+        return ReloadWorkspaceAsync(SelectedEnterprise, SelectedFiscalYear);
+    }
+
+    protected void HandleSavedScenarioChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<long?, WorkspaceScenarioSummaryResponse> args)
+    {
+        SelectedScenarioSnapshotId = args.Value;
+
+        var selectedScenario = SavedScenarios.FirstOrDefault(item => item.SnapshotId == SelectedScenarioSnapshotId);
+        if (selectedScenario != null)
+        {
+            ScenarioDescription = selectedScenario.Description ?? string.Empty;
+            ScenarioPersistenceStatus = $"Selected saved scenario '{selectedScenario.ScenarioName}'.";
+        }
+    }
+
+    protected async Task SaveScenarioAsync()
+    {
+        if (IsSavingScenario)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(ActiveScenarioName))
+        {
+            ScenarioPersistenceStatus = "Enter a scenario name before saving.";
+            return;
+        }
+
+        IsSavingScenario = true;
+        ScenarioPersistenceStatus = "Saving scenario to persisted workspace storage...";
+        StateHasChanged();
+
+        try
+        {
+            var request = new WorkspaceScenarioSaveRequest(
+                ActiveScenarioName.Trim(),
+                string.IsNullOrWhiteSpace(ScenarioDescription) ? null : ScenarioDescription.Trim(),
+                WorkspaceState.ToBootstrapData());
+
+            var savedScenario = await WorkspaceSnapshotApiService.SaveScenarioAsync(request);
+            SelectedScenarioSnapshotId = savedScenario.SnapshotId;
+            WorkspaceState.SetActiveScenarioName(savedScenario.ScenarioName);
+            ScenarioDescription = savedScenario.Description ?? ScenarioDescription;
+            ScenarioPersistenceStatus = $"Saved scenario '{savedScenario.ScenarioName}' at {savedScenario.CreatedAtUtc}.";
+            await RefreshScenarioCatalogAsync(savedScenario.SnapshotId);
+        }
+        catch (Exception ex)
+        {
+            ScenarioPersistenceStatus = $"Scenario save failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSavingScenario = false;
+            StateHasChanged();
+        }
+    }
+
+    protected async Task SaveWorkspaceBaselineAsync()
+    {
+        if (IsSavingBaseline)
+        {
+            return;
+        }
+
+        IsSavingBaseline = true;
+        BaselineSaveStatus = "Saving baseline values to the workspace API...";
+        StateHasChanged();
+
+        try
+        {
+            var request = new WorkspaceBaselineUpdateRequest(
+                SelectedEnterprise,
+                SelectedFiscalYear,
+                CurrentRate,
+                TotalCosts,
+                ProjectedVolume);
+
+            var response = await WorkspaceSnapshotApiService.SaveWorkspaceBaselineAsync(request);
+            WorkspaceState.ApplyBootstrap(response.Snapshot);
+            BaselineSaveStatus = response.Message;
+            WorkspaceLoadStatus = $"Reloaded {WorkspaceState.ContextSummary} after baseline save.";
+            await RefreshScenarioCatalogAsync();
+        }
+        catch (Exception ex)
+        {
+            BaselineSaveStatus = $"Baseline save failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSavingBaseline = false;
+            StateHasChanged();
+        }
+    }
+
+    protected async Task ApplySelectedScenarioAsync()
+    {
+        if (IsApplyingScenario || SelectedScenarioSnapshotId is not > 0)
+        {
+            return;
+        }
+
+        IsApplyingScenario = true;
+        ScenarioPersistenceStatus = "Applying saved scenario to the workspace...";
+        StateHasChanged();
+
+        try
+        {
+            var scenarioSnapshot = await WorkspaceSnapshotApiService.GetScenarioSnapshotAsync(SelectedScenarioSnapshotId.Value);
+            WorkspaceState.ApplyBootstrap(scenarioSnapshot);
+            ScenarioPersistenceStatus = $"Applied saved scenario '{WorkspaceState.ActiveScenarioName}'.";
+            WorkspaceLoadStatus = $"Loaded {WorkspaceState.ContextSummary} from saved scenario.";
+            await RefreshScenarioCatalogAsync(SelectedScenarioSnapshotId.Value);
+        }
+        catch (Exception ex)
+        {
+            ScenarioPersistenceStatus = $"Scenario apply failed: {ex.Message}";
+        }
+        finally
+        {
+            IsApplyingScenario = false;
+            StateHasChanged();
+        }
+    }
+
     protected async Task SaveRateSnapshotAsync()
     {
-        if (IsScenarioSnapshotBusy)
+        if (IsSavingSnapshot)
         {
             return;
         }
 
         IsSavingSnapshot = true;
-        SnapshotSaveStatus = "Saving scenario snapshot to Aurora...";
+        SnapshotSaveStatus = "Saving rate snapshot to Aurora...";
         StateHasChanged();
 
         try
@@ -159,34 +296,25 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
     }
 
-    protected async Task LoadScenarioSnapshotAsync()
+    protected Task ExportCustomerWorkbookAsync()
     {
-        if (IsScenarioSnapshotBusy)
-        {
-            return;
-        }
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateCustomerWorkbook(WorkspaceState),
+            "Preparing customer workbook...");
+    }
 
-        var enterprise = SelectedEnterprise;
-        var fiscalYear = SelectedFiscalYear;
+    protected Task ExportScenarioWorkbookAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateScenarioWorkbook(WorkspaceState),
+            "Preparing scenario workbook...");
+    }
 
-        IsLoadingSnapshot = true;
-        SnapshotSaveStatus = $"Loading scenario snapshot for {enterprise} FY{fiscalYear}...";
-        StateHasChanged();
-
-        try
-        {
-            await WorkspaceBootstrapService.LoadAsync(enterprise, fiscalYear);
-            SnapshotSaveStatus = $"Loaded scenario snapshot for {WorkspaceState.ContextSummary}";
-        }
-        catch (Exception ex)
-        {
-            SnapshotSaveStatus = $"Scenario load failed: {ex.Message}";
-        }
-        finally
-        {
-            IsLoadingSnapshot = false;
-            StateHasChanged();
-        }
+    protected Task ExportWorkspacePdfAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateWorkspacePdfReport(WorkspaceState),
+            "Preparing PDF rate packet...");
     }
 
     protected void HandleTotalCostsChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
@@ -218,6 +346,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         persistenceInitialized = true;
         await WorkspacePersistenceService.InitializeAsync();
+        await RefreshScenarioCatalogAsync();
     }
 
     public void Dispose()
@@ -228,8 +357,99 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     private void HandleWorkspaceStateChanged()
     {
-        _ = WorkspaceState;
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)
+    {
+        if (IsLoadingWorkspace)
+        {
+            return;
+        }
+
+        IsLoadingWorkspace = true;
+        WorkspaceLoadStatus = $"Loading {enterprise} FY {fiscalYear} from the workspace API...";
+        StateHasChanged();
+
+        try
+        {
+            var snapshot = await WorkspaceSnapshotApiService.GetWorkspaceSnapshotAsync(enterprise, fiscalYear);
+            WorkspaceState.ApplyBootstrap(snapshot);
+            WorkspaceLoadStatus = $"Loaded {WorkspaceState.ContextSummary} from the workspace API.";
+            await RefreshScenarioCatalogAsync();
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLoadStatus = $"Workspace reload failed: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingWorkspace = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshScenarioCatalogAsync(long? selectedScenarioId = null)
+    {
+        try
+        {
+            var scenarios = await WorkspaceSnapshotApiService.GetScenariosAsync(SelectedEnterprise, SelectedFiscalYear);
+            SavedScenarios = scenarios.Scenarios;
+
+            if (selectedScenarioId.HasValue && SavedScenarios.Any(item => item.SnapshotId == selectedScenarioId.Value))
+            {
+                SelectedScenarioSnapshotId = selectedScenarioId;
+            }
+            else if (SelectedScenarioSnapshotId.HasValue && SavedScenarios.All(item => item.SnapshotId != SelectedScenarioSnapshotId.Value))
+            {
+                SelectedScenarioSnapshotId = null;
+            }
+
+            if (SelectedScenarioSnapshotId.HasValue)
+            {
+                var selectedScenario = SavedScenarios.FirstOrDefault(item => item.SnapshotId == SelectedScenarioSnapshotId.Value);
+                ScenarioDescription = selectedScenario?.Description ?? ScenarioDescription;
+            }
+
+            if (SavedScenarios.Count == 0)
+            {
+                ScenarioPersistenceStatus = $"No saved scenarios found for {SelectedEnterprise} FY {SelectedFiscalYear}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ScenarioPersistenceStatus = $"Saved scenario list could not be loaded: {ex.Message}";
+            SavedScenarios = [];
+            SelectedScenarioSnapshotId = null;
+        }
+    }
+
+    private async Task ExportDocumentAsync(Func<WorkspaceExportDocument> exportFactory, string pendingStatus)
+    {
+        if (IsExportingDocuments)
+        {
+            return;
+        }
+
+        IsExportingDocuments = true;
+        DocumentExportStatus = pendingStatus;
+        StateHasChanged();
+
+        try
+        {
+            var document = exportFactory();
+            await BrowserDownloadService.DownloadAsync(document);
+            DocumentExportStatus = $"Downloaded {document.FileName}";
+        }
+        catch (Exception ex)
+        {
+            DocumentExportStatus = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            IsExportingDocuments = false;
+            StateHasChanged();
+        }
     }
 
     protected void HandleScenarioGridActionComplete(Syncfusion.Blazor.Grids.ActionEventArgs<ScenarioItem> args)

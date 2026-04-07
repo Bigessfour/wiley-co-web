@@ -12,6 +12,7 @@ using CsvHelper.Configuration;
 using ExcelDataReader;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using WileyWidget.Data;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Models;
@@ -47,7 +48,11 @@ namespace WileyWidget.Services
         {
             try
             {
-                await RecordImportMetadataAsync(filePath, "ledger_entries", cancellationToken).ConfigureAwait(false);
+                var duplicateCheck = await TryRecordImportMetadataAsync(filePath, "ledger_entries", cancellationToken).ConfigureAwait(false);
+                if (!duplicateCheck.Success)
+                {
+                    return duplicateCheck;
+                }
 
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
@@ -72,7 +77,11 @@ namespace WileyWidget.Services
         {
             try
             {
-                await RecordImportMetadataAsync(filePath, "budget_entries", cancellationToken).ConfigureAwait(false);
+                var duplicateCheck = await TryRecordImportMetadataAsync(filePath, "budget_entries", cancellationToken).ConfigureAwait(false);
+                if (!duplicateCheck.Success)
+                {
+                    return duplicateCheck;
+                }
 
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
@@ -90,9 +99,29 @@ namespace WileyWidget.Services
             }
         }
 
-        private async Task RecordImportMetadataAsync(string filePath, string canonicalEntity, CancellationToken cancellationToken)
+        private async Task<ImportResult> TryRecordImportMetadataAsync(string filePath, string canonicalEntity, CancellationToken cancellationToken)
         {
+            var fileHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(filePath, cancellationToken).ConfigureAwait(false)));
+
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+            var duplicateExists = await context.SourceFiles
+                .AsNoTracking()
+                .AnyAsync(sourceFile => sourceFile.CanonicalEntity == canonicalEntity && sourceFile.FileHash == fileHash, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (duplicateExists)
+            {
+                var message = $"Duplicate import blocked for {canonicalEntity}: the selected file has already been imported.";
+                _logger.LogWarning("{Message} File: {FilePath}", message, filePath);
+
+                return new ImportResult
+                {
+                    Success = false,
+                    ErrorMessage = message,
+                    ValidationErrors = new List<string> { message }
+                };
+            }
 
             var batch = new ImportBatch
             {
@@ -103,21 +132,37 @@ namespace WileyWidget.Services
             };
 
             context.ImportBatches.Add(batch);
-            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             context.SourceFiles.Add(new SourceFile
             {
-                BatchId = batch.Id,
+                Batch = batch,
                 CanonicalEntity = canonicalEntity,
                 OriginalFileName = Path.GetFileName(filePath),
                 NormalizedFileName = Path.GetFileName(filePath),
-                FileHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(filePath, cancellationToken).ConfigureAwait(false))),
+                FileHash = fileHash,
                 RowCount = 0,
                 ColumnCount = 0,
                 ImportedAt = DateTimeOffset.UtcNow
             });
 
-            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException postgresException && postgresException.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                var message = $"Duplicate import blocked for {canonicalEntity}: the selected file has already been imported.";
+                _logger.LogWarning(ex, "{Message} File: {FilePath}", message, filePath);
+
+                return new ImportResult
+                {
+                    Success = false,
+                    ErrorMessage = message,
+                    ValidationErrors = new List<string> { message }
+                };
+            }
+
+            return new ImportResult { Success = true };
         }
 
         private async Task<ImportResult> ImportTransactionsFromCsvAsync(string filePath, CancellationToken cancellationToken = default)

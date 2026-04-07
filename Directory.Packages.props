@@ -60,6 +60,9 @@
     <PackageVersion Include="Syncfusion.Blazor.Inputs" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.Layouts" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.Navigations" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Notifications" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Popups" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.ProgressBar" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.SfPdfViewer" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.Spreadsheet" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.Themes" Version="33.1.44" />

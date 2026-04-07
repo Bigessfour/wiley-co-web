@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Components;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -16,11 +16,13 @@ public sealed class WorkspaceBootstrapService
 
     private readonly HttpClient httpClient;
     private readonly WorkspaceState workspaceState;
+    private readonly WorkspaceSnapshotApiService workspaceSnapshotApiService;
 
-    public WorkspaceBootstrapService(HttpClient httpClient, WorkspaceState workspaceState)
+    public WorkspaceBootstrapService(HttpClient httpClient, WorkspaceState workspaceState, WorkspaceSnapshotApiService workspaceSnapshotApiService)
     {
         this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         this.workspaceState = workspaceState ?? throw new ArgumentNullException(nameof(workspaceState));
+        this.workspaceSnapshotApiService = workspaceSnapshotApiService ?? throw new ArgumentNullException(nameof(workspaceSnapshotApiService));
     }
 
     public Task LoadAsync(CancellationToken cancellationToken = default)
@@ -28,16 +30,26 @@ public sealed class WorkspaceBootstrapService
         return LoadAsync(null, null, cancellationToken);
     }
 
-    public async Task LoadAsync(string? enterprise, int? fiscalYear, CancellationToken cancellationToken = default)
+    public async Task LoadAsync(string? enterprise = null, int? fiscalYear = null, CancellationToken cancellationToken = default)
     {
         WorkspaceBootstrapData? bootstrapData = null;
+        var startupSource = WorkspaceStartupSource.ApiSnapshot;
+        var startupStatus = "Workspace started from the live workspace API snapshot.";
 
         try
         {
-            bootstrapData = await httpClient.GetFromJsonAsync<WorkspaceBootstrapData>(BuildSnapshotRequestUri(enterprise, fiscalYear), JsonOptions, cancellationToken);
+            bootstrapData = await workspaceSnapshotApiService.GetWorkspaceSnapshotAsync(enterprise, fiscalYear, cancellationToken);
         }
         catch (HttpRequestException)
         {
+            startupSource = WorkspaceStartupSource.LocalBootstrapFallback;
+            startupStatus = "Workspace started from local fallback data because the workspace API was unavailable.";
+            bootstrapData = null;
+        }
+        catch (JsonException)
+        {
+            startupSource = WorkspaceStartupSource.LocalBootstrapFallback;
+            startupStatus = "Workspace started from local fallback data because the workspace API response could not be parsed.";
             bootstrapData = null;
         }
 
@@ -48,31 +60,7 @@ public sealed class WorkspaceBootstrapService
         }
 
         workspaceState.ApplyBootstrap(bootstrapData);
-    }
-
-    private static string BuildSnapshotRequestUri(string? enterprise, int? fiscalYear)
-    {
-        var requestUri = "api/workspace/snapshot";
-        var hasEnterprise = !string.IsNullOrWhiteSpace(enterprise);
-        var hasFiscalYear = fiscalYear is > 0;
-
-        if (!hasEnterprise && !hasFiscalYear)
-        {
-            return requestUri;
-        }
-
-        var queryParts = new List<string>(2);
-
-        if (hasEnterprise)
-        {
-            queryParts.Add($"enterprise={Uri.EscapeDataString(enterprise!.Trim())}");
-        }
-
-        if (hasFiscalYear)
-        {
-            queryParts.Add($"fiscalYear={fiscalYear}");
-        }
-
-        return $"{requestUri}?{string.Join('&', queryParts)}";
+        workspaceState.SetStartupSource(startupSource, startupStatus);
+        workspaceState.SetCurrentStateSource(startupSource, startupStatus);
     }
 }

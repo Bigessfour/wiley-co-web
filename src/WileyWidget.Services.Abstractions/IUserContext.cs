@@ -4,5 +4,6 @@ namespace WileyWidget.Services.Abstractions
     {
         string? UserId { get; }
         string? DisplayName { get; }
+        string? Email { get; }
     }
 }

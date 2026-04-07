@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.JSInterop;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -44,7 +45,12 @@ public sealed class WorkspacePersistenceService : IAsyncDisposable, IDisposable
                 suppressSave = true;
                 workspaceState.ApplyBootstrap(persistedState);
                 suppressSave = false;
+                workspaceState.SetCurrentStateSource(WorkspaceStartupSource.BrowserStorageRestore, "Current workspace state was restored from browser storage.");
             }
+        }
+        else
+        {
+            workspaceState.SetCurrentStateSource(workspaceState.StartupSource, workspaceState.StartupSourceStatus);
         }
 
         workspaceState.Changed += HandleWorkspaceChanged;

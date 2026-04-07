@@ -11,6 +11,18 @@ frontend:
     build:
       commands:
         - export PATH="$HOME/.dotnet:$PATH"
+        - |
+          if secret_string="$(aws secretsmanager get-secret-value --secret-id "SYNCFUION_LICENSE_KEY" --query SecretString --output text 2>/dev/null)"; then
+            export SYNCFUSION_LICENSE_KEY="$(SECRET_STRING="$secret_string" node -e "const raw = process.env.SECRET_STRING || ''; try { const parsed = JSON.parse(raw); process.stdout.write(parsed.SYNCFUSION_LICENSE_KEY || parsed.SyncfusionLicenseKey || raw); } catch { process.stdout.write(raw); }")"
+            echo "Loaded SYNCFUSION_LICENSE_KEY from AWS Secrets Manager secret SYNCFUION_LICENSE_KEY."
+          else
+            export SYNCFUSION_LICENSE_KEY="$(node -e \"const secrets = JSON.parse(process.env.secrets || '{}'); process.stdout.write(secrets.SYNCFUSION_LICENSE_KEY || '')\")"
+            if [ -n "$SYNCFUSION_LICENSE_KEY" ]; then
+              echo "Loaded SYNCFUSION_LICENSE_KEY from Amplify environment secrets."
+            else
+              echo "WARNING: SYNCFUSION_LICENSE_KEY was not found in AWS Secrets Manager secret SYNCFUION_LICENSE_KEY or Amplify environment secrets."
+            fi
+          fi
         - dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore
   artifacts:
     baseDirectory: publish_output/wwwroot
