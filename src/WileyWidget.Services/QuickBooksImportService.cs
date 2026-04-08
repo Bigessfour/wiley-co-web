@@ -32,6 +32,7 @@ public sealed class QuickBooksImportService
 
 	public async Task<QuickBooksImportPreviewResponse> PreviewAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
 	{
+		logger.LogInformation("Previewing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var preview = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
@@ -41,6 +42,8 @@ public sealed class QuickBooksImportService
 		var statusMessage = isDuplicate
 			? "This QuickBooks export is already imported. The commit step will be blocked."
 			: $"Preview loaded for {preview.Count} rows.";
+
+		logger.LogInformation("QuickBooks preview completed for {FileName}: rows={RowCount}, duplicate={IsDuplicate}", Path.GetFileName(fileName), preview.Count, isDuplicate);
 
 		return new QuickBooksImportPreviewResponse(
 			Path.GetFileName(fileName),
@@ -56,6 +59,7 @@ public sealed class QuickBooksImportService
 
 	public async Task<QuickBooksImportCommitResponse> CommitAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
 	{
+		logger.LogInformation("Committing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var parsedRows = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
@@ -124,6 +128,7 @@ public sealed class QuickBooksImportService
 		}
 
 		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, parsedRows.Count);
 
 		return new QuickBooksImportCommitResponse(
 			Path.GetFileName(fileName),

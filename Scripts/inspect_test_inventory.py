@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
-import sys
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -133,12 +131,13 @@ def read_latest_coverage(root: Path, results_folder: str) -> float | None:
 
     coverage_file = candidates[0]
     try:
-        tree = ET.parse(coverage_file)
-        coverage_node = tree.getroot()
-        line_rate = coverage_node.attrib.get("line-rate")
-        if line_rate is None:
+        match = re.search(
+            r'<coverage\b[^>]*\bline-rate="(\d+(?:\.\d+)?)"',
+            coverage_file.read_text(encoding="utf-8"),
+        )
+        if match is None:
             return None
-        return float(line_rate) * 100.0
+        return float(match.group(1)) * 100.0
     except Exception:
         return None
 

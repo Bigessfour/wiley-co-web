@@ -36,6 +36,7 @@ public sealed class WorkspaceAiAssistantService
 	public async Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
 	{
 		ArgumentNullException.ThrowIfNull(request);
+		logger.LogInformation("Workspace AI request started for {Enterprise} FY {FiscalYear} (question length {QuestionLength})", request.SelectedEnterprise, request.SelectedFiscalYear, request.Question?.Length ?? 0);
 
 		var question = string.IsNullOrWhiteSpace(request.Question)
 			? "What should I know about the current workspace?"
@@ -43,7 +44,28 @@ public sealed class WorkspaceAiAssistantService
 		var activeUser = ResolveCurrentUser();
 		var conversationId = BuildConversationId(activeUser, request);
 		var conversationHistory = await LoadConversationHistoryAsync(conversationId, request.ConversationHistory, cancellationToken).ConfigureAwait(false);
+		var isFirstConversation = conversationHistory.Count == 0;
 		var contextSummary = BuildContextSummary(request);
+
+		if (isFirstConversation)
+		{
+			var onboardingAnswer = BuildOnboardingAnswer(activeUser, request);
+			conversationHistory = AppendTurn(conversationHistory, question, onboardingAnswer);
+			await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+
+			var onboardingResponse = new WorkspaceChatResponse(question, onboardingAnswer, true, contextSummary)
+			{
+				UserDisplayName = activeUser.DisplayName,
+				UserProfileSummary = BuildOnboardingProfileSummary(activeUser),
+				ConversationId = conversationId,
+				ConversationMessageCount = conversationHistory.Count,
+				IsFirstConversation = true,
+				CanResetConversation = true
+			};
+
+			logger.LogInformation("Workspace AI returned onboarding prompt for first conversation {ConversationId}", conversationId);
+			return onboardingResponse;
+		}
 
 		var assistant = kernelContext.Value;
 		if (assistant is null)
@@ -53,6 +75,7 @@ public sealed class WorkspaceAiAssistantService
 				BuildFallbackAnswer(question, request, activeUser),
 				true,
 				contextSummary);
+			logger.LogInformation("Workspace AI returned deterministic fallback for conversation {ConversationId}", conversationId);
 			return ApplyUserMetadata(fallbackResponse, activeUser, conversationId, conversationHistory.Count + 1);
 		}
 
@@ -88,6 +111,7 @@ public sealed class WorkspaceAiAssistantService
 				await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
 
 				var chatResponse = new WorkspaceChatResponse(question, answer, false, contextSummary);
+				logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
 				return ApplyUserMetadata(chatResponse, activeUser, conversationId, conversationHistory.Count);
 			}
 		}
@@ -101,6 +125,7 @@ public sealed class WorkspaceAiAssistantService
 		await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
 
 		var fallbackChatResponse = new WorkspaceChatResponse(question, fallbackAnswer, true, contextSummary);
+		logger.LogInformation("Workspace AI returned deterministic fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
 		return ApplyUserMetadata(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count);
 	}
 
@@ -178,6 +203,12 @@ public sealed class WorkspaceAiAssistantService
 	private static string BuildContextSummary(WorkspaceChatRequest request)
 		=> $"{request.SelectedEnterprise} FY {request.SelectedFiscalYear} | {request.ContextSummary}";
 
+	private static string BuildOnboardingAnswer(ResolvedUserContext user, WorkspaceChatRequest request)
+		=> $"Hi {user.DisplayName}. I’ll keep this thread tied to {request.SelectedEnterprise} FY {request.SelectedFiscalYear}. Tell me your preferred name, your role or department, and what you want Jarvis to help with. I’ll use that to keep the guidance plain-language and relevant.";
+
+	private static string BuildOnboardingProfileSummary(ResolvedUserContext user)
+		=> $"Onboarding pending for {user.DisplayName}: preferred name, role or department, and Jarvis goals have not been captured yet.";
+
 	private ResolvedUserContext ResolveCurrentUser()
 	{
 		var userId = string.IsNullOrWhiteSpace(userContext.UserId) ? "anonymous" : userContext.UserId.Trim();
@@ -208,8 +239,9 @@ public sealed class WorkspaceAiAssistantService
 		{
 			builder.AppendLine($"User email: {user.Email}");
 		}
+
 		builder.AppendLine($"User preference summary: {user.PreferencesSummary}");
-		builder.AppendLine($"Workspace context: {BuildContextSummary(request)}");
+		builder.AppendLine($"Workspace focus: {BuildContextSummary(request)}");
 		return builder.ToString();
 	}
 
@@ -246,6 +278,7 @@ public sealed class WorkspaceAiAssistantService
 		};
 
 		await conversationRepository.SaveConversationAsync(conversation, cancellationToken).ConfigureAwait(false);
+		logger.LogInformation("Saved Jarvis conversation {ConversationId} for {Enterprise} FY {FiscalYear} with {MessageCount} messages", conversationId, request.SelectedEnterprise, request.SelectedFiscalYear, conversationHistory.Count);
 	}
 
 	private async Task<IReadOnlyList<WorkspaceChatMessage>> ReadPersistedConversationAsync(string conversationId, CancellationToken cancellationToken)
@@ -272,13 +305,16 @@ public sealed class WorkspaceAiAssistantService
 		}
 	}
 
-	private WorkspaceChatResponse ApplyUserMetadata(WorkspaceChatResponse response, ResolvedUserContext user, string conversationId, int messageCount)
+	private WorkspaceChatResponse ApplyUserMetadata(WorkspaceChatResponse response, ResolvedUserContext user, string conversationId, int messageCount, string? userProfileSummary = null)
 	{
 		return response with
 		{
 			UserDisplayName = user.DisplayName,
+			UserProfileSummary = userProfileSummary ?? user.PreferencesSummary,
 			ConversationId = conversationId,
-			ConversationMessageCount = messageCount
+			ConversationMessageCount = messageCount,
+			IsFirstConversation = messageCount <= 2,
+			CanResetConversation = true
 		};
 	}
 

@@ -73,7 +73,7 @@
                     Width="100%"
                     Height="calc(100vh - 14rem)"
                     Orientation="Syncfusion.Blazor.Layouts.Orientation.Horizontal"
-                    EnablePersistence="true"
+                    EnablePersistence="false"
                     EnableGestures="true"
                     SeparatorSize="8"
                     MediaQuery="(max-width: 1024px)">
@@ -87,7 +87,7 @@
                                     <div class="space-y-4">
                                         <SfDropDownList TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" ValueChange="HandleEnterpriseChanged" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
                                         <SfDropDownList TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" ValueChange="HandleFiscalYearChanged" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" />
-                                        <SfTextBox Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
+                                        <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
                                         <SfTextBox Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
                                         <SfDropDownList TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" ValueChange="HandleSavedScenarioChanged" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
                                             <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
@@ -98,8 +98,8 @@
                                         </div>
                                         <SfButton Disabled="@(!CanApplySelectedScenario || IsApplyingScenario)" OnClick="ApplySelectedScenarioAsync">@(IsApplyingScenario ? "Applying..." : "Apply saved scenario")</SfButton>
                                         <div class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
-                                            <div><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
-                                            <div class="mt-2"><span class="font-semibold text-slate-700">Scenarios:</span> @ScenarioPersistenceStatus</div>
+                                            <div id="workspace-load-status"><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
+                                            <div class="mt-2"><span class="font-semibold text-slate-700">Scenarios:</span> <span id="scenario-persistence-status">@ScenarioPersistenceStatus</span></div>
                                             <div class="mt-2">
                                                 <span class="font-semibold text-slate-700">Startup source:</span>
                                                 <span class="@(IsUsingStartupFallback ? "text-amber-700" : "text-emerald-700")"> @StartupSourceStatus</span>
@@ -123,7 +123,7 @@
                                                CellSpacing="@(new double[] { 16, 16 })"
                                                AllowDragging="true"
                                                AllowResizing="true"
-                                               EnablePersistence="true"
+                                               EnablePersistence="false"
                                                MediaQuery="(max-width: 1200px)"
                                                ShowGridLines="true"
                                                DraggableHandle=".e-panel-header">
@@ -224,7 +224,7 @@
                                             </div>
                                             <div class="mt-4 grid gap-4 md:grid-cols-2">
                                                 <div class="space-y-2">
-                                                    <SfNumericTextBox TValue="decimal" Value="@CurrentRate" ValueChange="HandleCurrentRateChanged" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C2" />
+                                                    <SfNumericTextBox ID="current-rate-input" TValue="decimal" Value="@CurrentRate" ValueChange="HandleCurrentRateChanged" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C2" />
                                                     <p class="text-xs text-slate-500">Validated numeric rate editing updates the workspace instantly and keeps the rate panel aligned with the break-even calculation.</p>
                                                 </div>
                                                 <SfChart Title="Rate Comparison" AccessibilityDescription="Rate comparison chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="180px">
@@ -248,7 +248,7 @@
                                                 <SfButton CssClass="e-primary" IsPrimary="true" OnClick="SaveRateSnapshotAsync" Disabled="@IsSavingSnapshot">
                                                     @(IsSavingSnapshot ? "Saving..." : "Save rate snapshot")
                                                 </SfButton>
-                                                <p class="text-xs text-slate-500">@SnapshotSaveStatus</p>
+                                                <p id="snapshot-save-status" class="text-xs text-slate-500">@SnapshotSaveStatus</p>
                                             </div>
                                         </ContentTemplate>
                                     </DashboardLayoutPanel>

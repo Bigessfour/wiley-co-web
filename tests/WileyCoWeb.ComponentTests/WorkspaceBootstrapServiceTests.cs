@@ -27,6 +27,7 @@ public sealed class WorkspaceBootstrapServiceTests
 
 		var service = new WorkspaceBootstrapService(
 			new HttpClient(fallbackHandler) { BaseAddress = new Uri("https://workspace.local/") },
+			"https://workspace.local/",
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 
@@ -59,6 +60,7 @@ public sealed class WorkspaceBootstrapServiceTests
 
 		var service = new WorkspaceBootstrapService(
 			new HttpClient(fallbackHandler) { BaseAddress = new Uri("https://workspace.local/") },
+			"https://workspace.local/",
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 

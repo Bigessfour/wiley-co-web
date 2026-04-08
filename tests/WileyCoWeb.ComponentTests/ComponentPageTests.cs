@@ -57,6 +57,51 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void WileyWorkspace_RendersCoreShellSections()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
+		Assert.Contains("Document Center", cut.Markup);
+		Assert.Contains("Break-Even Panel", cut.Markup);
+		Assert.Contains("Rates Panel", cut.Markup);
+		Assert.Contains("QuickBooks Import Panel", cut.Markup);
+		Assert.Contains("Trends & Projections", cut.Markup);
+		Assert.Contains("Export customers to Excel", cut.Markup);
+		Assert.Contains("Save rate snapshot", cut.Markup);
+	}
+
+	[Fact]
+	public async Task WileyWorkspaceBaseHarness_SaveRateSnapshotAsync_UpdatesSnapshotStatus()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.SetSelection("Water Utility", 2026);
+		workspaceState.SetCurrentRate(31.25m);
+		workspaceState.SetTotalCosts(98000m);
+		workspaceState.SetProjectedVolume(4500m);
+
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		await cut.InvokeAsync(() => cut.Instance.InvokeSaveRateSnapshotAsync());
+
+		Assert.Contains("Saved workspace snapshot", cut.Instance.SnapshotStatus, StringComparison.OrdinalIgnoreCase);
+	}
+
+	[Fact]
+	public async Task WileyWorkspaceBaseHarness_RefreshWorkspaceAsync_UpdatesWorkspaceStatus()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		await cut.InvokeAsync(() => cut.Instance.InvokeRefreshWorkspaceAsync());
+
+		Assert.Contains("Loaded", cut.Instance.WorkspaceStatus, StringComparison.OrdinalIgnoreCase);
+	}
+
+	[Fact]
 	public void JarvisChatPanel_SendsConversation_AndClearsItAgain()
 	{
 		using var context = CreateContext();
@@ -80,7 +125,7 @@ public sealed class ComponentPageTests
 		var snapshotClient = CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
 		context.Services.AddScoped(_ => snapshotService);
-		context.Services.AddScoped(_ => new WorkspaceBootstrapService(snapshotClient, workspaceState, snapshotService));
+		context.Services.AddScoped(_ => new WorkspaceBootstrapService(snapshotClient, "https://example.test/", workspaceState, snapshotService));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));

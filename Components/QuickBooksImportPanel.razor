@@ -56,7 +56,6 @@
                                 AllowMultiple="false"
                                 AutoUpload="false"
                                 SequentialUpload="true"
-                                EnablePersistence="true"
                                 DropArea="#quickbooks-import-drop-area"
                                 ShowFileList="true"
                                 ShowProgressBar="true"
@@ -78,6 +77,11 @@
                             <CardHeader Title="Import Status" SubTitle="@StatusHeadline" />
                             <CardContent Content="@StatusMessage" />
                         </SfCard>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        <div id="quickbooks-import-status-headline" class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">@StatusHeadline</div>
+                        <div id="quickbooks-import-status-message" class="mt-1 whitespace-pre-line">@StatusMessage</div>
                     </div>
 
                     <div class="grid gap-3 sm:grid-cols-2">

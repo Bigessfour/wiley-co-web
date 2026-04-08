@@ -101,7 +101,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, state, snapshotService);
+        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
         await service.LoadAsync();
 
@@ -143,7 +143,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, state, snapshotService);
+        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
         await service.LoadAsync("Water Utility", 2026);
 
@@ -186,7 +186,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, state, snapshotService);
+        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
         await service.LoadAsync();
 
@@ -196,7 +196,7 @@ public sealed class WorkspaceServiceTests
     }
 
     [Fact]
-    public async Task WorkspaceBootstrapService_ThrowsWhenBothSourcesAreUnavailable()
+    public async Task WorkspaceBootstrapService_FallsBackToDefaultBootstrap_WhenBothSourcesAreUnavailable()
     {
         var state = new WorkspaceState();
         var client = new HttpClient(new RoutedHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -208,11 +208,15 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, state, snapshotService);
+        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
+        await service.LoadAsync();
 
-        Assert.Contains("workspace snapshot response was empty", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Water", state.SelectedEnterprise);
+        Assert.Equal(2026, state.SelectedFiscalYear);
+        Assert.Equal("Base Planning Scenario", state.ActiveScenarioName);
+        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
+        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.CurrentStateSource);
     }
 
     [Fact]

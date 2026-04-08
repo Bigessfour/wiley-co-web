@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Models;
@@ -8,14 +9,17 @@ namespace WileyCoWeb.Api;
 internal sealed class WorkspaceSnapshotComposer
 {
     private readonly IDbContextFactory<AppDbContext> contextFactory;
+    private readonly ILogger<WorkspaceSnapshotComposer> logger;
 
-    public WorkspaceSnapshotComposer(IDbContextFactory<AppDbContext> contextFactory)
+    public WorkspaceSnapshotComposer(IDbContextFactory<AppDbContext> contextFactory, ILogger<WorkspaceSnapshotComposer> logger)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<WorkspaceSnapshotResponse> BuildAsync(string? enterpriseName, int? fiscalYear, CancellationToken cancellationToken)
     {
+        logger.LogInformation("Building workspace snapshot for {Enterprise} FY {FiscalYear}", enterpriseName ?? "default", fiscalYear?.ToString() ?? "default");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
         var enterprises = await context.Enterprises
@@ -65,6 +69,15 @@ internal sealed class WorkspaceSnapshotComposer
 
         var projectionRows = BuildProjectionRows(selectedFiscalYear, currentRate, recommendedRate, adjustedRecommendedRate);
         var scenarioItems = await BuildScenarioItemsAsync(context, selectedFiscalYear, cancellationToken);
+
+        logger.LogInformation(
+            "Workspace snapshot composed for {Enterprise} FY {FiscalYear}: enterprises={EnterpriseCount}, customers={CustomerCount}, scenarios={ScenarioCount}, items={ScenarioItemCount}",
+            selectedEnterprise.Name,
+            selectedFiscalYear,
+            enterprises.Count,
+            customerRows.Count,
+            budgetYears.Count,
+            scenarioItems.Count);
 
         return new WorkspaceSnapshotResponse
         {

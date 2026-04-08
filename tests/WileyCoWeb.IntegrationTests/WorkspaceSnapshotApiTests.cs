@@ -365,4 +365,40 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GetScenario_ReturnsNotFound_WhenSnapshotDoesNotExist()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/workspace/scenarios/999999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetExportDownload_ReturnsNotFound_WhenArtifactDoesNotExist()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/workspace/exports/999999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostSnapshotExports_ReturnsNotFound_WhenSnapshotDoesNotExist()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/workspace/snapshot/999999/exports",
+            new WorkspaceSnapshotArtifactRequest(["workspace-pdf"], false),
+            _jsonOptions);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
 }

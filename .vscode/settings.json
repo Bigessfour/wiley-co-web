@@ -1,14 +1,13 @@
 {
   "dotnet.defaultSolution": "WileyCoWeb.slnx",
   "terminal.integrated.env.osx": {
-    "PATH": "/opt/homebrew/bin:${env:PATH}"
+    "PATH": "/opt/homebrew/bin:${env:PATH}",
+    "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
   },
   "terminal.integrated.profiles.osx": {
     "PowerShell 7.6": {
       "path": "/opt/homebrew/bin/pwsh",
-      "args": [
-        "-NoLogo"
-      ]
+      "args": ["-NoLogo"]
     },
     "zsh": {
       "path": "/bin/zsh"
@@ -17,9 +16,7 @@
   "terminal.integrated.defaultProfile.osx": "PowerShell 7.6",
   "terminal.integrated.automationProfile.osx": {
     "path": "/opt/homebrew/bin/pwsh",
-    "args": [
-      "-NoLogo"
-    ]
+    "args": ["-NoLogo"]
   },
   "chat.mcp.autostart": "newAndOutdated",
   "chat.mcp.discovery.enabled": {

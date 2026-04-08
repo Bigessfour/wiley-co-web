@@ -1,13 +1,14 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
-using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.Logging;
 
 namespace WileyCoWeb.Api;
 
@@ -23,6 +24,27 @@ public partial class Program
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+            ?? builder.Configuration["DATABASE_URL"]
+            ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+        if (string.IsNullOrWhiteSpace(configuredConnectionString))
+        {
+            AppDbStartupState.ActivateFallback("No database connection string was configured for the API host.");
+        }
+
+        builder.Logging.ClearProviders();
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
+        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
+        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
+        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Connection", LogLevel.Information);
+        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Migrations", LogLevel.Information);
+        builder.Logging.AddFilter("WileyWidget", LogLevel.Debug);
+        builder.Logging.AddFilter("WileyWidget.Data", LogLevel.Debug);
+        builder.Logging.AddFilter("WileyWidget.Services", LogLevel.Debug);
+        builder.Logging.AddFilter("WileyWidget.Business", LogLevel.Debug);
+        builder.Logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
 
         builder.Services.AddCors(options =>
         {
@@ -45,6 +67,44 @@ public partial class Program
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
 
         var app = builder.Build();
+        var logger = app.Logger;
+
+        if (AppDbStartupState.IsDegradedMode)
+        {
+            await SeedDevelopmentDataAsync(app.Services);
+            logger.LogWarning("Workspace API is running in degraded in-memory mode for local development.");
+        }
+
+        logger.LogInformation("Workspace API host initialized.");
+
+        app.Use(async (context, next) =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            logger.LogInformation("API request started: {Method} {Path}{QueryString}", context.Request.Method, context.Request.Path, context.Request.QueryString);
+
+            try
+            {
+                await next().ConfigureAwait(false);
+                logger.LogInformation(
+                    "API request completed: {Method} {Path}{QueryString} -> {StatusCode} in {ElapsedMs}ms",
+                    context.Request.Method,
+                    context.Request.Path,
+                    context.Request.QueryString,
+                    context.Response.StatusCode,
+                    stopwatch.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "API request failed: {Method} {Path}{QueryString} after {ElapsedMs}ms",
+                    context.Request.Method,
+                    context.Request.Path,
+                    context.Request.QueryString,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
+        });
 
         app.Use(async (context, next) =>
         {
@@ -85,6 +145,7 @@ public partial class Program
     private static void MapWorkspaceAiChatEndpoint(WebApplication app)
     {
         app.MapPost("/api/ai/chat", MapWorkspaceAiChatMessageEndpoint);
+        app.MapPost("/api/ai/chat/reset", MapWorkspaceAiChatResetEndpoint);
     }
 
     private static void MapQuickBooksImportEndpoints(WebApplication app)
@@ -144,6 +205,18 @@ public partial class Program
         return Results.Ok(chatResponse);
     }
 
+    private static async Task<IResult> MapWorkspaceAiChatResetEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, CancellationToken cancellationToken)
+    {
+        var resetRequest = await request.ReadFromJsonAsync<WorkspaceConversationResetRequest>(cancellationToken: cancellationToken);
+        if (resetRequest is null)
+        {
+            return Results.BadRequest("Workspace context is required to reset the Jarvis conversation.");
+        }
+
+        await assistantService.ResetConversationAsync(resetRequest, cancellationToken);
+        return Results.NoContent();
+    }
+
     private static void PopulateUserContext(HttpContext context, UserContext userContext)
     {
         var principal = context.User;
@@ -169,6 +242,75 @@ public partial class Program
 
     private static string? ResolveClaim(ClaimsPrincipal principal, string claimType)
         => principal.FindFirst(claimType)?.Value;
+
+    private static async Task SeedDevelopmentDataAsync(IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        await context.Database.EnsureCreatedAsync();
+
+        if (await context.Enterprises.AnyAsync())
+        {
+            return;
+        }
+
+        context.Enterprises.AddRange(
+            new WileyWidget.Models.Enterprise
+            {
+                Name = "Water Utility",
+                CurrentRate = 31.25m,
+                MonthlyExpenses = 98000m,
+                CitizenCount = 4500,
+                IsDeleted = false
+            },
+            new WileyWidget.Models.Enterprise
+            {
+                Name = "Sanitation Utility",
+                CurrentRate = 21.50m,
+                MonthlyExpenses = 72000m,
+                CitizenCount = 3200,
+                IsDeleted = false
+            },
+            new WileyWidget.Models.Enterprise
+            {
+                Name = "Archived Utility",
+                CurrentRate = 12m,
+                MonthlyExpenses = 800m,
+                CitizenCount = 20,
+                IsDeleted = true
+            });
+
+        context.UtilityCustomers.AddRange(
+            new WileyWidget.Models.UtilityCustomer
+            {
+                AccountNumber = "1001",
+                FirstName = "Ada",
+                LastName = "Lovelace",
+                CustomerType = WileyWidget.Models.CustomerType.Residential,
+                ServiceAddress = "1 Main St",
+                ServiceCity = "Wiley",
+                ServiceState = "CO",
+                ServiceZipCode = "81092",
+                ServiceLocation = WileyWidget.Models.ServiceLocation.InsideCityLimits
+            },
+            new WileyWidget.Models.UtilityCustomer
+            {
+                AccountNumber = "1002",
+                FirstName = "Grace",
+                LastName = "Hopper",
+                CompanyName = "Harbor Foods",
+                CustomerType = WileyWidget.Models.CustomerType.Commercial,
+                ServiceAddress = "2 Market St",
+                ServiceCity = "Wiley",
+                ServiceState = "CO",
+                ServiceZipCode = "81092",
+                ServiceLocation = WileyWidget.Models.ServiceLocation.OutsideCityLimits
+            });
+
+        await context.SaveChangesAsync();
+    }
 
     private static async Task<QuickBooksImportRequest?> ReadQuickBooksImportRequestAsync(HttpRequest request, CancellationToken cancellationToken)
     {

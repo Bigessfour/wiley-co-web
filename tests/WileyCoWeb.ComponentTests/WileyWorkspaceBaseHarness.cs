@@ -6,6 +6,19 @@ namespace WileyCoWeb.ComponentTests;
 
 public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 {
+	public string SnapshotStatus => SnapshotSaveStatus;
+	public string WorkspaceStatus => WorkspaceLoadStatus;
+
+	public Task InvokeRefreshWorkspaceAsync()
+	{
+		return RefreshWorkspaceAsync();
+	}
+
+	public Task InvokeSaveRateSnapshotAsync()
+	{
+		return SaveRateSnapshotAsync();
+	}
+
 	protected override void BuildRenderTree(RenderTreeBuilder builder)
 	{
 		builder.OpenElement(0, "div");
@@ -42,6 +55,11 @@ public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 		builder.OpenElement(20, "span");
 		builder.AddAttribute(21, "id", "workspace-status");
 		builder.AddContent(22, WorkspaceLoadStatus);
+		builder.CloseElement();
+
+		builder.OpenElement(23, "span");
+		builder.AddAttribute(24, "id", "snapshot-status");
+		builder.AddContent(25, SnapshotSaveStatus);
 		builder.CloseElement();
 
 		builder.CloseElement();

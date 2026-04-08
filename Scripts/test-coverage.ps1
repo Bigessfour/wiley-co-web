@@ -60,6 +60,27 @@ function Write-CoverageSummary {
     Write-Host ("  Report: {0}" -f $ReportPath)
 }
 
+function Get-CoveragePercent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [xml]$CoverageXml
+    )
+
+    return [double]$CoverageXml.DocumentElement.'line-rate' * 100
+}
+
+function Get-PlatformCoverageThreshold {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName
+    )
+
+    switch ($ProjectName) {
+        'WileyCoWeb.E2ETests' { return 0 }
+        default { return 80 }
+    }
+}
+
 if (-not (Test-Path "tests")) {
     throw "tests directory not found"
 }
@@ -71,6 +92,8 @@ $projectPaths = Get-TestProjectPaths -ExplicitPaths $TestProjectPaths
 if ($projectPaths.Count -eq 0) {
     throw "No test project files were found"
 }
+
+$coverageResults = @()
 
 foreach ($projectPath in $projectPaths) {
     if (-not (Test-Path $projectPath)) {
@@ -87,6 +110,22 @@ foreach ($projectPath in $projectPaths) {
     dotnet test $projectPath --collect:"XPlat Code Coverage" --results-directory $projectResultsDirectory
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
+    }
+
+    $projectCoverageReport = Get-ChildItem -Path $projectResultsDirectory -Recurse -Filter coverage.cobertura.xml |
+        Sort-Object FullName |
+        Select-Object -First 1
+
+    if (-not $projectCoverageReport) {
+        throw "Coverage report was not generated for $projectPath"
+    }
+
+    [xml]$projectCoverageXml = Get-Content -Path $projectCoverageReport.FullName -Raw
+    $coverageResults += [pscustomobject]@{
+        ProjectName = $projectName
+        CoveragePercent = [math]::Round((Get-CoveragePercent -CoverageXml $projectCoverageXml), 2)
+        Threshold = (Get-PlatformCoverageThreshold -ProjectName $projectName)
+        ReportPath = $projectCoverageReport.FullName
     }
 }
 
@@ -119,3 +158,20 @@ if (-not $mergedReport) {
 
 [xml]$coverageXml = Get-Content -Path $mergedReport -Raw
 Write-CoverageSummary -CoverageXml $coverageXml -ReportPath $mergedReport
+
+Write-Host ""
+Write-Host "Per-platform coverage"
+foreach ($coverageResult in $coverageResults) {
+    $gateNote = if ($coverageResult.ProjectName -eq 'WileyCoWeb.E2ETests') { ' (browser-only; reported separately)' } else { '' }
+    Write-Host ("  {0}: {1:N2}%{2} [threshold {3:N0}%]" -f $coverageResult.ProjectName, $coverageResult.CoveragePercent, $gateNote, $coverageResult.Threshold)
+}
+
+$gateFailures = $coverageResults |
+    Where-Object { $_.CoveragePercent -lt $_.Threshold -and $_.Threshold -gt 0 }
+
+if ($gateFailures) {
+    $failureLines = $gateFailures |
+        ForEach-Object { "{0}: {1:N2}% < {2:N0}%" -f $_.ProjectName, $_.CoveragePercent, $_.Threshold }
+
+    throw "Coverage gate failed:`n$($failureLines -join [Environment]::NewLine)"
+}

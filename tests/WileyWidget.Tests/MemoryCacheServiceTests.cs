@@ -104,6 +104,26 @@ public sealed class MemoryCacheServiceTests : IDisposable
         await service.SetAsync("sample:null", (SampleCacheItem)null!, ttl: TimeSpan.FromMinutes(1));
     }
 
+    [Fact]
+    public async Task DisposedCache_MethodsFallBackGracefully()
+    {
+        var disposedCache = new MemoryCache(new MemoryCacheOptions());
+        var service = new MemoryCacheService(disposedCache);
+
+        disposedCache.Dispose();
+
+        Assert.Null(await service.GetAsync<SampleCacheItem>("sample:disposed"));
+        Assert.False(await service.ExistsAsync("sample:disposed"));
+
+        await service.SetAsync("sample:disposed", new SampleCacheItem { Name = "ignored" }, ttl: TimeSpan.FromMinutes(1));
+        await service.RemoveAsync("sample:disposed");
+        await service.ClearAllAsync();
+
+        var created = await service.GetOrCreateAsync("sample:disposed", () => Task.FromResult(new SampleCacheItem { Name = "factory" }));
+
+        Assert.Equal("factory", created.Name);
+    }
+
     public void Dispose()
     {
         _memoryCache.Dispose();

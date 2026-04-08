@@ -18,8 +18,11 @@ public sealed record WorkspaceChatResponse(
 	string ContextSummary)
 {
 	public string? UserDisplayName { get; init; }
+	public string? UserProfileSummary { get; init; }
 	public string? ConversationId { get; init; }
 	public int ConversationMessageCount { get; init; }
+	public bool IsFirstConversation { get; init; }
+	public bool CanResetConversation { get; init; }
 }
 
 public sealed record WorkspaceUserContext(
@@ -27,3 +30,8 @@ public sealed record WorkspaceUserContext(
 	string DisplayName,
 	string? Email,
 	string PreferencesSummary);
+
+public sealed record WorkspaceConversationResetRequest(
+	string ContextSummary,
+	string SelectedEnterprise,
+	int SelectedFiscalYear);

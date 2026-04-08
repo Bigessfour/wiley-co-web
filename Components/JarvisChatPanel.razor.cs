@@ -8,6 +8,7 @@ namespace WileyCoWeb.Components;
 public partial class JarvisChatPanel : ComponentBase, IDisposable
 {
     private readonly List<WorkspaceChatMessage> chatTranscript = [];
+    private Action? workspaceChangedHandler;
 
     [Inject]
     protected WorkspaceState WorkspaceState { get; set; } = default!;
@@ -25,17 +26,15 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected string ChatContextSummary => BuildChatContextSummary();
     protected string CurrentUserLabel { get; set; } = "Guest";
     protected string CurrentConversationLabel { get; set; } = "Local session";
+    protected string CurrentProfileSummary { get; set; } = "Jarvis will ask a few setup questions on first contact.";
     protected bool IsChatBusy { get; set; }
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
 
     protected override void OnInitialized()
     {
-        WorkspaceState.Changed += HandleWorkspaceChanged;
-    }
-
-    protected void RefreshPanel()
-    {
-        StateHasChanged();
+        Console.WriteLine("[startup] JarvisChatPanel.OnInitialized entered.");
+        workspaceChangedHandler = () => _ = InvokeAsync(StateHasChanged);
+        WorkspaceState.Changed += workspaceChangedHandler;
     }
 
     protected async Task AskChatAsync()
@@ -53,6 +52,9 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             IsChatBusy = true;
             await InvokeAsync(StateHasChanged);
 
+            chatTranscript.Add(new WorkspaceChatMessage("user", question));
+            await InvokeAsync(StateHasChanged);
+
             var response = await AiApi.AskAsync(new WorkspaceChatRequest(
                 question,
                 BuildChatContextSummary(),
@@ -62,14 +64,42 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
                 ConversationHistory = BuildConversationHistory()
             }).ConfigureAwait(false);
 
-            chatTranscript.Add(new WorkspaceChatMessage("user", question));
             chatTranscript.Add(new WorkspaceChatMessage("assistant", response.Answer));
             ChatAnswer = response.Answer;
             CurrentUserLabel = string.IsNullOrWhiteSpace(response.UserDisplayName) ? CurrentUserLabel : response.UserDisplayName;
+            CurrentProfileSummary = string.IsNullOrWhiteSpace(response.UserProfileSummary) ? CurrentProfileSummary : response.UserProfileSummary;
             CurrentConversationLabel = !string.IsNullOrWhiteSpace(response.ConversationId)
                 ? $"Conversation {response.ConversationId} ({response.ConversationMessageCount} messages)"
                 : CurrentConversationLabel;
             ChatQuestion = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            ChatAnswer = ex.Message;
+        }
+        finally
+        {
+            IsChatBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    protected async Task ResetChatAsync()
+    {
+        try
+        {
+            IsChatBusy = true;
+            await InvokeAsync(StateHasChanged);
+
+            await AiApi.ResetConversationAsync(new WorkspaceConversationResetRequest(
+                BuildChatContextSummary(),
+                WorkspaceState.SelectedEnterprise,
+                WorkspaceState.SelectedFiscalYear)).ConfigureAwait(false);
+
+            chatTranscript.Clear();
+            ChatAnswer = "Jarvis thread reset for the current workspace context.";
+            CurrentConversationLabel = "Local session";
+            CurrentProfileSummary = "Jarvis will ask a few setup questions on first contact.";
         }
         catch (Exception ex)
         {
@@ -126,7 +156,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         return $"{WorkspaceState.ContextSummary}; rate gap {rateGap:C2}; scenario costs {WorkspaceState.ScenarioCostTotal:C0}; customers {WorkspaceState.FilteredCustomerCount}.";
     }
 
-    protected bool IsAssistantMessage(string role)
+    protected static bool IsAssistantMessage(string role)
     {
         return string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase) || string.Equals(role, "jarvis", StringComparison.OrdinalIgnoreCase);
     }
@@ -210,14 +240,12 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         return recommendations;
     }
 
-    private void HandleWorkspaceChanged()
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
-
     public void Dispose()
     {
-        WorkspaceState.Changed -= HandleWorkspaceChanged;
+        if (workspaceChangedHandler is not null)
+        {
+            WorkspaceState.Changed -= workspaceChangedHandler;
+        }
     }
 
     protected sealed record InsightCard(string Label, string Value, string Description);

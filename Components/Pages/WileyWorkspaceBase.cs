@@ -35,7 +35,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected string SnapshotSaveStatus { get; set; } = "Ready to save rate snapshot";
     protected string BaselineSaveStatus { get; set; } = "Baseline changes are local until you save them.";
     protected string ScenarioPersistenceStatus { get; set; } = "Saved scenarios load by enterprise and fiscal year.";
-    protected string WorkspaceLoadStatus { get; set; } = "Workspace ready.";
+    protected string WorkspaceLoadStatus { get; set; } = "Workspace initialization is pending.";
     protected string DocumentExportStatus { get; set; } = "Excel and PDF exports are ready.";
 
     protected long? SelectedScenarioSnapshotId { get; set; }
@@ -334,6 +334,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected override void OnInitialized()
     {
+        Console.WriteLine("[startup] WileyWorkspaceBase.OnInitialized entered.");
         WorkspaceState.Changed += HandleWorkspaceStateChanged;
     }
 
@@ -345,8 +346,27 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         persistenceInitialized = true;
-        await WorkspacePersistenceService.InitializeAsync();
-        await RefreshScenarioCatalogAsync();
+        Console.WriteLine("[startup] WileyWorkspaceBase.OnAfterRenderAsync first render.");
+        try
+        {
+            await WorkspacePersistenceService.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLoadStatus = $"Workspace persistence initialization failed: {ex.Message}";
+        }
+
+        try
+        {
+            await RefreshScenarioCatalogAsync();
+        }
+        catch (Exception ex)
+        {
+            ScenarioPersistenceStatus = $"Saved scenario list could not be loaded: {ex.Message}";
+        }
+
+        WorkspaceLoadStatus = "Workspace ready.";
+        StateHasChanged();
     }
 
     public void Dispose()

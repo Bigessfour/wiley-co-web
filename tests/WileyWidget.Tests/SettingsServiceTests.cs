@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
+using WileyWidget.Models;
 using WileyWidget.Services;
 
 namespace WileyWidget.Tests;
@@ -80,5 +82,83 @@ public sealed class SettingsServiceTests
 		var service = new SettingsService(new ConfigurationBuilder().Build());
 
 		Assert.ThrowsAny<ArgumentOutOfRangeException>(() => service.SaveFiscalYearSettings(month, day));
+	}
+
+	[Fact]
+	public async Task LoadAsync_RebuildsCorruptedSettingsFile_AndCreatesBackup()
+	{
+		var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+		try
+		{
+			Directory.CreateDirectory(tempDir);
+			await File.WriteAllTextAsync(Path.Combine(tempDir, "settings.json"), "{ not valid json");
+
+			var configuration = new ConfigurationBuilder()
+				.AddInMemoryCollection(new Dictionary<string, string?>
+				{
+					["Settings:Directory"] = tempDir
+				})
+				.Build();
+
+			var service = new SettingsService(configuration);
+			await service.LoadAsync();
+
+			var backups = Directory.GetFiles(tempDir, "settings.json.bad_*");
+
+			Assert.Equal("FluentDark", service.Current.Theme);
+			Assert.True(File.Exists(Path.Combine(tempDir, "settings.json")));
+			Assert.NotEmpty(backups);
+		}
+		finally
+		{
+			if (Directory.Exists(tempDir))
+			{
+				Directory.Delete(tempDir, recursive: true);
+			}
+		}
+	}
+
+	[Fact]
+	public async Task LoadAsync_MigratesLegacyQuickBooksTokens_ToCanonicalQboValues()
+	{
+		var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+		try
+		{
+			Directory.CreateDirectory(tempDir);
+
+			var legacySettings = new AppSettings
+			{
+				QuickBooksAccessToken = "legacy-access-token",
+				QuickBooksRefreshToken = "legacy-refresh-token",
+				QuickBooksTokenExpiresUtc = new DateTime(2026, 4, 7, 12, 0, 0, DateTimeKind.Utc)
+			};
+
+			await File.WriteAllTextAsync(
+				Path.Combine(tempDir, "settings.json"),
+				JsonSerializer.Serialize(legacySettings, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = null }));
+
+			var configuration = new ConfigurationBuilder()
+				.AddInMemoryCollection(new Dictionary<string, string?>
+				{
+					["Settings:Directory"] = tempDir
+				})
+				.Build();
+
+			var service = new SettingsService(configuration);
+			await service.LoadAsync();
+
+			Assert.Equal("legacy-access-token", service.Current.QboAccessToken);
+			Assert.Equal("legacy-refresh-token", service.Current.QboRefreshToken);
+			Assert.Equal(legacySettings.QuickBooksTokenExpiresUtc, service.Current.QboTokenExpiry);
+		}
+		finally
+		{
+			if (Directory.Exists(tempDir))
+			{
+				Directory.Delete(tempDir, recursive: true);
+			}
+		}
 	}
 }

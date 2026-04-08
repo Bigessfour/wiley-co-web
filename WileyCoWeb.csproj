@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
     <UserSecretsId>f6ce628b-59d0-4238-ad1f-5b6f977fd5b9</UserSecretsId>
+    <SyncfusionLocalSettingsFile>$(ProjectDir)appsettings.Syncfusion.local.json</SyncfusionLocalSettingsFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -57,18 +58,18 @@
   <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <_SyncfusionLicenseKey Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">$(SYNCFUSION_LICENSE_KEY)</_SyncfusionLicenseKey>
-      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKey)' == '' and '$(SYNCUSION_LICENSE_KEY)' != ''">$(SYNCUSION_LICENSE_KEY)</_SyncfusionLicenseKey>
+      <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' != ''">{"SyncfusionLicenseKey":"$(_SyncfusionLicenseKey)"}</_GeneratedSyncfusionAppSettings>
+      <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' == '' and !Exists('$(SyncfusionLocalSettingsFile)')">{}</_GeneratedSyncfusionAppSettings>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(_SyncfusionLicenseKey)' != ''">
-      <_SyncfusionAppSettingsLines Include='{"SyncfusionLicenseKey":"$(_SyncfusionLicenseKey)"}' />
-    </ItemGroup>
-    <ItemGroup Condition="'$(_SyncfusionLicenseKey)' == ''">
-      <_SyncfusionAppSettingsLines Include='{}' />
-    </ItemGroup>
+    <Copy Condition="'$(_SyncfusionLicenseKey)' == '' and Exists('$(SyncfusionLocalSettingsFile)')"
+          SourceFiles="$(SyncfusionLocalSettingsFile)"
+          DestinationFiles="$(ProjectDir)wwwroot\appsettings.json"
+          SkipUnchangedFiles="true" />
 
-    <WriteLinesToFile File="$(ProjectDir)wwwroot\appsettings.json"
-                      Lines="@(_SyncfusionAppSettingsLines)"
+    <WriteLinesToFile Condition="'$(_GeneratedSyncfusionAppSettings)' != ''"
+                      File="$(ProjectDir)wwwroot\appsettings.json"
+                      Lines="$(_GeneratedSyncfusionAppSettings)"
                       Overwrite="true"
                       WriteOnlyWhenDifferent="true" />
   </Target>

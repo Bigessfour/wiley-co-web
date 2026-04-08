@@ -18,6 +18,32 @@ namespace WileyCoWeb.ComponentTests;
 public sealed class JarvisChatPanelTests : TestContext
 {
 	[Fact]
+	public async Task AskJarvis_FirstConversationShowsOnboardingPrompt()
+	{
+		var state = new WorkspaceState();
+		var handler = new RecordingHttpMessageHandler(firstResponseAnswer: "Hi Guest. I’ll keep this thread tied to Water FY 2026. Tell me your preferred name, your role or department, and what you want Jarvis to help with.", firstResponseProfileSummary: "Onboarding pending for Guest: preferred name, role or department, and Jarvis goals have not been captured yet.");
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(new WorkspaceAiApiService(new HttpClient(handler)
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		}));
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<JarvisChatPanel>();
+
+		await AskJarvisAsync(cut, "What should I know about the current workspace?");
+
+		Assert.Contains("preferred name", cut.Markup, StringComparison.OrdinalIgnoreCase);
+		Assert.Contains("Profile summary", cut.Markup);
+		Assert.Contains("Onboarding pending", cut.Markup);
+		Assert.Contains("Jarvis will ask a few setup questions on first contact.", cut.Markup);
+	}
+
+	[Fact]
 	public async Task AskJarvis_PreservesConversationHistoryAcrossTurns()
 	{
 		var state = new WorkspaceState();
@@ -57,6 +83,35 @@ public sealed class JarvisChatPanelTests : TestContext
 		Assert.Contains("Second answer", cut.Markup);
 	}
 
+	[Fact]
+	public async Task ResetThread_ClearsConversationHistoryAndRequestsBackendReset()
+	{
+		var state = new WorkspaceState();
+		var handler = new RecordingHttpMessageHandler();
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(new WorkspaceAiApiService(new HttpClient(handler)
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		}));
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<JarvisChatPanel>();
+
+		await AskJarvisAsync(cut, "What is the current status?");
+
+		var resetButton = cut.FindAll("button").First(button => button.TextContent.Contains("Reset Thread", StringComparison.Ordinal));
+		await resetButton.ClickAsync(new MouseEventArgs());
+
+		cut.WaitForAssertion(() => Assert.DoesNotContain("What is the current status?", cut.Markup));
+		Assert.Contains("Jarvis thread reset for the current workspace context.", cut.Markup);
+		Assert.Equal(2, handler.Requests.Count);
+		Assert.EndsWith("/api/ai/chat/reset", handler.Paths[1], StringComparison.Ordinal);
+	}
+
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		PropertyNameCaseInsensitive = true
@@ -76,21 +131,40 @@ public sealed class JarvisChatPanelTests : TestContext
 	#pragma warning disable S1144
 	private sealed class RecordingHttpMessageHandler : HttpMessageHandler
 	{
+		private readonly string firstResponseAnswer;
+		private readonly string firstResponseProfileSummary;
+
+		public RecordingHttpMessageHandler(string? firstResponseAnswer = null, string? firstResponseProfileSummary = null)
+		{
+			this.firstResponseAnswer = firstResponseAnswer ?? "First answer";
+			this.firstResponseProfileSummary = firstResponseProfileSummary ?? "Preferences summary";
+		}
+
 		public List<string> Requests { get; } = [];
+		public List<string> Paths { get; } = [];
 
 		protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
 		{
 			_ = cancellationToken;
+			Paths.Add(request.RequestUri?.AbsolutePath ?? request.RequestUri?.ToString() ?? string.Empty);
 			Requests.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
 
+			if (request.RequestUri is not null && request.RequestUri.AbsolutePath.EndsWith("/reset", StringComparison.OrdinalIgnoreCase))
+			{
+				return new HttpResponseMessage(HttpStatusCode.NoContent);
+			}
+
 			var answer = Requests.Count == 1 ? "First answer" : "Second answer";
+			var profileSummary = Requests.Count == 1 ? firstResponseProfileSummary : "Preferences summary";
+			var currentAnswer = Requests.Count == 1 ? firstResponseAnswer : answer;
 			var response = new WorkspaceChatResponse(
 				Requests.Count == 1 ? "What is the current status?" : "What did I just ask you?",
-				answer,
+				currentAnswer,
 				false,
 				"Test context")
 			{
 				UserDisplayName = "Alex Morgan",
+				UserProfileSummary = profileSummary,
 				ConversationId = "jarvis:alex-morgan:water-utility:2026",
 				ConversationMessageCount = Requests.Count * 2
 			};

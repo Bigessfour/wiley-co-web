@@ -17,13 +17,14 @@ AWS Amplify Gen 1 stores encrypted hosting secrets in AWS Systems Manager Parame
 
 For this app, the build now supports either of these sources before `dotnet publish` runs:
 
-1. AWS Secrets Manager, using the secret name `SYNCFUION_LICENSE_KEY`.
+1. AWS Secrets Manager, using the secret name `SYNCFUSION_LICENSE_KEY`.
 2. Amplify Gen 1 environment secrets from Systems Manager Parameter Store as a fallback.
+3. A local ignored file named `appsettings.Syncfusion.local.json` in the repository root.
 
 If you are using AWS Secrets Manager:
 
 1. Store the secret either as a raw string or as JSON containing `SYNCFUSION_LICENSE_KEY` or `SyncfusionLicenseKey`.
-2. Ensure the Amplify build role can call `secretsmanager:GetSecretValue` for the secret named `SYNCFUION_LICENSE_KEY`.
+2. Ensure the Amplify build role can call `secretsmanager:GetSecretValue` for the secret named `SYNCFUSION_LICENSE_KEY`.
 3. Redeploy the Amplify branch.
 
 If you are using Amplify Gen 1 environment secrets instead:
@@ -31,6 +32,14 @@ If you are using Amplify Gen 1 environment secrets instead:
 1. In Systems Manager Parameter Store, create a `SecureString` parameter named `/amplify/d2ellat1y3ljd9/<backend-environment-name>/SYNCFUSION_LICENSE_KEY`.
 2. Use the default AWS KMS key for the account so Amplify can decrypt it.
 3. Redeploy the Amplify branch.
+
+If you are working locally on macOS and user secrets are not being surfaced reliably, create an ignored file named `appsettings.Syncfusion.local.json` in the repository root with this shape:
+
+```json
+{"SyncfusionLicenseKey":"<your-license-key>"}
+```
+
+The build copies that file into `wwwroot/appsettings.json`, and that generated file is already ignored by git.
 
 Important: this app is a static Blazor WebAssembly site. That means the Syncfusion license is injected at build time and then included in the published client assets so `Program.cs` can read it from configuration at startup. This is not a private server-side runtime secret path.
 

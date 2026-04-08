@@ -87,12 +87,16 @@ Key finding: The rebuild is about 85% complete for the core features already dev
 - [x] E2E test platform exists and is marked as a test project.
 - [x] Widget test platform exists as a separate test project.
 - [x] Add a test inventory report that lists discovered tests by platform and feature area.
+- [!] E2E is currently broken in this environment; do not initiate any new E2E tests here.
+- [x] The Component, Integration, and Widget test projects are the supported test targets in this environment.
 - [ ] Add a coverage gate that keeps each of the four platforms at or above 80 percent coverage.
 - [ ] Verify Component test coverage is at least 80 percent.
 - [ ] Verify Integration test coverage is at least 80 percent.
-- [ ] Verify E2E test coverage is at least 80 percent.
+- [ ] Track E2E scenario pass rate separately; coverlet reports 0.0% for browser-only runs because the app executes outside the test process.
 - [ ] Verify Widget test coverage is at least 80 percent.
-- Current coverage snapshot from the inventory script: Component 40.9%, Integration 11.7%, E2E 0.0%, Widget 9.5%.
+- Verified discovered test counts: Component 36, Integration 27, E2E 6, Widget 96.
+- Coverage reporting is now configured through [coverlet.runsettings](../coverlet.runsettings).
+- Current coverage snapshot from the collector output: Component 63.4%, Integration 12.5%, E2E 0.0% (browser-only suite; no in-process app code is instrumented), Widget 29.2%.
 
 ### AWS Amplify Resources That Help Close The Gaps
 
@@ -263,7 +267,7 @@ Build the web app as a thin Blazor client over a clean, layered backend. Each la
 4. [x] Save rate snapshot to Aurora via thin API.
    - Manual current-rate entry (`SfTextBox` + validation).
    - Visual current vs. recommended + break-even (`SfChart` column or bullet chart).
-4. [x] Save rate snapshot to Aurora via thin API.
+5. [x] Save rate snapshot to Aurora via thin API.
    - Implemented as a POST to the thin snapshot host. The workspace now archives the current rate and scenario payload to Aurora-backed storage from the rates panel.
 
 **Acceptance**: Met for the live-data gate. Break-even interactions are live, and the page now hydrates customers and projections from the thin API workspace snapshot instead of seeded client-side sample collections.

@@ -2,6 +2,7 @@ using Syncfusion.Drawing;
 using Syncfusion.Pdf;
 using Syncfusion.Pdf.Graphics;
 using Syncfusion.XlsIO;
+using Microsoft.Extensions.Logging;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -10,10 +11,18 @@ public sealed class WorkspaceDocumentExportService
 {
     private const string ExcelContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private const string PdfContentType = "application/pdf";
+    private const string CurrencyNumberFormat = "$#,##0.00";
+    private readonly ILogger<WorkspaceDocumentExportService>? logger;
+
+    public WorkspaceDocumentExportService(ILogger<WorkspaceDocumentExportService>? logger = null)
+    {
+        this.logger = logger;
+    }
 
     public WorkspaceExportDocument CreateCustomerWorkbook(WorkspaceState workspaceState)
     {
         ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation("Creating customer workbook export for {Enterprise} FY {FiscalYear} with {CustomerCount} customers.", workspaceState.SelectedEnterprise, workspaceState.SelectedFiscalYear, workspaceState.FilteredCustomerCount);
 
         using var excelEngine = new ExcelEngine();
         var application = excelEngine.Excel;
@@ -46,15 +55,19 @@ public sealed class WorkspaceDocumentExportService
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
 
-        return new WorkspaceExportDocument(
+        var exportDocument = new WorkspaceExportDocument(
             $"{BuildFileStem(workspaceState)}-customers.xlsx",
             ExcelContentType,
             stream.ToArray());
+
+        logger?.LogInformation("Customer workbook export created: {FileName} ({ByteCount} bytes)", exportDocument.FileName, exportDocument.Content.LongLength);
+        return exportDocument;
     }
 
     public WorkspaceExportDocument CreateScenarioWorkbook(WorkspaceState workspaceState)
     {
         ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation("Creating scenario workbook export for {Enterprise} FY {FiscalYear} with {ScenarioItemCount} scenario items.", workspaceState.SelectedEnterprise, workspaceState.SelectedFiscalYear, workspaceState.ScenarioItems.Count);
 
         using var excelEngine = new ExcelEngine();
         var application = excelEngine.Excel;
@@ -66,13 +79,13 @@ public sealed class WorkspaceDocumentExportService
         WriteWorkbookTitle(summarySheet, $"{workspaceState.SelectedEnterprise} rate summary", 1, 2);
         summarySheet.Range[3, 1].Text = "Current Rate";
         summarySheet.Range[3, 2].Number = (double)workspaceState.CurrentRate;
-        summarySheet.Range[3, 2].NumberFormat = "$#,##0.00";
+        summarySheet.Range[3, 2].NumberFormat = CurrencyNumberFormat;
         summarySheet.Range[4, 1].Text = "Break-Even Rate";
         summarySheet.Range[4, 2].Number = (double)workspaceState.RecommendedRate;
-        summarySheet.Range[4, 2].NumberFormat = "$#,##0.00";
+        summarySheet.Range[4, 2].NumberFormat = CurrencyNumberFormat;
         summarySheet.Range[5, 1].Text = "Scenario Adjusted Rate";
         summarySheet.Range[5, 2].Number = (double)workspaceState.AdjustedRecommendedRate;
-        summarySheet.Range[5, 2].NumberFormat = "$#,##0.00";
+        summarySheet.Range[5, 2].NumberFormat = CurrencyNumberFormat;
         summarySheet.Range[6, 1].Text = "Scenario Cost Total";
         summarySheet.Range[6, 2].Number = (double)workspaceState.ScenarioCostTotal;
         summarySheet.Range[6, 2].NumberFormat = "$#,##0";
@@ -93,7 +106,7 @@ public sealed class WorkspaceDocumentExportService
             scenarioSheet.Range[rowIndex, 2].Number = (double)item.Cost;
             scenarioSheet.Range[rowIndex, 2].NumberFormat = "$#,##0";
             scenarioSheet.Range[rowIndex, 3].Number = (double)(workspaceState.CurrentRate - workspaceState.AdjustedRecommendedRate);
-            scenarioSheet.Range[rowIndex, 3].NumberFormat = "$#,##0.00";
+            scenarioSheet.Range[rowIndex, 3].NumberFormat = CurrencyNumberFormat;
             rowIndex++;
         }
 
@@ -103,15 +116,19 @@ public sealed class WorkspaceDocumentExportService
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
 
-        return new WorkspaceExportDocument(
+        var exportDocument = new WorkspaceExportDocument(
             $"{BuildFileStem(workspaceState)}-scenario.xlsx",
             ExcelContentType,
             stream.ToArray());
+
+        logger?.LogInformation("Scenario workbook export created: {FileName} ({ByteCount} bytes)", exportDocument.FileName, exportDocument.Content.LongLength);
+        return exportDocument;
     }
 
     public WorkspaceExportDocument CreateWorkspacePdfReport(WorkspaceState workspaceState)
     {
         ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation("Creating workspace PDF export for {Enterprise} FY {FiscalYear} with {ScenarioItemCount} scenario items.", workspaceState.SelectedEnterprise, workspaceState.SelectedFiscalYear, workspaceState.ScenarioItems.Count);
 
         using var document = new PdfDocument();
         var page = document.Pages.Add();
@@ -169,10 +186,13 @@ public sealed class WorkspaceDocumentExportService
         using var stream = new MemoryStream();
         document.Save(stream);
 
-        return new WorkspaceExportDocument(
+        var exportDocument = new WorkspaceExportDocument(
             $"{BuildFileStem(workspaceState)}-rate-packet.pdf",
             PdfContentType,
             stream.ToArray());
+
+        logger?.LogInformation("Workspace PDF export created: {FileName} ({ByteCount} bytes)", exportDocument.FileName, exportDocument.Content.LongLength);
+        return exportDocument;
     }
 
     private static IEnumerable<string> BuildSummaryLines(WorkspaceState workspaceState)
