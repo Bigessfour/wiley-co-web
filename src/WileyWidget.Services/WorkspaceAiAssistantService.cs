@@ -1,3 +1,10 @@
+using System.Globalization;
+using System.Linq;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using WileyCoWeb.Contracts;
 using WileyWidget.Services.Abstractions;
 
@@ -13,23 +20,38 @@ public sealed class WorkspaceAiAssistantService
 
 	private readonly ILogger<WorkspaceAiAssistantService> logger;
 	private readonly IConfiguration configuration;
+	private readonly IHttpClientFactory? httpClientFactory;
 	private readonly IGrokApiKeyProvider? apiKeyProvider;
 	private readonly IUserContext userContext;
 	private readonly IConversationRepository conversationRepository;
 	private readonly Lazy<KernelContext?> kernelContext;
+	private readonly bool legacyXaiEnabled;
+	private readonly Uri legacyXaiEndpoint;
+	private readonly string legacyXaiModel;
+	private readonly double legacyXaiTemperature;
+	private readonly int legacyXaiMaxTokens;
+	private readonly int legacyXaiTimeoutSeconds;
 
 	public WorkspaceAiAssistantService(
 		IConfiguration configuration,
 		ILogger<WorkspaceAiAssistantService> logger,
 		IUserContext userContext,
 		IConversationRepository conversationRepository,
+		IHttpClientFactory? httpClientFactory = null,
 		IGrokApiKeyProvider? apiKeyProvider = null)
 	{
 		this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 		this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		this.userContext = userContext ?? throw new ArgumentNullException(nameof(userContext));
 		this.conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+		this.httpClientFactory = httpClientFactory;
 		this.apiKeyProvider = apiKeyProvider;
+		legacyXaiEnabled = configuration.GetValue<bool>("XAI:Enabled", true);
+		legacyXaiEndpoint = NormalizeResponsesEndpoint(configuration["XAI:Endpoint"]);
+		legacyXaiModel = configuration["XAI:Model"] ?? configuration["Grok:Model"] ?? "grok-4.1";
+		legacyXaiTemperature = ParseDouble(configuration["XAI:Temperature"], 0.3d);
+		legacyXaiMaxTokens = ParseInt(configuration["XAI:MaxTokens"], 800);
+		legacyXaiTimeoutSeconds = ParseInt(configuration["XAI:TimeoutSeconds"], 15);
 		kernelContext = new Lazy<KernelContext?>(InitializeKernelContext);
 	}
 
@@ -52,6 +74,7 @@ public sealed class WorkspaceAiAssistantService
 			var onboardingAnswer = BuildOnboardingAnswer(activeUser, request);
 			conversationHistory = AppendTurn(conversationHistory, question, onboardingAnswer);
 			await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+			await SaveRecommendationAsync(conversationId, activeUser, request, question, onboardingAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
 
 			var onboardingResponse = new WorkspaceChatResponse(question, onboardingAnswer, true, contextSummary)
 			{
@@ -68,65 +91,111 @@ public sealed class WorkspaceAiAssistantService
 		}
 
 		var assistant = kernelContext.Value;
-		if (assistant is null)
+		if (assistant is not null)
 		{
-			var fallbackResponse = new WorkspaceChatResponse(
-				question,
-				BuildFallbackAnswer(question, request, activeUser),
-				true,
-				contextSummary);
-			logger.LogInformation("Workspace AI returned deterministic fallback for conversation {ConversationId}", conversationId);
-			return ApplyUserMetadata(fallbackResponse, activeUser, conversationId, conversationHistory.Count + 1);
-		}
-
-		try
-		{
-			var chatHistory = new ChatHistory();
-			chatHistory.AddSystemMessage(BuildSystemPrompt(activeUser, request));
-
-			foreach (var message in conversationHistory)
+			try
 			{
-				if (IsAssistantMessage(message.Role))
+				var chatHistory = new ChatHistory();
+				chatHistory.AddSystemMessage(BuildSystemPrompt(activeUser, request));
+
+				foreach (var message in conversationHistory)
 				{
-					chatHistory.AddAssistantMessage(message.Content);
+					if (IsAssistantMessage(message.Role))
+					{
+						chatHistory.AddAssistantMessage(message.Content);
+					}
+					else
+					{
+						chatHistory.AddUserMessage(message.Content);
+					}
 				}
-				else
+
+				chatHistory.AddUserMessage(BuildUserPrompt(question, request, conversationHistory));
+
+				var executionSettings = new OpenAIPromptExecutionSettings
 				{
-					chatHistory.AddUserMessage(message.Content);
+					ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
+				};
+
+				var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, cancellationToken).ConfigureAwait(false);
+				var answer = response.Content?.Trim();
+				if (!string.IsNullOrWhiteSpace(answer))
+				{
+					conversationHistory = AppendTurn(conversationHistory, question, answer);
+					await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+					await SaveRecommendationAsync(conversationId, activeUser, request, question, answer, usedFallback: false, cancellationToken).ConfigureAwait(false);
+
+					var chatResponse = new WorkspaceChatResponse(question, answer, false, contextSummary);
+					logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
+					return ApplyUserMetadata(chatResponse, activeUser, conversationId, conversationHistory.Count);
 				}
 			}
-
-			chatHistory.AddUserMessage(BuildUserPrompt(question, request, conversationHistory));
-
-			var executionSettings = new OpenAIPromptExecutionSettings
+			catch (Exception ex)
 			{
-				ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
-			};
-
-			var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, cancellationToken).ConfigureAwait(false);
-			var answer = response.Content?.Trim();
-			if (!string.IsNullOrWhiteSpace(answer))
-			{
-				conversationHistory = AppendTurn(conversationHistory, question, answer);
-				await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-
-				var chatResponse = new WorkspaceChatResponse(question, answer, false, contextSummary);
-				logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
-				return ApplyUserMetadata(chatResponse, activeUser, conversationId, conversationHistory.Count);
+				logger.LogWarning(ex, "Workspace AI assistant request fell back to legacy xAI responses");
 			}
 		}
-		catch (Exception ex)
+
+		var legacyAnswer = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+		if (!string.IsNullOrWhiteSpace(legacyAnswer))
 		{
-			logger.LogWarning(ex, "Workspace AI assistant request fell back to deterministic guidance");
+			conversationHistory = AppendTurn(conversationHistory, question, legacyAnswer);
+			await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+			await SaveRecommendationAsync(conversationId, activeUser, request, question, legacyAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
+
+			var legacyResponse = new WorkspaceChatResponse(question, legacyAnswer, true, contextSummary);
+			logger.LogInformation("Workspace AI returned legacy xAI fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
+			return ApplyUserMetadata(legacyResponse, activeUser, conversationId, conversationHistory.Count);
 		}
 
 		var fallbackAnswer = BuildFallbackAnswer(question, request, activeUser);
 		conversationHistory = AppendTurn(conversationHistory, question, fallbackAnswer);
 		await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+		await SaveRecommendationAsync(conversationId, activeUser, request, question, fallbackAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
 
 		var fallbackChatResponse = new WorkspaceChatResponse(question, fallbackAnswer, true, contextSummary);
 		logger.LogInformation("Workspace AI returned deterministic fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
 		return ApplyUserMetadata(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count);
+	}
+
+	public async Task ResetConversationAsync(WorkspaceConversationResetRequest request, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(request);
+		var activeUser = ResolveCurrentUser();
+		var conversationId = BuildConversationId(activeUser, new WorkspaceChatRequest(
+			string.Empty,
+			request.ContextSummary,
+			request.SelectedEnterprise,
+			request.SelectedFiscalYear));
+
+		await conversationRepository.DeleteConversationAsync(conversationId, cancellationToken).ConfigureAwait(false);
+		await conversationRepository.DeleteRecommendationsAsync(conversationId, cancellationToken).ConfigureAwait(false);
+		logger.LogInformation("Deleted Jarvis conversation {ConversationId} for {Enterprise} FY {FiscalYear}", conversationId, request.SelectedEnterprise, request.SelectedFiscalYear);
+	}
+
+	public async Task<WorkspaceRecommendationHistoryResponse> GetRecommendationHistoryAsync(WorkspaceRecommendationHistoryRequest request, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(request);
+		var activeUser = ResolveCurrentUser();
+
+		var recommendations = await conversationRepository
+			.GetRecommendationsAsync(activeUser.UserId, request.SelectedEnterprise, request.SelectedFiscalYear, request.Limit, cancellationToken)
+			.ConfigureAwait(false);
+
+		var items = recommendations
+			.OfType<RecommendationHistory>()
+			.OrderByDescending(entry => entry.CreatedAtUtc)
+			.Select(entry => new WorkspaceRecommendationHistoryItem(
+				entry.RecommendationId,
+				entry.ConversationId,
+				entry.UserDisplayName,
+				entry.Question,
+				entry.Recommendation,
+				entry.UsedFallback,
+				entry.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture)))
+			.ToList();
+
+		return new WorkspaceRecommendationHistoryResponse(items);
 	}
 
 	private KernelContext? InitializeKernelContext()
@@ -168,6 +237,138 @@ public sealed class WorkspaceAiAssistantService
 		{
 			logger.LogWarning(ex, "Workspace AI assistant could not initialize Semantic Kernel");
 			return null;
+		}
+	}
+
+	private async Task<string?> TryGetLegacyXaiAnswerAsync(
+		ResolvedUserContext user,
+		WorkspaceChatRequest request,
+		string question,
+		IReadOnlyList<WorkspaceChatMessage> conversationHistory,
+		CancellationToken cancellationToken)
+	{
+		if (!legacyXaiEnabled)
+		{
+			return null;
+		}
+
+		var apiKey = apiKeyProvider?.ApiKey
+			?? configuration["XAI:ApiKey"]
+			?? configuration["xAI:ApiKey"]
+			?? configuration["XAI_API_KEY"];
+		if (string.IsNullOrWhiteSpace(apiKey))
+		{
+			return null;
+		}
+
+		var requestBody = new
+		{
+			input = new[]
+			{
+				new { role = "system", content = BuildSystemPrompt(user, request) },
+				new { role = "user", content = BuildUserPrompt(question, request, conversationHistory) }
+			},
+			model = legacyXaiModel,
+			stream = false,
+			temperature = legacyXaiTemperature,
+			max_output_tokens = legacyXaiMaxTokens,
+			store = true
+		};
+
+		var client = httpClientFactory?.CreateClient(nameof(WorkspaceAiAssistantService));
+		var ownsClient = false;
+		if (client is null)
+		{
+			client = new HttpClient();
+			ownsClient = true;
+		}
+
+		client.Timeout = TimeSpan.FromSeconds(legacyXaiTimeoutSeconds);
+
+		try
+		{
+			using var requestMessage = new HttpRequestMessage(HttpMethod.Post, legacyXaiEndpoint)
+			{
+				Content = JsonContent.Create(requestBody, options: JsonOptions)
+			};
+			requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+			var response = await client.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
+			if (!response.IsSuccessStatusCode)
+			{
+				var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+				logger.LogWarning(
+					"Workspace AI legacy xAI fallback returned {StatusCode} for conversation prompt: {Body}",
+					response.StatusCode,
+					responseBody);
+				return null;
+			}
+
+			var xaiResponse = await response.Content.ReadFromJsonAsync<LegacyXaiResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+			var answer = xaiResponse?.output?.FirstOrDefault()?.content?.FirstOrDefault()?.text?.Trim();
+			if (!string.IsNullOrWhiteSpace(answer))
+			{
+				return answer;
+			}
+
+			logger.LogWarning("Workspace AI legacy xAI fallback returned an empty response.");
+			return null;
+		}
+		catch (Exception ex)
+		{
+			logger.LogWarning(ex, "Workspace AI legacy xAI fallback could not produce an answer.");
+			return null;
+		}
+		finally
+		{
+			if (ownsClient)
+			{
+				client.Dispose();
+			}
+		}
+	}
+
+	private static Uri NormalizeResponsesEndpoint(string? endpoint)
+	{
+		var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
+		if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
+		{
+			return new Uri(candidate, UriKind.Absolute);
+		}
+
+		if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+		{
+			candidate = candidate[..^"/chat/completions".Length];
+		}
+
+		return new Uri($"{candidate}/responses", UriKind.Absolute);
+	}
+
+	private static int ParseInt(string? value, int fallback)
+		=> int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback;
+
+	private static double ParseDouble(string? value, double fallback)
+		=> double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback;
+
+	private sealed class LegacyXaiResponse
+	{
+		public LegacyXaiOutputItem[]? output { get; set; }
+		public LegacyXaiError? Error { get; set; }
+
+		public sealed class LegacyXaiOutputItem
+		{
+			public LegacyXaiContentItem[]? content { get; set; }
+		}
+
+		public sealed class LegacyXaiContentItem
+		{
+			public string? text { get; set; }
+		}
+
+		public sealed class LegacyXaiError
+		{
+			public string? message { get; set; }
+			public string? type { get; set; }
 		}
 	}
 
@@ -279,6 +480,30 @@ public sealed class WorkspaceAiAssistantService
 
 		await conversationRepository.SaveConversationAsync(conversation, cancellationToken).ConfigureAwait(false);
 		logger.LogInformation("Saved Jarvis conversation {ConversationId} for {Enterprise} FY {FiscalYear} with {MessageCount} messages", conversationId, request.SelectedEnterprise, request.SelectedFiscalYear, conversationHistory.Count);
+	}
+
+	private async Task SaveRecommendationAsync(string conversationId, ResolvedUserContext user, WorkspaceChatRequest request, string question, string answer, bool usedFallback, CancellationToken cancellationToken)
+	{
+		if (string.IsNullOrWhiteSpace(answer))
+		{
+			return;
+		}
+
+		var recommendation = new RecommendationHistory
+		{
+			RecommendationId = $"reco:{Guid.NewGuid():N}",
+			ConversationId = conversationId,
+			UserId = user.UserId,
+			UserDisplayName = user.DisplayName,
+			Enterprise = request.SelectedEnterprise,
+			FiscalYear = request.SelectedFiscalYear,
+			Question = question,
+			Recommendation = answer,
+			UsedFallback = usedFallback,
+			CreatedAtUtc = DateTime.UtcNow
+		};
+
+		await conversationRepository.SaveRecommendationAsync(recommendation, cancellationToken).ConfigureAwait(false);
 	}
 
 	private async Task<IReadOnlyList<WorkspaceChatMessage>> ReadPersistedConversationAsync(string conversationId, CancellationToken cancellationToken)

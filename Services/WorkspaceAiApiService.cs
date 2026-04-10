@@ -54,4 +54,25 @@ public sealed class WorkspaceAiApiService
 				: responseBody);
 		}
 	}
+
+	public async Task<WorkspaceRecommendationHistoryResponse> GetRecommendationHistoryAsync(WorkspaceRecommendationHistoryRequest request, CancellationToken cancellationToken = default)
+	{
+		ArgumentNullException.ThrowIfNull(request);
+		logger?.LogInformation("Loading recommendation history for {Enterprise} FY {FiscalYear} (limit {Limit}).", request.SelectedEnterprise, request.SelectedFiscalYear, request.Limit);
+
+		var endpoint = $"api/ai/recommendations?enterprise={Uri.EscapeDataString(request.SelectedEnterprise)}&fiscalYear={request.SelectedFiscalYear}&limit={request.Limit}";
+		var response = await httpClient.GetAsync(endpoint, cancellationToken).ConfigureAwait(false);
+		var payload = await response.Content.ReadFromJsonAsync<WorkspaceRecommendationHistoryResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+
+		if (!response.IsSuccessStatusCode)
+		{
+			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+			logger?.LogWarning("Workspace recommendation history request failed with status {StatusCode}", (int)response.StatusCode);
+			throw new InvalidOperationException(string.IsNullOrWhiteSpace(responseBody)
+				? $"Workspace recommendation history request failed with status {(int)response.StatusCode}."
+				: responseBody);
+		}
+
+		return payload ?? new WorkspaceRecommendationHistoryResponse([]);
+	}
 }

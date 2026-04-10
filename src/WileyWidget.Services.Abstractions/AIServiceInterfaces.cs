@@ -89,6 +89,9 @@ namespace WileyWidget.Services.Abstractions
         Task<object?> GetConversationAsync(string id, CancellationToken cancellationToken = default);
         Task<List<object>> GetConversationsAsync(int skip, int limit, CancellationToken cancellationToken = default);
         Task DeleteConversationAsync(string conversationId, CancellationToken cancellationToken = default);
+        Task SaveRecommendationAsync(object recommendation, CancellationToken cancellationToken = default);
+        Task<List<object>> GetRecommendationsAsync(string userId, string enterprise, int fiscalYear, int limit, CancellationToken cancellationToken = default);
+        Task DeleteRecommendationsAsync(string conversationId, CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -143,6 +146,23 @@ namespace WileyWidget.Services.Abstractions
         public int MessageCount { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Recommendation history persisted per user and workspace scope.
+    /// </summary>
+    public class RecommendationHistory
+    {
+        public string RecommendationId { get; set; } = string.Empty;
+        public string ConversationId { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string UserDisplayName { get; set; } = string.Empty;
+        public string Enterprise { get; set; } = string.Empty;
+        public int FiscalYear { get; set; }
+        public string Question { get; set; } = string.Empty;
+        public string Recommendation { get; set; } = string.Empty;
+        public bool UsedFallback { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
     }
 
     /// <summary>

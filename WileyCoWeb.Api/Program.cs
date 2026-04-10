@@ -1,5 +1,9 @@
 using System.Text.Json;
 using System.Diagnostics;
+using Amazon;
+using Amazon.SecretsManager;
+using Amazon.SecretsManager.Model;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +28,7 @@ public partial class Program
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
         var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
             ?? builder.Configuration["DATABASE_URL"]
@@ -44,7 +49,10 @@ public partial class Program
         builder.Logging.AddFilter("WileyWidget.Data", LogLevel.Debug);
         builder.Logging.AddFilter("WileyWidget.Services", LogLevel.Debug);
         builder.Logging.AddFilter("WileyWidget.Business", LogLevel.Debug);
-        builder.Logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
+        if (!builder.Environment.IsEnvironment("IntegrationTest"))
+        {
+            builder.Logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
+        }
 
         builder.Services.AddCors(options =>
         {
@@ -55,6 +63,7 @@ public partial class Program
                     .AllowAnyOrigin();
             });
         });
+        builder.Services.AddHttpClient();
 
         builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
         builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
@@ -127,6 +136,128 @@ public partial class Program
         await app.RunAsync();
     }
 
+    private static async Task ConfigureXaiSecretAsync(ConfigurationManager configuration, IWebHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        var existingApiKey = configuration["XAI_API_KEY"]
+            ?? configuration["XAI:ApiKey"]
+            ?? Environment.GetEnvironmentVariable("XAI_API_KEY");
+
+        if (!string.IsNullOrWhiteSpace(existingApiKey))
+        {
+            return;
+        }
+
+        if (environment.IsEnvironment("IntegrationTest"))
+        {
+            return;
+        }
+
+        var secretName = configuration["XAI:SecretName"]
+            ?? configuration["XAI_SECRET_NAME"]
+            ?? "Grok";
+        var regionName = configuration["WILEY_AWS_REGION"]
+            ?? configuration["AWS_REGION"]
+            ?? configuration["AWS_DEFAULT_REGION"]
+            ?? "us-east-2";
+
+        var secretValue = await TryGetSecretAsync(secretName, regionName).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(secretValue))
+        {
+            return;
+        }
+
+        var normalizedApiKey = TryExtractApiKey(secretValue);
+        if (string.IsNullOrWhiteSpace(normalizedApiKey))
+        {
+            return;
+        }
+
+        configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["XAI_API_KEY"] = normalizedApiKey,
+            ["XAI:ApiKey"] = normalizedApiKey,
+            ["XAI:SecretName"] = secretName
+        });
+    }
+
+    private static async Task<string?> TryGetSecretAsync(string secretName, string regionName)
+    {
+        if (string.IsNullOrWhiteSpace(secretName) || string.IsNullOrWhiteSpace(regionName))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var client = new AmazonSecretsManagerClient(RegionEndpoint.GetBySystemName(regionName));
+            var response = await client.GetSecretValueAsync(new GetSecretValueRequest
+            {
+                SecretId = secretName,
+                VersionStage = "AWSCURRENT"
+            }).ConfigureAwait(false);
+
+            return response.SecretString;
+        }
+        catch (ResourceNotFoundException)
+        {
+            return null;
+        }
+        catch (InvalidRequestException)
+        {
+            return null;
+        }
+        catch (InvalidParameterException)
+        {
+            return null;
+        }
+        catch (AmazonSecretsManagerException)
+        {
+            return null;
+        }
+    }
+
+    private static string? TryExtractApiKey(string secretValue)
+    {
+        if (string.IsNullOrWhiteSpace(secretValue))
+        {
+            return null;
+        }
+
+        var trimmed = secretValue.Trim();
+        if (!trimmed.StartsWith('{'))
+        {
+            return trimmed;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(trimmed);
+            var root = document.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return trimmed;
+            }
+
+            foreach (var propertyName in new[] { "XAI_API_KEY", "ApiKey", "XaiApiKey", "GrokApiKey", "XAI:ApiKey" })
+            {
+                if (root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String)
+                {
+                    return value.GetString();
+                }
+            }
+
+            return trimmed;
+        }
+        catch (JsonException)
+        {
+            return trimmed;
+        }
+    }
+
     private static void MapWorkspaceSnapshotEndpoints(WebApplication app)
     {
         MapWorkspaceSnapshotGetEndpoint(app);
@@ -146,6 +277,7 @@ public partial class Program
     {
         app.MapPost("/api/ai/chat", MapWorkspaceAiChatMessageEndpoint);
         app.MapPost("/api/ai/chat/reset", MapWorkspaceAiChatResetEndpoint);
+        app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint);
     }
 
     private static void MapQuickBooksImportEndpoints(WebApplication app)
@@ -215,6 +347,25 @@ public partial class Program
 
         await assistantService.ResetConversationAsync(resetRequest, cancellationToken);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> MapWorkspaceRecommendationHistoryEndpoint(
+        [FromQuery] string? enterprise,
+        [FromQuery] int? fiscalYear,
+        [FromQuery] int? limit,
+        WorkspaceAiAssistantService assistantService,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(enterprise) || fiscalYear is null)
+        {
+            return Results.BadRequest("Enterprise and fiscal year are required to load recommendation history.");
+        }
+
+        var history = await assistantService.GetRecommendationHistoryAsync(
+            new WorkspaceRecommendationHistoryRequest(enterprise.Trim(), fiscalYear.Value, limit ?? 12),
+            cancellationToken);
+
+        return Results.Ok(history);
     }
 
     private static void PopulateUserContext(HttpContext context, UserContext userContext)
@@ -446,7 +597,7 @@ public partial class Program
                 snapshot.SelectedFiscalYear,
                 savedAtUtc,
                 $"Saved baseline values for {snapshot.SelectedEnterprise} FY {snapshot.SelectedFiscalYear}.",
-                ToBootstrapData(snapshot));
+                snapshot);
 
             return Results.Ok(response);
         });
@@ -732,27 +883,6 @@ public partial class Program
             payload.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
             payload.ScenarioItems?.Count ?? 0,
             description);
-    }
-
-    private static WorkspaceBootstrapData ToBootstrapData(WorkspaceSnapshotResponse snapshot)
-    {
-        return new WorkspaceBootstrapData(
-            snapshot.SelectedEnterprise,
-            snapshot.SelectedFiscalYear,
-            snapshot.ActiveScenarioName,
-            snapshot.CurrentRate,
-            snapshot.TotalCosts,
-            snapshot.ProjectedVolume,
-            snapshot.LastUpdatedUtc)
-        {
-            EnterpriseOptions = snapshot.EnterpriseOptions,
-            FiscalYearOptions = snapshot.FiscalYearOptions,
-            CustomerServiceOptions = snapshot.CustomerServiceOptions,
-            CustomerCityLimitOptions = snapshot.CustomerCityLimitOptions,
-            ScenarioItems = snapshot.ScenarioItems,
-            CustomerRows = snapshot.CustomerRows,
-            ProjectionRows = snapshot.ProjectionRows
-        };
     }
 
     private static string? ExtractDescription(string notes)

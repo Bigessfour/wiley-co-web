@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Syncfusion.Blazor.InteractiveChat;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -8,6 +9,15 @@ namespace WileyCoWeb.Components;
 public partial class JarvisChatPanel : ComponentBase, IDisposable
 {
     private readonly List<WorkspaceChatMessage> chatTranscript = [];
+    private readonly List<AssistViewPrompt> chatPrompts = [];
+    private readonly List<WorkspaceRecommendationHistoryItem> recommendationHistory = [];
+    private readonly List<string> promptSuggestions = [
+        "What changed in the current workspace?",
+        "How far is the current rate from break-even?",
+        "What should I review before publishing?",
+        "Summarize the current scenario pressure."
+    ];
+
     private Action? workspaceChangedHandler;
 
     [Inject]
@@ -16,10 +26,13 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     [Inject]
     protected WorkspaceAiApiService AiApi { get; set; } = default!;
 
+    protected List<AssistViewPrompt> ChatPrompts => chatPrompts;
+    protected List<string> PromptSuggestions => promptSuggestions;
     protected string StatusText => GetStatusText();
     protected string PrimaryBrief => BuildPrimaryBrief();
     protected IReadOnlyList<InsightCard> Insights => BuildInsights();
     protected IReadOnlyList<RecommendationItem> RecommendedActions => BuildRecommendations();
+    protected IReadOnlyList<WorkspaceRecommendationHistoryItem> RecommendationHistory => recommendationHistory;
     protected IReadOnlyList<WorkspaceChatMessage> ChatTranscript => chatTranscript;
     protected string ChatQuestion { get; set; } = "What should I know about the current workspace?";
     protected string ChatAnswer { get; set; } = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
@@ -29,59 +42,45 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected string CurrentProfileSummary { get; set; } = "Jarvis will ask a few setup questions on first contact.";
     protected bool IsChatBusy { get; set; }
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
+    protected bool IsSecureJarvisEnabled => !string.Equals(Environment.GetEnvironmentVariable("UI__UseSecureJarvis"), "false", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
-        Console.WriteLine("[startup] JarvisChatPanel.OnInitialized entered.");
         workspaceChangedHandler = () => _ = InvokeAsync(StateHasChanged);
         WorkspaceState.Changed += workspaceChangedHandler;
     }
 
-    protected async Task AskChatAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var question = ChatQuestion?.Trim();
-        if (string.IsNullOrWhiteSpace(question))
+        if (!firstRender || !IsSecureJarvisEnabled)
         {
-            ChatAnswer = "Enter a question before asking Jarvis.";
-            await InvokeAsync(StateHasChanged);
             return;
         }
 
-        try
-        {
-            IsChatBusy = true;
-            await InvokeAsync(StateHasChanged);
+        await LoadRecommendationHistoryAsync().ConfigureAwait(false);
+        await InvokeAsync(StateHasChanged);
+    }
 
-            chatTranscript.Add(new WorkspaceChatMessage("user", question));
-            await InvokeAsync(StateHasChanged);
-
-            var response = await AiApi.AskAsync(new WorkspaceChatRequest(
-                question,
-                BuildChatContextSummary(),
-                WorkspaceState.SelectedEnterprise,
-                WorkspaceState.SelectedFiscalYear)
-            {
-                ConversationHistory = BuildConversationHistory()
-            }).ConfigureAwait(false);
-
-            chatTranscript.Add(new WorkspaceChatMessage("assistant", response.Answer));
-            ChatAnswer = response.Answer;
-            CurrentUserLabel = string.IsNullOrWhiteSpace(response.UserDisplayName) ? CurrentUserLabel : response.UserDisplayName;
-            CurrentProfileSummary = string.IsNullOrWhiteSpace(response.UserProfileSummary) ? CurrentProfileSummary : response.UserProfileSummary;
-            CurrentConversationLabel = !string.IsNullOrWhiteSpace(response.ConversationId)
-                ? $"Conversation {response.ConversationId} ({response.ConversationMessageCount} messages)"
-                : CurrentConversationLabel;
-            ChatQuestion = string.Empty;
-        }
-        catch (Exception ex)
+    protected async Task OnPromptRequestedAsync(AssistViewPromptRequestedEventArgs args)
+    {
+        if (args is null)
         {
-            ChatAnswer = ex.Message;
+            return;
         }
-        finally
+
+        var question = string.IsNullOrWhiteSpace(args.Prompt) ? ChatQuestion : args.Prompt.Trim();
+        if (string.IsNullOrWhiteSpace(question))
         {
-            IsChatBusy = false;
-            await InvokeAsync(StateHasChanged);
+            args.Cancel = true;
+            return;
         }
+
+        await SubmitPromptAsync(question, args);
+    }
+
+    protected async Task AskChatAsync()
+    {
+        await SubmitPromptAsync(ChatQuestion);
     }
 
     protected async Task ResetChatAsync()
@@ -97,9 +96,12 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
                 WorkspaceState.SelectedFiscalYear)).ConfigureAwait(false);
 
             chatTranscript.Clear();
+            chatPrompts.Clear();
+            recommendationHistory.Clear();
             ChatAnswer = "Jarvis thread reset for the current workspace context.";
             CurrentConversationLabel = "Local session";
             CurrentProfileSummary = "Jarvis will ask a few setup questions on first contact.";
+            ChatQuestion = string.Empty;
         }
         catch (Exception ex)
         {
@@ -117,7 +119,79 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         ChatQuestion = "What should I know about the current workspace?";
         ChatAnswer = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
         chatTranscript.Clear();
+        chatPrompts.Clear();
+        recommendationHistory.Clear();
         return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SubmitPromptAsync(string question, AssistViewPromptRequestedEventArgs? args = null)
+    {
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            ChatAnswer = "Enter a question before asking Jarvis.";
+            if (args is not null)
+            {
+                args.Cancel = true;
+            }
+
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        try
+        {
+            IsChatBusy = true;
+            ChatQuestion = question;
+            await InvokeAsync(StateHasChanged);
+
+            AppendUserMessage(question);
+
+            var response = await AiApi.AskAsync(new WorkspaceChatRequest(
+                question,
+                BuildChatContextSummary(),
+                WorkspaceState.SelectedEnterprise,
+                WorkspaceState.SelectedFiscalYear)
+            {
+                ConversationHistory = BuildConversationHistory()
+            }).ConfigureAwait(false);
+
+            AppendAssistantMessage(response.Answer);
+            chatPrompts.Add(new AssistViewPrompt
+            {
+                Prompt = question,
+                Response = response.Answer,
+                IsResponseHelpful = null
+            });
+            ChatAnswer = response.Answer;
+            CurrentUserLabel = string.IsNullOrWhiteSpace(response.UserDisplayName) ? CurrentUserLabel : response.UserDisplayName;
+            CurrentProfileSummary = string.IsNullOrWhiteSpace(response.UserProfileSummary) ? CurrentProfileSummary : response.UserProfileSummary;
+            CurrentConversationLabel = !string.IsNullOrWhiteSpace(response.ConversationId)
+                ? $"Conversation {response.ConversationId} ({response.ConversationMessageCount} messages)"
+                : CurrentConversationLabel;
+
+            await LoadRecommendationHistoryAsync().ConfigureAwait(false);
+
+            if (args is not null)
+            {
+                args.Response = response.Answer;
+            }
+
+            ChatQuestion = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            ChatAnswer = ex.Message;
+            AppendAssistantMessage(ex.Message);
+            if (args is not null)
+            {
+                args.Response = ex.Message;
+            }
+        }
+        finally
+        {
+            IsChatBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private string GetStatusText()
@@ -161,14 +235,42 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         return string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase) || string.Equals(role, "jarvis", StringComparison.OrdinalIgnoreCase);
     }
 
-    private IReadOnlyList<WorkspaceChatMessage> BuildConversationHistory()
+    private List<WorkspaceChatMessage> BuildConversationHistory()
     {
         if (chatTranscript.Count == 0)
         {
             return [];
         }
 
-        return chatTranscript.TakeLast(12).ToArray();
+        return chatTranscript.TakeLast(12).ToList();
+    }
+
+    private async Task LoadRecommendationHistoryAsync()
+    {
+        try
+        {
+            var history = await AiApi.GetRecommendationHistoryAsync(new WorkspaceRecommendationHistoryRequest(
+                WorkspaceState.SelectedEnterprise,
+                WorkspaceState.SelectedFiscalYear,
+                8)).ConfigureAwait(false);
+
+            recommendationHistory.Clear();
+            recommendationHistory.AddRange(history.Items);
+        }
+        catch
+        {
+            // Keep the panel resilient even when recommendation history endpoint is unavailable.
+        }
+    }
+
+    private void AppendUserMessage(string message)
+    {
+        chatTranscript.Add(new WorkspaceChatMessage("user", message));
+    }
+
+    private void AppendAssistantMessage(string message)
+    {
+        chatTranscript.Add(new WorkspaceChatMessage("assistant", message));
     }
 
     private IReadOnlyList<InsightCard> BuildInsights()
@@ -248,7 +350,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         }
     }
 
-    protected sealed record InsightCard(string Label, string Value, string Description);
+    public sealed record InsightCard(string Label, string Value, string Description);
 
-    protected sealed record RecommendationItem(string Title, string Description);
+    public sealed record RecommendationItem(string Title, string Description);
 }

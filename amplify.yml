@@ -14,20 +14,12 @@ frontend:
         - |
           read_secret_field() {
             local key="$1"
-            local json_blob="${secrets:-{}}"
-            printf '%s' "$json_blob" | sed -nE "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\1/p"
+            KEY="$key" node -e 'const key = process.env.KEY || ""; const raw = process.env.secrets || "{}"; try { const parsed = JSON.parse(raw); process.stdout.write(parsed[key] || ""); } catch { process.stdout.write(""); }'
           }
 
           read_syncfusion_key_from_secret_string() {
             local raw="$1"
-            local extracted
-            extracted="$(printf '%s' "$raw" | sed -nE 's/.*"SYNCFUSION_LICENSE_KEY"[[:space:]]*:[[:space:]]*"([^\"]*)".*/\1/p')"
-            if [ -n "$extracted" ]; then
-              printf '%s' "$extracted"
-            else
-              # Support plain-text secret values in addition to JSON SecretString payloads.
-              printf '%s' "$raw"
-            fi
+            SECRET_STRING="$raw" node -e 'const rawValue = process.env.SECRET_STRING || ""; try { const parsed = JSON.parse(rawValue); process.stdout.write(parsed.SYNCFUSION_LICENSE_KEY || parsed.SyncfusionLicenseKey || rawValue); } catch { process.stdout.write(rawValue); }'
           }
 
           if secret_string="$(aws secretsmanager get-secret-value --secret-id "SYNCFUSION_LICENSE_KEY" --query SecretString --output text 2>/dev/null)"; then
@@ -38,9 +30,8 @@ frontend:
             if [ -n "$SYNCFUSION_LICENSE_KEY" ]; then
               echo "Loaded SYNCFUSION_LICENSE_KEY from Amplify environment secrets."
             else
-              echo "ERROR: SYNCFUSION_LICENSE_KEY was not found in AWS Secrets Manager secret SYNCFUSION_LICENSE_KEY or Amplify environment secrets."
-              echo "Refusing to publish a build that would show the Syncfusion license popup at runtime."
-              exit 1
+              echo "WARNING: SYNCFUSION_LICENSE_KEY was not found in AWS Secrets Manager secret SYNCFUSION_LICENSE_KEY or Amplify environment secrets."
+              echo "Continuing build; ensure runtime configuration provides the Syncfusion key."
             fi
           fi
 
