@@ -3,6 +3,10 @@ using System.Diagnostics;
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Channel;
+using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -35,26 +39,87 @@ public partial class Program
         var builder = WebApplication.CreateBuilder(args);
         await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
 
-        // Register Syncfusion license for server-side document features (PDF, XLSIO, Compression)
-        // Uses SYNCFUSION_LICENSE_KEY from env, config, or AWS secrets (aligned with client and .github/copilot-instructions.md)
-        var syncfusionLicenseKey = builder.Configuration["SYNCFUSION_LICENSE_KEY"]
-            ?? builder.Configuration["SyncfusionLicenseKey"]
-            ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+        var appInsightsConnectionString = ResolveApplicationInsightsConnectionString(builder.Configuration);
+        if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+        {
+            builder.Services.AddApplicationInsightsTelemetry(options =>
+            {
+                options.ConnectionString = appInsightsConnectionString;
+                options.EnableAdaptiveSampling = true;
+            });
+
+            builder.Services.Configure<TelemetryConfiguration>(telemetryConfiguration =>
+            {
+                telemetryConfiguration.ConnectionString = appInsightsConnectionString;
+                // Tag this API host so it is distinguishable from other roles in the AI portal
+                telemetryConfiguration.TelemetryInitializers.Add(new WileyApiRoleTelemetryInitializer());
+            });
+
+            Console.WriteLine("[API Startup] Application Insights telemetry enabled.");
+        }
+        else
+        {
+            Console.WriteLine("[API Startup] Application Insights is disabled (no APPLICATIONINSIGHTS_CONNECTION_STRING configured).");
+        }
+
+        // --- Syncfusion license resolution (track source for telemetry) ---
+        var syncfusionKeySource = "not-found";
+        string? syncfusionLicenseKey = null;
+
+        var sfFromConfigDirect = builder.Configuration["SYNCFUSION_LICENSE_KEY"];
+        if (!string.IsNullOrWhiteSpace(sfFromConfigDirect))
+        {
+            syncfusionLicenseKey = sfFromConfigDirect;
+            syncfusionKeySource = "config:SYNCFUSION_LICENSE_KEY";
+        }
+        else
+        {
+            var sfFromConfigNamed = builder.Configuration["SyncfusionLicenseKey"];
+            if (!string.IsNullOrWhiteSpace(sfFromConfigNamed))
+            {
+                syncfusionLicenseKey = sfFromConfigNamed;
+                syncfusionKeySource = "config:SyncfusionLicenseKey";
+            }
+            else
+            {
+                var sfFromEnv = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+                if (!string.IsNullOrWhiteSpace(sfFromEnv))
+                {
+                    syncfusionLicenseKey = sfFromEnv;
+                    syncfusionKeySource = "env:SYNCFUSION_LICENSE_KEY";
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(syncfusionLicenseKey)
             && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("IntegrationTest")))
         {
             syncfusionLicenseKey = await LoadSyncfusionLicenseKeyFromLocalSettingsAsync(builder.Environment).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
+                syncfusionKeySource = "local-settings-file";
         }
 
         if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
         {
             SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey.Trim());
-            Console.WriteLine("[API Startup] Syncfusion license key registered successfully for server-side exports.");
+            Console.WriteLine($"[API Startup] Syncfusion license key registered (source: {syncfusionKeySource}, length: {syncfusionLicenseKey.Trim().Length}).");
         }
         else
         {
-            Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found. Server-side PDF/Excel features may trigger license popups or limitations. Set via env var or AWS Secrets Manager.");
+            Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). " +
+                "Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
         }
+
+        // Capture xAI key resolution state after ConfigureXaiSecretAsync has run
+        var xaiKeyResolved = !string.IsNullOrWhiteSpace(
+            builder.Configuration["XAI_API_KEY"]
+            ?? builder.Configuration["XAI:ApiKey"]
+            ?? Environment.GetEnvironmentVariable("XAI_API_KEY"));
+        var xaiKeySource = xaiKeyResolved
+            ? (Environment.GetEnvironmentVariable("XAI_API_KEY") != null ? "env:XAI_API_KEY"
+                : builder.Configuration["XAI_API_KEY"] != null ? "config:XAI_API_KEY"
+                : "config:XAI:ApiKey-or-secrets-manager")
+            : "not-found";
 
         var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
@@ -126,6 +191,20 @@ public partial class Program
 
         var app = builder.Build();
         var logger = app.Logger;
+
+        // Emit a startup key-resolution event so the AI portal shows source/presence for each secret
+        var startupTelemetryClient = app.Services.GetService<TelemetryClient>();
+        if (startupTelemetryClient != null)
+        {
+            TrackStartupKeyResolution(
+                startupTelemetryClient,
+                syncfusionKeySource,
+                syncfusionLicenseKey,
+                xaiKeySource,
+                xaiKeyResolved,
+                appInsightsConnectionString,
+                builder.Environment.EnvironmentName);
+        }
 
         if (AppDbStartupState.IsDegradedMode)
         {
@@ -271,6 +350,62 @@ public partial class Program
         }
 
         return null;
+    }
+
+    private static void TrackStartupKeyResolution(
+        TelemetryClient telemetryClient,
+        string syncfusionKeySource,
+        string? syncfusionLicenseKey,
+        string xaiKeySource,
+        bool xaiKeyResolved,
+        string? appInsightsConnectionString,
+        string environmentName)
+    {
+        ArgumentNullException.ThrowIfNull(telemetryClient);
+
+        // Only surface a safe truncated fingerprint — never the full value
+        static string KeyFingerprint(string? key) =>
+            string.IsNullOrWhiteSpace(key)
+                ? "(empty)"
+                : (key.Trim().Length > 8 ? key.Trim()[..8] + "..." : "(too-short)");
+
+        var properties = new Dictionary<string, string?>
+        {
+            ["Environment"] = environmentName,
+            ["SyncfusionKeySource"] = syncfusionKeySource,
+            ["SyncfusionKeyPresent"] = (!string.IsNullOrWhiteSpace(syncfusionLicenseKey)).ToString(),
+            ["SyncfusionKeyLength"] = syncfusionLicenseKey?.Trim().Length.ToString() ?? "0",
+            ["SyncfusionKeyFingerprint"] = KeyFingerprint(syncfusionLicenseKey),
+            ["XaiKeySource"] = xaiKeySource,
+            ["XaiKeyPresent"] = xaiKeyResolved.ToString(),
+            ["AppInsightsConfigured"] = (!string.IsNullOrWhiteSpace(appInsightsConnectionString)).ToString(),
+        };
+
+        telemetryClient.TrackEvent("WileyWidget.Startup.KeyResolution", properties);
+        telemetryClient.Flush();
+    }
+
+    private static string? ResolveApplicationInsightsConnectionString(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+            ?? configuration["ApplicationInsights:ConnectionString"]
+            ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            var instrumentationKey = configuration["APPINSIGHTS_INSTRUMENTATIONKEY"]
+                ?? configuration["ApplicationInsights:InstrumentationKey"]
+                ?? Environment.GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY");
+
+            if (!string.IsNullOrWhiteSpace(instrumentationKey))
+            {
+                connectionString = $"InstrumentationKey={instrumentationKey.Trim()}";
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(connectionString) ? null : connectionString.Trim();
     }
 
     private static async Task<string?> TryGetSecretAsync(string secretName, string regionName)
@@ -483,6 +618,19 @@ public partial class Program
 
     private static string? ResolveClaim(ClaimsPrincipal principal, string claimType)
         => principal.FindFirst(claimType)?.Value;
+
+    /// <summary>
+    /// Tags every telemetry item with cloud.roleName = "WileyCoWeb.Api" so the API host
+    /// is easy to identify in Application Insights Application Map / Live Metrics.
+    /// </summary>
+    private sealed class WileyApiRoleTelemetryInitializer : ITelemetryInitializer
+    {
+        public void Initialize(ITelemetry telemetry)
+        {
+            if (string.IsNullOrWhiteSpace(telemetry.Context.Cloud.RoleName))
+                telemetry.Context.Cloud.RoleName = "WileyCoWeb.Api";
+        }
+    }
 
     private static async Task SeedDevelopmentDataAsync(IServiceProvider services)
     {

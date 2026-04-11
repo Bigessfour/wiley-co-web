@@ -45,7 +45,7 @@ If you are enabling hosted auth:
 If you are working locally on macOS and user secrets are not being surfaced reliably, create an ignored file named `appsettings.Syncfusion.local.json` in the repository root with this shape:
 
 ```json
-{"SyncfusionLicenseKey":"<your-license-key>"}
+{ "SyncfusionLicenseKey": "<your-license-key>" }
 ```
 
 The build copies that file into `wwwroot/appsettings.json`, and that generated file is already ignored by git.
@@ -87,6 +87,22 @@ The restored Wiley Widget rebuild plan is documented in [docs/wileyco-ui-rebuild
 ## Local Snapshot Host
 
 The workspace client prefers a live snapshot endpoint at `api/workspace/snapshot` when it is available. Set `WILEY_WORKSPACE_API_BASE_ADDRESS` to point the Blazor client at the thin API host during local development, for example when running `WileyCoWeb.Api` separately.
+
+## Application Insights
+
+The thin API host now supports Azure Application Insights telemetry.
+
+Set one of these runtime values for the `WileyCoWeb.Api` process:
+
+1. `APPLICATIONINSIGHTS_CONNECTION_STRING` (preferred)
+2. `APPINSIGHTS_INSTRUMENTATIONKEY` (legacy fallback)
+
+Optional config paths are also recognized:
+
+- `ApplicationInsights:ConnectionString`
+- `ApplicationInsights:InstrumentationKey`
+
+If neither value is present, telemetry remains disabled and startup logs a clear message.
 
 ## Local Secrets On macOS
 

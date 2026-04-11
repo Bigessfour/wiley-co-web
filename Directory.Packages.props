@@ -12,6 +12,7 @@
     <PackageVersion Include="ExcelDataReader" Version="3.8.0" />
     <PackageVersion Include="ExcelDataReader.DataSet" Version="3.8.0" />
     <PackageVersion Include="Microsoft.ApplicationInsights" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.14" />
