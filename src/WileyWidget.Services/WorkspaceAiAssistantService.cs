@@ -7,12 +7,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using WileyCoWeb.Contracts;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.Plugins;
 
 namespace WileyWidget.Services;
 
 public sealed class WorkspaceAiAssistantService
 {
-	private const string SystemPrompt = "You are Jarvis, a municipal finance workspace assistant. Use the live workspace context and the available kernel tools when helpful. Keep answers concise, practical, and specific. If the user asks about codebase structure, time, anomalies, or system behavior, use the registered Semantic Kernel plugins. Do not invent facts that are not in the context or tool output.";
+	private const string SystemPrompt = "You are Jarvis, the centerpiece municipal finance AI for rural utility communities. Excel at natural-language conversation: answer 'why is this a certain way?', 'what do we need to do to address this financial issue?' with auditor-impressing, transparent rationales grounded in real ledger data, QuickBooks imports, break-even models, operational methods (reserve building, infrastructure phasing, efficiency gains), GASB/AWWA rural benchmarks, and 5/10-yr trends. Help city councils with limited financial background feel confident in AI suggestions by explaining fluency concepts simply while showing rigorous methodology. Always tie to workspace context, AIContextStore, and UserContextPlugin. Use new functions explain_financial_issue, suggest_operational_actions, generate_rate_rationale for depth. Keep responses practical, human, non-creepy, and actionable for quality council decisions.";
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		PropertyNameCaseInsensitive = true
@@ -24,6 +25,7 @@ public sealed class WorkspaceAiAssistantService
 	private readonly IGrokApiKeyProvider? apiKeyProvider;
 	private readonly IUserContext userContext;
 	private readonly IConversationRepository conversationRepository;
+	private readonly IWileyWidgetContextService contextService;
 	private readonly Lazy<KernelContext?> kernelContext;
 	private readonly bool legacyXaiEnabled;
 	private readonly Uri legacyXaiEndpoint;
@@ -37,6 +39,7 @@ public sealed class WorkspaceAiAssistantService
 		ILogger<WorkspaceAiAssistantService> logger,
 		IUserContext userContext,
 		IConversationRepository conversationRepository,
+		IWileyWidgetContextService contextService,
 		IHttpClientFactory? httpClientFactory = null,
 		IGrokApiKeyProvider? apiKeyProvider = null)
 	{
@@ -44,11 +47,13 @@ public sealed class WorkspaceAiAssistantService
 		this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		this.userContext = userContext ?? throw new ArgumentNullException(nameof(userContext));
 		this.conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
+		this.contextService = contextService ?? throw new ArgumentNullException(nameof(contextService));
 		this.httpClientFactory = httpClientFactory;
 		this.apiKeyProvider = apiKeyProvider;
 		legacyXaiEnabled = configuration.GetValue<bool>("XAI:Enabled", true);
 		legacyXaiEndpoint = NormalizeResponsesEndpoint(configuration["XAI:Endpoint"]);
-		legacyXaiModel = configuration["XAI:Model"] ?? configuration["Grok:Model"] ?? "grok-4.1";
+		// Per xAI docs (docs.x.ai/developers/models): use 'grok-4' alias for Grok 4.20 (flagship with 2M context, function calling, low hallucination). Key via Bearer token from AWS Secrets Manager "Grok" (already configured).
+		legacyXaiModel = configuration["XAI:Model"] ?? configuration["Grok:Model"] ?? "grok-4";
 		legacyXaiTemperature = ParseDouble(configuration["XAI:Temperature"], 0.3d);
 		legacyXaiMaxTokens = ParseInt(configuration["XAI:MaxTokens"], 800);
 		legacyXaiTimeoutSeconds = ParseInt(configuration["XAI:TimeoutSeconds"], 15);
@@ -212,7 +217,8 @@ public sealed class WorkspaceAiAssistantService
 				return null;
 			}
 
-			var model = configuration["Grok:Model"] ?? configuration["XAI:Model"] ?? "grok-4.1";
+			// Per xAI docs (docs.x.ai/developers/models): 'grok-4' for Grok 4.20 (2M context, function calling, reasoning). Key from AWS Secrets Manager "Grok" secret (configured in Program.cs + amplify.yml).
+			var model = configuration["Grok:Model"] ?? configuration["XAI:Model"] ?? "grok-4";
 			var kernelBuilder = Kernel.CreateBuilder();
 			kernelBuilder.AddOpenAIChatCompletion(
 				modelId: model,
@@ -223,11 +229,16 @@ public sealed class WorkspaceAiAssistantService
 			kernelBuilder.Plugins.AddFromType<Plugins.Development.CodebaseInsightPlugin>();
 			kernelBuilder.Plugins.AddFromType<Plugins.AnomalyDetectionPlugin>();
 
+			// Jarvis User Context Plugin - now the AI centerpiece with financial fluency, 'why' explanations,
+			// operational recommendations for rural utilities, and auditor-level rate rationales via new functions.
+			var userContextPlugin = new UserContextPlugin(userContext, conversationRepository, contextService);
+			kernelBuilder.Plugins.AddFromObject(userContextPlugin, "JarvisUserContext");
+
 			var kernel = kernelBuilder.Build();
 			var chatService = kernel.GetRequiredService<IChatCompletionService>();
 
 			logger.LogInformation(
-				"Workspace AI assistant initialized with Semantic Kernel (model: {Model}, apiKeySource: {ApiKeySource})",
+				"Workspace AI assistant initialized with Semantic Kernel (model: {Model}, apiKeySource: {ApiKeySource}, plugins: Time+Codebase+Anomaly+JarvisUserContext+FinancialInsights)",
 				model,
 				apiKeyProvider?.GetConfigurationSource() ?? "configuration");
 

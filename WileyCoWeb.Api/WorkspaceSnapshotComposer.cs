@@ -1,13 +1,16 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Models;
+using WileyWidget.Models.Amplify;
 
 namespace WileyCoWeb.Api;
 
 internal sealed class WorkspaceSnapshotComposer
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDbContextFactory<AppDbContext> contextFactory;
     private readonly ILogger<WorkspaceSnapshotComposer> logger;
 
@@ -65,9 +68,9 @@ internal sealed class WorkspaceSnapshotComposer
         var totalCosts = selectedEnterprise.MonthlyExpenses > 0 ? selectedEnterprise.MonthlyExpenses : 0m;
         var projectedVolume = selectedEnterprise.CitizenCount > 0 ? selectedEnterprise.CitizenCount : 0m;
         var recommendedRate = projectedVolume == 0 ? 0m : Math.Round(totalCosts / projectedVolume, 2, MidpointRounding.AwayFromZero);
-        var adjustedRecommendedRate = projectedVolume == 0 ? 0m : Math.Round((totalCosts + Math.Max(0m, totalCosts * 0.08m)) / projectedVolume, 2, MidpointRounding.AwayFromZero);
+        var rateHistory = await LoadRateHistoryAsync(context, selectedEnterprise.Name, selectedFiscalYear, cancellationToken);
 
-        var projectionRows = BuildProjectionRows(selectedFiscalYear, currentRate, recommendedRate, adjustedRecommendedRate);
+        var projectionRows = BuildProjectionRows(selectedFiscalYear, currentRate, recommendedRate, rateHistory);
         var scenarioItems = await BuildScenarioItemsAsync(context, selectedFiscalYear, cancellationToken);
 
         logger.LogInformation(
@@ -113,20 +116,125 @@ internal sealed class WorkspaceSnapshotComposer
         return DateTime.UtcNow.Year;
     }
 
-    private static List<ProjectionRow> BuildProjectionRows(int fiscalYear, decimal currentRate, decimal recommendedRate, decimal adjustedRecommendedRate)
+    private static List<ProjectionRow> BuildProjectionRows(
+        int fiscalYear,
+        decimal currentRate,
+        decimal recommendedRate,
+        IReadOnlyList<RateHistoryPoint> rateHistory)
     {
         var previousYear = Math.Max(1, fiscalYear - 1);
         var nextYear = fiscalYear + 1;
         var followingYear = fiscalYear + 2;
 
+        var historicalPreviousRate = rateHistory
+            .Where(point => point.FiscalYear < fiscalYear)
+            .OrderByDescending(point => point.FiscalYear)
+            .Select(point => point.Rate)
+            .FirstOrDefault();
+
+        if (historicalPreviousRate <= 0)
+        {
+            historicalPreviousRate = currentRate;
+        }
+
+        var projectedStep = CalculateProjectionStep(rateHistory, currentRate, recommendedRate);
+        var nextYearRate = Math.Round(currentRate + projectedStep, 2, MidpointRounding.AwayFromZero);
+        var followingYearRate = Math.Round(nextYearRate + projectedStep, 2, MidpointRounding.AwayFromZero);
+
         return
         [
-            new ProjectionRow($"FY{previousYear % 100:00}", Math.Round(currentRate * 0.94m, 2, MidpointRounding.AwayFromZero)),
+            new ProjectionRow($"FY{previousYear % 100:00}", historicalPreviousRate),
             new ProjectionRow($"FY{fiscalYear % 100:00}", currentRate),
-            new ProjectionRow($"FY{nextYear % 100:00}", recommendedRate),
-            new ProjectionRow($"FY{followingYear % 100:00}", adjustedRecommendedRate)
+            new ProjectionRow($"FY{nextYear % 100:00}", nextYearRate),
+            new ProjectionRow($"FY{followingYear % 100:00}", followingYearRate)
         ];
     }
+
+    private static decimal CalculateProjectionStep(IReadOnlyList<RateHistoryPoint> rateHistory, decimal currentRate, decimal recommendedRate)
+    {
+        var orderedRates = rateHistory
+            .OrderBy(point => point.FiscalYear)
+            .Select(point => point.Rate)
+            .ToList();
+
+        if (orderedRates.Count >= 2)
+        {
+            var deltas = new List<decimal>(orderedRates.Count - 1);
+
+            for (var index = 1; index < orderedRates.Count; index++)
+            {
+                deltas.Add(orderedRates[index] - orderedRates[index - 1]);
+            }
+
+            return Math.Round(deltas.Average(), 2, MidpointRounding.AwayFromZero);
+        }
+
+        return Math.Round(recommendedRate - currentRate, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private async Task<List<RateHistoryPoint>> LoadRateHistoryAsync(AppDbContext context, string enterpriseName, int selectedFiscalYear, CancellationToken cancellationToken)
+    {
+        var snapshots = await context.BudgetSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.Payload != null)
+            .OrderBy(snapshot => snapshot.CreatedAt)
+            .Select(snapshot => new { snapshot.SnapshotDate, snapshot.Payload })
+            .ToListAsync(cancellationToken);
+
+        var rateHistory = new List<RateHistoryPoint>();
+
+        foreach (var snapshot in snapshots)
+        {
+            if (!TryReadBootstrap(snapshot.Payload, out var bootstrapData))
+            {
+                continue;
+            }
+
+            if (!string.Equals(bootstrapData.SelectedEnterprise, enterpriseName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (bootstrapData.CurrentRate is not > 0)
+            {
+                continue;
+            }
+
+            var fiscalYear = bootstrapData.SelectedFiscalYear > 0
+                ? bootstrapData.SelectedFiscalYear
+                : (snapshot.SnapshotDate?.Year ?? selectedFiscalYear);
+
+            rateHistory.Add(new RateHistoryPoint(fiscalYear, decimal.Round(bootstrapData.CurrentRate.Value, 2, MidpointRounding.AwayFromZero)));
+        }
+
+        return rateHistory
+            .GroupBy(point => point.FiscalYear)
+            .Select(group => group.OrderByDescending(point => point.Rate).First())
+            .OrderBy(point => point.FiscalYear)
+            .ToList();
+    }
+
+    private static bool TryReadBootstrap(string? payload, out WorkspaceBootstrapData bootstrapData)
+    {
+        bootstrapData = default!;
+
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return false;
+        }
+
+        try
+        {
+            bootstrapData = JsonSerializer.Deserialize<WorkspaceBootstrapData>(payload, JsonOptions)!;
+            return bootstrapData is not null;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private sealed record RateHistoryPoint(int FiscalYear, decimal Rate);
 
     private static async Task<List<WorkspaceScenarioItemData>> BuildScenarioItemsAsync(AppDbContext context, int fiscalYear, CancellationToken cancellationToken)
     {

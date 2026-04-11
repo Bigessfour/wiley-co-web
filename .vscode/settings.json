@@ -47,5 +47,22 @@
   },
   "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
   "FSharp.suggestGitignore": false,
-  "workbench.settings.alwaysShowAdvancedSettings": true
+  "workbench.settings.alwaysShowAdvancedSettings": true,
+
+  // Complete AWS Toolkit Extension Configuration for this Wiley.co Amplify + Aurora project
+  "aws.profile": "default",
+  "aws.region": "us-east-2",
+  "aws.explorer.enabled": true,
+  "aws.resources.enabled": true,
+  "aws.explorer.showRegion": true,
+  "aws.lambda.enableCodeLenses": true,
+  "aws.suppressPrompts": {
+    "createCredentialsProfile": true,
+    "showRegionPrompt": true
+  },
+  "aws.amplify.showAmplifyView": true,
+  "aws.resources.filterByTag": {
+    "awsApplication": "arn:aws:resource-groups:us-east-2:570912405222:group/Wiley-Widget/08d8t52ldwuciha57h7wqvq8cb"
+  },
+  "aws.aurora.showInExplorer": true
 }

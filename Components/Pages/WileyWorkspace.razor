@@ -78,7 +78,7 @@
                     SeparatorSize="8"
                     MediaQuery="(max-width: 1024px)">
             <SplitterPanes>
-                <SplitterPane Size="20%" Min="18%" Resizable="true">
+                <SplitterPane Size="22%" Min="320px" Resizable="true">
                     <ContentTemplate>
                         <div class="workspace-pane rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                             <SfCard>
@@ -115,7 +115,7 @@
                         </div>
                     </ContentTemplate>
                 </SplitterPane>
-                <SplitterPane Size="60%" Min="52%">
+                <SplitterPane Size="50%" Min="720px">
                     <ContentTemplate>
                         <div class="workspace-pane space-y-4">
                             <SfDashboardLayout ID="workspace-dashboard"
@@ -385,9 +385,9 @@
                         </div>
                     </ContentTemplate>
                 </SplitterPane>
-                <SplitterPane Size="20%" Min="16%">
+                <SplitterPane Size="28%" Min="360px">
                     <ContentTemplate>
-                        <div class="workspace-pane rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="workspace-pane right-workspace-pane rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                             <JarvisChatPanel />
                         </div>
                     </ContentTemplate>
@@ -404,6 +404,10 @@
 
     .wiley-workspace .workspace-pane {
         height: 100%;
+    }
+
+    .wiley-workspace .right-workspace-pane {
+        min-width: 22rem;
     }
 
     .wiley-workspace .e-dashboardlayout {

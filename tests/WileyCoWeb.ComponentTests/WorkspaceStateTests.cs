@@ -11,46 +11,36 @@ public sealed class WorkspaceStateTests
 		var state = new WorkspaceState();
 		var scenarioId = Guid.NewGuid();
 
-		var bootstrap = new WorkspaceBootstrapData(
-			"Water Utility",
-			2026,
-			"Council Review Scenario",
-			61.75m,
-			15500m,
-			275m,
-			DateTime.UtcNow.ToString("O"))
-		{
-			EnterpriseOptions = ["Water Utility", "Sanitation Utility"],
-			FiscalYearOptions = [2025, 2026, 2027],
-			CustomerServiceOptions = ["All Services", "Water", "Sewer"],
-			CustomerCityLimitOptions = ["All", "Yes", "No"],
-			ScenarioItems =
-			[
+		var bootstrap = WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.BaselineCurrentRate,
+			WorkspaceTestData.BaselineTotalCosts,
+			WorkspaceTestData.BaselineProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			fiscalYearOptions: [WorkspaceTestData.PriorFiscalYear, WorkspaceTestData.WaterFiscalYear, 2027],
+			scenarioItems: [
 				new WorkspaceScenarioItemData(scenarioId, "Reserve transfer", 6200m)
 			],
-			CustomerRows =
-			[
+			customerRows: [
 				new CustomerRow("North Plant", "Water", "Yes"),
 				new CustomerRow("South Lift", "Sewer", "No")
 			],
-			ProjectionRows =
-			[
-				new ProjectionRow("FY26", 61.75m),
+			projectionRows: [
+				new ProjectionRow("FY26", WorkspaceTestData.BaselineCurrentRate),
 				new ProjectionRow("FY27", 65.10m)
-			]
-		};
+			]);
 
 		state.ApplyBootstrap(bootstrap);
 		var roundTripped = state.ToBootstrapData();
 
-		Assert.Equal("Water Utility", roundTripped.SelectedEnterprise);
-		Assert.Equal(2026, roundTripped.SelectedFiscalYear);
-		Assert.Equal("Council Review Scenario", roundTripped.ActiveScenarioName);
-		Assert.Equal(61.75m, roundTripped.CurrentRate);
-		Assert.Equal(15500m, roundTripped.TotalCosts);
-		Assert.Equal(275m, roundTripped.ProjectedVolume);
-		Assert.Equal(new[] { "Water Utility", "Sanitation Utility" }, roundTripped.EnterpriseOptions);
-		Assert.Equal(new[] { 2025, 2026, 2027 }, roundTripped.FiscalYearOptions);
+		Assert.Equal(WorkspaceTestData.WaterUtility, roundTripped.SelectedEnterprise);
+		Assert.Equal(WorkspaceTestData.WaterFiscalYear, roundTripped.SelectedFiscalYear);
+		Assert.Equal(WorkspaceTestData.CouncilReviewScenario, roundTripped.ActiveScenarioName);
+		Assert.Equal(WorkspaceTestData.BaselineCurrentRate, roundTripped.CurrentRate);
+		Assert.Equal(WorkspaceTestData.BaselineTotalCosts, roundTripped.TotalCosts);
+		Assert.Equal(WorkspaceTestData.BaselineProjectedVolume, roundTripped.ProjectedVolume);
+		Assert.Equal(new[] { WorkspaceTestData.WaterUtility, WorkspaceTestData.SanitationUtility }, roundTripped.EnterpriseOptions);
+		Assert.Equal(new[] { WorkspaceTestData.PriorFiscalYear, WorkspaceTestData.WaterFiscalYear, 2027 }, roundTripped.FiscalYearOptions);
 		Assert.Equal(new[] { "All Services", "Water", "Sewer" }, roundTripped.CustomerServiceOptions);
 		Assert.Single(roundTripped.ScenarioItems!);
 		Assert.Equal(scenarioId, roundTripped.ScenarioItems![0].Id);
@@ -62,30 +52,24 @@ public sealed class WorkspaceStateTests
 	public void ApplyBootstrap_UsesSharedContractOptionsForFilteringAndSelection()
 	{
 		var state = new WorkspaceState();
-		state.ApplyBootstrap(new WorkspaceBootstrapData(
-			"Water Utility",
-			2026,
-			"Base Planning Scenario",
-			55.25m,
-			13250m,
-			240m,
-			DateTime.UtcNow.ToString("O"))
-		{
-			EnterpriseOptions = ["Water Utility", "Trash Utility"],
-			FiscalYearOptions = [2025, 2026],
-			CustomerRows =
-			[
+		state.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.BasePlanningScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			enterpriseOptions: [WorkspaceTestData.WaterUtility, WorkspaceTestData.TrashUtility],
+			customerRows: [
 				new CustomerRow("North Plant", "Water", "Yes"),
 				new CustomerRow("South Lift", "Sewer", "No"),
 				new CustomerRow("West Shop", "Water", "No")
-			]
-		});
+			]));
 
 		state.SetCustomerServiceFilter("Water");
 		state.SetCustomerCityLimitsFilter("No");
 
-		Assert.Equal(new[] { "Water Utility", "Trash Utility" }, state.EnterpriseOptions);
-		Assert.Equal(new[] { 2025, 2026 }, state.FiscalYearOptions);
+		Assert.Equal(new[] { WorkspaceTestData.WaterUtility, WorkspaceTestData.TrashUtility }, state.EnterpriseOptions);
+		Assert.Equal(new[] { WorkspaceTestData.PriorFiscalYear, WorkspaceTestData.WaterFiscalYear }, state.FiscalYearOptions);
 		Assert.Single(state.FilteredCustomers);
 		Assert.Equal("West Shop", state.FilteredCustomers[0].Name);
 	}

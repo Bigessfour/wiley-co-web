@@ -29,8 +29,8 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		var service = CreateImportService(_ => CreateJsonResponse(new QuickBooksImportPreviewResponse(
 			"quickbooks-ledger.csv",
 			"file-hash",
-			"Water Utility",
-			2026,
+			WorkspaceTestData.WaterUtility,
+			WorkspaceTestData.WaterFiscalYear,
 			0,
 			0,
 			false,
@@ -84,7 +84,7 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		Assert.Equal(1, GetPrivateField<int>(cut.Instance, "ActiveStep"));
 		Assert.Equal(75, GetPrivateField<int>(cut.Instance, "ImportProgress"));
 		Assert.Equal(2, previewRows.Count);
-		Assert.Equal("quickbooks-ledger.csv for Water Utility FY 2026: 2 rows parsed, 0 duplicates flagged, file duplicate = False.", GetPrivateField<string>(cut.Instance, "AssistantContextSummary"));
+		Assert.Equal(WorkspaceTestData.QuickBooksAssistantContextSummary, GetPrivateField<string>(cut.Instance, "AssistantContextSummary"));
 		Assert.False(previewResponse!.IsDuplicate);
 	}
 
@@ -189,8 +189,8 @@ public sealed class QuickBooksImportPanelTests : TestContext
 				return CreateJsonResponse(new QuickBooksImportCommitResponse(
 					"quickbooks-ledger.csv",
 					"file-hash",
-					"Water Utility",
-					2026,
+					WorkspaceTestData.WaterUtility,
+					WorkspaceTestData.WaterFiscalYear,
 					2,
 					123,
 					false,
@@ -239,7 +239,7 @@ public sealed class QuickBooksImportPanelTests : TestContext
 					"Why would this file be blocked as a duplicate?",
 					"The file hash matches a prior QuickBooks import.",
 					false,
-					"quickbooks-ledger.csv for Water Utility FY 2026: 2 rows parsed, 0 duplicates flagged, file duplicate = False."));
+					$"quickbooks-ledger.csv for {WorkspaceTestData.WaterUtility} FY {WorkspaceTestData.WaterFiscalYear}: 2 rows parsed, 0 duplicates flagged, file duplicate = False."));
 			}
 
 			return CreateJsonResponse(CreatePreviewResponse(isDuplicate: false));
@@ -261,7 +261,7 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		await InvokePrivateAsync(cut, "AskAssistantAsync");
 
 		Assert.Equal("The file hash matches a prior QuickBooks import.", GetPrivateField<string>(cut.Instance, "AssistantAnswer"));
-		Assert.Equal("quickbooks-ledger.csv for Water Utility FY 2026: 2 rows parsed, 0 duplicates flagged, file duplicate = False.", GetPrivateField<string>(cut.Instance, "AssistantContextSummary"));
+		Assert.Equal(WorkspaceTestData.QuickBooksAssistantContextSummary, GetPrivateField<string>(cut.Instance, "AssistantContextSummary"));
 		Assert.Equal(2, GetPrivateField<int>(cut.Instance, "ActiveStep"));
 	}
 
@@ -318,8 +318,8 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		return new QuickBooksImportPreviewResponse(
 			"quickbooks-ledger.csv",
 			"file-hash",
-			"Water Utility",
-			2026,
+			WorkspaceTestData.WaterUtility,
+			WorkspaceTestData.WaterFiscalYear,
 			rows.Count,
 			isDuplicate ? 1 : 0,
 			isDuplicate,
@@ -334,7 +334,7 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		SetPrivateField(cut.Instance, "PreviewResponse", CreatePreviewResponse(isDuplicate: false));
 		SetPrivateField(cut.Instance, "AssistantQuestion", includeAssistantQuestion ? "Why would this file be blocked as a duplicate?" : string.Empty);
 		SetPrivateField(cut.Instance, "AssistantAnswer", "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.");
-		SetPrivateField(cut.Instance, "AssistantContextSummary", "quickbooks-ledger.csv for Water Utility FY 2026: 2 rows parsed, 0 duplicates flagged, file duplicate = False.");
+		SetPrivateField(cut.Instance, "AssistantContextSummary", $"quickbooks-ledger.csv for {WorkspaceTestData.WaterUtility} FY {WorkspaceTestData.WaterFiscalYear}: 2 rows parsed, 0 duplicates flagged, file duplicate = False.");
 		SetPrivateField(cut.Instance, "StatusHeadline", "Preview ready");
 		SetPrivateField(cut.Instance, "StatusMessage", "Preview loaded for quickbooks-ledger.csv.");
 		SetPrivateField(cut.Instance, "ActiveStep", 1);
@@ -349,7 +349,7 @@ public sealed class QuickBooksImportPanelTests : TestContext
 	{
 		await cut.InvokeAsync(async () =>
 		{
-			var method = cut.Instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+			var method = cut.Instance.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
 			Assert.NotNull(method);
 
 			if (method!.Invoke(cut.Instance, args) is Task task)

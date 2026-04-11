@@ -15,12 +15,12 @@ public sealed class WorkspaceApiClientTests
     {
         var client = new HttpClient(new RoutedHttpMessageHandler(request =>
         {
-            Assert.Contains("enterprise=Water%20Utility", request.RequestUri?.Query);
-            Assert.Contains("fiscalYear=2026", request.RequestUri?.Query);
+            Assert.Contains($"enterprise={Uri.EscapeDataString(WorkspaceTestData.WaterUtility)}", request.RequestUri?.Query);
+            Assert.Contains($"fiscalYear={WorkspaceTestData.WaterFiscalYear}", request.RequestUri?.Query);
 
             var payload = new WorkspaceScenarioCollectionResponse(
             [
-                new WorkspaceScenarioSummaryResponse(7, "Council Review", "Water Utility", 2026, "2026-04-05T12:00:00Z", 55.25m, 13250m, 240m, 6200m, 1, "Scenario persisted from the workspace shell.")
+                new WorkspaceScenarioSummaryResponse(7, WorkspaceTestData.CouncilReview, WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear, "2026-04-05T12:00:00Z", WorkspaceTestData.WaterCurrentRate, WorkspaceTestData.WaterTotalCosts, WorkspaceTestData.WaterProjectedVolume, 6200m, 1, "Scenario persisted from the workspace shell.")
             ]);
 
             return JsonResponse(payload);
@@ -30,10 +30,10 @@ public sealed class WorkspaceApiClientTests
         };
 
         var service = new WorkspaceSnapshotApiService(client);
-        var response = await service.GetScenariosAsync("Water Utility", 2026);
+        var response = await service.GetScenariosAsync(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear);
 
         Assert.Single(response.Scenarios);
-        Assert.Equal("Council Review", response.Scenarios[0].ScenarioName);
+        Assert.Equal(WorkspaceTestData.CouncilReview, response.Scenarios[0].ScenarioName);
     }
 
     [Fact]
@@ -43,21 +43,21 @@ public sealed class WorkspaceApiClientTests
         var client = new HttpClient(new RoutedHttpMessageHandler(async request =>
         {
             postedJson = await request.Content!.ReadAsStringAsync();
-            return JsonResponse(new WorkspaceScenarioSummaryResponse(9, "Council Review", "Water Utility", 2026, "2026-04-05T12:00:00Z", 55.25m, 13250m, 240m, 6200m, 1, "Saved"));
+            return JsonResponse(new WorkspaceScenarioSummaryResponse(9, WorkspaceTestData.CouncilReview, WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear, "2026-04-05T12:00:00Z", WorkspaceTestData.WaterCurrentRate, WorkspaceTestData.WaterTotalCosts, WorkspaceTestData.WaterProjectedVolume, 6200m, 1, "Saved"));
         }))
         {
             BaseAddress = new Uri("https://example.test/")
         };
 
         var request = new WorkspaceScenarioSaveRequest(
-            "Council Review",
+            WorkspaceTestData.CouncilReview,
             "Saved",
-            new WorkspaceBootstrapData("Water Utility", 2026, "Council Review", 55.25m, 13250m, 240m, "2026-04-05T12:00:00Z"));
+            WorkspaceTestData.CreateWaterUtilityBootstrap(WorkspaceTestData.CouncilReview, WorkspaceTestData.WaterCurrentRate, WorkspaceTestData.WaterTotalCosts, WorkspaceTestData.WaterProjectedVolume, "2026-04-05T12:00:00Z"));
 
         var service = new WorkspaceSnapshotApiService(client);
         var response = await service.SaveScenarioAsync(request);
 
-        Assert.Contains("Council Review", postedJson!, StringComparison.Ordinal);
+        Assert.Contains(WorkspaceTestData.CouncilReview, postedJson!, StringComparison.Ordinal);
         Assert.Equal(9, response.SnapshotId);
         Assert.Equal("Saved", response.Description);
     }
@@ -70,18 +70,18 @@ public sealed class WorkspaceApiClientTests
         {
             method = request.Method;
             return JsonResponse(new WorkspaceBaselineUpdateResponse(
-                "Water Utility",
-                2026,
+                WorkspaceTestData.WaterUtility,
+                WorkspaceTestData.WaterFiscalYear,
                 "2026-04-05T12:00:00Z",
-                "Saved baseline values for Water Utility FY 2026.",
-                new WorkspaceBootstrapData("Water Utility", 2026, "Base Planning Scenario", 61.75m, 15500m, 275m, "2026-04-05T12:00:00Z")));
+                WorkspaceTestData.SavedBaselineMessage,
+                WorkspaceTestData.CreateWaterUtilityBootstrap(WorkspaceTestData.BasePlanningScenario, WorkspaceTestData.BaselineCurrentRate, WorkspaceTestData.BaselineTotalCosts, WorkspaceTestData.BaselineProjectedVolume, "2026-04-05T12:00:00Z")));
         }))
         {
             BaseAddress = new Uri("https://example.test/")
         };
 
         var service = new WorkspaceSnapshotApiService(client);
-        var response = await service.SaveWorkspaceBaselineAsync(new WorkspaceBaselineUpdateRequest("Water Utility", 2026, 61.75m, 15500m, 275m));
+        var response = await service.SaveWorkspaceBaselineAsync(new WorkspaceBaselineUpdateRequest(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear, WorkspaceTestData.BaselineCurrentRate, WorkspaceTestData.BaselineTotalCosts, WorkspaceTestData.BaselineProjectedVolume));
 
         Assert.Equal(HttpMethod.Put, method);
         Assert.Equal(61.75m, response.Snapshot.CurrentRate);
@@ -91,7 +91,7 @@ public sealed class WorkspaceApiClientTests
     public async Task WorkspaceSnapshotApiService_GetScenarioSnapshotAsync_ReturnsBootstrapPayload()
     {
         var client = new HttpClient(new RoutedHttpMessageHandler(_ => JsonResponse(
-            new WorkspaceBootstrapData("Water Utility", 2026, "Council Review", 55.25m, 13250m, 240m, "2026-04-05T12:00:00Z"))))
+            WorkspaceTestData.CreateWaterUtilityBootstrap(WorkspaceTestData.CouncilReview, WorkspaceTestData.WaterCurrentRate, WorkspaceTestData.WaterTotalCosts, WorkspaceTestData.WaterProjectedVolume, "2026-04-05T12:00:00Z"))))
         {
             BaseAddress = new Uri("https://example.test/")
         };
@@ -99,7 +99,7 @@ public sealed class WorkspaceApiClientTests
         var service = new WorkspaceSnapshotApiService(client);
         var response = await service.GetScenarioSnapshotAsync(7);
 
-        Assert.Equal("Council Review", response.ActiveScenarioName);
+        Assert.Equal(WorkspaceTestData.CouncilReview, response.ActiveScenarioName);
     }
 
     [Fact]
@@ -121,9 +121,9 @@ public sealed class WorkspaceApiClientTests
         };
 
         var service = new WorkspaceAiApiService(client);
-        var response = await service.AskAsync(new WorkspaceChatRequest("Question", "Context", "Water Utility", 2026));
+        var response = await service.AskAsync(new WorkspaceChatRequest("Question", "Context", WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear));
 
-        Assert.Contains("Water Utility", postedJson!, StringComparison.Ordinal);
+        Assert.Contains(WorkspaceTestData.WaterUtility, postedJson!, StringComparison.Ordinal);
         Assert.Equal("Answer", response.Answer);
         Assert.Equal("conv-42", response.ConversationId);
     }
@@ -141,7 +141,7 @@ public sealed class WorkspaceApiClientTests
 
         var service = new WorkspaceAiApiService(client);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ResetConversationAsync(new WorkspaceConversationResetRequest("Context", "Water Utility", 2026)));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.ResetConversationAsync(new WorkspaceConversationResetRequest("Context", WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear)));
 
         Assert.Contains("reset rejected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -151,8 +151,8 @@ public sealed class WorkspaceApiClientTests
     {
         var client = new HttpClient(new RoutedHttpMessageHandler(request =>
         {
-            Assert.Contains("enterprise=Water%20Utility", request.RequestUri?.Query, StringComparison.Ordinal);
-            Assert.Contains("fiscalYear=2026", request.RequestUri?.Query, StringComparison.Ordinal);
+            Assert.Contains($"enterprise={Uri.EscapeDataString(WorkspaceTestData.WaterUtility)}", request.RequestUri?.Query, StringComparison.Ordinal);
+            Assert.Contains($"fiscalYear={WorkspaceTestData.WaterFiscalYear}", request.RequestUri?.Query, StringComparison.Ordinal);
 
             return JsonResponse(new WorkspaceRecommendationHistoryResponse([
                 new WorkspaceRecommendationHistoryItem(
@@ -170,7 +170,7 @@ public sealed class WorkspaceApiClientTests
         };
 
         var service = new WorkspaceAiApiService(client);
-        var response = await service.GetRecommendationHistoryAsync(new WorkspaceRecommendationHistoryRequest("Water Utility", 2026, 8));
+        var response = await service.GetRecommendationHistoryAsync(new WorkspaceRecommendationHistoryRequest(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear, 8));
 
         Assert.Single(response.Items);
         Assert.Equal("Alex Morgan", response.Items[0].UserDisplayName);

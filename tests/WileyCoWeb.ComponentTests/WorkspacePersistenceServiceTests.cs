@@ -13,14 +13,7 @@ public sealed class WorkspacePersistenceServiceTests
 	[Fact]
 	public async Task InitializeAsync_RestoresBrowserState_AndMarksCurrentStateSource()
 	{
-		var persistedState = new WorkspaceBootstrapData(
-			"Sanitation Utility",
-			2025,
-			"Browser Restored Scenario",
-			47.10m,
-			10125m,
-			214m,
-			DateTime.UtcNow.ToString("O"));
+		var persistedState = WorkspaceTestData.CreateBrowserRestoredBootstrap();
 		var jsRuntime = new StubJsRuntime()
 			.WithGetItemResult("wileyWorkspaceStorage.getItem", JsonSerializer.Serialize(persistedState, JsonOptions));
 		var state = new WorkspaceState();
@@ -29,7 +22,7 @@ public sealed class WorkspacePersistenceServiceTests
 		await using var service = new WorkspacePersistenceService(jsRuntime, state);
 		await service.InitializeAsync();
 
-		Assert.Equal("Sanitation Utility", state.SelectedEnterprise);
+		Assert.Equal(WorkspaceTestData.SanitationUtility, state.SelectedEnterprise);
 		Assert.Equal(WorkspaceStartupSource.ApiSnapshot, state.StartupSource);
 		Assert.Equal(WorkspaceStartupSource.BrowserStorageRestore, state.CurrentStateSource);
 		Assert.True(state.IsUsingBrowserRestoredState);

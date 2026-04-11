@@ -11,11 +11,13 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Syncfusion.Licensing;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
+using WileyWidget.Business.Interfaces;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
 using WileyWidget.Services.HealthChecks;
 using WileyWidget.Services.Logging;
+using BusinessActivityLogRepository = WileyWidget.Business.Interfaces.IActivityLogRepository;
 
 namespace WileyCoWeb.Api;
 
@@ -38,6 +40,12 @@ public partial class Program
         var syncfusionLicenseKey = builder.Configuration["SYNCFUSION_LICENSE_KEY"]
             ?? builder.Configuration["SyncfusionLicenseKey"]
             ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+        if (string.IsNullOrWhiteSpace(syncfusionLicenseKey)
+            && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("IntegrationTest")))
+        {
+            syncfusionLicenseKey = await LoadSyncfusionLicenseKeyFromLocalSettingsAsync(builder.Environment).ConfigureAwait(false);
+        }
+
         if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
         {
             SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey.Trim());
@@ -77,14 +85,31 @@ public partial class Program
         {
             options.AddPolicy("OpenWorkspaceClient", policy =>
             {
+                // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
                 policy.AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowAnyOrigin();
+                    .WithOrigins(
+                        "https://*.d2ellat1y3ljd9.amplifyapp.com",
+                        "https://main.d2ellat1y3ljd9.amplifyapp.com",
+                        "http://localhost:8080",
+                        "http://localhost:5*")
+                    .AllowCredentials();
             });
         });
         builder.Services.AddHttpClient();
+        builder.Services.AddMemoryCache();
 
         builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
+        builder.Services.AddSingleton<BusinessActivityLogRepository, ActivityLogRepository>();
+        builder.Services.AddSingleton<IAccountsRepository, AccountsRepository>();
+        builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
+        builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
+        builder.Services.AddSingleton<IEnterpriseRepository, EnterpriseRepository>();
+        builder.Services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
+        builder.Services.AddSingleton<IMunicipalAccountRepository, MunicipalAccountRepository>();
+        builder.Services.AddSingleton<IVendorRepository, VendorRepository>();
+        builder.Services.AddSingleton<IScenarioSnapshotRepository, ScenarioSnapshotRepository>();
+        builder.Services.AddSingleton<IDataAnonymizerService, DataAnonymizerService>();
         builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
         builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
@@ -93,6 +118,7 @@ public partial class Program
         builder.Services.AddSingleton<UserContext>();
         builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
+        builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
 
         // Deterministic license tracking via health check (covers the new registration logic in this file)
         builder.Services.AddHealthChecks()
@@ -205,6 +231,46 @@ public partial class Program
             ["XAI:ApiKey"] = normalizedApiKey,
             ["XAI:SecretName"] = secretName
         });
+    }
+
+    private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(IWebHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+
+        var candidatePaths = new[]
+        {
+            Path.Combine(environment.ContentRootPath, "appsettings.Syncfusion.local.json"),
+            Path.Combine(environment.ContentRootPath, "..", "appsettings.Syncfusion.local.json")
+        };
+
+        foreach (var candidatePath in candidatePaths)
+        {
+            if (!File.Exists(candidatePath))
+            {
+                continue;
+            }
+
+            try
+            {
+                var localSettingsJson = await File.ReadAllTextAsync(candidatePath).ConfigureAwait(false);
+                using var document = JsonDocument.Parse(localSettingsJson);
+
+                if (document.RootElement.TryGetProperty("SyncfusionLicenseKey", out var licenseKeyElement))
+                {
+                    var licenseKey = licenseKeyElement.GetString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(licenseKey))
+                    {
+                        return licenseKey;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore local file issues and keep the existing warning path.
+            }
+        }
+
+        return null;
     }
 
     private static async Task<string?> TryGetSecretAsync(string secretName, string regionName)

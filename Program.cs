@@ -21,7 +21,8 @@ if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
     SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
 }
 
-var apiBaseAddress = Environment.GetEnvironmentVariable("WILEY_WORKSPACE_API_BASE_ADDRESS");
+var apiBaseAddress = Environment.GetEnvironmentVariable("WILEY_WORKSPACE_API_BASE_ADDRESS")
+    ?? "https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod"; // Production Grok portal (updated per plan for Amplify hardening)
 var resolvedApiBaseAddress = !string.IsNullOrWhiteSpace(apiBaseAddress) && Uri.TryCreate(apiBaseAddress, UriKind.Absolute, out var apiUri)
     ? apiUri
     : ResolveLocalApiBaseAddress(builder.HostEnvironment.BaseAddress);

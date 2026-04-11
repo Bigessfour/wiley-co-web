@@ -6,6 +6,7 @@ namespace WileyCoWeb.ComponentTests;
 
 public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 {
+	public string BaselineStatus => BaselineSaveStatus;
 	public string SnapshotStatus => SnapshotSaveStatus;
 	public string WorkspaceStatus => WorkspaceLoadStatus;
 
@@ -18,6 +19,14 @@ public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 	{
 		return SaveRateSnapshotAsync();
 	}
+
+	public Task InvokeSaveScenarioAsync() => SaveScenarioAsync();
+	public Task InvokeApplySelectedScenarioAsync() => ApplySelectedScenarioAsync();
+	public Task InvokeSaveWorkspaceBaselineAsync() => SaveWorkspaceBaselineAsync();
+	public Task InvokeExportCustomerWorkbookAsync() => ExportCustomerWorkbookAsync();
+	public Task InvokeExportScenarioWorkbookAsync() => ExportScenarioWorkbookAsync();
+	public Task InvokeExportWorkspacePdfAsync() => ExportWorkspacePdfAsync();
+	public void DisposeHarness() => Dispose();
 
 	protected override void BuildRenderTree(RenderTreeBuilder builder)
 	{

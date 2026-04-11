@@ -15,13 +15,11 @@ public sealed class WorkspaceBootstrapServiceTests
 	public async Task LoadAsync_UsesLiveApiSnapshot_WhenApiResponseSucceeds()
 	{
 		var state = new WorkspaceState();
-		var apiHandler = new StubHttpMessageHandler(_ => CreateJsonResponse(new WorkspaceBootstrapData(
-			"Water Utility",
-			2026,
-			"Live API Scenario",
-			55.25m,
-			13250m,
-			240m,
+		var apiHandler = new StubHttpMessageHandler(_ => CreateJsonResponse(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.LiveApiScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
 			DateTime.UtcNow.ToString("O"))));
 		var fallbackHandler = new StubHttpMessageHandler(_ => throw new InvalidOperationException("Fallback should not be called when the API succeeds."));
 
@@ -31,11 +29,11 @@ public sealed class WorkspaceBootstrapServiceTests
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 
-		await service.LoadAsync("Water Utility", 2026);
+		await service.LoadAsync(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear);
 
-		Assert.Equal("Water Utility", state.SelectedEnterprise);
-		Assert.Equal(2026, state.SelectedFiscalYear);
-		Assert.Equal("Live API Scenario", state.ActiveScenarioName);
+		Assert.Equal(WorkspaceTestData.WaterUtility, state.SelectedEnterprise);
+		Assert.Equal(WorkspaceTestData.WaterFiscalYear, state.SelectedFiscalYear);
+		Assert.Equal(WorkspaceTestData.LiveApiScenario, state.ActiveScenarioName);
 		Assert.Equal(WorkspaceStartupSource.ApiSnapshot, state.StartupSource);
 		Assert.Equal(WorkspaceStartupSource.ApiSnapshot, state.CurrentStateSource);
 		Assert.False(state.IsUsingStartupFallback);
@@ -45,36 +43,23 @@ public sealed class WorkspaceBootstrapServiceTests
 	}
 
 	[Fact]
-	public async Task LoadAsync_FallsBackToLocalBootstrap_WhenApiRequestFails()
+	public async Task LoadAsync_Throws_WhenApiRequestFails_AndDoesNotUseFallbackData()
 	{
 		var state = new WorkspaceState();
 		var apiHandler = new StubHttpMessageHandler(_ => throw new HttpRequestException("API unavailable"));
-		var fallbackHandler = new StubHttpMessageHandler(_ => CreateJsonResponse(new WorkspaceBootstrapData(
-			"Fallback Utility",
-			2025,
-			"Offline Fallback Scenario",
-			48.50m,
-			11900m,
-			225m,
-			DateTime.UtcNow.ToString("O"))));
 
 		var service = new WorkspaceBootstrapService(
-			new HttpClient(fallbackHandler) { BaseAddress = new Uri("https://workspace.local/") },
+			new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Local fallback should not be used."))) { BaseAddress = new Uri("https://workspace.local/") },
 			"https://workspace.local/",
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 
-		await service.LoadAsync();
+		var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
 
-		Assert.Equal("Fallback Utility", state.SelectedEnterprise);
-		Assert.Equal(2025, state.SelectedFiscalYear);
-		Assert.Equal("Offline Fallback Scenario", state.ActiveScenarioName);
-		Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
-		Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.CurrentStateSource);
-		Assert.True(state.IsUsingStartupFallback);
-		Assert.False(state.IsUsingBrowserRestoredState);
-		Assert.Contains("local fallback data", state.StartupSourceStatus);
-		Assert.Equal(1, fallbackHandler.CallCount);
+		Assert.Contains("live API snapshot", exception.Message, StringComparison.OrdinalIgnoreCase);
+		Assert.Equal(WorkspaceStartupSource.None, state.StartupSource);
+		Assert.Equal(WorkspaceStartupSource.None, state.CurrentStateSource);
+		Assert.Equal(string.Empty, state.SelectedEnterprise);
 	}
 
 	private static HttpResponseMessage CreateJsonResponse<TValue>(TValue value)

@@ -209,7 +209,23 @@ public sealed class WorkspaceAiAssistantServiceTests
             .Build();
 
         var logger = LoggerFactory.Create(builder => { }).CreateLogger<WorkspaceAiAssistantService>();
-        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository);
+        var contextService = new TestWileyWidgetContextService();
+        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService);
+    }
+
+    private sealed class TestWileyWidgetContextService : IWileyWidgetContextService
+    {
+        public Task<string> BuildCurrentSystemContextAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult("Test municipal finance context for AI plugin validation.");
+
+        public Task<string> GetEnterpriseContextAsync(int enterpriseId, CancellationToken cancellationToken = default)
+            => Task.FromResult($"Test enterprise context for ID {enterpriseId}.");
+
+        public Task<string> GetBudgetContextAsync(DateTime? startDate, DateTime? endDate, CancellationToken cancellationToken = default)
+            => Task.FromResult("Test budget context with anonymized summaries.");
+
+        public Task<string> GetOperationalContextAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult("Test operational context with audit metrics.");
     }
 
     private sealed class TestUserContext : IUserContext

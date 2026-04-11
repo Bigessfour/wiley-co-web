@@ -48,6 +48,22 @@ frontend:
 
           export COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-$(read_secret_field COGNITO_USER_POOL_ID)}"
           export COGNITO_APP_CLIENT_ID="${COGNITO_APP_CLIENT_ID:-$(read_secret_field COGNITO_APP_CLIENT_ID)}"
+
+          # Amplify hardening per plan and Amazon Q evaluation: set portal URL + load xAI key from AWS Secrets Manager "Grok" (unifies with Program.cs ConfigureXaiSecretAsync; node parser matches existing Syncfusion pattern to avoid jq in build image)
+          export WILEY_WORKSPACE_API_BASE_ADDRESS="https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod"
+          if secret_string="$(aws secretsmanager get-secret-value --secret-id "Grok" --query SecretString --output text 2>/dev/null)"; then
+            export XAI_API_KEY="$(node -e '
+              const raw = process.env.secret_string || "{}";
+              try {
+                const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+                const key = parsed.XAI_API_KEY || parsed.ApiKey || parsed.XaiApiKey || parsed.GrokApiKey || parsed.secret || raw.toString();
+                process.stdout.write(key.trim());
+              } catch(e) {
+                process.stdout.write(raw.toString().trim());
+              }
+            ')"
+            echo "Loaded XAI_API_KEY from AWS Secrets Manager secret 'Grok' for Jarvis/Grok portal."
+          fi
           export COGNITO_REGION="${COGNITO_REGION:-$(read_secret_field COGNITO_REGION)}"
 
           if [ -n "$COGNITO_USER_POOL_ID$COGNITO_APP_CLIENT_ID$COGNITO_REGION" ]; then

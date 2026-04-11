@@ -16,14 +16,7 @@ public sealed class WorkspaceServiceTests
     public async Task WorkspacePersistenceService_LoadsPersistedState_AndSavesChanges()
     {
         var runtime = new FakeJsRuntime();
-        var persisted = new WorkspaceBootstrapData(
-            "Trash",
-            2025,
-            "Persisted scenario",
-            33m,
-            123000m,
-            5800m,
-            "2026-04-05T12:00:00.0000000Z");
+        var persisted = WorkspaceTestData.CreatePersistedBootstrap();
 
         runtime.Storage["wiley.workspace.state.v1"] = JsonSerializer.Serialize(persisted, JsonOptions);
 
@@ -32,13 +25,13 @@ public sealed class WorkspaceServiceTests
 
         await service.InitializeAsync();
 
-        Assert.Equal("Trash", state.SelectedEnterprise);
-        Assert.Equal(2025, state.SelectedFiscalYear);
-        Assert.Equal("Persisted scenario", state.ActiveScenarioName);
+        Assert.Equal(WorkspaceTestData.TrashUtility, state.SelectedEnterprise);
+        Assert.Equal(WorkspaceTestData.PriorFiscalYear, state.SelectedFiscalYear);
+        Assert.Equal(WorkspaceTestData.PersistedScenario, state.ActiveScenarioName);
         Assert.Contains(runtime.Calls, call => call.Identifier == "wileyWorkspaceStorage.getItem");
         Assert.Contains(runtime.Calls, call => call.Identifier == "wileyWorkspaceStorage.setItem");
 
-        state.SetSelection("Sewer", 2026);
+        state.SetSelection("Sewer", WorkspaceTestData.WaterFiscalYear);
         await service.SaveAsync();
 
         Assert.Contains("Sewer", runtime.Storage["wiley.workspace.state.v1"]!, StringComparison.OrdinalIgnoreCase);
@@ -78,13 +71,11 @@ public sealed class WorkspaceServiceTests
     public async Task WorkspaceBootstrapService_UsesApiSnapshot_WhenAvailable()
     {
         var state = new WorkspaceState();
-        var apiBootstrap = new WorkspaceBootstrapData(
-            "Water Utility",
-            2026,
-            "API snapshot",
-            31.25m,
-            98000m,
-            4500m,
+        var apiBootstrap = WorkspaceTestData.CreateWaterUtilityBootstrap(
+            WorkspaceTestData.ApiSnapshotScenario,
+            WorkspaceTestData.ApiCurrentRate,
+            WorkspaceTestData.ApiTotalCosts,
+            WorkspaceTestData.ApiProjectedVolume,
             "2026-04-05T12:00:00.0000000Z");
 
         var client = new HttpClient(new RoutedHttpMessageHandler(request =>
@@ -105,12 +96,12 @@ public sealed class WorkspaceServiceTests
 
         await service.LoadAsync();
 
-        Assert.Equal("Water Utility", state.SelectedEnterprise);
-        Assert.Equal(2026, state.SelectedFiscalYear);
-        Assert.Equal("API snapshot", state.ActiveScenarioName);
-        Assert.Equal(31.25m, state.CurrentRate);
-        Assert.Equal(98000m, state.TotalCosts);
-        Assert.Equal(4500m, state.ProjectedVolume);
+        Assert.Equal(WorkspaceTestData.WaterUtility, state.SelectedEnterprise);
+        Assert.Equal(WorkspaceTestData.WaterFiscalYear, state.SelectedFiscalYear);
+        Assert.Equal(WorkspaceTestData.ApiSnapshotScenario, state.ActiveScenarioName);
+        Assert.Equal(WorkspaceTestData.ApiCurrentRate, state.CurrentRate);
+        Assert.Equal(WorkspaceTestData.ApiTotalCosts, state.TotalCosts);
+        Assert.Equal(WorkspaceTestData.ApiProjectedVolume, state.ProjectedVolume);
     }
 
     [Fact]
@@ -118,13 +109,11 @@ public sealed class WorkspaceServiceTests
     {
         var state = new WorkspaceState();
         string? requestedUri = null;
-        var apiBootstrap = new WorkspaceBootstrapData(
-            "Water Utility",
-            2026,
-            "Targeted API snapshot",
-            31.25m,
-            98000m,
-            4500m,
+        var apiBootstrap = WorkspaceTestData.CreateWaterUtilityBootstrap(
+            WorkspaceTestData.TargetedApiScenario,
+            WorkspaceTestData.ApiCurrentRate,
+            WorkspaceTestData.ApiTotalCosts,
+            WorkspaceTestData.ApiProjectedVolume,
             "2026-04-05T12:00:00.0000000Z");
 
         var client = new HttpClient(new RoutedHttpMessageHandler(request =>
@@ -145,42 +134,20 @@ public sealed class WorkspaceServiceTests
         var snapshotService = new WorkspaceSnapshotApiService(client);
         var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
-        await service.LoadAsync("Water Utility", 2026);
+        await service.LoadAsync(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear);
 
         Assert.Contains("/api/workspace/snapshot?", requestedUri);
         Assert.Contains("enterprise=Water%20Utility", requestedUri);
         Assert.Contains("fiscalYear=2026", requestedUri);
-        Assert.Equal("Water Utility", state.SelectedEnterprise);
-        Assert.Equal(2026, state.SelectedFiscalYear);
+        Assert.Equal(WorkspaceTestData.WaterUtility, state.SelectedEnterprise);
+        Assert.Equal(WorkspaceTestData.WaterFiscalYear, state.SelectedFiscalYear);
     }
 
     [Fact]
-    public async Task WorkspaceBootstrapService_FallsBackToStaticBootstrap_WhenApiFails()
+    public async Task WorkspaceBootstrapService_Throws_WhenApiSnapshotIsUnavailable()
     {
         var state = new WorkspaceState();
-        var staticBootstrap = new WorkspaceBootstrapData(
-            "Trash Utility",
-            2025,
-            "Static bootstrap",
-            21.50m,
-            72000m,
-            3200m,
-            "2026-04-05T12:00:00.0000000Z");
-
-        var client = new HttpClient(new RoutedHttpMessageHandler(request =>
-        {
-            if (request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                return new HttpResponseMessage(HttpStatusCode.NotFound);
-            }
-
-            if (request.RequestUri?.AbsolutePath.EndsWith("/data/workspace-bootstrap.json", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                return JsonResponse(staticBootstrap);
-            }
-
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        }))
+        var client = new HttpClient(new RoutedHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)))
         {
             BaseAddress = new Uri("https://example.test/")
         };
@@ -188,15 +155,17 @@ public sealed class WorkspaceServiceTests
         var snapshotService = new WorkspaceSnapshotApiService(client);
         var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
-        await service.LoadAsync();
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
 
-        Assert.Equal("Trash Utility", state.SelectedEnterprise);
-        Assert.Equal(2025, state.SelectedFiscalYear);
-        Assert.Equal("Static bootstrap", state.ActiveScenarioName);
+        Assert.Contains("live API snapshot", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, state.SelectedEnterprise);
+        Assert.Equal(0, state.SelectedFiscalYear);
+        Assert.Equal(WorkspaceStartupSource.None, state.StartupSource);
+        Assert.Equal(WorkspaceStartupSource.None, state.CurrentStateSource);
     }
 
     [Fact]
-    public async Task WorkspaceBootstrapService_FallsBackToDefaultBootstrap_WhenBothSourcesAreUnavailable()
+    public async Task WorkspaceBootstrapService_Throws_WhenLiveApiSnapshotIsUnavailable()
     {
         var state = new WorkspaceState();
         var client = new HttpClient(new RoutedHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -210,13 +179,13 @@ public sealed class WorkspaceServiceTests
         var snapshotService = new WorkspaceSnapshotApiService(client);
         var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
 
-        await service.LoadAsync();
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
 
-        Assert.Equal("Water", state.SelectedEnterprise);
-        Assert.Equal(2026, state.SelectedFiscalYear);
-        Assert.Equal("Base Planning Scenario", state.ActiveScenarioName);
-        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
-        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.CurrentStateSource);
+        Assert.Contains("live API snapshot", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(string.Empty, state.SelectedEnterprise);
+        Assert.Equal(0, state.SelectedFiscalYear);
+        Assert.Equal(WorkspaceStartupSource.None, state.StartupSource);
+        Assert.Equal(WorkspaceStartupSource.None, state.CurrentStateSource);
     }
 
     [Fact]
@@ -230,7 +199,7 @@ public sealed class WorkspaceServiceTests
             capturedPayload = await request.Content!.ReadAsStringAsync();
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, "Water FY2026 rate snapshot", "2026-04-05T12:00:00Z"), JsonOptions), Encoding.UTF8, "application/json")
+                Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, WorkspaceTestData.WaterFY2026RateSnapshot, "2026-04-05T12:00:00Z"), JsonOptions), Encoding.UTF8, "application/json")
             };
         }))
         {
@@ -238,12 +207,12 @@ public sealed class WorkspaceServiceTests
         };
 
         var service = new WorkspaceSnapshotApiService(client);
-        var response = await service.SaveRateSnapshotAsync(new { Enterprise = "Water Utility", FiscalYear = 2026 });
+        var response = await service.SaveRateSnapshotAsync(new { Enterprise = WorkspaceTestData.WaterUtility, FiscalYear = WorkspaceTestData.WaterFiscalYear });
 
         Assert.Equal(HttpMethod.Post, capturedMethod);
-        Assert.Contains("Water Utility", capturedPayload!.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(WorkspaceTestData.WaterUtility, capturedPayload!.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(42, response.SnapshotId);
-        Assert.Equal("Water FY2026 rate snapshot", response.SnapshotName);
+        Assert.Equal(WorkspaceTestData.WaterFY2026RateSnapshot, response.SnapshotName);
     }
 
     [Fact]
@@ -259,7 +228,7 @@ public sealed class WorkspaceServiceTests
 
         var service = new WorkspaceSnapshotApiService(client);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveRateSnapshotAsync(new { Enterprise = "Water Utility" }));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveRateSnapshotAsync(new { Enterprise = WorkspaceTestData.WaterUtility }));
 
         Assert.Contains("400", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("snapshot rejected", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -278,7 +247,7 @@ public sealed class WorkspaceServiceTests
 
         var service = new WorkspaceSnapshotApiService(client);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveRateSnapshotAsync(new { Enterprise = "Water Utility" }));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveRateSnapshotAsync(new { Enterprise = WorkspaceTestData.WaterUtility }));
 
         Assert.Contains("empty", exception.Message, StringComparison.OrdinalIgnoreCase);
     }

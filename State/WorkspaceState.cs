@@ -19,8 +19,8 @@ public sealed class WorkspaceState
     private readonly List<ScenarioItem> scenarioItems = [];
     private readonly List<CustomerRow> customerRows = [];
     private readonly List<ProjectionRow> projectionRows = [];
-    private readonly List<string> enterpriseOptions = [WorkspaceDefaults.SelectedEnterprise];
-    private readonly List<int> fiscalYearOptions = [WorkspaceDefaults.SelectedFiscalYear];
+    private readonly List<string> enterpriseOptions = [];
+    private readonly List<int> fiscalYearOptions = [];
     private readonly List<string> customerServiceOptions = [AllServicesOption];
     private readonly List<string> customerCityLimitOptions = [AllCityLimitsOption, "Yes", "No"];
     private WorkspaceStartupSource startupSource;

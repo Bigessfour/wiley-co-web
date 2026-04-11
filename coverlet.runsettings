@@ -7,6 +7,9 @@
           <Format>cobertura</Format>
           <ExcludeByFile>
             **/bin/**/*,**/obj/**/*,**/Program.cs,**/Migrations/*.cs,**/Logging/*.cs,**/Telemetry/*.cs,**/Interceptors/*.cs</ExcludeByFile>
+          <Threshold>80</Threshold>
+          <ThresholdType>line</ThresholdType>
+          <ThresholdStat>total</ThresholdStat>
         </Configuration>
       </DataCollector>
     </DataCollectors>

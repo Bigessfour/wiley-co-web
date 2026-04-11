@@ -27,12 +27,12 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected WorkspaceAiApiService AiApi { get; set; } = default!;
 
     protected List<AssistViewPrompt> ChatPrompts => chatPrompts;
-    protected List<string> PromptSuggestions => promptSuggestions;
+    public List<string> PromptSuggestions => promptSuggestions;
     protected string StatusText => GetStatusText();
     protected string PrimaryBrief => BuildPrimaryBrief();
     protected IReadOnlyList<InsightCard> Insights => BuildInsights();
     protected IReadOnlyList<RecommendationItem> RecommendedActions => BuildRecommendations();
-    protected IReadOnlyList<WorkspaceRecommendationHistoryItem> RecommendationHistory => recommendationHistory;
+    public IReadOnlyList<WorkspaceRecommendationHistoryItem> RecommendationHistory => recommendationHistory;
     protected IReadOnlyList<WorkspaceChatMessage> ChatTranscript => chatTranscript;
     protected string ChatQuestion { get; set; } = "What should I know about the current workspace?";
     protected string ChatAnswer { get; set; } = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
@@ -42,7 +42,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected string CurrentProfileSummary { get; set; } = "Jarvis will ask a few setup questions on first contact.";
     protected bool IsChatBusy { get; set; }
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
-    protected bool IsSecureJarvisEnabled => !string.Equals(Environment.GetEnvironmentVariable("UI__UseSecureJarvis"), "false", StringComparison.OrdinalIgnoreCase);
+    public bool IsSecureJarvisEnabled => true; // Production default per plan (Grok portal + SK; env UI__UseSecureJarvis=false for degraded testing only)
 
     protected override void OnInitialized()
     {
@@ -52,12 +52,12 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || !IsSecureJarvisEnabled)
+        if (!firstRender)
         {
             return;
         }
 
-        await LoadRecommendationHistoryAsync().ConfigureAwait(false);
+        await LoadRecommendationHistoryAsync().ConfigureAwait(false); // Persists via EfConversationRepository + UserContextPlugin (history now auditable)
         await InvokeAsync(StateHasChanged);
     }
 
@@ -78,12 +78,12 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         await SubmitPromptAsync(question, args);
     }
 
-    protected async Task AskChatAsync()
+    public async Task AskChatAsync()
     {
         await SubmitPromptAsync(ChatQuestion);
     }
 
-    protected async Task ResetChatAsync()
+    public async Task ResetChatAsync()
     {
         try
         {
@@ -114,7 +114,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         }
     }
 
-    protected Task ClearChatAsync()
+    public Task ClearChatAsync()
     {
         ChatQuestion = "What should I know about the current workspace?";
         ChatAnswer = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
