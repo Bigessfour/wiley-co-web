@@ -22,7 +22,10 @@ frontend:
             SECRET_STRING="$raw" node -e 'const normalize = value => typeof value === "string" ? value.trim().replace(/^"|"$/g, "").trim() : ""; const rawValue = process.env.SECRET_STRING || ""; try { const parsed = JSON.parse(rawValue); process.stdout.write(normalize(parsed.SYNCFUSION_LICENSE_KEY || parsed.SyncfusionLicenseKey || rawValue)); } catch { process.stdout.write(normalize(rawValue)); }'
           }
 
-          if secret_string="$(aws secretsmanager get-secret-value --secret-id "SYNCFUSION_LICENSE_KEY" --query SecretString --output text 2>/dev/null)"; then
+          export SYNCFUSION_LICENSE_KEY="$(printf '%s' "${SYNCFUSION_LICENSE_KEY:-}" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if [ -n "$SYNCFUSION_LICENSE_KEY" ]; then
+            echo "Using pre-configured SYNCFUSION_LICENSE_KEY from Amplify branch environment variables."
+          elif secret_string="$(aws secretsmanager get-secret-value --secret-id "SYNCFUSION_LICENSE_KEY" --query SecretString --output text 2>/dev/null)"; then
             export SYNCFUSION_LICENSE_KEY="$(read_syncfusion_key_from_secret_string "$secret_string")"
             echo "Loaded SYNCFUSION_LICENSE_KEY from AWS Secrets Manager secret SYNCFUSION_LICENSE_KEY."
           else
