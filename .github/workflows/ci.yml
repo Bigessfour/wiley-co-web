@@ -1,5 +1,4 @@
 name: Wiley.co CI
-
 on:
   push:
     branches: [main]
@@ -13,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write   # required for GitHub OIDC — deployment-guard assumes role via federation
 
 jobs:
   test:
@@ -134,18 +134,10 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Ensure AWS credentials are configured for deployment guard
-        run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
-            echo "AWS credentials are required for Amplify deployment guard checks on main."
-            exit 1
-          fi
-
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::570912405222:role/wiley-co-github-ci
           aws-region: us-east-2
 
       - name: Fail if latest Amplify main job is unhealthy
