@@ -1,23 +1,5 @@
 namespace WileyCoWeb.Contracts;
 
-public sealed record WorkspaceSnapshotResponse
-{
-    public string SelectedEnterprise { get; init; } = string.Empty;
-    public int SelectedFiscalYear { get; init; }
-    public string ActiveScenarioName { get; init; } = string.Empty;
-    public decimal? CurrentRate { get; init; }
-    public decimal? TotalCosts { get; init; }
-    public decimal? ProjectedVolume { get; init; }
-    public string? LastUpdatedUtc { get; init; }
-    public List<string>? EnterpriseOptions { get; init; }
-    public List<int>? FiscalYearOptions { get; init; }
-    public List<string>? CustomerServiceOptions { get; init; }
-    public List<string>? CustomerCityLimitOptions { get; init; }
-    public List<WorkspaceScenarioItemData>? ScenarioItems { get; init; }
-    public List<CustomerRow>? CustomerRows { get; init; }
-    public List<ProjectionRow>? ProjectionRows { get; init; }
-}
-
 public sealed record WorkspaceScenarioItemData(Guid Id, string Name, decimal Cost);
 
 public sealed record CustomerRow(string Name, string Service, string CityLimits);

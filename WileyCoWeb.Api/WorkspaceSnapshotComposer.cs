@@ -17,7 +17,7 @@ internal sealed class WorkspaceSnapshotComposer
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<WorkspaceSnapshotResponse> BuildAsync(string? enterpriseName, int? fiscalYear, CancellationToken cancellationToken)
+    public async Task<WorkspaceBootstrapData> BuildAsync(string? enterpriseName, int? fiscalYear, CancellationToken cancellationToken)
     {
         logger.LogInformation("Building workspace snapshot for {Enterprise} FY {FiscalYear}", enterpriseName ?? "default", fiscalYear?.ToString() ?? "default");
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
@@ -79,15 +79,15 @@ internal sealed class WorkspaceSnapshotComposer
             budgetYears.Count,
             scenarioItems.Count);
 
-        return new WorkspaceSnapshotResponse
+        return new WorkspaceBootstrapData(
+            selectedEnterprise.Name,
+            selectedFiscalYear,
+            $"{selectedEnterprise.Name} planning snapshot",
+            currentRate,
+            totalCosts,
+            projectedVolume,
+            DateTime.UtcNow.ToString("O"))
         {
-            SelectedEnterprise = selectedEnterprise.Name,
-            SelectedFiscalYear = selectedFiscalYear,
-            ActiveScenarioName = $"{selectedEnterprise.Name} planning snapshot",
-            CurrentRate = currentRate,
-            TotalCosts = totalCosts,
-            ProjectedVolume = projectedVolume,
-            LastUpdatedUtc = DateTime.UtcNow.ToString("O"),
             EnterpriseOptions = enterprises.Select(enterprise => enterprise.Name).ToList(),
             FiscalYearOptions = budgetYears.Count > 0 ? budgetYears : [selectedFiscalYear],
             CustomerServiceOptions = serviceOptions,

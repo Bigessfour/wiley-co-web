@@ -162,7 +162,7 @@
                                                 <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="SaveWorkspaceBaselineAsync">
                                                     @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
                                                 </SfButton>
-                                                <p class="text-xs text-slate-500">@BaselineSaveStatus</p>
+                                                <p id="baseline-save-status" class="text-xs text-slate-500">@BaselineSaveStatus</p>
                                             </div>
                                             <div class="mt-4 grid gap-4 xl:grid-cols-[1fr_1.4fr]">
                                                 <div class="rounded-2xl border border-slate-200 p-3">

@@ -32,6 +32,7 @@ public sealed class WorkspaceFileLoggerProvider : ILoggerProvider
 
 internal sealed class WorkspaceFileLogger : ILogger
 {
+    private static readonly object FileWriteLock = new();
     private readonly string _categoryName;
     private readonly string _logFilePath;
 
@@ -108,6 +109,13 @@ internal sealed class WorkspaceFileLogger : ILogger
 
         builder.AppendLine();
 
-        File.AppendAllText(_logFilePath, builder.ToString(), Encoding.UTF8);
+        lock (FileWriteLock)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_logFilePath) ?? AppContext.BaseDirectory);
+            using var fileStream = new FileStream(_logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            using var writer = new StreamWriter(fileStream, Encoding.UTF8);
+            writer.Write(builder.ToString());
+            writer.Flush();
+        }
     }
 }

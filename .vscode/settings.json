@@ -37,13 +37,15 @@
     "__remote_check__": true
   },
   "dotnetAcquisitionExtension.sharedExistingDotnetPath": "/Users/stephenmckitrick/.dotnet-x64/dotnet",
-  "csharp-dev-tools.roslyn.projectOrSolutionFiles": ["WileyCoWeb.slnx"],
+  "csharp-dev-tools.roslyn.projectOrSolutionFiles": [
+    "c:\\Users\\biges\\Desktop\\WW AWS\\WileyCoWeb.slnx"
+  ],
   "chat.tools.terminal.autoApprove": {
     "rg": true,
     "rg --files": true,
     "where rg": true
   },
-  "github.copilot.chat.agentDebugLog.fileLogging.enabled": false,
+  "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
   "FSharp.suggestGitignore": false,
   "workbench.settings.alwaysShowAdvancedSettings": true
 }

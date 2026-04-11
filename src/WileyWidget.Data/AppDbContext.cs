@@ -57,6 +57,7 @@ namespace WileyWidget.Data
         public DbSet<TelemetryLog> TelemetryLogs { get; set; } = null!;
         public DbSet<SavedScenarioSnapshot> SavedScenarioSnapshots { get; set; } = null!;
         public DbSet<global::WileyWidget.Services.Abstractions.ConversationHistory> ConversationHistories { get; set; } = null!;
+        public DbSet<global::WileyWidget.Services.Abstractions.RecommendationHistory> RecommendationHistories { get; set; } = null!;
         public DbSet<TownOfWileyBudget2026> TownOfWileyBudgetData { get; set; } = null!;
         public DbSet<ImportBatch> ImportBatches { get; set; } = null!;
         public DbSet<SourceFileVariant> SourceFileVariants { get; set; } = null!;
@@ -303,6 +304,47 @@ namespace WileyWidget.Data
 
                 // Legacy/unused property - ConversationId is the canonical key
                 entity.Ignore(e => e.Id);
+            });
+
+            modelBuilder.Entity<global::WileyWidget.Services.Abstractions.RecommendationHistory>(entity =>
+            {
+                entity.ToTable("RecommendationHistories");
+                entity.HasKey(e => e.RecommendationId);
+
+                entity.Property(e => e.RecommendationId)
+                    .HasMaxLength(64)
+                    .IsRequired();
+
+                entity.Property(e => e.ConversationId)
+                    .HasMaxLength(128)
+                    .IsRequired();
+
+                entity.Property(e => e.UserId)
+                    .HasMaxLength(128)
+                    .IsRequired();
+
+                entity.Property(e => e.UserDisplayName)
+                    .HasMaxLength(120)
+                    .IsRequired();
+
+                entity.Property(e => e.Enterprise)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.Question)
+                    .HasMaxLength(1000)
+                    .IsRequired();
+
+                entity.Property(e => e.Recommendation)
+                    .HasMaxLength(6000)
+                    .IsRequired();
+
+                entity.Property(e => e.CreatedAtUtc)
+                    .HasColumnType(TimestampWithTimeZone)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(e => new { e.UserId, e.Enterprise, e.FiscalYear, e.CreatedAtUtc });
+                entity.HasIndex(e => e.ConversationId);
             });
 
             // New: Vendor configuration

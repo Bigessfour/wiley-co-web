@@ -1,0 +1,141 @@
+{
+  "exclude_patterns": [
+    "^docs/",
+    "^scripts/",
+    "^tools/",
+    "^config/",
+    "^docker/",
+    "^ci-logs/",
+    "^sql/",
+    "\\.md$",
+    "\\.txt$",
+    "\\.yml$",
+    "\\.yaml$",
+    "ai-fetchable-manifest\\.json$",
+    "AI-BRIEF\\.md$",
+    "^tests/",
+    "^src/legacy/",
+    "packages\\.lock\\.json$",
+    "Directory\\.(Build|Packages)\\.props$",
+    "^signing/",
+    "^secrets/",
+    "^licenses/",
+    "^\\.github/",
+    "^\\.vscode/",
+    "^\\.venv/",
+    "^\\.nuget-temp/",
+    "^\\.nuget_temp/",
+    "^\\.tmpzipcheck/",
+    "^\\.trunk/",
+    "^amplify-local-backend/",
+    "^publish_output/",
+    "^__remote_check__/",
+    "^wwwroot/",
+    "^schemas/",
+    "/bin/",
+    "/obj/",
+    "/\\.vs/",
+    "/\\.git/"
+  ],
+
+  "focus_mode": false,
+  "include_only_extensions": [
+    ".cs",
+    ".csproj",
+    ".sln",
+    ".xaml",
+    ".json",
+    ".py",
+    ".ps1"
+  ],
+  "max_files": 12000,
+  "max_file_size_bytes": 10485760,
+  "manifest_mode": "full-context",
+  "generate_context_summary": true,
+
+  "emit_full_tree": false,
+  "tree_max_depth": 5,
+  "max_tree_entries_per_dir": 50,
+
+  "focus_directories": [
+    "Components",
+    "Services",
+    "WileyCoWeb.Api"
+  ],
+
+  "always_include_dirs": [
+    "Components",
+    "Services",
+    "WileyCoWeb.Api"
+  ],
+
+  "priority_patterns": {
+    "MainForm": 100,
+    "Program": 90,
+    "ViewModel": 95,
+    "Panel": 92,
+    "Control": 88,
+    "Service": 85,
+    "Repository": 82,
+    "Factory": 78,
+    "Extension": 75,
+    "Helper": 70,
+    "Test": 65
+  },
+
+  "content_inclusion": {
+    "embed_full_if_smaller_than_kb": 600,
+    "preview_lines_for_large_files": 800,
+    "max_embedded_files": 400,
+    "critical_globs": [
+      "**/*ViewModel.cs",
+      "**/*Panel.cs",
+      "**/*Control.cs",
+      "**/MainForm*.cs",
+      "**/Analytics*.cs",
+      "**/*Service.cs",
+      "**/*Repository.cs",
+      "**/Program.cs",
+      "**/*.csproj",
+      "**/App.xaml.cs"
+    ],
+    "never_embed": [
+      "**/bin/**",
+      "**/obj/**",
+      "**/*.Designer.cs",
+      "**/*.g.cs",
+      "**/*.g.i.cs",
+      "**/*.AssemblyInfo.cs",
+      "**/node_modules/**"
+    ]
+  },
+
+  "test_file_summary_length": 5000,
+  "max_summary_length": 1000,
+
+  "architecture_hints": {
+    "project_type": "Blazor WebAssembly application",
+    "ui_framework": "Syncfusion Blazor component suite",
+    "architecture_pattern": "MVVM-inspired with dependency injection",
+    "navigation_surface": "Syncfusion dashboard layout and panels",
+    "theme_authority": "Syncfusion theme provider",
+    "di_container": "Microsoft.Extensions.DependencyInjection",
+    "async_init_pattern": "IAsyncDisposable and initialization patterns",
+    "control_factory": "Syncfusion Blazor components",
+    "key_base_classes": [
+      "ComponentBase",
+      "OwningComponentBase",
+      "ServiceBase"
+    ],
+    "di_extension_files": "*ServiceCollectionExtensions.cs",
+    "ribbon_config": "SfDashboardLayout for workspace organization"
+  },
+
+  "project_analysis": {
+    "parse_csharp_inheritance": true,
+    "parse_sln_dependencies": true,
+    "detect_tech_from_csproj": true,
+    "analyze_xaml_controls": true,
+    "build_dependency_graph": true
+  }
+}

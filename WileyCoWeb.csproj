@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer"
       PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Syncfusion.Blazor.InteractiveChat" />
     <PackageReference Include="Syncfusion.Blazor.Buttons" />
     <PackageReference Include="Syncfusion.Blazor.Cards" />
     <PackageReference Include="Syncfusion.Blazor.Charts" />
@@ -41,15 +42,18 @@
     <Compile Remove="src/**/*.cs" />
     <Compile Remove="WileyCoWeb.Api/**/*.cs" />
     <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="__remote_check__/**/*.cs" />
     <Content Remove="src/**" />
     <Content Remove="tests/**" />
     <Content Remove="WileyCoWeb.Api/**" />
+    <Content Remove="__remote_check__/**" />
     <Content Remove="publish_output/**" />
     <Content Remove="bin/**" />
     <Content Remove="obj/**" />
     <None Remove="src/**" />
     <None Remove="tests/**" />
     <None Remove="WileyCoWeb.Api/**" />
+    <None Remove="__remote_check__/**" />
     <None Remove="publish_output/**" />
     <None Remove="bin/**" />
     <None Remove="obj/**" />

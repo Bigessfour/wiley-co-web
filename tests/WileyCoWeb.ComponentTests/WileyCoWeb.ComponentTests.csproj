@@ -19,6 +19,7 @@
     <PackageReference Include="bunit.core" />
     <PackageReference Include="bunit.generators" />
     <PackageReference Include="Syncfusion.Blazor.Core" />
+    <PackageReference Include="Syncfusion.Blazor.InteractiveChat" />
   </ItemGroup>
 
   <ItemGroup>

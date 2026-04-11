@@ -136,6 +136,20 @@
           "Syncfusion.Blazor.SplitButtons": "33.1.44"
         }
       },
+      "Syncfusion.Blazor.InteractiveChat": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "lmS3qT0znkwFNRLwMqMJHpfGT+h8iXXt7q9yr5WW0mTSF8XYiFVGQemHbpp3rFl0mAGR5E6Iigk3fYi+gtkbMQ==",
+        "dependencies": {
+          "Syncfusion.Blazor.Buttons": "33.1.44",
+          "Syncfusion.Blazor.Core": "33.1.44",
+          "Syncfusion.Blazor.Inputs": "33.1.44",
+          "Syncfusion.Blazor.MarkdownConverter": "33.1.44",
+          "Syncfusion.Blazor.Navigations": "33.1.44",
+          "Syncfusion.Blazor.Notifications": "33.1.44"
+        }
+      },
       "Syncfusion.Blazor.Layouts": {
         "type": "Direct",
         "requested": "[33.1.44, )",
@@ -584,6 +598,11 @@
           "Syncfusion.Blazor.Core": "33.1.44",
           "Syncfusion.Blazor.Data": "33.1.44"
         }
+      },
+      "Syncfusion.Blazor.MarkdownConverter": {
+        "type": "Transitive",
+        "resolved": "33.1.44",
+        "contentHash": "0N657xLl8cx4CUDrXlRG9igZ/8bcNFXyzPUZizwIYK4nG87EeBndhaQRl4WOxCj1CZUMld9WazrO5H2ncjNINg=="
       },
       "Syncfusion.Blazor.Ribbon": {
         "type": "Transitive",

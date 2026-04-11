@@ -35,3 +35,20 @@ public sealed record WorkspaceConversationResetRequest(
 	string ContextSummary,
 	string SelectedEnterprise,
 	int SelectedFiscalYear);
+
+public sealed record WorkspaceRecommendationHistoryRequest(
+	string SelectedEnterprise,
+	int SelectedFiscalYear,
+	int Limit = 12);
+
+public sealed record WorkspaceRecommendationHistoryItem(
+	string RecommendationId,
+	string ConversationId,
+	string UserDisplayName,
+	string Question,
+	string Recommendation,
+	bool UsedFallback,
+	string CreatedAtUtc);
+
+public sealed record WorkspaceRecommendationHistoryResponse(
+	IReadOnlyList<WorkspaceRecommendationHistoryItem> Items);

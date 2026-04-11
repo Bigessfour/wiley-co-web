@@ -10,7 +10,7 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment("IntegrationTest");
 
         builder.ConfigureServices(services =>
         {

@@ -55,6 +55,67 @@ public sealed class WileyWorkspaceE2ETests
 	}
 
 	[Fact]
+	public async Task Workspace_SaveBaseline_ReloadsPersistedWorkspaceValues()
+	{
+		await RunWorkspaceTestAsync(async page =>
+		{
+			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
+			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
+			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
+
+			await currentRateInput.FillAsync("71.25");
+			await totalCostsInput.FillAsync("49250");
+			await projectedVolumeInput.FillAsync("8400");
+
+			await page.GetByRole(AriaRole.Button, new() { Name = "Save workspace baseline" }).ClickAsync();
+
+			await Expect(page.Locator("#workspace-load-status")).ToContainTextAsync("Reloaded", new() { Timeout = 30000 });
+			await Expect(page.Locator("#workspace-load-status")).ToContainTextAsync("after baseline save", new() { Timeout = 30000 });
+			await Expect(page.Locator("#baseline-save-status")).ToContainTextAsync("Saved baseline values", new() { Timeout = 30000 });
+
+			Assert.Equal("71.25", NormalizeNumericValue(await currentRateInput.InputValueAsync()));
+			Assert.Equal("49250", NormalizeNumericValue(await totalCostsInput.InputValueAsync()));
+			Assert.Equal("8400", NormalizeNumericValue(await projectedVolumeInput.InputValueAsync()));
+		});
+	}
+
+	[Fact]
+	public async Task Workspace_SaveAndApplyScenario_RestoresSavedWorkspaceValues()
+	{
+		await RunWorkspaceTestAsync(async page =>
+		{
+			var scenarioName = $"E2E Scenario {Guid.NewGuid():N}";
+			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
+			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
+			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
+			var scenarioNameInput = page.Locator("#scenario-panel").GetByPlaceholder("Scenario name");
+
+			await currentRateInput.FillAsync("88.25");
+			await totalCostsInput.FillAsync("45000");
+			await projectedVolumeInput.FillAsync("7000");
+			await scenarioNameInput.FillAsync(scenarioName);
+
+			await page.GetByRole(AriaRole.Button, new() { Name = "Save scenario" }).ClickAsync();
+
+			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync("Saved scenario", new() { Timeout = 30000 });
+			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync(scenarioName, new() { Timeout = 30000 });
+
+			await currentRateInput.FillAsync("99.75");
+			await totalCostsInput.FillAsync("52000");
+			await projectedVolumeInput.FillAsync("8100");
+
+			await page.GetByRole(AriaRole.Button, new() { Name = "Apply saved scenario" }).ClickAsync();
+
+			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync("Applied saved scenario", new() { Timeout = 30000 });
+			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync(scenarioName, new() { Timeout = 30000 });
+
+			Assert.Equal("88.25", NormalizeNumericValue(await currentRateInput.InputValueAsync()));
+			Assert.Equal("45000", NormalizeNumericValue(await totalCostsInput.InputValueAsync()));
+			Assert.Equal("7000", NormalizeNumericValue(await projectedVolumeInput.InputValueAsync()));
+		});
+	}
+
+	[Fact]
 	public async Task Workspace_QuickBooksImportPanel_PreviewsUploadedFile()
 	{
 		var tempFile = Path.Combine(Path.GetTempPath(), $"quickbooks-e2e-{Guid.NewGuid():N}.csv");
@@ -194,5 +255,10 @@ public sealed class WileyWorkspaceE2ETests
 		return "Date,Type,Num,Name,Memo,Account,Split,Amount,Balance,Clr\n" +
 			   "01/01/2026,Invoice,1001,Town of Wiley,Water Billing,Water Revenue,Accounts Receivable,125.00,125.00,C\n" +
 			   "01/02/2026,Payment,1002,Town of Wiley,Payment Received,Accounts Receivable,Water Revenue,-125.00,0.00,C\n";
+	}
+
+	private static string NormalizeNumericValue(string value)
+	{
+		return new string(value.Where(character => char.IsDigit(character) || character is '.' or '-').ToArray());
 	}
 }

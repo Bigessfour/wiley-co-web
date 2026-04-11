@@ -176,6 +176,11 @@ namespace WileyWidget.Services.Abstractions
     ///    - Legacy: XAI_API_KEY (single underscore - still supported)
     /// 3. appsettings.json: "XAI": { "ApiKey": "..." } (lowest priority - DO NOT use for secrets!)
     ///
+    /// SECURITY CONSIDERATIONS:
+    /// - API keys should never be stored in source code or appsettings.json in production.
+    /// - Use user secrets for development and environment variables for production.
+    /// - Regularly rotate API keys for security.
+    ///
     /// Usage:
     /// 1. Set API key via user secrets: dotnet user-secrets set "XAI:ApiKey" "your-key"
     /// 2. Inject IGrokApiKeyProvider into services

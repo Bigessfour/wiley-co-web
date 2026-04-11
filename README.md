@@ -21,6 +21,10 @@ For this app, the build now supports either of these sources before `dotnet publ
 2. Amplify Gen 1 environment secrets from Systems Manager Parameter Store as a fallback.
 3. A local ignored file named `appsettings.Syncfusion.local.json` in the repository root.
 
+Amplify production builds now fail fast if `SYNCFUSION_LICENSE_KEY` is missing after those lookup steps. This prevents deploying a client bundle that would show the Syncfusion license popup at runtime.
+
+Amplify builds now also validate Cognito secret consistency. If any of `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, or `COGNITO_REGION` is set, all three must be present or the build fails.
+
 If you are using AWS Secrets Manager:
 
 1. Store the secret either as a raw string or as JSON containing `SYNCFUSION_LICENSE_KEY` or `SyncfusionLicenseKey`.
@@ -33,6 +37,11 @@ If you are using Amplify Gen 1 environment secrets instead:
 2. Use the default AWS KMS key for the account so Amplify can decrypt it.
 3. Redeploy the Amplify branch.
 
+If you are enabling hosted auth:
+
+1. Add `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, and `COGNITO_REGION` as Amplify environment secrets.
+2. Keep them in sync per branch; partial values now fail the build to prevent inconsistent auth configuration in production.
+
 If you are working locally on macOS and user secrets are not being surfaced reliably, create an ignored file named `appsettings.Syncfusion.local.json` in the repository root with this shape:
 
 ```json
@@ -42,6 +51,21 @@ If you are working locally on macOS and user secrets are not being surfaced reli
 The build copies that file into `wwwroot/appsettings.json`, and that generated file is already ignored by git.
 
 Important: this app is a static Blazor WebAssembly site. That means the Syncfusion license is injected at build time and then included in the published client assets so `Program.cs` can read it from configuration at startup. This is not a private server-side runtime secret path.
+
+### Grok And xAI Secrets
+
+The xAI Grok API key is a backend runtime secret, not an Amplify frontend build secret.
+
+The active browser client in [Program.cs](Program.cs) only talks to the thin API host. Grok participation happens server-side in the API and service layer, so keep the xAI key out of Amplify static hosting unless you intentionally redesign the app to call xAI directly from the browser.
+
+For AWS deployment:
+
+1. Store the Grok secret in AWS Secrets Manager as `Grok` or set `XAI:SecretName` / `XAI_SECRET_NAME` to the secret name you choose.
+2. The secret value can be either a raw API key string or JSON containing `XAI_API_KEY`, `ApiKey`, `XaiApiKey`, or `GrokApiKey`.
+3. Give the API host IAM role `secretsmanager:GetSecretValue` permission for that secret.
+4. Set the runtime region with `WILEY_AWS_REGION`, `AWS_REGION`, or `AWS_DEFAULT_REGION`. The API defaults to `us-east-2`.
+
+The API host now attempts to load the Grok secret from AWS Secrets Manager at startup only when `XAI_API_KEY` is not already present in configuration or the environment. Local `.NET user secrets` remain a development-only path.
 
 ## Aurora Database
 

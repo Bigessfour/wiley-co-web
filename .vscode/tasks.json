@@ -1957,6 +1957,22 @@
 			"label": "temp: kill dotnet lock holders",
 			"type": "shell",
 			"command": "Get-Process dotnet,vstest.console,testhost,MSBuild -ErrorAction SilentlyContinue | Stop-Process -Force"
+		},
+		{
+			"label": "Generate AI Manifest",
+			"type": "shell",
+			"command": "& \"c:/Users/biges/Desktop/WW AWS/.venv/Scripts/python.exe\" Scripts/generate-ai-manifest.py",
+			"args": [],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Generate AI Manifest",
+			"type": "shell",
+			"command": "\"c:/Users/biges/Desktop/WW AWS/.venv/Scripts/python.exe\" Scripts/generate-ai-manifest.py",
+			"args": [],
+			"problemMatcher": [],
+			"group": "build"
 		}
 	],
 	"inputs": [

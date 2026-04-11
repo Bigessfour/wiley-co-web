@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.SecretsManager" />
     <ProjectReference Include="..\src\WileyWidget.Data\WileyWidget.Data.csproj" />
     <ProjectReference Include="..\src\WileyWidget.Models\WileyWidget.Models.csproj" />
     <ProjectReference Include="..\src\WileyWidget.Services\WileyWidget.Services.csproj" />

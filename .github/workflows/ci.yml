@@ -51,7 +51,41 @@ jobs:
         run: dotnet build ${{ matrix.project }} --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Run tests with coverage
-        run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }}
+        run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --settings coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }}
+
+      - name: Enforce coverage threshold
+        shell: pwsh
+        run: |
+          $thresholds = @{
+            component = 68
+            integration = 11
+            widget = 32
+            e2e = 0
+          }
+
+          $resultsDirectory = Join-Path "TestResults" "${{ matrix.name }}"
+          $coverageReport = Get-ChildItem -Path $resultsDirectory -Recurse -Filter coverage.cobertura.xml |
+            Sort-Object FullName |
+            Select-Object -First 1
+
+          if (-not $coverageReport) {
+            throw "Coverage report was not generated for ${{ matrix.project }}."
+          }
+
+          [xml]$coverageXml = Get-Content -Path $coverageReport.FullName -Raw
+          $coveragePercent = [math]::Round(([double]$coverageXml.DocumentElement.'line-rate' * 100), 2)
+          $threshold = $thresholds['${{ matrix.name }}']
+
+          Write-Host "${{ matrix.name }} line coverage: $coveragePercent% (threshold $threshold%)"
+
+          if ($threshold -eq 0) {
+            Write-Host "E2E coverage is reported separately because browser-only runs do not instrument app code in-process."
+            exit 0
+          }
+
+          if ($coveragePercent -lt $threshold) {
+            throw "Coverage gate failed for ${{ matrix.name }}: $coveragePercent% < $threshold%."
+          }
 
       - name: Upload coverage artifact
         if: always()

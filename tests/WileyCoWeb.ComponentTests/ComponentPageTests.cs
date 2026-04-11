@@ -167,7 +167,7 @@ public sealed class ComponentPageTests
 
 			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
 			{
-				Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, "workspace snapshot", "2026-04-05T12:00:00Z")), Encoding.UTF8, "application/json")
+				Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, "Saved workspace snapshot", "2026-04-05T12:00:00Z")), Encoding.UTF8, "application/json")
 			});
 		}))
 		{

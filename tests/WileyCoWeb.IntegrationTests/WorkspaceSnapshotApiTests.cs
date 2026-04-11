@@ -24,7 +24,7 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         var response = await client.GetAsync("/api/workspace/snapshot?enterprise=Water%20Utility&fiscalYear=2026");
 
         response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<WorkspaceSnapshotResponse>(_jsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<WorkspaceBootstrapData>(_jsonOptions);
 
         Assert.NotNull(payload);
         Assert.Equal("Water Utility", payload.SelectedEnterprise);
@@ -57,7 +57,7 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         var response = await client.GetAsync("/api/workspace/snapshot");
 
         response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<WorkspaceSnapshotResponse>(_jsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<WorkspaceBootstrapData>(_jsonOptions);
 
         Assert.NotNull(payload);
         Assert.Equal(2026, payload.SelectedFiscalYear);
@@ -275,7 +275,7 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
 
         var snapshotResponse = await client.GetAsync("/api/workspace/snapshot?enterprise=Water%20Utility&fiscalYear=2026");
         snapshotResponse.EnsureSuccessStatusCode();
-        var snapshot = await snapshotResponse.Content.ReadFromJsonAsync<WorkspaceSnapshotResponse>(_jsonOptions);
+        var snapshot = await snapshotResponse.Content.ReadFromJsonAsync<WorkspaceBootstrapData>(_jsonOptions);
 
         Assert.NotNull(snapshot);
         Assert.Equal(61.75m, snapshot.CurrentRate);

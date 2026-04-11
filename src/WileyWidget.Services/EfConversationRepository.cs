@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,12 +37,11 @@ public sealed class EfConversationRepository : IConversationRepository
 
         using var scope = _serviceProvider.CreateScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-        await using var context = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         var existing = await context.ConversationHistories
             .OrderByDescending(c => c.UpdatedAt)
-            .ThenByDescending(c => c.Id)
-            .FirstOrDefaultAsync(c => c.ConversationId == history.ConversationId)
+            .FirstOrDefaultAsync(c => c.ConversationId == history.ConversationId, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         if (existing == null)
@@ -63,7 +63,7 @@ public sealed class EfConversationRepository : IConversationRepository
             }
         }
 
-        await context.SaveChangesAsync().ConfigureAwait(false);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<object?> GetConversationAsync(string id, CancellationToken cancellationToken = default)
@@ -75,13 +75,12 @@ public sealed class EfConversationRepository : IConversationRepository
 
         using var scope = _serviceProvider.CreateScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-        await using var context = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         var conversation = await context.ConversationHistories
             .AsNoTracking()
             .OrderByDescending(c => c.UpdatedAt)
-            .ThenByDescending(c => c.Id)
-            .FirstOrDefaultAsync(c => c.ConversationId == id)
+            .FirstOrDefaultAsync(c => c.ConversationId == id, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         return conversation;
@@ -94,14 +93,14 @@ public sealed class EfConversationRepository : IConversationRepository
 
         using var scope = _serviceProvider.CreateScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-        await using var context = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         var conversations = await context.ConversationHistories
             .AsNoTracking()
             .OrderByDescending(c => c.UpdatedAt)
             .Skip(skip)
             .Take(limit)
-            .ToListAsync()
+            .ToListAsync(cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         return conversations.Cast<object>().ToList();
@@ -116,12 +115,11 @@ public sealed class EfConversationRepository : IConversationRepository
 
         using var scope = _serviceProvider.CreateScope();
         var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-        await using var context = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         var existing = await context.ConversationHistories
             .OrderByDescending(c => c.UpdatedAt)
-            .ThenByDescending(c => c.Id)
-            .FirstOrDefaultAsync(c => c.ConversationId == conversationId)
+            .FirstOrDefaultAsync(c => c.ConversationId == conversationId, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         if (existing == null)
@@ -131,6 +129,80 @@ public sealed class EfConversationRepository : IConversationRepository
         }
 
         context.ConversationHistories.Remove(existing);
-        await context.SaveChangesAsync().ConfigureAwait(false);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SaveRecommendationAsync(object recommendation, CancellationToken cancellationToken = default)
+    {
+        if (recommendation is not RecommendationHistory history)
+        {
+            throw new ArgumentException(
+                $"Expected {nameof(RecommendationHistory)} but got {recommendation?.GetType().FullName ?? "<null>"}",
+                nameof(recommendation));
+        }
+
+        if (string.IsNullOrWhiteSpace(history.RecommendationId))
+        {
+            throw new ArgumentException("RecommendationId is required.", nameof(recommendation));
+        }
+
+        using var scope = _serviceProvider.CreateScope();
+        var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        context.RecommendationHistories.Add(history);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<List<object>> GetRecommendationsAsync(string userId, string enterprise, int fiscalYear, int limit, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(enterprise))
+        {
+            return [];
+        }
+
+        if (limit <= 0)
+        {
+            limit = 12;
+        }
+
+        using var scope = _serviceProvider.CreateScope();
+        var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        var recommendations = await context.RecommendationHistories
+            .AsNoTracking()
+            .Where(entry => entry.UserId == userId && entry.Enterprise == enterprise && entry.FiscalYear == fiscalYear)
+            .OrderByDescending(entry => entry.CreatedAtUtc)
+            .Take(limit)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return recommendations.Cast<object>().ToList();
+    }
+
+    public async Task DeleteRecommendationsAsync(string conversationId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(conversationId))
+        {
+            return;
+        }
+
+        using var scope = _serviceProvider.CreateScope();
+        var dbContextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+
+        var recommendations = await context.RecommendationHistories
+            .Where(entry => entry.ConversationId == conversationId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (recommendations.Count == 0)
+        {
+            return;
+        }
+
+        context.RecommendationHistories.RemoveRange(recommendations);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 }
