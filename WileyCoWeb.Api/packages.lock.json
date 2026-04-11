@@ -11,10 +11,39 @@
           "AWSSDK.Core": "[4.0.3.28, 5.0.0)"
         }
       },
+      "AWSXRayRecorder.Handlers.AspNetCore": {
+        "type": "Direct",
+        "requested": "[2.13.0, )",
+        "resolved": "2.13.0",
+        "contentHash": "s9w1xopeNQszV8Jj6SQrP3KspequT6D4upQerU935x5dwOGHydrJp5ArIqJ5IbFFkKqfb59GwBbWEqjO+3MBQQ==",
+        "dependencies": {
+          "AWSXRayRecorder.Core": "2.16.0"
+        }
+      },
+      "Amazon.Lambda.Core": {
+        "type": "Transitive",
+        "resolved": "2.8.0",
+        "contentHash": "mZnqCrLuNvB9T9/bCIcu/7H8HWd3yi6sEDzRE76D9ym06D+CoEfJ/EG4w7FucclvpSXO7ui/MKpzqhEnR2FAVg=="
+      },
+      "Amazon.Lambda.SQSEvents": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "a1xaCIuXDleJ8iRE3vHWWhtPqUiURmoQUS68INMEQmtfHr4wTz837TQZONo4cyubv5sZj78DDrYessZEzgFRGQ=="
+      },
       "AWSSDK.Core": {
         "type": "Transitive",
         "resolved": "4.0.3.28",
         "contentHash": "OKvL+4Z/SFpOo7lbDbsT7bgcZY03fZkIQNFVV5LDZAt9hVhpX9z1Xn2MsGKSpXo4hwxXeiINv2j5Bb4n1KrVaQ=="
+      },
+      "AWSXRayRecorder.Core": {
+        "type": "Transitive",
+        "resolved": "2.16.0",
+        "contentHash": "I4BMYX4Fs7SiDHtvKoS/TsRUp2flCrfotJOsYRvvn4+gU1wPjD6LEHkIiLNDSwS9Vbh2784dxeWfdAG7oct5MQ==",
+        "dependencies": {
+          "AWSSDK.Core": "3.3.25.1",
+          "Amazon.Lambda.Core": "2.8.0",
+          "Amazon.Lambda.SQSEvents": "2.1.0"
+        }
       },
       "Azure.AI.OpenAI": {
         "type": "Transitive",
@@ -693,7 +722,6 @@
           "ExcelDataReader": "[3.8.0, )",
           "ExcelDataReader.DataSet": "[3.8.0, )",
           "FluentValidation": "[12.1.1, )",
-          "Microsoft.ApplicationInsights": "[2.23.0, )",
           "Microsoft.EntityFrameworkCore": "[9.0.4, )",
           "Microsoft.Extensions.Caching.Memory": "[10.0.5, )",
           "Microsoft.Extensions.Configuration.EnvironmentVariables": "[10.0.5, )",
@@ -759,15 +787,6 @@
         "requested": "[12.1.1, )",
         "resolved": "12.1.1",
         "contentHash": "EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw=="
-      },
-      "Microsoft.ApplicationInsights": {
-        "type": "CentralTransitive",
-        "requested": "[2.23.0, )",
-        "resolved": "2.23.0",
-        "contentHash": "nWArUZTdU7iqZLycLKWe0TDms48KKGE6pONH2terYNa8REXiqixrMOkf1sk5DHGMaUTqONU2YkS4SAXBhLStgw==",
-        "dependencies": {
-          "System.Diagnostics.DiagnosticSource": "5.0.0"
-        }
       },
       "Microsoft.EntityFrameworkCore": {
         "type": "CentralTransitive",

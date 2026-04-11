@@ -18,7 +18,6 @@ using Serilog.Context;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
 using WileyWidget.Services.Telemetry;
-// using Microsoft.ApplicationInsights;
 
 namespace WileyWidget.Services;
 
@@ -316,9 +315,9 @@ public class XAIService : IAIService, IDisposable
                 return $"API error: {result.error.message}";
             }
 
-            if (result?.output?.Length > 0 && result.output[0]?.content?.Length > 0)
+            if (result?.Output?.Length > 0 && result.Output[0]?.content?.Length > 0)
             {
-                var content = result.output[0].content[0]?.text;
+                var content = result.Output[0].content[0]?.text;
                 if (!string.IsNullOrEmpty(content))
                 {
                     var totalTokens = result.usage?.TotalTokens ?? 0;
@@ -583,9 +582,9 @@ public class XAIService : IAIService, IDisposable
             return $"API error: {result.error.message}";
         }
 
-        if (result?.output?.Length > 0 && result.output[0]?.content?.Length > 0)
+        if (result?.Output?.Length > 0 && result.Output[0]?.content?.Length > 0)
         {
-            var content = result.output[0].content[0]?.text;
+            var content = result.Output[0].content[0]?.text;
             if (!string.IsNullOrEmpty(content))
             {
                 var totalTokens = result.usage?.TotalTokens ?? 0;
@@ -679,7 +678,7 @@ public class XAIService : IAIService, IDisposable
             return new AIResponseResult($"API error: {xaiResponse.error.message}", 500, xaiResponse.error.type, xaiResponse.error.message);
         }
 
-        var content = xaiResponse?.output?.Length > 0 && xaiResponse.output[0]?.content?.Length > 0 ? xaiResponse.output[0].content[0]?.text : null;
+        var content = xaiResponse?.Output?.Length > 0 && xaiResponse.Output[0]?.content?.Length > 0 ? xaiResponse.Output[0].content[0]?.text : null;
 
         if (!string.IsNullOrEmpty(content))
         {
@@ -751,7 +750,7 @@ public class XAIService : IAIService, IDisposable
                 return new AIResponseResult(xaiResponse.error.message ?? "API error", 500, xaiResponse.error.type, xaiResponse.error.message);
             }
 
-            var content = xaiResponse?.output?.Length > 0 && xaiResponse.output[0]?.content?.Length > 0 ? xaiResponse.output[0].content[0]?.text : null;
+            var content = xaiResponse?.Output?.Length > 0 && xaiResponse.Output[0]?.content?.Length > 0 ? xaiResponse.Output[0].content[0]?.text : null;
             return new AIResponseResult(content ?? "OK", 200, null, null);
         }
         catch (HttpRequestException ex)
@@ -794,7 +793,8 @@ public class XAIService : IAIService, IDisposable
     /// </summary>
     private class XAIResponse
     {
-        public OutputItem[] output { get; set; }
+        [JsonPropertyName("output")]
+        public OutputItem[] Output { get; set; }
         public XAIError error { get; set; }
 
         public class OutputItem
@@ -938,7 +938,7 @@ public class XAIService : IAIService, IDisposable
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<XAIResponse>();
-                var message = result?.output?.Length > 0 && result.output[0]?.content?.Length > 0 ? result.output[0].content[0]?.text : "No response content";
+                var message = result?.Output?.Length > 0 && result.Output[0]?.content?.Length > 0 ? result.Output[0].content[0]?.text : "No response content";
 
                 _logger.LogInformation("Successfully received response from xAI");
                 return new AIResponseResult(message, (int)response.StatusCode);

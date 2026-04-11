@@ -3,10 +3,8 @@ using System.Diagnostics;
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Channel;
-using Microsoft.ApplicationInsights.DataContracts;
-using Microsoft.ApplicationInsights.Extensibility;
+using Amazon.XRay.Recorder.Core;
+using Amazon.XRay.Recorder.Handlers.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -39,28 +37,10 @@ public partial class Program
         var builder = WebApplication.CreateBuilder(args);
         await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
 
-        var appInsightsConnectionString = ResolveApplicationInsightsConnectionString(builder.Configuration);
-        if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
-        {
-            builder.Services.AddApplicationInsightsTelemetry(options =>
-            {
-                options.ConnectionString = appInsightsConnectionString;
-                options.EnableAdaptiveSampling = true;
-            });
-
-            builder.Services.Configure<TelemetryConfiguration>(telemetryConfiguration =>
-            {
-                telemetryConfiguration.ConnectionString = appInsightsConnectionString;
-                // Tag this API host so it is distinguishable from other roles in the AI portal
-                telemetryConfiguration.TelemetryInitializers.Add(new WileyApiRoleTelemetryInitializer());
-            });
-
-            Console.WriteLine("[API Startup] Application Insights telemetry enabled.");
-        }
-        else
-        {
-            Console.WriteLine("[API Startup] Application Insights is disabled (no APPLICATIONINSIGHTS_CONNECTION_STRING configured).");
-        }
+        // AWS X-Ray: distributed tracing for all incoming requests.
+        // Credentials are resolved from the IAM execution role (Amplify / ECS task role) — no connection string needed.
+        AWSXRayRecorder.InitializeInstance(builder.Configuration);
+        Console.WriteLine("[API Startup] AWS X-Ray tracing initialized (service: WileyCoWeb.Api).");
 
         // --- Syncfusion license resolution (track source for telemetry) ---
         var syncfusionKeySource = "not-found";
@@ -192,19 +172,15 @@ public partial class Program
         var app = builder.Build();
         var logger = app.Logger;
 
-        // Emit a startup key-resolution event so the AI portal shows source/presence for each secret
-        var startupTelemetryClient = app.Services.GetService<TelemetryClient>();
-        if (startupTelemetryClient != null)
-        {
-            TrackStartupKeyResolution(
-                startupTelemetryClient,
-                syncfusionKeySource,
-                syncfusionLicenseKey,
-                xaiKeySource,
-                xaiKeyResolved,
-                appInsightsConnectionString,
-                builder.Environment.EnvironmentName);
-        }
+        // Emit startup key-resolution event as a structured log entry.
+        // Amplify ships stdout to CloudWatch Logs automatically; query with CloudWatch Logs Insights.
+        LogStartupKeyResolution(
+            logger,
+            syncfusionKeySource,
+            syncfusionLicenseKey,
+            xaiKeySource,
+            xaiKeyResolved,
+            builder.Environment.EnvironmentName);
 
         if (AppDbStartupState.IsDegradedMode)
         {
@@ -258,6 +234,7 @@ public partial class Program
             }
         });
 
+        app.UseXRay("WileyCoWeb.Api");
         app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
         app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
@@ -352,61 +329,34 @@ public partial class Program
         return null;
     }
 
-    private static void TrackStartupKeyResolution(
-        TelemetryClient telemetryClient,
+    private static void LogStartupKeyResolution(
+        ILogger logger,
         string syncfusionKeySource,
         string? syncfusionLicenseKey,
         string xaiKeySource,
         bool xaiKeyResolved,
-        string? appInsightsConnectionString,
         string environmentName)
     {
-        ArgumentNullException.ThrowIfNull(telemetryClient);
-
         // Only surface a safe truncated fingerprint — never the full value
         static string KeyFingerprint(string? key) =>
             string.IsNullOrWhiteSpace(key)
                 ? "(empty)"
                 : (key.Trim().Length > 8 ? key.Trim()[..8] + "..." : "(too-short)");
 
-        var properties = new Dictionary<string, string?>
-        {
-            ["Environment"] = environmentName,
-            ["SyncfusionKeySource"] = syncfusionKeySource,
-            ["SyncfusionKeyPresent"] = (!string.IsNullOrWhiteSpace(syncfusionLicenseKey)).ToString(),
-            ["SyncfusionKeyLength"] = syncfusionLicenseKey?.Trim().Length.ToString() ?? "0",
-            ["SyncfusionKeyFingerprint"] = KeyFingerprint(syncfusionLicenseKey),
-            ["XaiKeySource"] = xaiKeySource,
-            ["XaiKeyPresent"] = xaiKeyResolved.ToString(),
-            ["AppInsightsConfigured"] = (!string.IsNullOrWhiteSpace(appInsightsConnectionString)).ToString(),
-        };
-
-        telemetryClient.TrackEvent("WileyWidget.Startup.KeyResolution", properties);
-        telemetryClient.Flush();
+        logger.LogInformation(
+            "WileyWidget.Startup.KeyResolution Environment={Environment} SyncfusionKeySource={SyncfusionKeySource} " +
+            "SyncfusionKeyPresent={SyncfusionKeyPresent} SyncfusionKeyLength={SyncfusionKeyLength} " +
+            "SyncfusionKeyFingerprint={SyncfusionKeyFingerprint} XaiKeySource={XaiKeySource} XaiKeyPresent={XaiKeyPresent}",
+            environmentName,
+            syncfusionKeySource,
+            !string.IsNullOrWhiteSpace(syncfusionLicenseKey),
+            syncfusionLicenseKey?.Trim().Length ?? 0,
+            KeyFingerprint(syncfusionLicenseKey),
+            xaiKeySource,
+            xaiKeyResolved);
     }
 
-    private static string? ResolveApplicationInsightsConnectionString(IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
 
-        var connectionString = configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
-            ?? configuration["ApplicationInsights:ConnectionString"]
-            ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
-
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            var instrumentationKey = configuration["APPINSIGHTS_INSTRUMENTATIONKEY"]
-                ?? configuration["ApplicationInsights:InstrumentationKey"]
-                ?? Environment.GetEnvironmentVariable("APPINSIGHTS_INSTRUMENTATIONKEY");
-
-            if (!string.IsNullOrWhiteSpace(instrumentationKey))
-            {
-                connectionString = $"InstrumentationKey={instrumentationKey.Trim()}";
-            }
-        }
-
-        return string.IsNullOrWhiteSpace(connectionString) ? null : connectionString.Trim();
-    }
 
     private static async Task<string?> TryGetSecretAsync(string secretName, string regionName)
     {
@@ -619,18 +569,7 @@ public partial class Program
     private static string? ResolveClaim(ClaimsPrincipal principal, string claimType)
         => principal.FindFirst(claimType)?.Value;
 
-    /// <summary>
-    /// Tags every telemetry item with cloud.roleName = "WileyCoWeb.Api" so the API host
-    /// is easy to identify in Application Insights Application Map / Live Metrics.
-    /// </summary>
-    private sealed class WileyApiRoleTelemetryInitializer : ITelemetryInitializer
-    {
-        public void Initialize(ITelemetry telemetry)
-        {
-            if (string.IsNullOrWhiteSpace(telemetry.Context.Cloud.RoleName))
-                telemetry.Context.Cloud.RoleName = "WileyCoWeb.Api";
-        }
-    }
+
 
     private static async Task SeedDevelopmentDataAsync(IServiceProvider services)
     {

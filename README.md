@@ -88,21 +88,21 @@ The restored Wiley Widget rebuild plan is documented in [docs/wileyco-ui-rebuild
 
 The workspace client prefers a live snapshot endpoint at `api/workspace/snapshot` when it is available. Set `WILEY_WORKSPACE_API_BASE_ADDRESS` to point the Blazor client at the thin API host during local development, for example when running `WileyCoWeb.Api` separately.
 
-## Application Insights
+## Observability (AWS X-Ray + CloudWatch Logs)
 
-The thin API host now supports Azure Application Insights telemetry.
+The thin API host uses AWS-native observability tools.
 
-Set one of these runtime values for the `WileyCoWeb.Api` process:
+**Distributed Tracing — AWS X-Ray**
+All incoming requests are traced via `AWSXRayRecorder.Handlers.AspNetCore`. Credentials are resolved automatically from the IAM execution role (Amplify/ECS task role) — no connection string required. Traces are visible in the [AWS X-Ray console](https://console.aws.amazon.com/xray/home).
 
-1. `APPLICATIONINSIGHTS_CONNECTION_STRING` (preferred)
-2. `APPINSIGHTS_INSTRUMENTATIONKEY` (legacy fallback)
+**Startup Events — Amazon CloudWatch Logs**
+Structured startup events (key resolution sources, secret presence) are emitted via `ILogger`. Amplify ships all stdout to CloudWatch Logs automatically. Query them in CloudWatch Logs Insights with:
 
-Optional config paths are also recognized:
-
-- `ApplicationInsights:ConnectionString`
-- `ApplicationInsights:InstrumentationKey`
-
-If neither value is present, telemetry remains disabled and startup logs a clear message.
+```
+fields @timestamp, @message
+| filter @message like "WileyWidget.Startup.KeyResolution"
+| sort @timestamp desc
+```
 
 ## Local Secrets On macOS
 
