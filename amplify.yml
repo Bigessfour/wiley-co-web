@@ -14,12 +14,12 @@ frontend:
         - |
           read_secret_field() {
             local key="$1"
-            KEY="$key" node -e 'const key = process.env.KEY || ""; const raw = process.env.secrets || "{}"; try { const parsed = JSON.parse(raw); process.stdout.write(parsed[key] || ""); } catch { process.stdout.write(""); }'
+            KEY="$key" node -e 'const key = process.env.KEY || ""; const normalize = value => typeof value === "string" ? value.trim().replace(/^"|"$/g, "").trim() : ""; const raw = process.env.secrets || "{}"; try { const parsed = JSON.parse(raw); process.stdout.write(normalize(parsed[key])); } catch { process.stdout.write(""); }'
           }
 
           read_syncfusion_key_from_secret_string() {
             local raw="$1"
-            SECRET_STRING="$raw" node -e 'const rawValue = process.env.SECRET_STRING || ""; try { const parsed = JSON.parse(rawValue); process.stdout.write(parsed.SYNCFUSION_LICENSE_KEY || parsed.SyncfusionLicenseKey || rawValue); } catch { process.stdout.write(rawValue); }'
+            SECRET_STRING="$raw" node -e 'const normalize = value => typeof value === "string" ? value.trim().replace(/^"|"$/g, "").trim() : ""; const rawValue = process.env.SECRET_STRING || ""; try { const parsed = JSON.parse(rawValue); process.stdout.write(normalize(parsed.SYNCFUSION_LICENSE_KEY || parsed.SyncfusionLicenseKey || rawValue)); } catch { process.stdout.write(normalize(rawValue)); }'
           }
 
           if secret_string="$(aws secretsmanager get-secret-value --secret-id "SYNCFUSION_LICENSE_KEY" --query SecretString --output text 2>/dev/null)"; then
@@ -30,10 +30,21 @@ frontend:
             if [ -n "$SYNCFUSION_LICENSE_KEY" ]; then
               echo "Loaded SYNCFUSION_LICENSE_KEY from Amplify environment secrets."
             else
-              echo "WARNING: SYNCFUSION_LICENSE_KEY was not found in AWS Secrets Manager secret SYNCFUSION_LICENSE_KEY or Amplify environment secrets."
-              echo "Continuing build; ensure runtime configuration provides the Syncfusion key."
+              echo "ERROR: SYNCFUSION_LICENSE_KEY was not found in AWS Secrets Manager secret SYNCFUSION_LICENSE_KEY or Amplify environment secrets."
+              exit 1
             fi
           fi
+
+          export SYNCFUSION_LICENSE_KEY="$(printf '%s' "${SYNCFUSION_LICENSE_KEY:-}" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if [ -z "$SYNCFUSION_LICENSE_KEY" ]; then
+            echo "ERROR: SYNCFUSION_LICENSE_KEY resolved to an empty value after normalization."
+            exit 1
+          fi
+
+          echo "Generating wwwroot/appsettings.Syncfusion.local.json from Amplify secret/SYNCFUSION_LICENSE_KEY for Syncfusion Blazor (prevents license popup in deployed client)."
+          mkdir -p wwwroot
+          printf '{"SyncfusionLicenseKey":"%s"}' "$SYNCFUSION_LICENSE_KEY" > wwwroot/appsettings.Syncfusion.local.json
+          echo "Syncfusion client license file generated successfully. xAI key is configured server-side via AWS Secrets Manager in WileyCoWeb.Api/Program.cs (SYNCFUSION_API_KEY for MCP is set in IDE environment per .github/copilot-instructions.md)."
 
           export COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-$(read_secret_field COGNITO_USER_POOL_ID)}"
           export COGNITO_APP_CLIENT_ID="${COGNITO_APP_CLIENT_ID:-$(read_secret_field COGNITO_APP_CLIENT_ID)}"

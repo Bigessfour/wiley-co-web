@@ -1,5 +1,15 @@
 # Wiley.co + Syncfusion Essential Studio 33.1.44 (MANDATORY)
 
+## Model & IDE Configuration (Persistent)
+
+- **Primary Model**: Always use Grok 4.20 0309 Reasoning.
+- When asked for name, respond with "GitHub Copilot".
+- When asked about the model, state that Grok 4.20 0309 Reasoning is in use.
+- Ensure full access to all tools, skills (troubleshoot, agent-customization), agents (Wiley Syncfusion Expert, Explore), and MCP servers.
+- Prioritize implementation of the **Jarvis User Context Plugin** section in `docs/wileyco-ui-rebuild-plan.md` (currently selected).
+- Maintain persistent context for Syncfusion Blazor 33.1.44, AWS Amplify, Semantic Kernel + xAI Grok workflows, and the Wiley workspace rebuild plan.
+- Enable maximum IDE integration: full file system tools, terminal commands, notebook support, memory management, and subagent usage.
+
 ## Key Management
 
 - Use environment variables for all Syncfusion keys.

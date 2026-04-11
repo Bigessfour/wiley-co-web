@@ -7,11 +7,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Syncfusion.Licensing;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.HealthChecks;
 using WileyWidget.Services.Logging;
 
 namespace WileyCoWeb.Api;
@@ -29,6 +32,22 @@ public partial class Program
     {
         var builder = WebApplication.CreateBuilder(args);
         await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
+
+        // Register Syncfusion license for server-side document features (PDF, XLSIO, Compression)
+        // Uses SYNCFUSION_LICENSE_KEY from env, config, or AWS secrets (aligned with client and .github/copilot-instructions.md)
+        var syncfusionLicenseKey = builder.Configuration["SYNCFUSION_LICENSE_KEY"]
+            ?? builder.Configuration["SyncfusionLicenseKey"]
+            ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+        if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
+        {
+            SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey.Trim());
+            Console.WriteLine("[API Startup] Syncfusion license key registered successfully for server-side exports.");
+        }
+        else
+        {
+            Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found. Server-side PDF/Excel features may trigger license popups or limitations. Set via env var or AWS Secrets Manager.");
+        }
+
         var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
             ?? builder.Configuration["DATABASE_URL"]
@@ -74,6 +93,10 @@ public partial class Program
         builder.Services.AddSingleton<UserContext>();
         builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
+
+        // Deterministic license tracking via health check (covers the new registration logic in this file)
+        builder.Services.AddHealthChecks()
+            .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", HealthStatus.Degraded);
 
         var app = builder.Build();
         var logger = app.Logger;
@@ -132,6 +155,7 @@ public partial class Program
 
         app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
+        app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
 
         await app.RunAsync();
     }

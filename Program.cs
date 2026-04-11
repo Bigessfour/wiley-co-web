@@ -5,11 +5,17 @@ using Syncfusion.Licensing;
 using WileyCoWeb.Components;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
+using System.Text.Json;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 Console.WriteLine("[startup] WebAssembly host builder created.");
-var syncfusionLicenseKey = builder.Configuration["SyncfusionLicenseKey"]
-    ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+var syncfusionLicenseKey = NormalizeSyncfusionLicenseKey(
+    builder.Configuration["SyncfusionLicenseKey"]
+    ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY"));
+if (string.IsNullOrWhiteSpace(syncfusionLicenseKey))
+{
+    syncfusionLicenseKey = await LoadSyncfusionLicenseKeyFromLocalSettingsAsync(builder.HostEnvironment.BaseAddress);
+}
 if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
 {
     SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
@@ -92,4 +98,46 @@ static Uri ResolveLocalApiBaseAddress(string clientBaseAddress)
     }
 
     return clientUri;
+}
+
+static string? NormalizeSyncfusionLicenseKey(string? rawLicenseKey)
+{
+    if (string.IsNullOrWhiteSpace(rawLicenseKey))
+    {
+        return null;
+    }
+
+    var normalizedLicenseKey = rawLicenseKey.Trim();
+
+    if (normalizedLicenseKey.Length >= 2
+        && normalizedLicenseKey.StartsWith('"')
+        && normalizedLicenseKey.EndsWith('"'))
+    {
+        normalizedLicenseKey = normalizedLicenseKey[1..^1].Trim();
+    }
+
+    return string.IsNullOrWhiteSpace(normalizedLicenseKey)
+        ? null
+        : normalizedLicenseKey;
+}
+
+async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(string baseAddress)
+{
+    try
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri(baseAddress) };
+        var localSettingsJson = await httpClient.GetStringAsync("appsettings.Syncfusion.local.json");
+        using var document = JsonDocument.Parse(localSettingsJson);
+
+        if (!document.RootElement.TryGetProperty("SyncfusionLicenseKey", out var licenseKeyElement))
+        {
+            return null;
+        }
+
+        return NormalizeSyncfusionLicenseKey(licenseKeyElement.GetString());
+    }
+    catch
+    {
+        return null;
+    }
 }

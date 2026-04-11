@@ -61,21 +61,20 @@
 
   <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
-      <_SyncfusionLicenseKey Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">$(SYNCFUSION_LICENSE_KEY)</_SyncfusionLicenseKey>
+      <_SyncfusionLicenseKeyRaw Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
+        $(SYNCFUSION_LICENSE_KEY)</_SyncfusionLicenseKeyRaw>
+      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKeyRaw)' != ''">
+        $([System.String]::Copy('$(_SyncfusionLicenseKeyRaw)').Trim())</_SyncfusionLicenseKey>
+      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKey)' != ''">$([System.Text.RegularExpressions.Regex]::Replace('$(_SyncfusionLicenseKey)',
+        '^\"(.*)\"$', '$1'))</_SyncfusionLicenseKey>
       <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' != ''">{"SyncfusionLicenseKey":"$(_SyncfusionLicenseKey)"}</_GeneratedSyncfusionAppSettings>
       <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' == '' and !Exists('$(SyncfusionLocalSettingsFile)')">{}</_GeneratedSyncfusionAppSettings>
     </PropertyGroup>
 
     <Copy Condition="'$(_SyncfusionLicenseKey)' == '' and Exists('$(SyncfusionLocalSettingsFile)')"
-          SourceFiles="$(SyncfusionLocalSettingsFile)"
-          DestinationFiles="$(ProjectDir)wwwroot\appsettings.json"
-          SkipUnchangedFiles="true" />
-
-    <WriteLinesToFile Condition="'$(_GeneratedSyncfusionAppSettings)' != ''"
-                      File="$(ProjectDir)wwwroot\appsettings.json"
-                      Lines="$(_GeneratedSyncfusionAppSettings)"
-                      Overwrite="true"
-                      WriteOnlyWhenDifferent="true" />
+      SourceFiles="$(SyncfusionLocalSettingsFile)"
+      DestinationFiles="$(ProjectDir)wwwroot\appsettings.Syncfusion.local.json"
+      SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
