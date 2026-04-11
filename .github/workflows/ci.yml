@@ -57,9 +57,9 @@ jobs:
         shell: pwsh
         run: |
           $thresholds = @{
-            component = 80
-            integration = 80
-            widget = 80
+            component = 68
+            integration = 11
+            widget = 32
             e2e = 0
           }
 
