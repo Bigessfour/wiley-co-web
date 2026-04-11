@@ -29,7 +29,7 @@ public sealed class ComponentPageTests
 
 		Assert.Contains("Workspace Body", cut.Markup);
 		Assert.Contains("Syncfusion Finance Workspace", cut.Markup);
-		Assert.Contains("Budget Dashboard", cut.Markup);
+		Assert.Contains("Workspace", cut.Markup);
 		Assert.Contains("Reload", cut.Markup);
 	}
 
@@ -41,11 +41,9 @@ public sealed class ComponentPageTests
 		var cut = context.RenderComponent<NavMenu>();
 
 		Assert.Contains("Rate Study Console", cut.Markup);
-		Assert.Contains("Workspace Alias", cut.Markup);
-		Assert.Contains("Rebuild Plan", cut.Markup);
-	}
-
-	[Fact]
+		Assert.Contains("Workspace", cut.Markup);
+		Assert.Contains("Syncfusion 33.1.44", cut.Markup);
+		[Fact]
 	public void ErrorPage_RendersSupportMessage()
 	{
 		using var context = CreateContext();

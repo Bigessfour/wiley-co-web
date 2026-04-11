@@ -1,6 +1,7 @@
 *.key
 *.log
 appsettings.Syncfusion.local.json
+wwwroot/appsettings.Syncfusion.local.json
 .DS_Store
 bin/
 obj/
