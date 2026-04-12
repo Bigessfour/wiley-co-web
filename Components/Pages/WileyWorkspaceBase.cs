@@ -8,8 +8,16 @@ namespace WileyCoWeb.Components.Pages;
 #pragma warning disable S2325
 public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 {
+    protected enum WorkspaceApiHealth { Unknown, Healthy, Degraded }
+
+    [Parameter]
+    public string? Panel { get; set; }
+
     [Inject]
     protected WorkspaceState WorkspaceState { get; set; } = default!;
+
+    [Inject]
+    protected NavigationManager NavigationManager { get; set; } = default!;
 
     [Inject]
     protected WorkspacePersistenceService WorkspacePersistenceService { get; set; } = default!;
@@ -24,6 +32,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected BrowserDownloadService BrowserDownloadService { get; set; } = default!;
 
     private bool persistenceInitialized;
+    private DateTimeOffset? lastWorkspaceSyncUtc;
+    private WorkspaceApiHealth _apiHealth = WorkspaceApiHealth.Unknown;
 
     protected bool IsSavingSnapshot { get; set; }
     protected bool IsSavingScenario { get; set; }
@@ -31,6 +41,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsApplyingScenario { get; set; }
     protected bool IsLoadingWorkspace { get; set; }
     protected bool IsExportingDocuments { get; set; }
+    protected bool IsSidebarOpen { get; set; }
 
     protected string SnapshotSaveStatus { get; set; } = "Ready to save rate snapshot";
     protected string BaselineSaveStatus { get; set; } = "Baseline changes are local until you save them.";
@@ -131,6 +142,49 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected IReadOnlyList<string> ScenarioToolbarItems { get; } = ["Add", "Edit", "Delete", "Update", "Cancel"];
 
+    protected string ActivePanelKey => NormalizePanelKey(Panel);
+    protected bool IsOverviewMode => string.Equals(ActivePanelKey, "overview", StringComparison.Ordinal);
+    protected string ActivePanelLabel => PanelNavItems.FirstOrDefault(item => item.Key == ActivePanelKey)?.Label ?? "Overview";
+    protected string BreadcrumbSection => IsOverviewMode ? "Workspace Overview" : "Workspace Panel";
+    protected string HostingEnvironmentName => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+    protected string HostingVersion => typeof(WileyWorkspaceBase).Assembly.GetName().Version?.ToString() ?? "dev";
+    protected string HostingLastSyncedDisplay => lastWorkspaceSyncUtc?.ToLocalTime().ToString("g") ?? "Not synced";
+    protected string HostingPersistenceStatus => IsUsingStartupFallback ? "Fallback persistence active" : "Primary persistence active";
+    protected string HostingApiHealth => _apiHealth switch
+    {
+        WorkspaceApiHealth.Healthy => "Healthy",
+        WorkspaceApiHealth.Degraded => "Degraded",
+        _ => "Unknown"
+    };
+
+    protected IReadOnlyList<WorkspacePanelNavItem> PanelNavItems { get; } =
+    [
+        new("overview", "Overview"),
+        new("break-even", "Break-Even"),
+        new("rates", "Rates"),
+        new("quickbooks-import", "QuickBooks Import"),
+        new("scenario", "Scenario Planner"),
+        new("customers", "Customer Viewer"),
+        new("trends", "Trends"),
+        new("decision-support", "Decision Support")
+    ];
+
+    protected void OpenPanel(string panelKey)
+    {
+        var normalized = NormalizePanelKey(panelKey);
+        var route = string.Equals(normalized, "overview", StringComparison.Ordinal)
+            ? "/wiley-workspace"
+            : $"/wiley-workspace/{normalized}";
+
+        IsSidebarOpen = false;
+        NavigationManager.NavigateTo(route);
+    }
+
+    protected void ToggleSidebar()
+    {
+        IsSidebarOpen = !IsSidebarOpen;
+    }
+
     protected void ClearCustomerFilters() => WorkspaceState.ClearCustomerFilters();
 
     protected async Task HandleEnterpriseChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args)
@@ -189,11 +243,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             WorkspaceState.SetActiveScenarioName(savedScenario.ScenarioName);
             ScenarioDescription = savedScenario.Description ?? ScenarioDescription;
             ScenarioPersistenceStatus = $"Saved scenario '{savedScenario.ScenarioName}' at {savedScenario.CreatedAtUtc}.";
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            _apiHealth = WorkspaceApiHealth.Healthy;
             await RefreshScenarioCatalogAsync(savedScenario.SnapshotId);
         }
         catch (Exception ex)
         {
             ScenarioPersistenceStatus = $"Scenario save failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
         }
         finally
         {
@@ -226,11 +283,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             WorkspaceState.ApplyBootstrap(response.Snapshot);
             BaselineSaveStatus = response.Message;
             WorkspaceLoadStatus = $"Reloaded {WorkspaceState.ContextSummary} after baseline save.";
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            _apiHealth = WorkspaceApiHealth.Healthy;
             await RefreshScenarioCatalogAsync();
         }
         catch (Exception ex)
         {
             BaselineSaveStatus = $"Baseline save failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
         }
         finally
         {
@@ -256,11 +316,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             WorkspaceState.ApplyBootstrap(scenarioSnapshot);
             ScenarioPersistenceStatus = $"Applied saved scenario '{WorkspaceState.ActiveScenarioName}'.";
             WorkspaceLoadStatus = $"Loaded {WorkspaceState.ContextSummary} from saved scenario.";
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            _apiHealth = WorkspaceApiHealth.Healthy;
             await RefreshScenarioCatalogAsync(SelectedScenarioSnapshotId.Value);
         }
         catch (Exception ex)
         {
             ScenarioPersistenceStatus = $"Scenario apply failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
         }
         finally
         {
@@ -284,10 +347,13 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         {
             var savedSnapshot = await WorkspaceSnapshotApiService.SaveRateSnapshotAsync(WorkspaceState.ToBootstrapData());
             SnapshotSaveStatus = $"Saved {savedSnapshot.SnapshotName} at {savedSnapshot.SavedAtUtc}";
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            _apiHealth = WorkspaceApiHealth.Healthy;
         }
         catch (Exception ex)
         {
             SnapshotSaveStatus = $"Snapshot save failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
         }
         finally
         {
@@ -366,6 +432,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         WorkspaceLoadStatus = "Workspace ready.";
+        lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
         StateHasChanged();
     }
 
@@ -396,11 +463,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             var snapshot = await WorkspaceSnapshotApiService.GetWorkspaceSnapshotAsync(enterprise, fiscalYear);
             WorkspaceState.ApplyBootstrap(snapshot);
             WorkspaceLoadStatus = $"Loaded {WorkspaceState.ContextSummary} from the workspace API.";
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            _apiHealth = WorkspaceApiHealth.Healthy;
             await RefreshScenarioCatalogAsync();
         }
         catch (Exception ex)
         {
             WorkspaceLoadStatus = $"Workspace reload failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
         }
         finally
         {
@@ -479,5 +549,27 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             WorkspaceState.Refresh();
         }
     }
+
+    private static string NormalizePanelKey(string? value)
+    {
+        var candidate = string.IsNullOrWhiteSpace(value)
+            ? "overview"
+            : value.Trim().ToLowerInvariant();
+
+        return candidate switch
+        {
+            "overview" => "overview",
+            "break-even" => "break-even",
+            "rates" => "rates",
+            "quickbooks-import" => "quickbooks-import",
+            "scenario" => "scenario",
+            "customers" => "customers",
+            "trends" => "trends",
+            "decision-support" => "decision-support",
+            _ => "overview"
+        };
+    }
+
+    protected sealed record WorkspacePanelNavItem(string Key, string Label);
 }
 #pragma warning restore S2325

@@ -1,0 +1,59 @@
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Inputs
+@using WileyCoWeb.State
+
+<div class="space-y-4">
+    <div class="grid gap-4 md:grid-cols-2">
+        <SfCard>
+            <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
+            <CardContent Content="Editable rate used for instant break-even recalculation." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
+            <CardContent Content="Calculated from the current cost and volume inputs." />
+        </SfCard>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+            <SfNumericTextBox ID="current-rate-input" TValue="decimal" Value="@CurrentRate" ValueChange="OnCurrentRateChanged" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C2" />
+            <p class="text-xs text-slate-500">Validated numeric rate editing updates the workspace instantly and keeps the rate panel aligned with the break-even calculation.</p>
+        </div>
+        <SfChart Title="Rate Comparison" AccessibilityDescription="Rate comparison chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="220px">
+            <ChartArea>
+                <ChartAreaBorder Width="0"></ChartAreaBorder>
+            </ChartArea>
+            <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
+                <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+            </ChartPrimaryXAxis>
+            <ChartPrimaryYAxis LabelFormat="C2">
+                <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+            </ChartPrimaryYAxis>
+            <ChartLegendSettings Visible="false"></ChartLegendSettings>
+            <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
+            <ChartSeriesCollection>
+                <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
+            </ChartSeriesCollection>
+        </SfChart>
+    </div>
+
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <SfButton CssClass="e-primary" IsPrimary="true" OnClick="OnSaveRateSnapshot" Disabled="@IsSavingSnapshot">
+            @(IsSavingSnapshot ? "Saving..." : "Save rate snapshot")
+        </SfButton>
+        <p id="snapshot-save-status" class="text-xs text-slate-500">@SnapshotSaveStatus</p>
+    </div>
+</div>
+
+@code {
+    [Parameter] public decimal CurrentRate { get; set; }
+    [Parameter] public string CurrentRateDisplay { get; set; } = string.Empty;
+    [Parameter] public string BreakEvenRateDisplay { get; set; } = string.Empty;
+    [Parameter] public bool IsSavingSnapshot { get; set; }
+    [Parameter] public string SnapshotSaveStatus { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<RateComparisonPoint> RateComparison { get; set; } = [];
+    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnCurrentRateChanged { get; set; }
+    [Parameter] public EventCallback OnSaveRateSnapshot { get; set; }
+}

@@ -1,0 +1,104 @@
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.State
+
+<div class="space-y-4">
+    <div class="grid gap-4 md:grid-cols-3">
+        <SfCard>
+            <CardHeader Title="Visible Customers" SubTitle="@FilteredCustomerCountDisplay" />
+            <CardContent Content="Rows matching the active customer filters." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Service Filter" SubTitle="@SelectedCustomerService" />
+            <CardContent Content="Limit the list to one service line." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="City Limits" SubTitle="@SelectedCustomerCityLimits" />
+            <CardContent Content="Show city-limits status at a glance." />
+        </SfCard>
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-3">
+        <SfTextBox Placeholder="Search customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
+        <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerServiceOptions" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Service" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+        <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerCityLimitOptions" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+    </div>
+
+    <div class="flex justify-end">
+        <SfButton OnClick="OnClearCustomerFilters">Clear filters</SfButton>
+    </div>
+
+    <div>
+        <SfGrid TValue="CustomerRow" DataSource="@Customers" AllowFiltering="true" AllowSorting="true" AllowPaging="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="520">
+            <GridPageSettings PageSize="8" PageCount="5" />
+            <GridColumns>
+                <GridColumn Field=@nameof(CustomerRow.Name) HeaderText="Name" Width="160" />
+                <GridColumn Field=@nameof(CustomerRow.Service) HeaderText="Service" Width="110" />
+                <GridColumn Field=@nameof(CustomerRow.CityLimits) HeaderText="City Limits" Width="100" />
+            </GridColumns>
+        </SfGrid>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string FilteredCustomerCountDisplay { get; set; } = string.Empty;
+    [Parameter] public string SelectedCustomerService { get; set; } = string.Empty;
+    [Parameter] public string SelectedCustomerCityLimits { get; set; } = string.Empty;
+    [Parameter] public string CustomerSearchTerm { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<string> CustomerServiceOptions { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> CustomerCityLimitOptions { get; set; } = [];
+    [Parameter] public IReadOnlyList<CustomerRow> Customers { get; set; } = [];
+    [Parameter] public EventCallback<string> CustomerSearchTermChanged { get; set; }
+    [Parameter] public EventCallback<string> SelectedCustomerServiceChanged { get; set; }
+    [Parameter] public EventCallback<string> SelectedCustomerCityLimitsChanged { get; set; }
+    [Parameter] public EventCallback OnClearCustomerFilters { get; set; }
+
+    private string SearchTermProxy
+    {
+        get => CustomerSearchTerm;
+        set
+        {
+            if (CustomerSearchTerm == value)
+            {
+                return;
+            }
+
+            CustomerSearchTerm = value;
+            _ = CustomerSearchTermChanged.InvokeAsync(value);
+        }
+    }
+
+    private string SelectedCustomerServiceProxy
+    {
+        get => SelectedCustomerService;
+        set
+        {
+            if (SelectedCustomerService == value)
+            {
+                return;
+            }
+
+            SelectedCustomerService = value;
+            _ = SelectedCustomerServiceChanged.InvokeAsync(value);
+        }
+    }
+
+    private string SelectedCustomerCityLimitsProxy
+    {
+        get => SelectedCustomerCityLimits;
+        set
+        {
+            if (SelectedCustomerCityLimits == value)
+            {
+                return;
+            }
+
+            SelectedCustomerCityLimits = value;
+            _ = SelectedCustomerCityLimitsChanged.InvokeAsync(value);
+        }
+    }
+}

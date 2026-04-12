@@ -1,0 +1,27 @@
+@using Syncfusion.Blazor.Charts
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.State
+
+<div class="space-y-4">
+    <SfChart Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="560px">
+        <ChartArea>
+            <ChartAreaBorder Width="0"></ChartAreaBorder>
+        </ChartArea>
+        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
+            <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+        </ChartPrimaryXAxis>
+        <ChartPrimaryYAxis LabelFormat="C2">
+            <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+        </ChartPrimaryYAxis>
+        <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
+        <ChartSeriesCollection>
+            <ChartSeries DataSource="@ProjectionSeries" XName="Year" YName="Rate" Type="ChartSeriesType.Line" Name="Projection" Width="3">
+                <ChartMarker Visible="true" Width="8" Height="8"></ChartMarker>
+            </ChartSeries>
+        </ChartSeriesCollection>
+    </SfChart>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<ProjectionRow> ProjectionSeries { get; set; } = [];
+}

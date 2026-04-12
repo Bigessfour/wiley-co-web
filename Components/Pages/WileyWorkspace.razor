@@ -1,14 +1,12 @@
 @page "/wiley-workspace"
+@page "/wiley-workspace/{Panel?}"
 
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
-@using Syncfusion.Blazor.Charts
-@using Syncfusion.Blazor.CircularGauge
 @using Syncfusion.Blazor.DropDowns
-@using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Layouts
-@using Syncfusion.Blazor.Navigations
+@using WileyCoWeb.Components.Panels
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 
@@ -17,7 +15,7 @@
 <PageTitle>Wiley Workspace | Wiley.co</PageTitle>
 
 <div class="wiley-workspace min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
-    <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <div class="mx-auto flex max-w-[96rem] flex-col gap-4">
         <div class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 px-6 py-5 text-white shadow-lg">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
@@ -68,346 +66,239 @@
             </div>
         </div>
 
-        <SfSplitter ID="workspace-shell-splitter"
-                    CssClass="workspace-splitter"
-                    Width="100%"
-                    Height="calc(100vh - 14rem)"
-                    Orientation="Syncfusion.Blazor.Layouts.Orientation.Horizontal"
-                    EnablePersistence="false"
-                    EnableGestures="true"
-                    SeparatorSize="8"
-                    MediaQuery="(max-width: 1024px)">
-            <SplitterPanes>
-                <SplitterPane Size="22%" Min="320px" Resizable="true">
-                    <ContentTemplate>
-                        <div class="workspace-pane rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <SfCard>
-                                <CardHeader Title="Enterprise Context" SubTitle="Select the active service and fiscal year" />
-                                <CardContent>
-                                    <div class="space-y-4">
-                                        <SfDropDownList TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" ValueChange="HandleEnterpriseChanged" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-                                        <SfDropDownList TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" ValueChange="HandleFiscalYearChanged" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" />
-                                        <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
-                                        <SfTextBox Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
-                                        <SfDropDownList TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" ValueChange="HandleSavedScenarioChanged" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
-                                            <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
-                                        </SfDropDownList>
-                                        <div class="grid gap-2 sm:grid-cols-2">
-                                            <SfButton Disabled="@IsLoadingWorkspace" OnClick="RefreshWorkspaceAsync">@(IsLoadingWorkspace ? "Refreshing..." : "Reload workspace")</SfButton>
-                                            <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingScenario" OnClick="SaveScenarioAsync">@(IsSavingScenario ? "Saving..." : "Save scenario")</SfButton>
-                                        </div>
-                                        <SfButton Disabled="@(!CanApplySelectedScenario || IsApplyingScenario)" OnClick="ApplySelectedScenarioAsync">@(IsApplyingScenario ? "Applying..." : "Apply saved scenario")</SfButton>
-                                        <div class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
-                                            <div id="workspace-load-status"><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
-                                            <div class="mt-2"><span class="font-semibold text-slate-700">Scenarios:</span> <span id="scenario-persistence-status">@ScenarioPersistenceStatus</span></div>
-                                            <div class="mt-2">
-                                                <span class="font-semibold text-slate-700">Startup source:</span>
-                                                <span class="@(IsUsingStartupFallback ? "text-amber-700" : "text-emerald-700")"> @StartupSourceStatus</span>
-                                            </div>
-                                            <div class="mt-2">
-                                                <span class="font-semibold text-slate-700">Current state:</span>
-                                                <span class="@(IsUsingBrowserRestoredState ? "text-sky-700" : "text-emerald-700")"> @CurrentStateSourceStatus</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </SfCard>
+        <div class="lg:hidden">
+            <SfButton CssClass="e-outline" OnClick="ToggleSidebar">@(IsSidebarOpen ? "Hide workspace controls" : "Show workspace controls")</SfButton>
+        </div>
+
+        <div class="flex flex-col gap-4 lg:flex-row">
+            <aside class="workspace-sidebar @(IsSidebarOpen ? "block" : "hidden") lg:block lg:w-[22rem] lg:shrink-0">
+                <div class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <SfCard>
+                        <CardHeader Title="Enterprise Context" SubTitle="Select the active service and fiscal year" />
+                        <CardContent>
+                            <div class="space-y-4">
+                                <SfDropDownList TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" ValueChange="HandleEnterpriseChanged" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                                <SfDropDownList TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" ValueChange="HandleFiscalYearChanged" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" />
+                                <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
+                                <SfTextBox Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
+                                <SfDropDownList TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" ValueChange="HandleSavedScenarioChanged" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
+                                    <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
+                                </SfDropDownList>
+                            </div>
+                        </CardContent>
+                    </SfCard>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Hosting Information</p>
+                        <div class="mt-3 grid gap-2 text-xs text-slate-600">
+                            <div><span class="font-semibold text-slate-700">Environment:</span> @HostingEnvironmentName</div>
+                            <div><span class="font-semibold text-slate-700">Last synced:</span> @HostingLastSyncedDisplay</div>
+                            <div><span class="font-semibold text-slate-700">Persistence:</span> @HostingPersistenceStatus</div>
+                            <div><span class="font-semibold text-slate-700">API health:</span> @HostingApiHealth</div>
+                            <div><span class="font-semibold text-slate-700">Version:</span> @HostingVersion</div>
                         </div>
-                    </ContentTemplate>
-                </SplitterPane>
-                <SplitterPane Size="50%" Min="720px">
-                    <ContentTemplate>
-                        <div class="workspace-pane space-y-4">
-                            <SfDashboardLayout ID="workspace-dashboard"
-                                               Columns="6"
-                                               CellSpacing="@(new double[] { 16, 16 })"
-                                               AllowDragging="true"
-                                               AllowResizing="true"
-                                               EnablePersistence="false"
-                                               MediaQuery="(max-width: 1200px)"
-                                               ShowGridLines="true"
-                                               DraggableHandle=".e-panel-header">
-                                <DashboardLayoutPanels>
-                                    <DashboardLayoutPanel Id="break-even-panel" Row="0" Column="0" SizeX="3" SizeY="2" MinSizeX="2" MinSizeY="2">
-                                        <HeaderTemplate>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Analysis</p>
-                                                <h2 class="text-lg font-semibold text-slate-900">Break-Even Panel</h2>
-                                            </div>
-                                        </HeaderTemplate>
-                                        <ContentTemplate>
-                                            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                                <SfCard>
-                                                    <CardHeader Title="Total Costs" SubTitle="@TotalCostsDisplay" />
-                                                    <CardContent Content="Operating and capital inputs used in the current scenario." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Projected Volume" SubTitle="@ProjectedVolumeDisplay" />
-                                                    <CardContent Content="Illustrative service volume for the selected enterprise." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Rate Delta" SubTitle="@RateDeltaDisplay" />
-                                                    <CardContent Content="Gap between the current rate and the break-even rate." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
-                                                    <CardContent Content="Calculated break-even rate for the current scenario." />
-                                                </SfCard>
-                                            </div>
-                                            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                                                <SfNumericTextBox TValue="decimal" Value="@TotalCosts" ValueChange="HandleTotalCostsChanged" Placeholder="Total Costs" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C0" />
-                                                <SfNumericTextBox TValue="decimal" Value="@ProjectedVolume" ValueChange="HandleProjectedVolumeChanged" Placeholder="Projected Volume" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="N0" />
-                                            </div>
-                                            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="SaveWorkspaceBaselineAsync">
-                                                    @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
-                                                </SfButton>
-                                                <p id="baseline-save-status" class="text-xs text-slate-500">@BaselineSaveStatus</p>
-                                            </div>
-                                            <div class="mt-4 grid gap-4 xl:grid-cols-[1fr_1.4fr]">
-                                                <div class="rounded-2xl border border-slate-200 p-3">
-                                                    <SfCircularGauge Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
-                                                        <CircularGaugeAxes>
-                                                            <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
-                                                                <CircularGaugeAxisLineStyle Width="8" Color="#e2e8f0" />
-                                                                <CircularGaugeRanges>
-                                                                    <CircularGaugeRange Start="0" End="@Math.Max(0, GaugeMaximum * 0.55)" Color="#bae6fd" StartWidth="8" EndWidth="8" />
-                                                                    <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.55)" End="@Math.Max(0, GaugeMaximum * 0.85)" Color="#7dd3fc" StartWidth="8" EndWidth="8" />
-                                                                    <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.85)" End="@GaugeMaximum" Color="#0f172a" StartWidth="8" EndWidth="8" />
-                                                                </CircularGaugeRanges>
-                                                                <CircularGaugePointers>
-                                                                    <CircularGaugePointer Value="@GaugeCurrentRateValue" Radius="70%" Color="#0f172a" />
-                                                                </CircularGaugePointers>
-                                                            </CircularGaugeAxis>
-                                                        </CircularGaugeAxes>
-                                                    </SfCircularGauge>
-                                                </div>
-                                                <div class="h-64 rounded-2xl border border-slate-200 p-3">
-                                                    <SfChart Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
-                                                        <ChartArea>
-                                                            <ChartAreaBorder Width="0"></ChartAreaBorder>
-                                                        </ChartArea>
-                                                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-                                                            <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-                                                        </ChartPrimaryXAxis>
-                                                        <ChartPrimaryYAxis LabelFormat="C2">
-                                                            <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-                                                        </ChartPrimaryYAxis>
-                                                        <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-                                                        <ChartLegendSettings Visible="false"></ChartLegendSettings>
-                                                        <ChartSeriesCollection>
-                                                            <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
-                                                        </ChartSeriesCollection>
-                                                    </SfChart>
-                                                </div>
-                                            </div>
-                                        </ContentTemplate>
-                                    </DashboardLayoutPanel>
+                    </div>
 
-                                    <DashboardLayoutPanel Id="rates-panel" Row="0" Column="3" SizeX="3" SizeY="1" MinSizeX="2" MinSizeY="1">
-                                        <HeaderTemplate>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Pricing</p>
-                                                <h2 class="text-lg font-semibold text-slate-900">Rates Panel</h2>
-                                            </div>
-                                        </HeaderTemplate>
-                                        <ContentTemplate>
-                                            <div class="grid gap-4 md:grid-cols-2">
-                                                <SfCard>
-                                                    <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
-                                                    <CardContent Content="Editable rate used for instant break-even recalculation." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
-                                                    <CardContent Content="Calculated from the current cost and volume inputs." />
-                                                </SfCard>
-                                            </div>
-                                            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                                                <div class="space-y-2">
-                                                    <SfNumericTextBox ID="current-rate-input" TValue="decimal" Value="@CurrentRate" ValueChange="HandleCurrentRateChanged" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C2" />
-                                                    <p class="text-xs text-slate-500">Validated numeric rate editing updates the workspace instantly and keeps the rate panel aligned with the break-even calculation.</p>
-                                                </div>
-                                                <SfChart Title="Rate Comparison" AccessibilityDescription="Rate comparison chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="180px">
-                                                    <ChartArea>
-                                                        <ChartAreaBorder Width="0"></ChartAreaBorder>
-                                                    </ChartArea>
-                                                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-                                                        <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-                                                    </ChartPrimaryXAxis>
-                                                    <ChartPrimaryYAxis LabelFormat="C2">
-                                                        <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-                                                    </ChartPrimaryYAxis>
-                                                    <ChartLegendSettings Visible="false"></ChartLegendSettings>
-                                                    <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-                                                    <ChartSeriesCollection>
-                                                        <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
-                                                    </ChartSeriesCollection>
-                                                </SfChart>
-                                            </div>
-                                            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                <SfButton CssClass="e-primary" IsPrimary="true" OnClick="SaveRateSnapshotAsync" Disabled="@IsSavingSnapshot">
-                                                    @(IsSavingSnapshot ? "Saving..." : "Save rate snapshot")
-                                                </SfButton>
-                                                <p id="snapshot-save-status" class="text-xs text-slate-500">@SnapshotSaveStatus</p>
-                                            </div>
-                                        </ContentTemplate>
-                                    </DashboardLayoutPanel>
-
-                                    <DashboardLayoutPanel Id="quickbooks-import-panel" Row="2" Column="0" SizeX="3" SizeY="1" MinSizeX="3" MinSizeY="1">
-                                        <HeaderTemplate>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Import</p>
-                                                <h2 class="text-lg font-semibold text-slate-900">QuickBooks Import Panel</h2>
-                                            </div>
-                                        </HeaderTemplate>
-                                        <ContentTemplate>
-                                            <QuickBooksImportPanel WorkspaceState="@WorkspaceState" />
-                                        </ContentTemplate>
-                                    </DashboardLayoutPanel>
-
-                                    <DashboardLayoutPanel Id="scenario-panel" Row="1" Column="3" SizeX="3" SizeY="2" MinSizeX="2" MinSizeY="2">
-                                        <HeaderTemplate>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Planning</p>
-                                                <h2 class="text-lg font-semibold text-slate-900">Scenario Planner</h2>
-                                            </div>
-                                        </HeaderTemplate>
-                                        <ContentTemplate>
-                                            <div class="grid gap-4 md:grid-cols-2">
-                                                <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" Placeholder="Scenario Adjusted Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
-                                                <SfNumericTextBox TValue="decimal" Value="@ScenarioCostTotal" Enabled="false" Placeholder="Scenario Cost Total" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C0" />
-                                                <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedDelta" Enabled="false" Placeholder="Scenario Delta" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
-                                                <SfNumericTextBox TValue="decimal" Value="@CurrentRate" Enabled="false" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
-                                            </div>
-                                            <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                                <SfCard>
-                                                    <CardHeader Title="Base Break-Even" SubTitle="@BreakEvenRateDisplay" />
-                                                    <CardContent Content="Calculated from current costs and projected volume." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Scenario Break-Even" SubTitle="@ScenarioAdjustedRateDisplay" />
-                                                    <CardContent Content="Includes the active scenario cost items." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Scenario Cost Total" SubTitle="@ScenarioCostTotalDisplay" />
-                                                    <CardContent Content="Added pressure from the selected what-if items." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Scenario Delta" SubTitle="@ScenarioAdjustedDeltaDisplay" />
-                                                    <CardContent Content="Gap between the current rate and adjusted break-even." />
-                                                </SfCard>
-                                            </div>
-                                            <div class="mt-4 space-y-3">
-                                                <SfGrid TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="260" OnActionComplete="HandleScenarioGridActionComplete">
-                                                    <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
-                                                    <GridColumns>
-                                                        <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
-                                                        <GridColumn Field=@nameof(ScenarioItem.Name) HeaderText="Scenario Item" Width="180" />
-                                                        <GridColumn Field=@nameof(ScenarioItem.Cost) HeaderText="Cost" Format="C0" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
-                                                    </GridColumns>
-                                                </SfGrid>
-                                            </div>
-                                        </ContentTemplate>
-                                    </DashboardLayoutPanel>
-
-                                    <DashboardLayoutPanel Id="customer-panel" Row="3" Column="0" SizeX="3" SizeY="2" MinSizeX="2" MinSizeY="2">
-                                        <HeaderTemplate>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Records</p>
-                                                <h2 class="text-lg font-semibold text-slate-900">Customer Viewer</h2>
-                                            </div>
-                                        </HeaderTemplate>
-                                        <ContentTemplate>
-                                            <div class="grid gap-4 md:grid-cols-3">
-                                                <SfCard>
-                                                    <CardHeader Title="Visible Customers" SubTitle="@FilteredCustomerCountDisplay" />
-                                                    <CardContent Content="Rows matching the active customer filters." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="Service Filter" SubTitle="@SelectedCustomerService" />
-                                                    <CardContent Content="Limit the list to one service line." />
-                                                </SfCard>
-                                                <SfCard>
-                                                    <CardHeader Title="City Limits" SubTitle="@SelectedCustomerCityLimits" />
-                                                    <CardContent Content="Show city-limits status at a glance." />
-                                                </SfCard>
-                                            </div>
-                                            <div class="mt-4 grid gap-3 md:grid-cols-3">
-                                                <SfTextBox Placeholder="Search customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="CustomerSearchTerm" />
-                                                <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerServiceOptions" @bind-Value="SelectedCustomerService" Placeholder="Service" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-                                                <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerCityLimitOptions" @bind-Value="SelectedCustomerCityLimits" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-                                            </div>
-                                            <div class="mt-3 flex justify-end">
-                                                <SfButton OnClick="ClearCustomerFilters">Clear filters</SfButton>
-                                            </div>
-                                            <div class="mt-4">
-                                                <SfGrid TValue="CustomerRow" DataSource="@Customers" AllowFiltering="true" AllowSorting="true" AllowPaging="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="320">
-                                                    <GridPageSettings PageSize="5" PageCount="3" />
-                                                    <GridColumns>
-                                                        <GridColumn Field=@nameof(CustomerRow.Name) HeaderText="Name" Width="160" />
-                                                        <GridColumn Field=@nameof(CustomerRow.Service) HeaderText="Service" Width="110" />
-                                                        <GridColumn Field=@nameof(CustomerRow.CityLimits) HeaderText="City Limits" Width="100" />
-                                                    </GridColumns>
-                                                </SfGrid>
-                                            </div>
-                                        </ContentTemplate>
-                                    </DashboardLayoutPanel>
-
-                                    <DashboardLayoutPanel Id="trend-panel" Row="3" Column="3" SizeX="3" SizeY="2" MinSizeX="2" MinSizeY="2">
-                                        <HeaderTemplate>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Forecast</p>
-                                                <h2 class="text-lg font-semibold text-slate-900">Trends & Projections</h2>
-                                            </div>
-                                        </HeaderTemplate>
-                                        <ContentTemplate>
-                                            <SfChart Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="320">
-                                                <ChartArea>
-                                                    <ChartAreaBorder Width="0"></ChartAreaBorder>
-                                                </ChartArea>
-                                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-                                                    <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-                                                </ChartPrimaryXAxis>
-                                                <ChartPrimaryYAxis LabelFormat="C2">
-                                                    <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-                                                </ChartPrimaryYAxis>
-                                                <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-                                                <ChartSeriesCollection>
-                                                    <ChartSeries DataSource="@ProjectionSeries" XName="Year" YName="Rate" Type="ChartSeriesType.Line" Name="Projection" Width="3">
-                                                        <ChartMarker Visible="true" Width="8" Height="8"></ChartMarker>
-                                                    </ChartSeries>
-                                                </ChartSeriesCollection>
-                                            </SfChart>
-                                        </ContentTemplate>
-                                    </DashboardLayoutPanel>
-                                </DashboardLayoutPanels>
-                            </SfDashboardLayout>
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace Navigation</p>
+                        <div class="mt-2 grid gap-2">
+                            @foreach (var panelNavItem in PanelNavItems)
+                            {
+                                <SfButton CssClass="@(ActivePanelKey == panelNavItem.Key ? "e-primary" : string.Empty)"
+                                          IsPrimary="@(ActivePanelKey == panelNavItem.Key)"
+                                          OnClick="() => OpenPanel(panelNavItem.Key)">
+                                    @panelNavItem.Label
+                                </SfButton>
+                            }
                         </div>
-                    </ContentTemplate>
-                </SplitterPane>
-                <SplitterPane Size="28%" Min="360px">
-                    <ContentTemplate>
-                        <div class="workspace-pane right-workspace-pane rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <JarvisChatPanel />
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Global Actions</p>
+                        <div class="mt-2 grid gap-2">
+                            <SfButton Disabled="@IsLoadingWorkspace" OnClick="RefreshWorkspaceAsync">@(IsLoadingWorkspace ? "Refreshing..." : "Reload workspace")</SfButton>
+                            <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="SaveWorkspaceBaselineAsync">@(IsSavingBaseline ? "Saving baseline..." : "Save baseline")</SfButton>
+                            <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingScenario" OnClick="SaveScenarioAsync">@(IsSavingScenario ? "Saving..." : "Save scenario")</SfButton>
+                            <SfButton Disabled="@(!CanApplySelectedScenario || IsApplyingScenario)" OnClick="ApplySelectedScenarioAsync">@(IsApplyingScenario ? "Applying..." : "Apply saved scenario")</SfButton>
+                            <div class="grid grid-cols-1 gap-2 pt-2">
+                                <SfButton Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers</SfButton>
+                                <SfButton Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario</SfButton>
+                                <SfButton Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">Export PDF packet</SfButton>
+                            </div>
                         </div>
-                    </ContentTemplate>
-                </SplitterPane>
-            </SplitterPanes>
-        </SfSplitter>
+                    </div>
+
+                    <div class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                        <div id="workspace-load-status"><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
+                        <div class="mt-2"><span class="font-semibold text-slate-700">Scenarios:</span> <span id="scenario-persistence-status">@ScenarioPersistenceStatus</span></div>
+                        <div class="mt-2">
+                            <span class="font-semibold text-slate-700">Startup source:</span>
+                            <span class="@(IsUsingStartupFallback ? "text-amber-700" : "text-emerald-700")"> @StartupSourceStatus</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="font-semibold text-slate-700">Current state:</span>
+                            <span class="@(IsUsingBrowserRestoredState ? "text-sky-700" : "text-emerald-700")"> @CurrentStateSourceStatus</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                <div class="mb-4 border-b border-slate-200 pb-3">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@BreadcrumbSection</p>
+                    <div class="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                        <span>Workspace</span>
+                        <span>/</span>
+                        <span class="font-semibold text-slate-800">@ActivePanelLabel</span>
+                    </div>
+                </div>
+
+                @if (IsOverviewMode)
+                {
+                    <SfDashboardLayout ID="workspace-overview-dashboard"
+                                       Columns="6"
+                                       CellSpacing="@(new double[] { 16, 16 })"
+                                       AllowDragging="false"
+                                       AllowResizing="false"
+                                       EnablePersistence="false"
+                                       MediaQuery="(max-width: 1200px)"
+                                       ShowGridLines="false">
+                        <DashboardLayoutPanels>
+                            <DashboardLayoutPanel Id="overview-break-even" Row="0" Column="0" SizeX="3" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Break-Even</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">Current @CurrentRateDisplay · Recommended @BreakEvenRateDisplay · Delta @RateDeltaDisplay</p>
+                                    <div class="mt-3"><SfButton CssClass="e-primary" IsPrimary="true" OnClick='() => OpenPanel("break-even")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-rates" Row="0" Column="3" SizeX="3" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Rates</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">Rate editing, comparison chart, and snapshot persistence.</p>
+                                    <div class="mt-3"><SfButton CssClass="e-primary" IsPrimary="true" OnClick='() => OpenPanel("rates")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-import" Row="1" Column="0" SizeX="2" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">QuickBooks Import</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">Upload and validate QuickBooks records before commit.</p>
+                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("quickbooks-import")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-scenario" Row="1" Column="2" SizeX="2" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Scenario Planner</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">Build what-if cost changes and compare adjusted break-even.</p>
+                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("scenario")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-customers" Row="1" Column="4" SizeX="2" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Customer Viewer</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">@FilteredCustomerCountDisplay customers match active filters.</p>
+                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("customers")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-trends" Row="2" Column="0" SizeX="3" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Trends & Projections</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">Historical and projected rate trend line by year.</p>
+                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("trends")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-ai" Row="2" Column="3" SizeX="3" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Decision Support</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">Context-aware Jarvis recommendations for operational and rate decisions.</p>
+                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("decision-support")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
+                        </DashboardLayoutPanels>
+                    </SfDashboardLayout>
+                }
+                else
+                {
+                    @switch (ActivePanelKey)
+                    {
+                        case "break-even":
+                            <BreakEvenPanel @key="ActivePanelKey"
+                                            TotalCosts="@TotalCosts"
+                                            ProjectedVolume="@ProjectedVolume"
+                                            TotalCostsDisplay="@TotalCostsDisplay"
+                                            ProjectedVolumeDisplay="@ProjectedVolumeDisplay"
+                                            RateDeltaDisplay="@RateDeltaDisplay"
+                                            BreakEvenRateDisplay="@BreakEvenRateDisplay"
+                                            IsSavingBaseline="@IsSavingBaseline"
+                                            BaselineSaveStatus="@BaselineSaveStatus"
+                                            GaugeMaximum="@GaugeMaximum"
+                                            GaugeCurrentRateValue="@GaugeCurrentRateValue"
+                                            RateComparison="@RateComparison"
+                                            OnTotalCostsChanged="HandleTotalCostsChanged"
+                                            OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
+                                            OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync" />
+                            break;
+                        case "rates":
+                            <RatesPanel @key="ActivePanelKey"
+                                        CurrentRate="@CurrentRate"
+                                        CurrentRateDisplay="@CurrentRateDisplay"
+                                        BreakEvenRateDisplay="@BreakEvenRateDisplay"
+                                        IsSavingSnapshot="@IsSavingSnapshot"
+                                        SnapshotSaveStatus="@SnapshotSaveStatus"
+                                        RateComparison="@RateComparison"
+                                        OnCurrentRateChanged="HandleCurrentRateChanged"
+                                        OnSaveRateSnapshot="SaveRateSnapshotAsync" />
+                            break;
+                        case "quickbooks-import":
+                            <QuickBooksImportPanelWrapper @key="ActivePanelKey" WorkspaceState="@WorkspaceState" />
+                            break;
+                        case "scenario":
+                            <ScenarioPlannerPanel @key="ActivePanelKey"
+                                                  ScenarioAdjustedRate="@ScenarioAdjustedRate"
+                                                  ScenarioCostTotal="@ScenarioCostTotal"
+                                                  ScenarioAdjustedDelta="@ScenarioAdjustedDelta"
+                                                  CurrentRate="@CurrentRate"
+                                                  BreakEvenRateDisplay="@BreakEvenRateDisplay"
+                                                  ScenarioAdjustedRateDisplay="@ScenarioAdjustedRateDisplay"
+                                                  ScenarioCostTotalDisplay="@ScenarioCostTotalDisplay"
+                                                  ScenarioAdjustedDeltaDisplay="@ScenarioAdjustedDeltaDisplay"
+                                                  ScenarioItems="@ScenarioItems"
+                                                  ScenarioToolbarItems="@ScenarioToolbarItems"
+                                                  OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
+                            break;
+                        case "customers":
+                            <CustomerViewerPanel @key="ActivePanelKey"
+                                                 FilteredCustomerCountDisplay="@FilteredCustomerCountDisplay"
+                                                 SelectedCustomerService="@SelectedCustomerService"
+                                                 SelectedCustomerCityLimits="@SelectedCustomerCityLimits"
+                                                 CustomerSearchTerm="@CustomerSearchTerm"
+                                                 CustomerSearchTermChanged="@(value => CustomerSearchTerm = value)"
+                                                 CustomerServiceOptions="@CustomerServiceOptions"
+                                                 CustomerCityLimitOptions="@CustomerCityLimitOptions"
+                                                 SelectedCustomerServiceChanged="@(value => SelectedCustomerService = value)"
+                                                 SelectedCustomerCityLimitsChanged="@(value => SelectedCustomerCityLimits = value)"
+                                                 Customers="@Customers"
+                                                 OnClearCustomerFilters="ClearCustomerFilters" />
+                            break;
+                        case "trends":
+                            <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
+                            break;
+                        case "decision-support":
+                            <DecisionSupportPanel @key="ActivePanelKey" />
+                            break;
+                        default:
+                            NavigationManager.NavigateTo("/wiley-workspace", replace: true);
+                            break;
+                    }
+                }
+            </main>
+        </div>
     </div>
 </div>
 
 <style>
-    .wiley-workspace .workspace-splitter {
-        min-height: 52rem;
-    }
-
-    .wiley-workspace .workspace-pane {
-        height: 100%;
-    }
-
-    .wiley-workspace .right-workspace-pane {
-        min-width: 22rem;
+    .wiley-workspace .workspace-sidebar {
+        max-height: calc(100vh - 14rem);
+        overflow: auto;
     }
 
     .wiley-workspace .e-dashboardlayout {
@@ -438,14 +329,9 @@
         box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
-    .wiley-workspace .e-splitter .e-pane {
-        overflow: auto;
-    }
-
     @@media (max-width: 1024px) {
-        .wiley-workspace .workspace-splitter {
-            min-height: auto;
-            height: auto !important;
+        .wiley-workspace .workspace-sidebar {
+            max-height: none;
         }
     }
 </style>

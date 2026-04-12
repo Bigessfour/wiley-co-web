@@ -10,6 +10,18 @@ public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 	public string SnapshotStatus => SnapshotSaveStatus;
 	public string WorkspaceStatus => WorkspaceLoadStatus;
 
+	// Panel routing surface
+	public string ActivePanel => ActivePanelKey;
+	public bool IsOverview => IsOverviewMode;
+	public bool SidebarOpen => IsSidebarOpen;
+	public string ApiHealth => HostingApiHealth;
+	public string LastSyncedDisplay => HostingLastSyncedDisplay;
+	public string ActiveLabel => ActivePanelLabel;
+	public string BreadcrumbSectionValue => BreadcrumbSection;
+
+	public void InvokeOpenPanel(string key) => OpenPanel(key);
+	public void InvokeToggleSidebar() => ToggleSidebar();
+
 	public Task InvokeRefreshWorkspaceAsync()
 	{
 		return RefreshWorkspaceAsync();

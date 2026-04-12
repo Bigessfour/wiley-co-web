@@ -158,16 +158,18 @@ public sealed class WorkspaceState
         }
     }
 
-    public IReadOnlyList<CustomerRow> FilteredCustomers => Customers.Where(customer =>
-        (string.IsNullOrWhiteSpace(customerSearchTerm) ||
-         customer.Name.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
-         customer.Service.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
-         customer.CityLimits.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase)) &&
-        (string.Equals(selectedCustomerService, AllServicesOption, StringComparison.Ordinal) ||
-         string.Equals(customer.Service, selectedCustomerService, StringComparison.Ordinal)) &&
-        (string.Equals(selectedCustomerCityLimits, AllCityLimitsOption, StringComparison.Ordinal) ||
-         string.Equals(customer.CityLimits, selectedCustomerCityLimits, StringComparison.Ordinal)))
-        .ToList();
+    public IReadOnlyList<CustomerRow> FilteredCustomers =>
+    [
+        .. Customers.Where(customer =>
+            (string.IsNullOrWhiteSpace(customerSearchTerm) ||
+             customer.Name.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+             customer.Service.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+             customer.CityLimits.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase)) &&
+            (string.Equals(selectedCustomerService, AllServicesOption, StringComparison.Ordinal) ||
+             string.Equals(customer.Service, selectedCustomerService, StringComparison.Ordinal)) &&
+            (string.Equals(selectedCustomerCityLimits, AllCityLimitsOption, StringComparison.Ordinal) ||
+             string.Equals(customer.CityLimits, selectedCustomerCityLimits, StringComparison.Ordinal)))
+    ];
 
     public int FilteredCustomerCount => FilteredCustomers.Count;
 

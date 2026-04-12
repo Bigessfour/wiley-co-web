@@ -65,12 +65,11 @@ public sealed class ComponentPageTests
 
 		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
 		Assert.Contains("Document Center", cut.Markup);
-		Assert.Contains("Break-Even Panel", cut.Markup);
-		Assert.Contains("Rates Panel", cut.Markup);
-		Assert.Contains("QuickBooks Import Panel", cut.Markup);
+		Assert.Contains("Break-Even", cut.Markup);
+		Assert.Contains("Rates", cut.Markup);
+		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Trends & Projections", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
-		Assert.Contains("Save rate snapshot", cut.Markup);
 	}
 
 	[Fact]
@@ -224,6 +223,160 @@ public sealed class ComponentPageTests
 		state.SelectedEnterprise = "City Council";
 		state.CustomerSearchTerm = "test filter";
 		Assert.Contains("Saved", harnessCut.Markup); // status assertions
+	}
+
+
+	[Theory]
+	[InlineData(null, "overview", true)]
+	[InlineData("", "overview", true)]
+	[InlineData("break-even", "break-even", false)]
+	[InlineData("rates", "rates", false)]
+	[InlineData("quickbooks-import", "quickbooks-import", false)]
+	[InlineData("scenario", "scenario", false)]
+	[InlineData("customers", "customers", false)]
+	[InlineData("trends", "trends", false)]
+	[InlineData("decision-support", "decision-support", false)]
+	[InlineData("BREAK-EVEN", "break-even", false)]
+	[InlineData("unknown-panel", "overview", true)]
+	public void WileyWorkspaceBaseHarness_PanelRouting_NormalizesPanelKeyCorrectly(
+		string? panelParam, string expectedKey, bool expectedIsOverview)
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>(parameters => parameters
+			.Add(p => p.Panel, panelParam));
+
+		Assert.Equal(expectedKey, cut.Instance.ActivePanel);
+		Assert.Equal(expectedIsOverview, cut.Instance.IsOverview);
+	}
+
+	[Fact]
+	public void WileyWorkspaceBaseHarness_OpenPanel_CloseSidebarAndNavigates()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		cut.Instance.InvokeToggleSidebar();
+		Assert.True(cut.Instance.SidebarOpen);
+
+		cut.Instance.InvokeOpenPanel("break-even");
+
+		Assert.False(cut.Instance.SidebarOpen);
+	}
+
+	[Fact]
+	public void WileyWorkspaceBaseHarness_ToggleSidebar_FlipsSidebarState()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		Assert.False(cut.Instance.SidebarOpen);
+		cut.Instance.InvokeToggleSidebar();
+		Assert.True(cut.Instance.SidebarOpen);
+		cut.Instance.InvokeToggleSidebar();
+		Assert.False(cut.Instance.SidebarOpen);
+	}
+
+	[Fact]
+	public void WileyWorkspaceBaseHarness_ApiHealth_StartsUnknown()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		Assert.Equal("Unknown", cut.Instance.ApiHealth);
+	}
+
+	[Fact]
+	public async Task WileyWorkspaceBaseHarness_ApiHealth_BecomesHealthyAfterSuccessfulReload()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		await cut.InvokeAsync(() => cut.Instance.InvokeRefreshWorkspaceAsync());
+
+		Assert.Equal("Healthy", cut.Instance.ApiHealth);
+	}
+
+	[Fact]
+	public async Task WileyWorkspaceBaseHarness_ApiHealth_BecomesDegradedAfterFailedApiCall()
+	{
+		using var context = CreateContext();
+		var state = context.Services.GetRequiredService<WorkspaceState>();
+		state.SetActiveScenarioName("Test Scenario For Degraded Path");
+
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+		await cut.InvokeAsync(() => cut.Instance.InvokeSaveScenarioAsync());
+
+		Assert.Equal("Degraded", cut.Instance.ApiHealth);
+	}
+
+	[Fact]
+	public void WileyWorkspaceBaseHarness_HostingLastSyncedDisplay_IsSetAfterInitialRender()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		Assert.NotEqual("Not synced", cut.Instance.LastSyncedDisplay);
+	}
+
+	[Fact]
+	public async Task WileyWorkspaceBaseHarness_HostingLastSyncedDisplay_UpdatesAfterSuccessfulReload()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+
+		await cut.InvokeAsync(() => cut.Instance.InvokeRefreshWorkspaceAsync());
+
+		Assert.NotEqual("Not synced", cut.Instance.LastSyncedDisplay);
+	}
+
+	[Theory]
+	[InlineData("overview", "Overview")]
+	[InlineData("break-even", "Break-Even")]
+	[InlineData("rates", "Rates")]
+	[InlineData("quickbooks-import", "QuickBooks Import")]
+	[InlineData("scenario", "Scenario Planner")]
+	[InlineData("customers", "Customer Viewer")]
+	[InlineData("trends", "Trends")]
+	[InlineData("decision-support", "Decision Support")]
+	public void WileyWorkspaceBaseHarness_ActivePanelLabel_ReturnsCorrectLabelForEachPanel(
+		string panelKey, string expectedLabel)
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>(parameters => parameters
+			.Add(p => p.Panel, panelKey == "overview" ? null : panelKey));
+
+		Assert.Equal(expectedLabel, cut.Instance.ActiveLabel);
+	}
+
+	[Fact]
+	public void WileyWorkspaceBaseHarness_BreadcrumbSection_IsOverviewWhenNoPanel()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>(parameters => parameters
+			.Add(p => p.Panel, null));
+
+		Assert.Equal("Workspace Overview", cut.Instance.BreadcrumbSectionValue);
+	}
+
+	[Fact]
+	public void WileyWorkspaceBaseHarness_BreadcrumbSection_IsPanelWhenPanelActive()
+	{
+		using var context = CreateContext();
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>(parameters => parameters
+			.Add(p => p.Panel, "rates"));
+
+		Assert.Equal("Workspace Panel", cut.Instance.BreadcrumbSectionValue);
+	}
+
+	[Fact]
+	public void WileyWorkspace_QuickBooksRoute_RendersQuickBooksContent()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "quickbooks-import"));
+
+		Assert.Contains("QuickBooks Import", cut.Markup);
 	}
 
 	private static TestContext CreateContext()

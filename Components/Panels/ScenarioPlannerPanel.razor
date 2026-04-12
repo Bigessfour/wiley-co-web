@@ -1,0 +1,57 @@
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Inputs
+@using WileyCoWeb.State
+
+<div class="space-y-4">
+    <div class="grid gap-4 md:grid-cols-2">
+        <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" Placeholder="Scenario Adjusted Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
+        <SfNumericTextBox TValue="decimal" Value="@ScenarioCostTotal" Enabled="false" Placeholder="Scenario Cost Total" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C0" />
+        <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedDelta" Enabled="false" Placeholder="Scenario Delta" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
+        <SfNumericTextBox TValue="decimal" Value="@CurrentRate" Enabled="false" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SfCard>
+            <CardHeader Title="Base Break-Even" SubTitle="@BreakEvenRateDisplay" />
+            <CardContent Content="Calculated from current costs and projected volume." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Scenario Break-Even" SubTitle="@ScenarioAdjustedRateDisplay" />
+            <CardContent Content="Includes the active scenario cost items." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Scenario Cost Total" SubTitle="@ScenarioCostTotalDisplay" />
+            <CardContent Content="Added pressure from the selected what-if items." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Scenario Delta" SubTitle="@ScenarioAdjustedDeltaDisplay" />
+            <CardContent Content="Gap between the current rate and adjusted break-even." />
+        </SfCard>
+    </div>
+
+    <div class="space-y-3">
+        <SfGrid TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420" OnActionComplete="OnScenarioGridActionComplete">
+            <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
+            <GridColumns>
+                <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
+                <GridColumn Field=@nameof(ScenarioItem.Name) HeaderText="Scenario Item" Width="180" />
+                <GridColumn Field=@nameof(ScenarioItem.Cost) HeaderText="Cost" Format="C0" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
+            </GridColumns>
+        </SfGrid>
+    </div>
+</div>
+
+@code {
+    [Parameter] public decimal ScenarioAdjustedRate { get; set; }
+    [Parameter] public decimal ScenarioCostTotal { get; set; }
+    [Parameter] public decimal ScenarioAdjustedDelta { get; set; }
+    [Parameter] public decimal CurrentRate { get; set; }
+    [Parameter] public string BreakEvenRateDisplay { get; set; } = string.Empty;
+    [Parameter] public string ScenarioAdjustedRateDisplay { get; set; } = string.Empty;
+    [Parameter] public string ScenarioCostTotalDisplay { get; set; } = string.Empty;
+    [Parameter] public string ScenarioAdjustedDeltaDisplay { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<ScenarioItem> ScenarioItems { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> ScenarioToolbarItems { get; set; } = [];
+    [Parameter] public EventCallback<Syncfusion.Blazor.Grids.ActionEventArgs<ScenarioItem>> OnScenarioGridActionComplete { get; set; }
+}

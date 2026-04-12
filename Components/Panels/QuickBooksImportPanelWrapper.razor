@@ -1,0 +1,10 @@
+@using WileyCoWeb.State
+
+<div class="h-full">
+    <QuickBooksImportPanel WorkspaceState="@WorkspaceState" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public WorkspaceState WorkspaceState { get; set; } = default!;
+}
