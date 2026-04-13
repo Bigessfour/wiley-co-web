@@ -7,21 +7,12 @@ using WileyCoWeb.Contracts;
 
 namespace WileyCoWeb.Services;
 
-public sealed class QuickBooksImportApiService
+public sealed class QuickBooksImportApiService(HttpClient httpClient, ILogger<QuickBooksImportApiService>? logger = null)
 {
 	private static readonly JsonSerializerOptions JsonOptions = new()
 	{
 		PropertyNameCaseInsensitive = true
 	};
-
-	private readonly HttpClient httpClient;
-	private readonly ILogger<QuickBooksImportApiService>? logger;
-
-	public QuickBooksImportApiService(HttpClient httpClient, ILogger<QuickBooksImportApiService>? logger = null)
-	{
-		this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-		this.logger = logger;
-	}
 
 	public Task<QuickBooksImportPreviewResponse> PreviewAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
 		=> PostAsync<QuickBooksImportPreviewResponse>("api/imports/quickbooks/preview", fileBytes, fileName, selectedEnterprise, selectedFiscalYear, cancellationToken);

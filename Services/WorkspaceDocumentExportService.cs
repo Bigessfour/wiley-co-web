@@ -7,17 +7,11 @@ using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
 
-public sealed class WorkspaceDocumentExportService
+public sealed class WorkspaceDocumentExportService(ILogger<WorkspaceDocumentExportService>? logger = null)
 {
     private const string ExcelContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private const string PdfContentType = "application/pdf";
     private const string CurrencyNumberFormat = "$#,##0.00";
-    private readonly ILogger<WorkspaceDocumentExportService>? logger;
-
-    public WorkspaceDocumentExportService(ILogger<WorkspaceDocumentExportService>? logger = null)
-    {
-        this.logger = logger;
-    }
 
     public WorkspaceExportDocument CreateCustomerWorkbook(WorkspaceState workspaceState)
     {
@@ -139,9 +133,9 @@ public sealed class WorkspaceDocumentExportService
         var brush = new PdfSolidBrush(new PdfColor(15, 23, 42));
         var accentBrush = new PdfSolidBrush(new PdfColor(14, 116, 144));
 
-        float left = 36;
-        float top = 32;
-        float lineHeight = 18;
+        const float left = 36;
+        const float top = 32;
+        const float lineHeight = 18;
         float y = top;
 
         graphics.DrawString("Wiley Workspace Rate Packet", titleFont, brush, new PointF(left, y));

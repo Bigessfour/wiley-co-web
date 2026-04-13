@@ -16,6 +16,7 @@ public sealed class WorkspaceState
     private decimal currentRate = WorkspaceDefaults.CurrentRate;
     private decimal totalCosts = WorkspaceDefaults.TotalCosts;
     private decimal projectedVolume = WorkspaceDefaults.ProjectedVolume;
+    private string lastUpdatedUtc = DateTime.UtcNow.ToString("O");
     private readonly List<ScenarioItem> scenarioItems = [];
     private readonly List<CustomerRow> customerRows = [];
     private readonly List<ProjectionRow> projectionRows = [];
@@ -194,6 +195,9 @@ public sealed class WorkspaceState
         hasChanged |= SetCustomerRowsWithoutNotify(bootstrapData.CustomerRows);
         hasChanged |= SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows);
 
+        if (!string.IsNullOrWhiteSpace(bootstrapData.LastUpdatedUtc))
+            lastUpdatedUtc = bootstrapData.LastUpdatedUtc;
+
         if (hasChanged)
         {
             NotifyChanged();
@@ -207,15 +211,15 @@ public sealed class WorkspaceState
         CurrentRate,
         TotalCosts,
         ProjectedVolume,
-        DateTime.UtcNow.ToString("O"))
+        lastUpdatedUtc)
     {
-        ScenarioItems = scenarioItems.Select(item => new WorkspaceScenarioItemData(item.Id, item.Name, item.Cost)).ToList(),
-        EnterpriseOptions = enterpriseOptions.ToList(),
-        FiscalYearOptions = fiscalYearOptions.ToList(),
-        CustomerServiceOptions = customerServiceOptions.ToList(),
-        CustomerCityLimitOptions = customerCityLimitOptions.ToList(),
-        CustomerRows = customerRows.ToList(),
-        ProjectionRows = projectionRows.ToList()
+        ScenarioItems = [.. scenarioItems.Select(item => new WorkspaceScenarioItemData(item.Id, item.Name, item.Cost))],
+        EnterpriseOptions = [.. enterpriseOptions],
+        FiscalYearOptions = [.. fiscalYearOptions],
+        CustomerServiceOptions = [.. customerServiceOptions],
+        CustomerCityLimitOptions = [.. customerCityLimitOptions],
+        CustomerRows = [.. customerRows],
+        ProjectionRows = [.. projectionRows]
     };
 
     public void SetSelection(string enterprise, int fiscalYear)
@@ -538,8 +542,7 @@ public sealed class WorkspaceState
         var normalized = (source is { Count: > 0 } ? source : fallback)
             .Where(item => item > 0)
             .Distinct()
-            .OrderBy(item => item)
-            .ToList();
+            .OrderBy(item => item);
 
         if (target.SequenceEqual(normalized))
         {

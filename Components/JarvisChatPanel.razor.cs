@@ -37,12 +37,13 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected string ChatQuestion { get; set; } = "What should I know about the current workspace?";
     protected string ChatAnswer { get; set; } = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
     protected string ChatContextSummary => BuildChatContextSummary();
+    protected string RecommendationHistoryStatus { get; set; } = "Recommendation history will appear here after Jarvis saves a recommendation.";
     protected string CurrentUserLabel { get; set; } = "Guest";
     protected string CurrentConversationLabel { get; set; } = "Local session";
     protected string CurrentProfileSummary { get; set; } = "Jarvis will ask a few setup questions on first contact.";
     protected bool IsChatBusy { get; set; }
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
-    public bool IsSecureJarvisEnabled => true; // Production default per plan (Grok portal + SK; env UI__UseSecureJarvis=false for degraded testing only)
+    public bool IsSecureJarvisEnabled => !string.Equals(Environment.GetEnvironmentVariable("UI__UseSecureJarvis"), "false", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
@@ -78,9 +79,9 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         await SubmitPromptAsync(question, args);
     }
 
-    public async Task AskChatAsync()
+    public Task AskChatAsync()
     {
-        await SubmitPromptAsync(ChatQuestion);
+        return SubmitPromptAsync(ChatQuestion);
     }
 
     public async Task ResetChatAsync()
@@ -242,7 +243,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             return [];
         }
 
-        return chatTranscript.TakeLast(12).ToList();
+        return [.. chatTranscript.TakeLast(12)];
     }
 
     private async Task LoadRecommendationHistoryAsync()
@@ -256,10 +257,14 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
             recommendationHistory.Clear();
             recommendationHistory.AddRange(history.Items);
+
+            RecommendationHistoryStatus = recommendationHistory.Count == 0
+                ? "No saved recommendations yet for this workspace scope."
+                : $"Loaded {recommendationHistory.Count} saved recommendation{(recommendationHistory.Count == 1 ? string.Empty : "s")} for this workspace scope.";
         }
-        catch
+        catch (Exception ex)
         {
-            // Keep the panel resilient even when recommendation history endpoint is unavailable.
+            RecommendationHistoryStatus = $"Recommendation history is unavailable right now: {ex.Message}";
         }
     }
 
@@ -303,7 +308,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         ];
     }
 
-    private IReadOnlyList<RecommendationItem> BuildRecommendations()
+    private List<RecommendationItem> BuildRecommendations()
     {
         var recommendations = new List<RecommendationItem>();
         var adjustedBreakEven = WorkspaceState.AdjustedRecommendedRate;
@@ -313,7 +318,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         {
             recommendations.Add(new RecommendationItem(
                 "Close the modeled rate gap",
-                $"Increase the working rate by {rateGap.ToString("C2")} or offset the same amount through cost reductions before finalizing the scenario."));
+                $"Increase the working rate by {rateGap:C2} or offset the same amount through cost reductions before finalizing the scenario."));
         }
         else
         {
@@ -348,6 +353,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         {
             WorkspaceState.Changed -= workspaceChangedHandler;
         }
+        GC.SuppressFinalize(this);
     }
 
     public sealed record InsightCard(string Label, string Value, string Description);

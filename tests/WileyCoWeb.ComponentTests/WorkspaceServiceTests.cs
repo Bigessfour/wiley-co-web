@@ -34,7 +34,7 @@ public sealed class WorkspaceServiceTests
         state.SetSelection("Sewer", WorkspaceTestData.WaterFiscalYear);
         await service.SaveAsync();
 
-        Assert.Contains("Sewer", runtime.Storage["wiley.workspace.state.v1"]!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Sewer", runtime.Storage["wiley.workspace.state.v1"], StringComparison.OrdinalIgnoreCase);
 
         await service.RemoveAsync();
         Assert.False(runtime.Storage.ContainsKey("wiley.workspace.state.v1"));
@@ -80,7 +80,7 @@ public sealed class WorkspaceServiceTests
 
         var client = new HttpClient(new RoutedHttpMessageHandler(request =>
         {
-            if (request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) == true)
+            if (request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) is true)
             {
                 return JsonResponse(apiBootstrap);
             }
@@ -92,7 +92,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService);
 
         await service.LoadAsync();
 
@@ -120,7 +120,7 @@ public sealed class WorkspaceServiceTests
         {
             requestedUri = request.RequestUri?.OriginalString;
 
-            if (request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) == true)
+            if (request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) is true)
             {
                 return JsonResponse(apiBootstrap);
             }
@@ -132,7 +132,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService);
 
         await service.LoadAsync(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear);
 
@@ -153,7 +153,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
 
@@ -177,7 +177,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(client, "https://example.test/", state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
 

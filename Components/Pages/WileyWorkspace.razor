@@ -213,6 +213,13 @@
                                     <div class="mt-3"><SfButton OnClick='() => OpenPanel("decision-support")'>Open full view</SfButton></div>
                                 </ContentTemplate>
                             </DashboardLayoutPanel>
+                            <DashboardLayoutPanel Id="overview-data-dashboard" Row="3" Column="0" SizeX="6" SizeY="1">
+                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Data Dashboard</h3></HeaderTemplate>
+                                <ContentTemplate>
+                                    <p class="text-sm text-slate-600">KPI gauges, coverage ratio, rate adequacy, scenario waterfall, rate trend, and customer distribution.</p>
+                                    <div class="mt-3"><SfButton CssClass="e-primary" IsPrimary="true" OnClick='() => OpenPanel("data-dashboard")'>Open full view</SfButton></div>
+                                </ContentTemplate>
+                            </DashboardLayoutPanel>
                         </DashboardLayoutPanels>
                     </SfDashboardLayout>
                 }
@@ -284,6 +291,21 @@
                             break;
                         case "decision-support":
                             <DecisionSupportPanel @key="ActivePanelKey" />
+                            break;
+                        case "data-dashboard":
+                            <DataDashboardPanel @key="ActivePanelKey"
+                                                CurrentRate="@CurrentRate"
+                                                TotalCosts="@TotalCosts"
+                                                ProjectedVolume="@ProjectedVolume"
+                                                RecommendedRate="@RecommendedRate"
+                                                AdjustedRecommendedRate="@ScenarioAdjustedRate"
+                                                ScenarioCostTotal="@ScenarioCostTotal"
+                                                ScenarioItems="@ScenarioItems"
+                                                ProjectionSeries="@ProjectionSeries"
+                                                Customers="@Customers"
+                                                RateComparison="@RateComparison"
+                                                SelectedEnterprise="@SelectedEnterprise"
+                                                SelectedFiscalYear="@SelectedFiscalYear" />
                             break;
                         default:
                             NavigationManager.NavigateTo("/wiley-workspace", replace: true);

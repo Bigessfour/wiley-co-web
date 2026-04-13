@@ -392,7 +392,7 @@ public sealed class ComponentPageTests
 		var snapshotClient = CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
 		context.Services.AddScoped(_ => snapshotService);
-		context.Services.AddScoped(_ => new WorkspaceBootstrapService(snapshotClient, "https://example.test/", workspaceState, snapshotService));
+		context.Services.AddScoped(_ => new WorkspaceBootstrapService(workspaceState, snapshotService));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));

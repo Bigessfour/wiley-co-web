@@ -44,7 +44,6 @@ builder.Services.AddScoped(sp =>
 {
     return new HttpClient { BaseAddress = resolvedApiBaseAddress };
 });
-builder.Services.AddScoped(_ => builder.HostEnvironment.BaseAddress);
 builder.Services.AddSingleton<WorkspaceState>();
 builder.Services.AddScoped<WorkspaceBootstrapService>();
 builder.Services.AddScoped<WorkspacePersistenceService>();

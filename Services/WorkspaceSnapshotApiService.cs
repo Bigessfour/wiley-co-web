@@ -6,22 +6,13 @@ using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
 
-public sealed class WorkspaceSnapshotApiService
+public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<WorkspaceSnapshotApiService>? logger = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = false
     };
-
-    private readonly HttpClient httpClient;
-    private readonly ILogger<WorkspaceSnapshotApiService>? logger;
-
-    public WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<WorkspaceSnapshotApiService>? logger = null)
-    {
-        this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        this.logger = logger;
-    }
 
     public async Task<WorkspaceBootstrapData> GetWorkspaceSnapshotAsync(string? enterprise = null, int? fiscalYear = null, CancellationToken cancellationToken = default)
     {

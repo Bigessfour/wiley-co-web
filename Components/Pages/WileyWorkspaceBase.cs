@@ -146,8 +146,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsOverviewMode => string.Equals(ActivePanelKey, "overview", StringComparison.Ordinal);
     protected string ActivePanelLabel => PanelNavItems.FirstOrDefault(item => item.Key == ActivePanelKey)?.Label ?? "Overview";
     protected string BreadcrumbSection => IsOverviewMode ? "Workspace Overview" : "Workspace Panel";
-    protected string HostingEnvironmentName => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-    protected string HostingVersion => typeof(WileyWorkspaceBase).Assembly.GetName().Version?.ToString() ?? "dev";
+    protected static string HostingEnvironmentName => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+    protected static string HostingVersion => typeof(WileyWorkspaceBase).Assembly.GetName().Version?.ToString() ?? "dev";
     protected string HostingLastSyncedDisplay => lastWorkspaceSyncUtc?.ToLocalTime().ToString("g") ?? "Not synced";
     protected string HostingPersistenceStatus => IsUsingStartupFallback ? "Fallback persistence active" : "Primary persistence active";
     protected string HostingApiHealth => _apiHealth switch
@@ -166,7 +166,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         new("scenario", "Scenario Planner"),
         new("customers", "Customer Viewer"),
         new("trends", "Trends"),
-        new("decision-support", "Decision Support")
+        new("decision-support", "Decision Support"),
+        new("data-dashboard", "Data Dashboard")
     ];
 
     protected void OpenPanel(string panelKey)
@@ -197,10 +198,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         await ReloadWorkspaceAsync(SelectedEnterprise, args.Value);
     }
 
-    protected Task RefreshWorkspaceAsync()
-    {
-        return ReloadWorkspaceAsync(SelectedEnterprise, SelectedFiscalYear);
-    }
+    protected Task RefreshWorkspaceAsync() => ReloadWorkspaceAsync(SelectedEnterprise, SelectedFiscalYear);
 
     protected void HandleSavedScenarioChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<long?, WorkspaceScenarioSummaryResponse> args)
     {
@@ -440,6 +438,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     {
         WorkspaceState.Changed -= HandleWorkspaceStateChanged;
         WorkspacePersistenceService.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private void HandleWorkspaceStateChanged()

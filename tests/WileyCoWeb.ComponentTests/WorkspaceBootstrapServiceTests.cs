@@ -24,8 +24,6 @@ public sealed class WorkspaceBootstrapServiceTests
 		var fallbackHandler = new StubHttpMessageHandler(_ => throw new InvalidOperationException("Fallback should not be called when the API succeeds."));
 
 		var service = new WorkspaceBootstrapService(
-			new HttpClient(fallbackHandler) { BaseAddress = new Uri("https://workspace.local/") },
-			"https://workspace.local/",
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 
@@ -49,8 +47,6 @@ public sealed class WorkspaceBootstrapServiceTests
 		var apiHandler = new StubHttpMessageHandler(_ => throw new HttpRequestException("API unavailable"));
 
 		var service = new WorkspaceBootstrapService(
-			new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("Local fallback should not be used."))) { BaseAddress = new Uri("https://workspace.local/") },
-			"https://workspace.local/",
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 

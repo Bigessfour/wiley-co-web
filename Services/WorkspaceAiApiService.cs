@@ -5,21 +5,12 @@ using WileyCoWeb.Contracts;
 
 namespace WileyCoWeb.Services;
 
-public sealed class WorkspaceAiApiService
+public sealed class WorkspaceAiApiService(HttpClient httpClient, ILogger<WorkspaceAiApiService>? logger = null)
 {
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		PropertyNameCaseInsensitive = true
 	};
-
-	private readonly HttpClient httpClient;
-    private readonly ILogger<WorkspaceAiApiService>? logger;
-
-    public WorkspaceAiApiService(HttpClient httpClient, ILogger<WorkspaceAiApiService>? logger = null)
-	{
-		this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        this.logger = logger;
-	}
 
 	public async Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
 	{
