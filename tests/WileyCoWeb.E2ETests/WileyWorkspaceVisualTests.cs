@@ -27,7 +27,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_WorkspaceOverview_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace", "Workspace Overview", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace", "Workspace Overview", static async (eyes, page) =>
         {
             eyes.Check("Full overview dashboard", Target.Window().Fully());
             await Task.CompletedTask;
@@ -37,7 +37,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_NavMenu_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace", "Nav Menu", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace", "Nav Menu", static async (eyes, page) =>
         {
             eyes.Check("Sidebar navigation",
                 Target.Region(page.Locator(".sidebar-nav, nav, .e-sidebar")).Fully());
@@ -48,7 +48,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_DataDashboard_KpiCards_MatchBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – KPI Cards", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – KPI Cards", static async (eyes, page) =>
         {
             await page.Locator("#coverage-ratio-gauge").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
             eyes.Check("KPI card row",
@@ -59,7 +59,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_DataDashboard_CoverageGauge_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Coverage Gauge", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Coverage Gauge", static async (eyes, page) =>
         {
             await page.Locator("#coverage-ratio-gauge").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
             eyes.Check("Coverage ratio circular gauge",
@@ -70,7 +70,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_DataDashboard_RateAdequacyGauge_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Rate Adequacy Gauge", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Rate Adequacy Gauge", static async (eyes, page) =>
         {
             await page.Locator("#rate-adequacy-gauge").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
             eyes.Check("Rate adequacy circular gauge",
@@ -81,7 +81,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_DataDashboard_RateComparisonChart_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Rate Comparison", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Rate Comparison", static async (eyes, page) =>
         {
             await page.Locator("#budget-variance-chart").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
             eyes.Check("Rate comparison bar chart",
@@ -92,7 +92,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_DataDashboard_FullPanel_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Full Panel", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace/data-dashboard", "Data Dashboard – Full Panel", static async (eyes, page) =>
         {
             await page.Locator("#budget-variance-chart").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
             eyes.Check("Full data dashboard panel", Target.Window().Fully());
@@ -102,7 +102,7 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_BreakEvenPanel_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace/break-even", "Break-Even Panel", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace/break-even", "Break-Even Panel", static async (eyes, page) =>
         {
             eyes.Check("Break-even panel", Target.Window().Fully());
             await Task.CompletedTask;
@@ -112,11 +112,91 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
     [Fact]
     public async Task Visual_DataDashboardOverviewTile_MatchesBaseline()
     {
-        await RunVisualTestAsync("/wiley-workspace", "Dashboard Overview Tile", async (eyes, page) =>
+        await RunVisualTestAsync("/wiley-workspace", "Dashboard Overview Tile", static async (eyes, page) =>
         {
             eyes.Check("Data Dashboard overview tile",
                 Target.Region(page.Locator("#overview-data-dashboard")).Fully());
             await Task.CompletedTask;
+        });
+    }
+
+    // ─── Missing panel visual tests ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Visual_RatesPanel_MatchesBaseline()
+    {
+        await RunVisualTestAsync("/wiley-workspace/rates", "Rates Panel", static async (eyes, page) =>
+        {
+            await page.Locator("#current-rate-input").WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Full rates panel", Target.Window().Fully());
+        });
+    }
+
+    [Fact]
+    public Task Visual_ScenarioPlannerPanel_MatchesBaseline()
+    {
+        return RunVisualTestAsync("/wiley-workspace/scenario", "Scenario Planner Panel", static async (eyes, page) =>
+        {
+            await page.Locator("#scenario-panel").WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Full scenario planner panel", Target.Window().Fully());
+        });
+    }
+
+    [Fact]
+    public Task Visual_CustomerViewerPanel_MatchesBaseline()
+    {
+        return RunVisualTestAsync("/wiley-workspace/customers", "Customer Viewer Panel", static async (eyes, page) =>
+        {
+            await page.Locator("#customer-service-filter, #customer-viewer-panel").First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Full customer viewer panel", Target.Window().Fully());
+        });
+    }
+
+    [Fact]
+    public Task Visual_TrendsPanel_MatchesBaseline()
+    {
+        return RunVisualTestAsync("/wiley-workspace/trends", "Trends and Projections Panel", static async (eyes, page) =>
+        {
+            await page.Locator("#trends-panel, [data-testid='trends-panel'], .trends-panel").First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Full trends panel", Target.Window().Fully());
+        });
+    }
+
+    [Fact]
+    public async Task Visual_DecisionSupportPanel_MatchesBaseline()
+    {
+        await RunVisualTestAsync("/wiley-workspace/decision-support", "Decision Support Panel", static async (eyes, page) =>
+        {
+            await page.Locator(".jarvis-chat-panel, #decision-support-panel").First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Full decision support panel", Target.Window().Fully());
+        });
+    }
+
+    [Fact]
+    public async Task Visual_QuickBooksImportPanel_MatchesBaseline()
+    {
+        await RunVisualTestAsync("/wiley-workspace/quickbooks-import", "QuickBooks Import Panel", static async (eyes, page) =>
+        {
+            await page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Full QuickBooks import panel", Target.Window().Fully());
+        });
+    }
+
+    [Fact]
+    public async Task Visual_RatesPanel_RateComparisonChart_MatchesBaseline()
+    {
+        await RunVisualTestAsync("/wiley-workspace/rates", "Rates Panel - Rate Comparison Chart", static async (eyes, page) =>
+        {
+            await page.Locator("#current-rate-input").WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            eyes.Check("Rate comparison chart region",
+                Target.Region(page.Locator("#rate-comparison-section, .rate-comparison-chart").First).Fully());
         });
     }
 
@@ -169,9 +249,6 @@ public sealed class WileyWorkspaceVisualTests : IDisposable
             eyes.Abort();
             Assert.Fail($"Visual test failed: {ex.Message}");
         }
-        finally
-        {
-            await browser.CloseAsync();
-        }
+        // browser and context are disposed by `await using` — no explicit CloseAsync needed
     }
 }
