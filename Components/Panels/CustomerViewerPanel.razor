@@ -6,7 +6,7 @@
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 
-<div class="space-y-4">
+<div id="customer-viewer-panel" class="space-y-4">
     <div class="grid gap-4 md:grid-cols-3">
         <SfCard>
             <CardHeader Title="Visible Customers" SubTitle="@FilteredCustomerCountDisplay" />
@@ -23,8 +23,8 @@
     </div>
 
     <div class="grid gap-3 md:grid-cols-3">
-        <SfTextBox Placeholder="Search customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
-        <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerServiceOptions" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Service" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+        <SfTextBox ID="customer-search-input" Placeholder="Search customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
+        <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@CustomerServiceOptions" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Service" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
         <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerCityLimitOptions" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
     </div>
 

@@ -4,8 +4,8 @@
 @using Syncfusion.Blazor.Inputs
 @using WileyCoWeb.State
 
-<div class="space-y-4">
-    <div class="grid gap-4 md:grid-cols-2">
+<div id="rates-panel" class="space-y-4">
+    <div id="rates-kpi-grid" class="grid gap-4 md:grid-cols-2">
         <SfCard>
             <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
             <CardContent Content="Editable rate used for instant break-even recalculation." />
@@ -16,11 +16,12 @@
         </SfCard>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2">
+    <div id="rates-input-chart-grid" class="grid gap-4 md:grid-cols-2">
         <div class="space-y-2">
             <SfNumericTextBox ID="current-rate-input" TValue="decimal" Value="@CurrentRate" ValueChange="OnCurrentRateChanged" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C2" />
             <p class="text-xs text-slate-500">Validated numeric rate editing updates the workspace instantly and keeps the rate panel aligned with the break-even calculation.</p>
         </div>
+        <div id="rates-panel-chart-section">
         <SfChart Title="Rate Comparison" AccessibilityDescription="Rate comparison chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="220px">
             <ChartArea>
                 <ChartAreaBorder Width="0"></ChartAreaBorder>
@@ -37,6 +38,7 @@
                 <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
             </ChartSeriesCollection>
         </SfChart>
+        </div>
     </div>
 
     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

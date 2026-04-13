@@ -170,15 +170,23 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         new("data-dashboard", "Data Dashboard")
     ];
 
-    protected void OpenPanel(string panelKey)
+    protected static string GetPanelRoute(string panelKey)
     {
         var normalized = NormalizePanelKey(panelKey);
-        var route = string.Equals(normalized, "overview", StringComparison.Ordinal)
+        return string.Equals(normalized, "overview", StringComparison.Ordinal)
             ? "/wiley-workspace"
             : $"/wiley-workspace/{normalized}";
+    }
 
+    protected void CloseSidebar()
+    {
         IsSidebarOpen = false;
-        NavigationManager.NavigateTo(route);
+    }
+
+    protected void OpenPanel(string panelKey)
+    {
+        IsSidebarOpen = false;
+        NavigationManager.NavigateTo(GetPanelRoute(panelKey));
     }
 
     protected void ToggleSidebar()

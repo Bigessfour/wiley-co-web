@@ -133,11 +133,7 @@ public partial class Program
                 // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
                 policy.AllowAnyHeader()
                     .AllowAnyMethod()
-                    .WithOrigins(
-                        "https://*.d2ellat1y3ljd9.amplifyapp.com",
-                        "https://main.d2ellat1y3ljd9.amplifyapp.com",
-                        "http://localhost:8080",
-                        "http://localhost:5*")
+                    .SetIsOriginAllowed(static origin => IsAllowedWorkspaceClientOrigin(origin))
                     .AllowCredentials();
             });
         });
@@ -240,6 +236,32 @@ public partial class Program
         app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
 
         await app.RunAsync();
+    }
+
+    private static bool IsAllowedWorkspaceClientOrigin(string origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin)
+            || !Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        const string amplifyDomain = "d2ellat1y3ljd9.amplifyapp.com";
+
+        return uri.Host.Equals(amplifyDomain, StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Equals($"main.{amplifyDomain}", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith($".{amplifyDomain}", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task ConfigureXaiSecretAsync(ConfigurationManager configuration, IWebHostEnvironment environment)

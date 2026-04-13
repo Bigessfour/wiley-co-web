@@ -5,8 +5,8 @@
 @using Syncfusion.Blazor.Inputs
 @using WileyCoWeb.State
 
-<div class="space-y-4">
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+<div id="break-even-panel" class="space-y-4">
+    <div id="break-even-kpi-grid" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SfCard>
             <CardHeader Title="Total Costs" SubTitle="@TotalCostsDisplay" />
             <CardContent Content="Operating and capital inputs used in the current scenario." />
@@ -25,7 +25,7 @@
         </SfCard>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2">
+    <div id="break-even-input-row" class="grid gap-4 md:grid-cols-2">
         <SfNumericTextBox TValue="decimal"
                           Value="@TotalCosts"
                           ValueChange="OnTotalCostsChanged"
@@ -44,7 +44,7 @@
                           Format="N0" />
     </div>
 
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div id="break-even-actions" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="OnSaveWorkspaceBaseline">
             @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
         </SfButton>
@@ -52,7 +52,7 @@
     </div>
 
     <div class="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
-        <div class="rounded-2xl border border-slate-200 p-3">
+        <div id="break-even-gauge-card" class="rounded-2xl border border-slate-200 p-3">
             <SfCircularGauge Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
                 <CircularGaugeAxes>
                     <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
@@ -70,7 +70,7 @@
             </SfCircularGauge>
         </div>
 
-        <div class="h-64 rounded-2xl border border-slate-200 p-3">
+        <div id="break-even-chart-card" class="h-64 rounded-2xl border border-slate-200 p-3">
             <SfChart Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
                 <ChartArea>
                     <ChartAreaBorder Width="0"></ChartAreaBorder>

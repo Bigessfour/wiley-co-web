@@ -5,7 +5,6 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
-@using Syncfusion.Blazor.Layouts
 @using WileyCoWeb.Components.Panels
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
@@ -16,7 +15,7 @@
 
 <div class="wiley-workspace min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
     <div class="mx-auto flex max-w-[96rem] flex-col gap-4">
-        <div class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 px-6 py-5 text-white shadow-lg">
+        <div id="workspace-overview-hero" class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 px-6 py-5 text-white shadow-lg">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley Widget</p>
@@ -46,7 +45,7 @@
             </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <div id="workspace-document-center" class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Document Center</p>
@@ -72,8 +71,8 @@
 
         <div class="flex flex-col gap-4 lg:flex-row">
             <aside class="workspace-sidebar @(IsSidebarOpen ? "block" : "hidden") lg:block lg:w-[22rem] lg:shrink-0">
-                <div class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <SfCard>
+                <div id="workspace-sidebar-shell" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <SfCard ID="workspace-enterprise-context-card">
                         <CardHeader Title="Enterprise Context" SubTitle="Select the active service and fiscal year" />
                         <CardContent>
                             <div class="space-y-4">
@@ -88,7 +87,7 @@
                         </CardContent>
                     </SfCard>
 
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div id="workspace-hosting-information" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Hosting Information</p>
                         <div class="mt-3 grid gap-2 text-xs text-slate-600">
                             <div><span class="font-semibold text-slate-700">Environment:</span> @HostingEnvironmentName</div>
@@ -99,21 +98,21 @@
                         </div>
                     </div>
 
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div id="workspace-navigation-card" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace Navigation</p>
                         <div class="mt-2 grid gap-2">
                             @foreach (var panelNavItem in PanelNavItems)
                             {
-                                <SfButton CssClass="@(ActivePanelKey == panelNavItem.Key ? "e-primary" : string.Empty)"
-                                          IsPrimary="@(ActivePanelKey == panelNavItem.Key)"
-                                          OnClick="() => OpenPanel(panelNavItem.Key)">
+                                <a class="workspace-panel-link @(ActivePanelKey == panelNavItem.Key ? "is-active" : string.Empty)"
+                                   href="@GetPanelRoute(panelNavItem.Key)"
+                                   @onclick="CloseSidebar">
                                     @panelNavItem.Label
-                                </SfButton>
+                                </a>
                             }
                         </div>
                     </div>
 
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div id="workspace-global-actions-card" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Global Actions</p>
                         <div class="mt-2 grid gap-2">
                             <SfButton Disabled="@IsLoadingWorkspace" OnClick="RefreshWorkspaceAsync">@(IsLoadingWorkspace ? "Refreshing..." : "Reload workspace")</SfButton>
@@ -128,7 +127,7 @@
                         </div>
                     </div>
 
-                    <div class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                    <div id="workspace-status-card" class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
                         <div id="workspace-load-status"><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
                         <div class="mt-2"><span class="font-semibold text-slate-700">Scenarios:</span> <span id="scenario-persistence-status">@ScenarioPersistenceStatus</span></div>
                         <div class="mt-2">
@@ -143,8 +142,8 @@
                 </div>
             </aside>
 
-            <main class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-                <div class="mb-4 border-b border-slate-200 pb-3">
+            <main id="workspace-main-content" class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                <div id="workspace-breadcrumb" class="mb-4 border-b border-slate-200 pb-3">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@BreadcrumbSection</p>
                     <div class="mt-1 flex items-center gap-2 text-sm text-slate-500">
                         <span>Workspace</span>
@@ -155,73 +154,92 @@
 
                 @if (IsOverviewMode)
                 {
-                    <SfDashboardLayout ID="workspace-overview-dashboard"
-                                       Columns="6"
-                                       CellSpacing="@(new double[] { 16, 16 })"
-                                       AllowDragging="false"
-                                       AllowResizing="false"
-                                       EnablePersistence="false"
-                                       MediaQuery="(max-width: 1200px)"
-                                       ShowGridLines="false">
-                        <DashboardLayoutPanels>
-                            <DashboardLayoutPanel Id="overview-break-even" Row="0" Column="0" SizeX="3" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Break-Even</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">Current @CurrentRateDisplay · Recommended @BreakEvenRateDisplay · Delta @RateDeltaDisplay</p>
-                                    <div class="mt-3"><SfButton CssClass="e-primary" IsPrimary="true" OnClick='() => OpenPanel("break-even")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-rates" Row="0" Column="3" SizeX="3" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Rates</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">Rate editing, comparison chart, and snapshot persistence.</p>
-                                    <div class="mt-3"><SfButton CssClass="e-primary" IsPrimary="true" OnClick='() => OpenPanel("rates")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-import" Row="1" Column="0" SizeX="2" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">QuickBooks Import</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">Upload and validate QuickBooks records before commit.</p>
-                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("quickbooks-import")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-scenario" Row="1" Column="2" SizeX="2" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Scenario Planner</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">Build what-if cost changes and compare adjusted break-even.</p>
-                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("scenario")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-customers" Row="1" Column="4" SizeX="2" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Customer Viewer</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">@FilteredCustomerCountDisplay customers match active filters.</p>
-                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("customers")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-trends" Row="2" Column="0" SizeX="3" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Trends & Projections</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">Historical and projected rate trend line by year.</p>
-                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("trends")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-ai" Row="2" Column="3" SizeX="3" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Decision Support</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">Context-aware Jarvis recommendations for operational and rate decisions.</p>
-                                    <div class="mt-3"><SfButton OnClick='() => OpenPanel("decision-support")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                            <DashboardLayoutPanel Id="overview-data-dashboard" Row="3" Column="0" SizeX="6" SizeY="1">
-                                <HeaderTemplate><h3 class="text-base font-semibold text-slate-900">Data Dashboard</h3></HeaderTemplate>
-                                <ContentTemplate>
-                                    <p class="text-sm text-slate-600">KPI gauges, coverage ratio, rate adequacy, scenario waterfall, rate trend, and customer distribution.</p>
-                                    <div class="mt-3"><SfButton CssClass="e-primary" IsPrimary="true" OnClick='() => OpenPanel("data-dashboard")'>Open full view</SfButton></div>
-                                </ContentTemplate>
-                            </DashboardLayoutPanel>
-                        </DashboardLayoutPanels>
-                    </SfDashboardLayout>
+                    <section id="workspace-overview-dashboard" class="workspace-overview-grid" aria-label="Workspace overview panels">
+                        <article id="overview-break-even" class="workspace-overview-card workspace-overview-card-featured">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Break-Even</p>
+                                <h3>Core rate position</h3>
+                                <p>Current @CurrentRateDisplay, recommended @BreakEvenRateDisplay, and delta @RateDeltaDisplay with direct baseline controls.</p>
+                                <div class="workspace-overview-card-metrics">
+                                    <span>Total costs @TotalCostsDisplay</span>
+                                    <span>Projected volume @ProjectedVolumeDisplay</span>
+                                </div>
+                            </div>
+                            <a class="workspace-card-link workspace-card-link-primary" href="@GetPanelRoute("break-even")" @onclick="CloseSidebar">Open Break-Even</a>
+                        </article>
+
+                        <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Rates</p>
+                                <h3>Editable rate controls</h3>
+                                <p>Adjust the current rate, compare it against the recommendation, and save a point-in-time snapshot.</p>
+                                <div class="workspace-overview-card-metrics">
+                                    <span>Current @CurrentRateDisplay</span>
+                                    <span>Target @BreakEvenRateDisplay</span>
+                                </div>
+                            </div>
+                            <a class="workspace-card-link workspace-card-link-primary" href="@GetPanelRoute("rates")" @onclick="CloseSidebar">Open Rates</a>
+                        </article>
+
+                        <article id="overview-import" class="workspace-overview-card">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">QuickBooks Import</p>
+                                <h3>Ingest and validate source records</h3>
+                                <p>Upload QuickBooks exports, inspect validation feedback, and stage records before commit.</p>
+                            </div>
+                            <a class="workspace-card-link" href="@GetPanelRoute("quickbooks-import")" @onclick="CloseSidebar">Open Import</a>
+                        </article>
+
+                        <article id="overview-scenario" class="workspace-overview-card">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Scenario Planner</p>
+                                <h3>Model what-if changes</h3>
+                                <p>Stress cost assumptions, compare adjusted break-even outcomes, and persist named scenarios.</p>
+                            </div>
+                            <a class="workspace-card-link" href="@GetPanelRoute("scenario")" @onclick="CloseSidebar">Open Scenario Planner</a>
+                        </article>
+
+                        <article id="overview-customers" class="workspace-overview-card">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Customer Viewer</p>
+                                <h3>Review affected accounts</h3>
+                                <p>@FilteredCustomerCountDisplay customers currently match the active filters for export and operational review.</p>
+                            </div>
+                            <a class="workspace-card-link" href="@GetPanelRoute("customers")" @onclick="CloseSidebar">Open Customer Viewer</a>
+                        </article>
+
+                        <article id="overview-trends" class="workspace-overview-card">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Trends</p>
+                                <h3>Projected rate movement</h3>
+                                <p>Inspect the year-by-year rate line and understand how the active assumptions move over time.</p>
+                            </div>
+                            <a class="workspace-card-link" href="@GetPanelRoute("trends")" @onclick="CloseSidebar">Open Trends</a>
+                        </article>
+
+                        <article id="overview-ai" class="workspace-overview-card">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Decision Support</p>
+                                <h3>Jarvis guidance</h3>
+                                <p>Pull context-aware recommendations tied to the current enterprise, year, and scenario state.</p>
+                            </div>
+                            <a class="workspace-card-link" href="@GetPanelRoute("decision-support")" @onclick="CloseSidebar">Open Decision Support</a>
+                        </article>
+
+                        <article id="overview-data-dashboard" class="workspace-overview-card workspace-overview-card-wide">
+                            <div class="workspace-overview-card-copy">
+                                <p class="workspace-overview-card-kicker">Data Dashboard</p>
+                                <h3>Executive visual summary</h3>
+                                <p>KPI gauges, scenario pressure, customer mix, and trend visuals in one consolidated dashboard.</p>
+                                <div class="workspace-overview-card-metrics">
+                                    <span>Enterprise @SelectedEnterprise</span>
+                                    <span>Fiscal year @SelectedFiscalYear</span>
+                                    <span>Scenario pressure @ScenarioCostTotalDisplay</span>
+                                </div>
+                            </div>
+                            <a class="workspace-card-link workspace-card-link-primary" href="@GetPanelRoute("data-dashboard")" @onclick="CloseSidebar">Open Data Dashboard</a>
+                        </article>
+                    </section>
                 }
                 else
                 {
@@ -323,27 +341,6 @@
         overflow: auto;
     }
 
-    .wiley-workspace .e-dashboardlayout {
-        background: transparent;
-        border: 0;
-    }
-
-    .wiley-workspace .e-panel {
-        border-radius: 1.25rem;
-        overflow: hidden;
-    }
-
-    .wiley-workspace .e-panel-header {
-        border-bottom: 1px solid rgba(148, 163, 184, 0.22);
-        background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 0.92));
-        padding: 1rem 1.125rem;
-    }
-
-    .wiley-workspace .e-panel-content {
-        background: transparent;
-        padding: 1rem 1.125rem 1.125rem;
-    }
-
     .wiley-workspace .e-card {
         height: 100%;
         border: 1px solid rgba(148, 163, 184, 0.22);
@@ -351,9 +348,140 @@
         box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
+    .wiley-workspace .workspace-panel-link,
+    .wiley-workspace .workspace-card-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        border-radius: 0.85rem;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 0.92rem;
+        font-weight: 600;
+        line-height: 1.2;
+        padding: 0.75rem 1rem;
+        text-decoration: none;
+        transition:
+            background-color 120ms ease,
+            border-color 120ms ease,
+            color 120ms ease,
+            transform 120ms ease;
+    }
+
+    .wiley-workspace .workspace-panel-link:hover,
+    .wiley-workspace .workspace-card-link:hover,
+    .wiley-workspace .workspace-panel-link.is-active {
+        background: #082f49;
+        border-color: #0ea5e9;
+        color: #f8fafc;
+        transform: translateY(-1px);
+    }
+
+    .wiley-workspace .workspace-panel-link {
+        width: 100%;
+    }
+
+    .wiley-workspace .workspace-card-link-primary {
+        background: #0f172a;
+        border-color: #0f172a;
+        color: #f8fafc;
+    }
+
+    .wiley-workspace .workspace-overview-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .wiley-workspace .workspace-overview-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1rem;
+        min-height: 15rem;
+        padding: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 1.25rem;
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+        grid-column: span 4;
+    }
+
+    .wiley-workspace .workspace-overview-card-featured {
+        grid-column: span 6;
+        min-height: 16rem;
+    }
+
+    .wiley-workspace .workspace-overview-card-wide {
+        grid-column: span 12;
+        min-height: 13rem;
+        background: linear-gradient(135deg, #eff6ff, #f8fafc 60%, #ecfeff);
+    }
+
+    .wiley-workspace .workspace-overview-card-copy {
+        display: grid;
+        gap: 0.6rem;
+    }
+
+    .wiley-workspace .workspace-overview-card-copy h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.15rem;
+        line-height: 1.25;
+    }
+
+    .wiley-workspace .workspace-overview-card-copy p {
+        margin: 0;
+        color: #475569;
+        line-height: 1.6;
+    }
+
+    .wiley-workspace .workspace-overview-card-kicker {
+        margin: 0;
+        color: #0284c7;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+    }
+
+    .wiley-workspace .workspace-overview-card-metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding-top: 0.25rem;
+    }
+
+    .wiley-workspace .workspace-overview-card-metrics span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 999px;
+        background: rgba(226, 232, 240, 0.75);
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+
     @@media (max-width: 1024px) {
         .wiley-workspace .workspace-sidebar {
             max-height: none;
+        }
+
+        .wiley-workspace .workspace-overview-card,
+        .wiley-workspace .workspace-overview-card-featured,
+        .wiley-workspace .workspace-overview-card-wide {
+            grid-column: span 12;
+            min-height: auto;
+        }
+    }
+
+    @@media (max-width: 720px) {
+        .wiley-workspace .workspace-overview-grid {
+            grid-template-columns: 1fr;
         }
     }
 </style>

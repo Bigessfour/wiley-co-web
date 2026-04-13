@@ -3,7 +3,7 @@
 @using Syncfusion.Blazor.Inputs
 @using WileyCoWeb.State
 
-<div class="space-y-4">
+<div id="scenario-panel" class="space-y-4">
     <div class="grid gap-4 md:grid-cols-2">
         <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" Placeholder="Scenario Adjusted Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
         <SfNumericTextBox TValue="decimal" Value="@ScenarioCostTotal" Enabled="false" Placeholder="Scenario Cost Total" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C0" />

@@ -319,6 +319,41 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
     }
 
     [Fact]
+    public async Task GetScenarios_ReturnsCorsHeaders_ForAmplifyPreviewOrigin()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/workspace/scenarios?enterprise=Water%20Utility&fiscalYear=2026");
+        request.Headers.TryAddWithoutValidation("Origin", "https://preview-branch.d2ellat1y3ljd9.amplifyapp.com");
+
+        using var response = await client.SendAsync(request);
+
+        response.EnsureSuccessStatusCode();
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedOrigins));
+        Assert.Contains("https://preview-branch.d2ellat1y3ljd9.amplifyapp.com", allowedOrigins);
+
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credentials));
+        Assert.Contains("true", credentials, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetScenarios_DoesNotReturnCorsHeaders_ForUnknownOrigin()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/workspace/scenarios?enterprise=Water%20Utility&fiscalYear=2026");
+        request.Headers.TryAddWithoutValidation("Origin", "https://example.com");
+
+        using var response = await client.SendAsync(request);
+
+        response.EnsureSuccessStatusCode();
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Credentials"));
+    }
+
+    [Fact]
     public async Task PostSnapshotExports_ReturnsBadRequest_WhenSnapshotPayloadIsMissing()
     {
         await _factory.ResetDatabaseAsync();

@@ -12,11 +12,12 @@ namespace WileyCoWeb.E2ETests;
 /// assertion, then takes an Applitools Eyes visual snapshot. This proves both that
 /// panel fields connect to live data AND that the rendered output looks correct.
 /// Tests gate on WILEYCO_E2E_BASE_URL and APPLITOOLS_API_KEY — skip silently when absent.
-/// Results appear at https://eyes.applitools.com under batch "Wiley Widget Visual Suite".
+/// Results are reviewed in the Applitools Eyes dashboard; a small local summary is emitted for CI and log review.
 /// </summary>
 public sealed class WileyWorkspaceHybridE2ETests : IDisposable
 {
     private const int ReadyTimeoutMilliseconds  = 90_000;
+    private const int NavigationTimeoutMilliseconds = 30_000;
     private const int ActionTimeoutMilliseconds = 30_000;
     private const int ChartSettleMilliseconds   = 15_000;
 
@@ -24,7 +25,9 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
 
     public void Dispose()
     {
-        _ = _runner.GetAllTestResults(false);
+        var summary = _runner.GetAllTestResults(false);
+        var exportedSummary = ApplitoolsResultWriter.WriteSummary(summary, nameof(WileyWorkspaceHybridE2ETests));
+        ApplitoolsResultWriter.ReactToResults(exportedSummary);
     }
 
     // ─── Rates Panel ─────────────────────────────────────────────────────────────
@@ -54,18 +57,18 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
     {
         await RunHybridTestAsync("/wiley-workspace/break-even", "Hybrid - Break-Even Edit", async (eyes, page) =>
         {
-            var panel = page.Locator("#break-even-panel");
-            await panel.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            var costsInput = page.GetByPlaceholder("Total Costs");
+            var volumeInput = page.GetByPlaceholder("Projected Volume");
 
-            var costsInput  = panel.GetByPlaceholder("Total Costs");
-            var volumeInput = panel.GetByPlaceholder("Projected Volume");
+            await costsInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            await volumeInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
 
             await costsInput.FillAsync("24000");
             await volumeInput.FillAsync("400");
             await volumeInput.PressAsync("Tab");
 
             // Break-even rate = TotalCosts / ProjectedVolume = 24000 / 400 = 60
-            await Expect(panel).ToContainTextAsync("60", new() { Timeout = ActionTimeoutMilliseconds });
+            await Expect(page.GetByText("60", new() { Exact = false }).First).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMilliseconds });
 
             eyes.Check("Break-even panel after recalculation", Target.Window().Fully());
         });
@@ -78,11 +81,12 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
     {
         await RunHybridTestAsync("/wiley-workspace/scenario", "Hybrid - Scenario Planner Edit", async (eyes, page) =>
         {
-            var panel = page.Locator("#scenario-panel");
-            await panel.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            await page.GetByText("Base Break-Even", new() { Exact = true }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
 
             var scenarioName = $"Hybrid-{Guid.NewGuid():N}";
-            var nameInput    = panel.GetByPlaceholder("Scenario name");
+            var nameInput = page.Locator("#scenario-name-input");
+            await nameInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ActionTimeoutMilliseconds });
             await nameInput.FillAsync(scenarioName);
 
             await page.GetByRole(AriaRole.Button, new() { Name = "Save scenario" }).ClickAsync();
@@ -101,10 +105,10 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
     {
         await RunHybridTestAsync("/wiley-workspace/customers", "Hybrid - Customer Viewer Filter", async (eyes, page) =>
         {
-            var panel = page.Locator("#customer-viewer-panel, [data-testid='customer-grid'], .customer-grid").First;
-            await panel.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            await page.GetByText("Visible Customers", new() { Exact = true }).WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
 
-            var serviceFilter = page.Locator("#customer-service-filter, [data-testid='service-filter']").First;
+            var serviceFilter = page.GetByPlaceholder("Service").First;
             await Expect(serviceFilter).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMilliseconds });
 
             eyes.Check("Customer viewer panel with service filter", Target.Window().Fully());
@@ -118,11 +122,11 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
     {
         await RunHybridTestAsync("/wiley-workspace/trends", "Hybrid - Trends Panel Projections", async (eyes, page) =>
         {
-            var panel = page.Locator("#trends-panel, [data-testid='trends-panel'], .trends-panel").First;
-            await panel.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
+            var panelTitle = page.GetByText("Historical and Projected Rates", new() { Exact = true });
+            await panelTitle.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = ChartSettleMilliseconds });
 
-            await Expect(panel).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMilliseconds });
-            await Expect(panel).ToContainTextAsync("Trend", new() { Timeout = ActionTimeoutMilliseconds });
+            await Expect(panelTitle).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMilliseconds });
+            await Expect(page.GetByText("Projection", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMilliseconds });
 
             eyes.Check("Trends panel with projection data", Target.Window().Fully());
         });
@@ -206,18 +210,12 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
         var baseUrl       = Environment.GetEnvironmentVariable("WILEYCO_E2E_BASE_URL");
         var applitoolsKey = Environment.GetEnvironmentVariable("APPLITOOLS_API_KEY");
 
-        if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(applitoolsKey))
-            return;
+        VisualTestHarness.EnsureConfigured(baseUrl, applitoolsKey);
 
-        var config = new Configuration();
-        config.SetBatch(new BatchInfo("Wiley Widget Visual Suite"));
-        config.SetAppName("Wiley Widget");
-        config.SetTestName(testName);
-        config.SetViewportSize(new RectangleSize(1280, 800));
-        config.SetApiKey(applitoolsKey);
+        var settings = ApplitoolsEyesConfiguration.Create(testName, applitoolsKey!);
 
         var eyes = new Eyes(_runner);
-        eyes.SetConfiguration(config);
+        eyes.SetConfiguration(settings.Configuration);
 
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
@@ -228,25 +226,28 @@ public sealed class WileyWorkspaceHybridE2ETests : IDisposable
         });
         await context.AddInitScriptAsync("window.localStorage.clear(); window.sessionStorage.clear();");
         var page = await context.NewPageAsync();
+        List<string> consoleMessages = [];
+        List<string> pageErrors = [];
+        VisualTestHarness.AttachDiagnostics(page, consoleMessages, pageErrors);
 
         try
         {
-            await page.GotoAsync(
-                $"{baseUrl.TrimEnd('/')}{path}",
-                new() { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await VisualTestHarness.LoadWorkspaceAsync(
+                page,
+                baseUrl!,
+                path,
+                ReadyTimeoutMilliseconds,
+                NavigationTimeoutMilliseconds);
 
-            await page.WaitForSelectorAsync(
-                "#workspace-load-status:has-text('Workspace ready.')",
-                new() { Timeout = ReadyTimeoutMilliseconds });
-
-            eyes.Open(page, "Wiley Widget", testName, new RectangleSize(1280, 800));
+            eyes.Open(page, settings.AppName, testName, settings.ViewportSize);
             await testBody(eyes, page);
             eyes.Close(false);
         }
         catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
         {
             eyes.Abort();
-            Assert.Fail($"Hybrid test failed: {ex.Message}");
+            var diagnostics = VisualTestHarness.BuildDiagnostics(page, consoleMessages, pageErrors);
+            Assert.Fail($"Hybrid test failed: {ex.Message}{Environment.NewLine}{diagnostics}");
         }
         // browser and context are disposed by `await using` — no explicit CloseAsync needed
     }
