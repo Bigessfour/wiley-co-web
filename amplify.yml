@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
-        - export DOTNET_SDK_VERSION="$(node -p \"require('./global.json').sdk.version\")"
+        - export DOTNET_SDK_VERSION=$(node -p 'require("./global.json").sdk.version')
         - bash dotnet-install.sh --version "$DOTNET_SDK_VERSION" --install-dir $HOME/.dotnet
         - export PATH="$HOME/.dotnet:$PATH"
         - dotnet --version
