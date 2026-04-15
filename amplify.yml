@@ -4,7 +4,8 @@ frontend:
     preBuild:
       commands:
         - curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
-        - bash dotnet-install.sh --channel 9.0 --install-dir $HOME/.dotnet
+        - export DOTNET_SDK_VERSION="$(node -p \"require('./global.json').sdk.version\")"
+        - bash dotnet-install.sh --version "$DOTNET_SDK_VERSION" --install-dir $HOME/.dotnet
         - export PATH="$HOME/.dotnet:$PATH"
         - dotnet --version
         - dotnet restore WileyCoWeb.slnx
@@ -52,8 +53,14 @@ frontend:
           export COGNITO_USER_POOL_ID="${COGNITO_USER_POOL_ID:-$(read_secret_field COGNITO_USER_POOL_ID)}"
           export COGNITO_APP_CLIENT_ID="${COGNITO_APP_CLIENT_ID:-$(read_secret_field COGNITO_APP_CLIENT_ID)}"
 
-          # Amplify hardening per plan and Amazon Q evaluation: set portal URL + load xAI key from AWS Secrets Manager "Grok" (unifies with Program.cs ConfigureXaiSecretAsync; node parser matches existing Syncfusion pattern to avoid jq in build image)
-          export WILEY_WORKSPACE_API_BASE_ADDRESS="https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod"
+          if [ -n "${WILEY_WORKSPACE_API_BASE_ADDRESS:-}" ]; then
+            echo "Generating wwwroot/appsettings.Workspace.local.json from WILEY_WORKSPACE_API_BASE_ADDRESS."
+            printf '{"WorkspaceApiBaseAddress":"%s"}' "$WILEY_WORKSPACE_API_BASE_ADDRESS" > wwwroot/appsettings.Workspace.local.json
+          else
+            echo "No WILEY_WORKSPACE_API_BASE_ADDRESS provided; the client will default to same-origin API routing."
+          fi
+
+          # Amplify hardening per plan and Amazon Q evaluation: load xAI key from AWS Secrets Manager "Grok" (unifies with Program.cs ConfigureXaiSecretAsync; node parser matches existing Syncfusion pattern to avoid jq in build image)
           if secret_string="$(aws secretsmanager get-secret-value --secret-id "Grok" --query SecretString --output text 2>/dev/null)"; then
             export XAI_API_KEY="$(node -e '
               const raw = process.env.secret_string || "{}";
