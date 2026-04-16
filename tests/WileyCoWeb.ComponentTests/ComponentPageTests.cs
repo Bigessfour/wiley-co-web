@@ -43,6 +43,21 @@ public sealed class ComponentPageTests
 		Assert.Contains("Rate Study Console", cut.Markup);
 		Assert.Contains("Workspace", cut.Markup);
 		Assert.Contains("Syncfusion 33.1.44", cut.Markup);
+		Assert.Equal("/", cut.Find(".app-brand-link").GetAttribute("href"));
+	}
+
+	[Fact]
+	public void Routes_RendersNotFoundFallback_ForUnknownRoute()
+	{
+		using var context = CreateContext();
+		var navigationManager = context.Services.GetRequiredService<NavigationManager>();
+		navigationManager.NavigateTo("/missing-route");
+
+		var cut = context.RenderComponent<Routes>();
+
+		Assert.Contains("Page not found", cut.Markup);
+		Assert.Contains("Return home", cut.Markup);
+		Assert.Contains("Open workspace overview", cut.Markup);
 	}
 
 	[Fact]

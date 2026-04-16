@@ -13,13 +13,13 @@ public sealed class WileyWorkspaceE2ETests
 		await RunWorkspaceTestAsync(async page =>
 		{
 			await Expect(page.GetByText("Utility Rate Study Workspace", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("Break-Even Panel", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("Rates Panel", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("Scenario Planner", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("Customer Viewer", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("Trends & Projections", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("QuickBooks Import Panel", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.GetByText("Decision Support", new() { Exact = true })).ToBeVisibleAsync();
+			await Expect(page.Locator("a[href='/wiley-workspace/break-even']").First).ToContainTextAsync("Break-Even");
+			await Expect(page.Locator("a[href='/wiley-workspace/rates']").First).ToContainTextAsync("Rates");
+			await Expect(page.Locator("a[href='/wiley-workspace/scenario']").First).ToContainTextAsync("Scenario Planner");
+			await Expect(page.Locator("a[href='/wiley-workspace/customers']").First).ToContainTextAsync("Customer Viewer");
+			await Expect(page.Locator("a[href='/wiley-workspace/trends']").First).ToContainTextAsync("Trends");
+			await Expect(page.Locator("a[href='/wiley-workspace/quickbooks-import']").First).ToContainTextAsync("QuickBooks Import");
+			await Expect(page.Locator("a[href='/wiley-workspace/decision-support']").First).ToContainTextAsync("Decision Support");
 		});
 	}
 
@@ -28,6 +28,8 @@ public sealed class WileyWorkspaceE2ETests
 	{
 		await RunWorkspaceTestAsync(async page =>
 		{
+			await OpenPanelAsync(page, "rates");
+
 			var currentRate = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
 			await currentRate.FillAsync("63.50");
 
@@ -44,7 +46,7 @@ public sealed class WileyWorkspaceE2ETests
 		await RunWorkspaceTestAsync(async page =>
 		{
 			var scenarioName = $"E2E Scenario {Guid.NewGuid():N}";
-			var scenarioNameInput = page.Locator("#scenario-panel").GetByPlaceholder("Scenario name");
+			var scenarioNameInput = page.Locator("#scenario-name-input");
 
 			await scenarioNameInput.FillAsync(scenarioName);
 			await page.GetByRole(AriaRole.Button, new() { Name = "Save scenario" }).ClickAsync();
@@ -59,11 +61,14 @@ public sealed class WileyWorkspaceE2ETests
 	{
 		await RunWorkspaceTestAsync(async page =>
 		{
+			await OpenPanelAsync(page, "rates");
 			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
+			await currentRateInput.FillAsync("71.25");
+
+			await OpenPanelAsync(page, "break-even");
 			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
 			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
 
-			await currentRateInput.FillAsync("71.25");
 			await totalCostsInput.FillAsync("49250");
 			await projectedVolumeInput.FillAsync("8400");
 
@@ -85,12 +90,15 @@ public sealed class WileyWorkspaceE2ETests
 		await RunWorkspaceTestAsync(async page =>
 		{
 			var scenarioName = $"E2E Scenario {Guid.NewGuid():N}";
+			await OpenPanelAsync(page, "rates");
 			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
+			await currentRateInput.FillAsync("88.25");
+
+			await OpenPanelAsync(page, "break-even");
 			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
 			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
-			var scenarioNameInput = page.Locator("#scenario-panel").GetByPlaceholder("Scenario name");
+			var scenarioNameInput = page.Locator("#scenario-name-input");
 
-			await currentRateInput.FillAsync("88.25");
 			await totalCostsInput.FillAsync("45000");
 			await projectedVolumeInput.FillAsync("7000");
 			await scenarioNameInput.FillAsync(scenarioName);
@@ -100,7 +108,10 @@ public sealed class WileyWorkspaceE2ETests
 			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync("Saved scenario", new() { Timeout = 30000 });
 			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync(scenarioName, new() { Timeout = 30000 });
 
+			await OpenPanelAsync(page, "rates");
 			await currentRateInput.FillAsync("99.75");
+
+			await OpenPanelAsync(page, "break-even");
 			await totalCostsInput.FillAsync("52000");
 			await projectedVolumeInput.FillAsync("8100");
 
@@ -109,9 +120,11 @@ public sealed class WileyWorkspaceE2ETests
 			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync("Applied saved scenario", new() { Timeout = 30000 });
 			await Expect(page.Locator("#scenario-persistence-status")).ToContainTextAsync(scenarioName, new() { Timeout = 30000 });
 
-			Assert.Equal("88.25", NormalizeNumericValue(await currentRateInput.InputValueAsync()));
 			Assert.Equal("45000", NormalizeNumericValue(await totalCostsInput.InputValueAsync()));
 			Assert.Equal("7000", NormalizeNumericValue(await projectedVolumeInput.InputValueAsync()));
+
+			await OpenPanelAsync(page, "rates");
+			Assert.Equal("88.25", NormalizeNumericValue(await currentRateInput.InputValueAsync()));
 		});
 	}
 
@@ -125,6 +138,8 @@ public sealed class WileyWorkspaceE2ETests
 		{
 			await RunWorkspaceTestAsync(async page =>
 			{
+				await OpenPanelAsync(page, "quickbooks-import");
+
 				var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });
 				var fileChooser = await page.RunAndWaitForFileChooserAsync(() => browseButton.ClickAsync());
 				await fileChooser.SetFilesAsync(tempFile);
@@ -157,6 +172,8 @@ public sealed class WileyWorkspaceE2ETests
 	{
 		await RunWorkspaceTestAsync(async page =>
 		{
+			await OpenPanelAsync(page, "decision-support");
+
 			var question = $"What does the workspace know about FY 2026? {Guid.NewGuid():N}";
 			var questionPrefix = question[..Math.Min(question.Length, 48)];
 			var chatBox = page.Locator("#jarvis-question-input");
@@ -255,6 +272,11 @@ public sealed class WileyWorkspaceE2ETests
 		return "Date,Type,Num,Name,Memo,Account,Split,Amount,Balance,Clr\n" +
 			   "01/01/2026,Invoice,1001,Town of Wiley,Water Billing,Water Revenue,Accounts Receivable,125.00,125.00,C\n" +
 			   "01/02/2026,Payment,1002,Town of Wiley,Payment Received,Accounts Receivable,Water Revenue,-125.00,0.00,C\n";
+	}
+
+	private static async Task OpenPanelAsync(IPage page, string panelKey)
+	{
+		await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
 	}
 
 	private static string NormalizeNumericValue(string value)

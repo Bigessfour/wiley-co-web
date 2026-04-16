@@ -28,16 +28,18 @@ Validated on April 15, 2026 using the AWS CLI and the current repository:
 	- `wiley-widget/api/database-url`
 	- `wiley-widget/api/xai-api-key`
 	- `wiley-widget/api/syncfusion-license-key`
-- Amplify app `d2ellat1y3ljd9` and branch `main` now carry `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com`.
+- Amplify app `d2ellat1y3ljd9` and branch `main` now carry `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com` without storing the Syncfusion license in Amplify environment variables.
+- The Syncfusion build-time license is now stored in the Amplify Gen 1 environment-secret path `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY`.
 - App Runner `/health` currently returns `200 Healthy`.
-- App Runner `/api/workspace/snapshot` currently returns `200`, but with empty `enterpriseOptions`, empty `selectedEnterprise`, and zeroed financials.
-- App Runner `/api/workspace/knowledge` currently returns `500`.
+- App Runner `/api/workspace/snapshot` currently returns `200` with populated enterprise options and live workspace data.
+- App Runner `/api/workspace/knowledge` currently returns `200` against the current snapshot payload.
 - App Runner `/api/ai/chat` currently returns `200` with a fallback onboarding response.
-- App Runner `/api/workspace/reference-data/import` currently returns `404`, even though that route exists in the repository, which indicates the deployed App Runner revision is behind the current repo code.
+- App Runner `/api/workspace/reference-data/import` currently returns `400` with `Import data folder '/app/Import Data' was not found.`, which confirms the route is deployed and that production does not currently bundle the repo-local bootstrap folder.
+- Aurora PostgreSQL remains unencrypted at rest (`StorageEncrypted=false`) and requires a planned migration.
 - Amplify release job `32` failed because the build used a floating `.NET 9` SDK while the cloned repo required the exact `global.json` version.
 - The workspace now contains the corrected [amplify.yml](../amplify.yml) that installs the pinned SDK version, but release job `33` confirmed that Amplify is still building from the tracked GitHub branch copy of `amplify.yml`. The branch used for production releases must carry the same file change before the public release can succeed.
 
-Production conclusion: the browser shell is deployed, the thin API runtime infrastructure exists, and the major server-side seams are complete in the repo. The remaining blockers are live deployment drift, missing production bootstrap data, and final Amplify/App Runner cutover verification.
+Production conclusion: the browser shell is deployed, the thin API runtime infrastructure exists, and the current App Runner revision is serving the main workspace routes. The remaining blockers are final Amplify cutover verification, a durable production reference-data source policy, Aurora encryption migration, and the longer-term API hosting roadmap.
 
 ## Provisioned Execution Checklist
 
@@ -50,11 +52,12 @@ Production conclusion: the browser shell is deployed, the thin API runtime infra
 - [x] Build and push the API container image to ECR.
 - [x] Create App Runner service `wiley-widget-api` with VPC egress and `/health` health checks.
 - [x] Update Amplify app/branch configuration so the next release targets the App Runner URL instead of the Grok proxy.
+- [x] Move the Syncfusion build-time license out of Amplify environment variables and into the Amplify Gen 1 environment-secret path.
 - [x] Validate `/health` from the public App Runner hostname.
 - [x] Validate `/api/ai/chat` from the public App Runner hostname.
-- [ ] Validate `/api/workspace/snapshot` with live enterprise bootstrap data instead of the current empty-enterprise response.
-- [ ] Validate `/api/workspace/knowledge` without the current `500` failure.
-- [ ] Validate that the deployed App Runner revision includes `/api/workspace/reference-data/import` and the other current repo routes.
+- [x] Validate `/api/workspace/snapshot` with live enterprise bootstrap data instead of the current empty-enterprise response.
+- [x] Validate `/api/workspace/knowledge` without the current `500` failure.
+- [x] Validate that the deployed App Runner revision includes `/api/workspace/reference-data/import` and the other current repo routes.
 - [ ] Start and verify the Amplify release that publishes the staged `WILEY_WORKSPACE_API_BASE_ADDRESS` with the corrected pinned-SDK build spec.
 - [ ] Replace the raw App Runner hostname with final public API DNS if `api.wileywidget.townofwiley.gov` is required before go-live.
 
@@ -105,6 +108,7 @@ Recommended secret sources:
 
 - Store xAI in Secrets Manager under `Grok`.
 - Store the database connection string in Secrets Manager or inject it from the App Runner service configuration.
+- Store the Amplify Syncfusion build-time license in Systems Manager Parameter Store at `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY` for the `main` build.
 - Avoid pushing any API runtime secret into Amplify static hosting unless it must be exposed to the browser, which is not the case here.
 
 ### 4. IAM For The API Runtime
@@ -155,43 +159,73 @@ These original plan items are now closed in the repository and should not be tre
 
 These are the concrete gaps still blocking the stated goals.
 
-### Gap 1. App Runner Runtime Drift
+### Gap 1. Amplify Public Cutover Is Not Yet Re-verified
 
 Current state:
 
-- App Runner exists and `/health` succeeds.
-- The deployed service appears to be behind the current repository revision because `/api/workspace/reference-data/import` returns `404` even though the route exists locally.
-- `/api/workspace/knowledge` still fails with `500` in the live runtime.
+- App Runner is serving `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, and `/api/workspace/reference-data/import` as expected.
+- The Syncfusion license has been moved out of Amplify environment variables and into the Amplify Gen 1 secret path.
+- The remaining unresolved cutover item is a successful Amplify release from the tracked GitHub branch using the corrected pinned-SDK build spec.
 
 Closure action:
 
-- Redeploy the current API image/revision to App Runner.
-- Re-run validation for `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, and `/api/workspace/reference-data/import` from the public hostname.
+- Publish the tracked GitHub branch with the corrected [amplify.yml](../amplify.yml) and rerun the Amplify production release.
+- Re-run validation from the public site against `/api/workspace/snapshot`, `/api/workspace/knowledge`, and the workspace shell.
 
-### Gap 2. Amplify Public Cutover Is Not Yet Verified
+### Gap 2. Production Reference Data Must Stay External To The App Runner Image
 
 Current state:
 
-- The branch environment points at the App Runner URL.
-- The workspace copy of [amplify.yml](../amplify.yml) has been corrected so Amplify installs the SDK pinned in `global.json` instead of a floating channel version.
-- Public cutover is still incomplete because the tracked GitHub branch used by Amplify has not yet published that same `amplify.yml` change, so release job `33` still executed the old floating-SDK prebuild commands.
+- The current repository and production API are now aligned on policy: production requires an explicit reference-data path and does not assume a bundled `Import Data` folder.
+- `WileyCoWeb.Api/appsettings.json` sets `WorkspaceReferenceData:RequireExplicitImportDataPath=true`.
+- The live App Runner route returns `400` with the missing-folder message, which confirms the container does not currently ship the repo-local sample set.
+- Monthly clerk imports are already handled through the QuickBooks Import panel and the API commit flow into Aurora.
 
 Closure action:
 
-- Publish the corrected [amplify.yml](../amplify.yml) into the GitHub branch that Amplify builds from, then complete a successful Amplify release.
-- Verify the public site publishes `wwwroot/appsettings.Workspace.local.json` and routes the browser client to App Runner instead of the Grok gateway.
+- Keep recurring monthly imports on the QuickBooks panel and API commit path.
+- Treat `Import Data/` as a developer or admin bootstrap set only.
+- If production needs repeatable reference-data bootstrap, provide it through an explicit path or managed source such as S3 plus an admin-only import job, rather than baking files into the App Runner image.
 
-### Gap 3. Production Bootstrap Data Is Still Missing
+### Gap 3. Aurora Encryption Migration Is Still Pending
 
 Current state:
 
-- `/api/workspace/snapshot` returns successfully from App Runner, but the payload has no enterprise options and no selected enterprise.
-- That means the public analysis experience still lacks the enterprise baseline data required to power the workspace, even when the API is reachable.
+- The current Aurora cluster is serving live data, but storage encryption is still disabled.
+- That is acceptable for short-term validation only; it is not the desired production end state.
 
 Closure action:
 
-- Seed or import the required enterprise baseline and fiscal-year budget data after schema alignment.
-- Re-run `/api/workspace/snapshot` and `/api/workspace/knowledge` validation against a non-empty enterprise scope.
+- Create an encrypted snapshot or logical export of the current cluster.
+- Restore to a new encrypted Aurora PostgreSQL cluster in the same VPC and security-group model.
+- Apply the current schema and validate snapshot, knowledge, import preview, and import commit flows against the encrypted target.
+- Update App Runner runtime secrets to the new encrypted writer endpoint, cut traffic during a controlled maintenance window, and retain the old cluster for rollback until acceptance is complete.
+
+## Operational Decisions Made On April 15, 2026
+
+### Reference-Data Source Policy
+
+- Do not bundle the repo-local `Import Data/` folder into the App Runner image.
+- Keep `Import Data/` as a bootstrap/admin dataset for local seeding, diagnostics, and one-time environment initialization.
+- Use the QuickBooks Import panel and API commit flow for recurring monthly analysis files.
+- If production requires centralized bootstrap data, move the curated seed files to an explicit managed source such as S3 and invoke the reference-data import with an explicit path or background job.
+
+### Aurora Encryption Migration Plan
+
+1. Freeze non-essential schema changes and capture a fresh restore point from `wiley-co-aurora-db`.
+2. Create a new encrypted Aurora PostgreSQL target in `us-east-2` using the same private-subnet and security-group posture.
+3. Load the current schema and copy data using snapshot restore or a controlled logical migration path, depending on what Aurora permits for the existing unencrypted cluster.
+4. Validate the thin API against the encrypted target: `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, QuickBooks preview, QuickBooks commit, and admin reference-data import with an explicit path.
+5. Rotate the App Runner `DATABASE_URL` secret to the new cluster during a maintenance window and monitor health, latency, and error rate.
+6. Keep the old cluster available for rollback until the encrypted cluster has passed operational acceptance.
+
+### App Runner Replacement Review
+
+- Short term: keep App Runner for the current thin API because it is already live, VPC-attached, and validated.
+- Trigger a formal replacement review before any broad production expansion because AWS App Runner is closed to new customers after April 30, 2026 even though existing customers can continue operating.
+- Compare at least these targets: App Runner as-is, ECS Fargate service behind an ALB, and Lambda only if the API surface is intentionally reduced and cold-start behavior is acceptable.
+- Evaluate each option on private Aurora connectivity, secrets handling, deployment workflow, cold-start and steady-state latency, CloudWatch/X-Ray support, and operational cost.
+- Current direction: plan ECS Fargate as the likely successor if Wiley needs a long-lived supported path beyond the current App Runner footprint.
 
 ## Recommended Delivery Sequence
 

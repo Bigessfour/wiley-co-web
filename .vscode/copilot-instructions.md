@@ -1,6 +1,6 @@
 # Wiley.co Project Instructions
 
-This file is the always-on instruction source for the Wiley.co Blazor project. Follow it on every prompt unless the user explicitly overrides it.
+This file supplements the repository root copilot-instructions.md and is the always-on instruction source for the Wiley.co Blazor project. Follow it on every prompt unless the user explicitly overrides it.
 
 ## Key Management
 
@@ -23,6 +23,14 @@ This file is the always-on instruction source for the Wiley.co Blazor project. F
 - `aws amplify create-branch` creates the production or preview branch for a hosted app.
 - `aws amplify update-app` updates app-level hosting settings and environment variables.
 - `aws amplify list-apps` and `aws amplify list-branches` are useful for confirming hosted app state.
+
+## AWS MCP Server Policy
+
+- The AWS MCP servers configured in `.vscode/mcp.json` are mandatory for AWS-related work in this repository.
+- Use `aws-knowledge-mcp` first for AWS processes, operational steps, architecture guidance, best practices, Amplify, App Runner, Aurora, IAM, networking, CDK, CloudFormation, and Well-Architected guidance.
+- Use `aws-documentation-mcp` to search and read exact AWS documentation, API references, CLI behavior, parameters, quotas, prerequisites, and service-specific details.
+- Do not answer AWS process or setup questions from memory alone when an AWS MCP server is available.
+- If an AWS MCP server is unavailable, state that explicitly before falling back to official AWS documentation or checked-in repo docs.
 
 ## Core Rules
 

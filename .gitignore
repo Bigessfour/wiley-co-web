@@ -6,7 +6,6 @@ wwwroot/appsettings.Workspace.local.json
 .DS_Store
 bin/
 obj/
-.vscode/mcp.json
 wwwroot/appsettings.json
 __blazor_dryrun__/
 __remote_check__/

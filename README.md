@@ -15,11 +15,14 @@ This app is hosted on AWS Amplify in `us-east-2`.
 
 AWS Amplify Gen 1 stores encrypted hosting secrets in AWS Systems Manager Parameter Store, not AWS Secrets Manager. The AWS docs specify that Amplify environment secrets are exposed to the build as `process.env.secrets`.
 
-For this app, the build now supports either of these sources before `dotnet publish` runs:
+For this app, production Amplify builds should resolve the key from the Amplify Gen 1 environment-secret path `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY` before `dotnet publish` runs.
+
+The build also supports these non-production or fallback sources:
 
 1. AWS Secrets Manager, using the secret name `SYNCFUSION_LICENSE_KEY`.
-2. Amplify Gen 1 environment secrets from Systems Manager Parameter Store as a fallback.
-3. A local ignored file named `appsettings.Syncfusion.local.json` in the repository root.
+2. A local ignored file named `appsettings.Syncfusion.local.json` in the repository root.
+
+Do not store `SYNCFUSION_LICENSE_KEY` in Amplify app-level or branch environment variables.
 
 Amplify production builds now fail fast if `SYNCFUSION_LICENSE_KEY` is missing after those lookup steps. This prevents deploying a client bundle that would show the Syncfusion license popup at runtime.
 
@@ -33,7 +36,7 @@ If you are using AWS Secrets Manager:
 
 If you are using Amplify Gen 1 environment secrets instead:
 
-1. In Systems Manager Parameter Store, create a `SecureString` parameter named `/amplify/d2ellat1y3ljd9/<backend-environment-name>/SYNCFUSION_LICENSE_KEY`.
+1. In Systems Manager Parameter Store, create a `SecureString` parameter named `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY`.
 2. Use the default AWS KMS key for the account so Amplify can decrypt it.
 3. Redeploy the Amplify branch.
 
@@ -106,6 +109,12 @@ Current data-path note:
 - Reserve and historical-ledger analytics read from `ledger_entries`.
 - Workspace baseline, top-variance, and scenario composition still depend on `Enterprises`, `BudgetEntries`, `MunicipalAccounts`, and `BudgetSnapshots`.
 - Rebuilding Aurora with only import-pipeline tables is not sufficient for the full workspace analysis surface.
+
+Reference-data note:
+
+- `Import Data/` is the repo-local bootstrap sample set used for developer and admin seeding. It contains QuickBooks-style `.csv` and `.xlsx` source files, not XAML assets.
+- Production App Runner does not bundle that folder by default. `WileyCoWeb.Api/appsettings.json` requires an explicit reference-data path in production.
+- Monthly analysis imports should use the QuickBooks Import panel and API commit flow, not the repo-local `Import Data/` folder.
 
 
 ## Workspace Knowledge Layer

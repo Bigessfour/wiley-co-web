@@ -193,7 +193,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var openButton = page.Locator("#overview-data-dashboard").GetByRole(AriaRole.Button, new() { Name = "Open full view" });
+            var openButton = page.Locator("#overview-data-dashboard a[href='/wiley-workspace/data-dashboard']").First;
             await openButton.ClickAsync();
 
             await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/wiley-workspace/data-dashboard"));
@@ -235,6 +235,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
 
         var consoleErrors = new List<string>();
         var pageErrors = new List<string>();
+        var networkEvents = new List<string>();
 
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
@@ -246,15 +247,35 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
         await context.AddInitScriptAsync("window.localStorage.clear(); window.sessionStorage.clear();");
 
         var page = await context.NewPageAsync();
-
-        if (collectErrors)
+        page.Request += (_, request) =>
         {
-            page.Console += (_, msg) =>
+            if (ShouldCaptureNetworkEvent(request.Url))
             {
-                if (msg.Type is "error") consoleErrors.Add(msg.Text);
-            };
-            page.PageError += (_, ex) => pageErrors.Add(ex);
-        }
+                networkEvents.Add($"> {request.Method} {request.Url}");
+            }
+        };
+        page.Response += (_, response) =>
+        {
+            if (ShouldCaptureNetworkEvent(response.Url))
+            {
+                networkEvents.Add($"< {(int)response.Status} {response.Url}");
+            }
+        };
+        page.RequestFailed += (_, request) =>
+        {
+            if (ShouldCaptureNetworkEvent(request.Url))
+            {
+                networkEvents.Add($"! {request.Method} {request.Url} :: {request.Failure}");
+            }
+        };
+        page.Console += (_, msg) =>
+        {
+            if (collectErrors || msg.Type is "error")
+            {
+                consoleErrors.Add($"{msg.Type}: {msg.Text}");
+            }
+        };
+        page.PageError += (_, ex) => pageErrors.Add(ex);
 
         try
         {
@@ -274,11 +295,45 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
         }
         catch (Exception ex) when (ex is not Xunit.Sdk.XunitException)
         {
-            Assert.Fail($"E2E test failed: {ex.Message}");
+            var diagnostics = BuildDiagnostics(page, consoleErrors, pageErrors, networkEvents);
+            Assert.Fail($"E2E test failed: {ex.Message}{Environment.NewLine}{diagnostics}");
         }
-        finally
-        {
-            await browser.CloseAsync();
-        }
+
+        // browser and context are disposed by `await using` — no explicit CloseAsync needed
+    }
+
+    private static string BuildDiagnostics(
+        IPage page,
+        IReadOnlyCollection<string> consoleMessages,
+        IReadOnlyCollection<string> pageErrors,
+        IReadOnlyCollection<string> networkEvents)
+    {
+        var safeConsoleMessages = consoleMessages.Count > 0
+            ? consoleMessages.Select(message => $"- {message}")
+            : ["- <none>"];
+        var safePageErrors = pageErrors.Count > 0
+            ? pageErrors.Select(error => $"- {error}")
+            : ["- <none>"];
+        var safeNetworkEvents = networkEvents.Count > 0
+            ? networkEvents.Select(entry => $"- {entry}")
+            : ["- <none>"];
+
+        return string.Join(Environment.NewLine, [
+            $"Page URL: {page.Url}",
+            "Console messages:",
+            .. safeConsoleMessages,
+            "Page errors:",
+            .. safePageErrors,
+            "Network events:",
+            .. safeNetworkEvents
+        ]);
+    }
+
+    private static bool ShouldCaptureNetworkEvent(string url)
+    {
+        return url.Contains("appsettings.Workspace.local.json", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("/api/workspace/", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("execute-api", StringComparison.OrdinalIgnoreCase)
+            || url.Contains("awsapprunner.com", StringComparison.OrdinalIgnoreCase);
     }
 }

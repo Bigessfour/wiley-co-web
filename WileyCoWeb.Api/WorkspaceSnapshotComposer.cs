@@ -47,10 +47,12 @@ internal sealed class WorkspaceSnapshotComposer
         var selectedFiscalYear = ResolveFiscalYear(fiscalYear, budgetYears);
         var persistedSnapshot = await LoadLatestRateSnapshotAsync(context, selectedEnterprise.Name, selectedFiscalYear, cancellationToken);
 
-        var customers = await context.UtilityCustomers
-            .AsNoTracking()
-            .OrderBy(customer => customer.AccountNumber)
-            .ToListAsync(cancellationToken);
+        var customers = (await context.UtilityCustomers
+                .AsNoTracking()
+                .ToListAsync(cancellationToken))
+            .OrderBy(customer => string.IsNullOrWhiteSpace(customer.DisplayName) ? customer.AccountNumber : customer.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(customer => customer.AccountNumber, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var customerRows = persistedSnapshot?.CustomerRows is { Count: > 0 }
             ? persistedSnapshot.CustomerRows
