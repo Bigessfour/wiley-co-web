@@ -32,6 +32,14 @@
 - `aws amplify update-app` updates app-level hosting settings and environment variables.
 - `aws amplify list-apps` and `aws amplify list-branches` are useful for confirming hosted app state.
 
+## AWS MCP Policy
+
+- The AWS MCP servers configured in `.vscode/mcp.json` are mandatory for AWS-related work in this repository.
+- Use `aws-knowledge-mcp` first for AWS processes, operational steps, architecture guidance, best practices, Amplify, App Runner, Aurora, IAM, networking, CDK, CloudFormation, and Well-Architected guidance.
+- Use `aws-documentation-mcp` to search and read exact AWS documentation, API references, CLI behavior, parameters, quotas, prerequisites, and service-specific details.
+- Do not answer AWS process or setup questions from memory alone when an AWS MCP server is available.
+- If an AWS MCP server is unavailable, say so explicitly and then fall back to official AWS documentation plus checked-in repo docs.
+
 ## Policy
 
 - Follow the repository root [copilot-instructions.md](../copilot-instructions.md) as the canonical project policy.

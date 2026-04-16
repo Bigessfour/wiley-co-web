@@ -7,7 +7,7 @@ namespace WileyCoWeb.E2ETests;
 /// Data-fidelity E2E tests: import a known QuickBooks CSV fixture then assert that
 /// specific values propagate correctly into each panel. Proves the full pipeline:
 /// QuickBooks CSV -> thin API -> Aurora DB -> Blazor panels rendered with live data.
-/// Tests gate on WILEYCO_E2E_BASE_URL only (no Applitools key required).
+/// Tests gate on WILEYCO_E2E_BASE_URL only.
 /// </summary>
 public sealed class WileyWorkspaceDataFidelityTests
 {
@@ -23,7 +23,7 @@ public sealed class WileyWorkspaceDataFidelityTests
         {
             await ImportFixtureAsync(page, tempFile);
 
-            var breakEvenNav = page.GetByText("Break-Even Panel", new() { Exact = true });
+            var breakEvenNav = page.Locator("a[href='/wiley-workspace/break-even']").First;
             await breakEvenNav.ClickAsync();
 
             var panel = page.Locator("#break-even-panel");
@@ -46,7 +46,7 @@ public sealed class WileyWorkspaceDataFidelityTests
         {
             await ImportFixtureAsync(page, tempFile);
 
-            var trendsNav = page.GetByText("Trends & Projections", new() { Exact = true });
+            var trendsNav = page.Locator("a[href='/wiley-workspace/trends']").First;
             await trendsNav.ClickAsync();
 
             var panel = page.Locator("#trends-panel, [data-testid='trends-panel'], .trends-panel").First;
@@ -109,7 +109,7 @@ public sealed class WileyWorkspaceDataFidelityTests
     /// </summary>
     private static async Task ImportFixtureAsync(IPage page, string tempFile)
     {
-        var importNav = page.GetByText("QuickBooks Import Panel", new() { Exact = true });
+        var importNav = page.Locator("a[href='/wiley-workspace/quickbooks-import']").First;
         await importNav.ClickAsync();
 
         var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });

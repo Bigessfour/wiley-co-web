@@ -33,10 +33,10 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
 
         Assert.NotNull(payload);
         Assert.True(payload.ImportedEnterpriseCount >= 2);
-        Assert.Equal(0, payload.ImportedUtilityCustomerCount);
+        Assert.True(payload.ImportedUtilityCustomerCount > 0);
         Assert.Contains("Water Utility", payload.EnterpriseNames);
         Assert.Contains("Wiley Sanitation District", payload.EnterpriseNames);
-        Assert.Contains("manual CRUD", payload.UtilityCustomerImportStatus, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Imported", payload.UtilityCustomerImportStatus, StringComparison.OrdinalIgnoreCase);
 
         var snapshotResponse = await client.GetAsync("/api/workspace/snapshot");
         snapshotResponse.EnsureSuccessStatusCode();
@@ -45,12 +45,13 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         Assert.NotNull(snapshot);
         Assert.Contains("Water Utility", snapshot.EnterpriseOptions ?? []);
         Assert.Contains("Wiley Sanitation District", snapshot.EnterpriseOptions ?? []);
-        Assert.Empty(snapshot.CustomerRows ?? []);
+        Assert.NotEmpty(snapshot.CustomerRows ?? []);
+        Assert.Contains(snapshot.CustomerRows ?? [], row => row.Name.Contains("COBANK", StringComparison.OrdinalIgnoreCase));
 
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
         await using var context = await contextFactory.CreateDbContextAsync();
         Assert.Equal(2, await context.Enterprises.CountAsync(item => !item.IsDeleted));
-        Assert.Equal(0, await context.UtilityCustomers.CountAsync());
+        Assert.Equal(payload.ImportedUtilityCustomerCount, await context.UtilityCustomers.CountAsync());
     }
 
     [Fact]

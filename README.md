@@ -15,11 +15,14 @@ This app is hosted on AWS Amplify in `us-east-2`.
 
 AWS Amplify Gen 1 stores encrypted hosting secrets in AWS Systems Manager Parameter Store, not AWS Secrets Manager. The AWS docs specify that Amplify environment secrets are exposed to the build as `process.env.secrets`.
 
-For this app, the build now supports either of these sources before `dotnet publish` runs:
+For this app, production Amplify builds should resolve the key from the Amplify Gen 1 environment-secret path `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY` before `dotnet publish` runs.
+
+The build also supports these non-production or fallback sources:
 
 1. AWS Secrets Manager, using the secret name `SYNCFUSION_LICENSE_KEY`.
-2. Amplify Gen 1 environment secrets from Systems Manager Parameter Store as a fallback.
-3. A local ignored file named `appsettings.Syncfusion.local.json` in the repository root.
+2. A local ignored file named `appsettings.Syncfusion.local.json` in the repository root.
+
+Do not store `SYNCFUSION_LICENSE_KEY` in Amplify app-level or branch environment variables.
 
 Amplify production builds now fail fast if `SYNCFUSION_LICENSE_KEY` is missing after those lookup steps. This prevents deploying a client bundle that would show the Syncfusion license popup at runtime.
 
@@ -33,7 +36,7 @@ If you are using AWS Secrets Manager:
 
 If you are using Amplify Gen 1 environment secrets instead:
 
-1. In Systems Manager Parameter Store, create a `SecureString` parameter named `/amplify/d2ellat1y3ljd9/<backend-environment-name>/SYNCFUSION_LICENSE_KEY`.
+1. In Systems Manager Parameter Store, create a `SecureString` parameter named `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY`.
 2. Use the default AWS KMS key for the account so Amplify can decrypt it.
 3. Redeploy the Amplify branch.
 
@@ -107,6 +110,12 @@ Current data-path note:
 - Workspace baseline, top-variance, and scenario composition still depend on `Enterprises`, `BudgetEntries`, `MunicipalAccounts`, and `BudgetSnapshots`.
 - Rebuilding Aurora with only import-pipeline tables is not sufficient for the full workspace analysis surface.
 
+Reference-data note:
+
+- `Import Data/` is the repo-local bootstrap sample set used for developer and admin seeding. It contains QuickBooks-style `.csv` and `.xlsx` source files, not XAML assets.
+- Production App Runner does not bundle that folder by default. `WileyCoWeb.Api/appsettings.json` requires an explicit reference-data path in production.
+- Monthly analysis imports should use the QuickBooks Import panel and API commit flow, not the repo-local `Import Data/` folder.
+
 
 ## Workspace Knowledge Layer
 
@@ -139,40 +148,17 @@ Production implication: the missing compute host is now provisioned, but final c
 
 Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with public ingress and VPC egress to Aurora. For the May 11 City Council working session, `1 vCPU / 2 GB`, minimum one warm instance, remains the safer baseline if load or export activity increases.
 
-## Applitools Eyes E2E
+## Browser E2E Tests
 
-The Playwright-based visual and hybrid browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) use Applitools Eyes, not Applitools Autonomous.
+The Playwright-based browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) run directly against the hosted site.
 
-- Eyes handles visual checkpoints from code and baseline review in the Eyes dashboard.
-- Autonomous is a separate no-code product and is optional for broader hosted smoke coverage.
-
-Supported Eyes environment variables:
-
-- `APPLITOOLS_API_KEY` required for all Eyes runs.
-- `WILEYCO_E2E_BASE_URL` required for live browser tests against the hosted app.
-- `APPLITOOLS_APP_NAME` optional, defaults to `Wiley Widget`.
-- `APPLITOOLS_BATCH_NAME` optional, defaults to `Wiley Widget Visual Suite`.
-- `APPLITOOLS_BRANCH` optional Eyes branch name.
-- `APPLITOOLS_PARENT_BRANCH` optional parent branch for Eyes baseline inheritance.
-- `APPLITOOLS_BASELINE_BRANCH` optional explicit baseline branch.
-- `APPLITOOLS_BASELINE_ENV_NAME` optional baseline environment name.
-- `APPLITOOLS_SERVER_URL` optional Eyes server override.
-- `APPLITOOLS_MATCH_LEVEL` optional match level, for example `Strict`.
-- `APPLITOOLS_VIEWPORT_WIDTH` and `APPLITOOLS_VIEWPORT_HEIGHT` optional viewport overrides.
-- `APPLITOOLS_FAIL_ON_UNRESOLVED` optional, defaults to `true`; set to `false` only when intentionally seeding or updating baselines without failing the test job.
-
-Local result summaries:
-
-- The Eyes dashboard remains the source of truth for accepting or rejecting baseline changes.
-- The test project also writes a small JSON session summary for CI or log review.
-- Set `WILEYCO_APPLITOOLS_RESULTS_DIR` or `APPLITOOLS_RESULTS_DIR` to control where that summary is written.
+- `WILEYCO_E2E_BASE_URL` points the tests at the deployed app.
+- The suites use ordinary Playwright assertions and do not require a visual-regression service.
 
 Example PowerShell invocation:
 
 ```powershell
-$env:APPLITOOLS_API_KEY = [Environment]::GetEnvironmentVariable('APPLITOOLS_API_KEY', 'Machine')
 $env:WILEYCO_E2E_BASE_URL = 'https://main.d2ellat1y3ljd9.amplifyapp.com'
-$env:APPLITOOLS_BRANCH = 'main'
 dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "FullyQualifiedName~Visual_WorkspaceOverview_MatchesBaseline"
 ```
 

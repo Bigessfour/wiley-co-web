@@ -55,7 +55,7 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var trendsSection = page.GetByText("Trends & Projections", new() { Exact = true });
+            var trendsSection = page.Locator("a[href='/wiley-workspace/trends']").First;
             await Expect(trendsSection).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
 
             // Navigate to the Trends panel.
@@ -72,8 +72,7 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var trendsNav = page.GetByText("Trends & Projections", new() { Exact = true });
-            await trendsNav.ClickAsync();
+            await OpenPanelAsync(page, "trends");
 
             // At least two fiscal-year labels in projection rows.
             var projectionYearCells = page.Locator("[data-testid='projection-year'], .projection-year, #trends-panel td:first-child");
@@ -133,12 +132,10 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var decisionNav = page.GetByText("Decision Support", new() { Exact = true });
-            await decisionNav.ClickAsync();
+            await OpenPanelAsync(page, "decision-support");
 
             // Enterprise selector must contain at least one option.
-            var enterpriseSelect = page.Locator(
-                "#enterprise-select, [data-testid='enterprise-select'], select[name='enterprise']").First;
+            var enterpriseSelect = page.Locator("#enterprise-select").First;
             await Expect(enterpriseSelect).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
         });
     }
@@ -156,8 +153,7 @@ public sealed class WileyWorkspacePanelE2ETests
             await RunWorkspaceTestAsync(async page =>
             {
                 // 1. Navigate to and use the QuickBooks import panel.
-                var importNav = page.GetByText("QuickBooks Import Panel", new() { Exact = true });
-                await importNav.ClickAsync();
+                await OpenPanelAsync(page, "quickbooks-import");
 
                 var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });
                 var fileChooser = await page.RunAndWaitForFileChooserAsync(() => browseButton.ClickAsync());
@@ -177,8 +173,7 @@ public sealed class WileyWorkspacePanelE2ETests
                 }
 
                 // 2. Navigate to Break-Even panel and verify it is still functional.
-                var breakEvenNav = page.GetByText("Break-Even Panel", new() { Exact = true });
-                await breakEvenNav.ClickAsync();
+                await OpenPanelAsync(page, "break-even");
 
                 var breakEvenPanel = page.Locator("#break-even-panel");
                 await Expect(breakEvenPanel).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
@@ -202,8 +197,9 @@ public sealed class WileyWorkspacePanelE2ETests
         {
             // 1. Set a known rate and save a scenario.
             var scenarioName = $"E2E Trends {Guid.NewGuid():N}";
+            await OpenPanelAsync(page, "rates");
             var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
-            var scenarioNameInput = page.Locator("#scenario-panel").GetByPlaceholder("Scenario name");
+            var scenarioNameInput = page.Locator("#scenario-name-input");
 
             await currentRateInput.FillAsync("58.00");
             await scenarioNameInput.FillAsync(scenarioName);
@@ -213,8 +209,7 @@ public sealed class WileyWorkspacePanelE2ETests
                 .ToContainTextAsync("Saved scenario", new() { Timeout = ActionTimeoutMs });
 
             // 2. Navigate to Trends panel and confirm it is visible.
-            var trendsNav = page.GetByText("Trends & Projections", new() { Exact = true });
-            await trendsNav.ClickAsync();
+            await OpenPanelAsync(page, "trends");
 
             var trendsPanel = page.Locator("#trends-panel, [data-testid='trends-panel'], .trends-panel").First;
             await Expect(trendsPanel).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
@@ -229,8 +224,7 @@ public sealed class WileyWorkspacePanelE2ETests
         await RunWorkspaceTestAsync(async page =>
         {
             // Locate the enterprise/fiscal-year switcher area.
-            var enterpriseSelector = page.Locator(
-                "#enterprise-select, [data-testid='enterprise-select'], select[name='enterprise']").First;
+            var enterpriseSelector = page.Locator("#enterprise-select").First;
 
             if (!await enterpriseSelector.IsVisibleAsync())
             {
@@ -238,29 +232,32 @@ public sealed class WileyWorkspacePanelE2ETests
                 return;
             }
 
-            // Get the current enterprise name.
             var initialValue = await enterpriseSelector.InputValueAsync();
 
-            // Select a different option.
-            var options = await enterpriseSelector.Locator("option").AllAsync();
-            var alternative = options.FirstOrDefault(o => o != null);
-            if (options.Count < 2)
+            await enterpriseSelector.ClickAsync();
+            var options = page.Locator("#enterprise-select_popup .e-list-item");
+            if (await options.CountAsync() < 2)
             {
                 // Only one enterprise seeded — nothing to switch to.
                 return;
             }
 
-            var alternativeValue = await options[1].GetAttributeAsync("value");
-            if (alternativeValue == initialValue)
+            for (var index = 0; index < await options.CountAsync(); index++)
             {
+                var option = options.Nth(index);
+                var optionText = (await option.InnerTextAsync()).Trim();
+                if (string.Equals(optionText, initialValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                await option.ClickAsync();
+
+                // Workspace should reload with new enterprise context.
+                await Expect(page.Locator("#workspace-load-status"))
+                    .ToContainTextAsync("Loaded", new() { Timeout = ReadyTimeoutMs });
                 return;
             }
-
-            await enterpriseSelector.SelectOptionAsync(new SelectOptionValue { Value = alternativeValue });
-
-            // Workspace should reload with new enterprise context.
-            await Expect(page.Locator("#workspace-load-status"))
-                .ToContainTextAsync("Workspace ready.", new() { Timeout = ReadyTimeoutMs });
         });
     }
 
@@ -326,4 +323,9 @@ public sealed class WileyWorkspacePanelE2ETests
         "Date,Type,Num,Name,Memo,Account,Split,Amount,Balance,Clr\n" +
         "01/01/2026,Invoice,1001,Town of Wiley,Water Billing,Water Revenue,Accounts Receivable,125.00,125.00,C\n" +
         "01/02/2026,Payment,1002,Town of Wiley,Payment Received,Accounts Receivable,Water Revenue,-125.00,0.00,C\n";
+
+    private static async Task OpenPanelAsync(IPage page, string panelKey)
+    {
+        await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
+    }
 }

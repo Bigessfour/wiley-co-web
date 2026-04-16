@@ -2,6 +2,12 @@
 
 This guide is the current operating procedure for moving QuickBooks Desktop ledger data into Wiley Widget and then into Aurora through the QuickBooks Import panel.
 
+This guide is for the recurring monthly import flow.
+
+- The repo-local `Import Data/` folder is a bootstrap/reference-data source for admin seeding and development.
+- It contains QuickBooks-style `.csv` and `.xlsx` files, not XAML files.
+- Town-clerk monthly imports should use the QuickBooks Import panel and the API commit path described here.
+
 ## What The Import Panel Accepts
 
 The QuickBooks Import panel is a ledger import, not a general workbook loader.
@@ -26,6 +32,11 @@ Current non-goals for this panel:
 - `Vendors` exports
 
 Those files belong to the broader source-data pipeline, not the clerk-facing QuickBooks ledger import panel.
+
+Production policy:
+
+- The App Runner image should not be treated as the storage location for recurring import files.
+- Monthly files should be uploaded through the panel, validated in preview, and then committed into Aurora.
 
 ## Required Columns
 

@@ -1,5 +1,8 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.EntityFrameworkCore;
@@ -15,9 +18,37 @@ namespace WileyCoWeb.Api;
 internal sealed class WorkspaceReferenceDataImportService
 {
     private static readonly Regex AccountCodeRegex = new(@"^\s*(?<code>\d+(?:\.\d+)?)\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex MultiWhitespaceRegex = new(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex CityStateZipRegex = new(@"^(?<street>.*?)(?<city>[A-Za-z][A-Za-z .'-]+),\s*(?<state>[A-Za-z]{2})\s+(?<zip>\d{5}(?:-\d{4})?)\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex NonAlphaNumericRegex = new(@"[^A-Za-z0-9]+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex PersonNameTokenRegex = new(@"^[A-Za-z][A-Za-z'.-]*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
     private static readonly XNamespace SpreadsheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private static readonly XNamespace RelationshipNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    private static readonly string[] CorporateKeywords =
+    [
+        "LLC",
+        "INC",
+        "CORP",
+        "COMPANY",
+        "COBANK",
+        "BANK",
+        "TREE",
+        "TRIMMING",
+        "SERVICE",
+        "SERVICES",
+        "UTILITY",
+        "DISTRICT",
+        "TOWN OF",
+        "CITY OF",
+        "STATE OF",
+        "COUNTY OF",
+        "RANCH",
+        "FARM",
+        "SHOP",
+        "STORE",
+        "MARKET"
+    ];
     private static readonly IReadOnlyDictionary<string, EnterpriseBaselineSeed> DefaultEnterpriseBaselines =
         new Dictionary<string, EnterpriseBaselineSeed>(StringComparer.OrdinalIgnoreCase)
         {
@@ -121,19 +152,23 @@ internal sealed class WorkspaceReferenceDataImportService
 
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+        var utilityCustomerImportSummary = await ImportUtilityCustomersAsync(context, resolvedImportPath, importedAtUtc, cancellationToken).ConfigureAwait(false);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
         var ledgerImportSummary = request?.IncludeSampleLedgerData == true
             ? await ImportSampleLedgerDataAsync(resolvedImportPath, cancellationToken).ConfigureAwait(false)
             : LedgerImportSummary.NotRequested();
 
         var discoveredCustomerRows = sources.Sum(item => item.DiscoveredCustomerReferenceRows);
-        var utilityCustomerImportStatus = BuildUtilityCustomerImportStatus(sources);
+        var utilityCustomerImportStatus = utilityCustomerImportSummary.Status;
 
         logger.LogInformation(
-            "Imported workspace reference data from {ImportPath}: imported={Imported}, updated={Updated}, customerRows={CustomerRows}, ledgerFiles={LedgerFiles}, ledgerRows={LedgerRows}, baselines={BaselineCount}",
+            "Imported workspace reference data from {ImportPath}: imported={Imported}, updated={Updated}, customerRows={CustomerRows}, importedCustomers={ImportedCustomers}, ledgerFiles={LedgerFiles}, ledgerRows={LedgerRows}, baselines={BaselineCount}",
             resolvedImportPath,
             importedEnterpriseCount,
             updatedEnterpriseCount,
             discoveredCustomerRows,
+            utilityCustomerImportSummary.ImportedCount,
             ledgerImportSummary.ImportedFileCount,
             ledgerImportSummary.ImportedRowCount,
             seededEnterpriseBaselineCount);
@@ -144,13 +179,124 @@ internal sealed class WorkspaceReferenceDataImportService
             importedEnterpriseCount,
             updatedEnterpriseCount,
             discoveredCustomerRows,
-            0,
+            utilityCustomerImportSummary.ImportedCount,
             utilityCustomerImportStatus,
             sources.Select(item => item.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
             ledgerImportSummary.ImportedFileCount,
             ledgerImportSummary.ImportedRowCount,
             ledgerImportSummary.Status,
             seededEnterpriseBaselineCount);
+    }
+
+    private async Task<UtilityCustomerImportSummary> ImportUtilityCustomersAsync(
+        AppDbContext context,
+        string importDataPath,
+        DateTime importedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var customerWorkbooks = Directory.EnumerateFiles(importDataPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(path => Path.GetExtension(path).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            .Where(path => IsCustomerWorkbook(Path.GetFileName(path)))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (customerWorkbooks.Count == 0)
+        {
+            return new UtilityCustomerImportSummary(
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                "No QuickBooks customer workbook was found. UtilityCustomers were left unchanged.");
+        }
+
+        var customersByAccountNumber = await context.UtilityCustomers
+            .ToDictionaryAsync(customer => customer.AccountNumber, StringComparer.OrdinalIgnoreCase, cancellationToken)
+            .ConfigureAwait(false);
+
+        var synchronizedAccountNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var workbookCount = 0;
+        var rowCount = 0;
+        var insertedCount = 0;
+        var updatedCount = 0;
+        var skippedCount = 0;
+        var structuredAddressCount = 0;
+        var fallbackAddressCount = 0;
+
+        foreach (var filePath in customerWorkbooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var workbookMetadata = TryReadWorkbookMetadata(filePath);
+            if (workbookMetadata is null)
+            {
+                logger.LogWarning("Skipping QuickBooks customer import for {FileName} because the workbook metadata could not be read.", Path.GetFileName(filePath));
+                continue;
+            }
+
+            var workbookData = ReadCustomerWorkbookData(filePath, workbookMetadata);
+            if (workbookData.Rows.Count == 0)
+            {
+                continue;
+            }
+
+            workbookCount++;
+            rowCount += workbookData.Rows.Count;
+
+            var enterpriseName = ResolveEnterpriseName(workbookMetadata.CompanyFileName, Path.GetFileName(filePath)) ?? "Water Utility";
+
+            foreach (var row in workbookData.Rows)
+            {
+                var preparedCustomer = PrepareUtilityCustomer(filePath, enterpriseName, row, importedAtUtc);
+                if (preparedCustomer is null)
+                {
+                    skippedCount++;
+                    continue;
+                }
+
+                if (!synchronizedAccountNumbers.Add(preparedCustomer.Customer.AccountNumber))
+                {
+                    continue;
+                }
+
+                if (preparedCustomer.UsedFallbackAddress)
+                {
+                    fallbackAddressCount++;
+                }
+                else
+                {
+                    structuredAddressCount++;
+                }
+
+                if (customersByAccountNumber.TryGetValue(preparedCustomer.Customer.AccountNumber, out var existingCustomer))
+                {
+                    CopyImportedCustomer(preparedCustomer.Customer, existingCustomer, importedAtUtc);
+                    updatedCount++;
+                }
+                else
+                {
+                    context.UtilityCustomers.Add(preparedCustomer.Customer);
+                    customersByAccountNumber.Add(preparedCustomer.Customer.AccountNumber, preparedCustomer.Customer);
+                    insertedCount++;
+                }
+            }
+        }
+
+        var importedCount = insertedCount + updatedCount;
+        return new UtilityCustomerImportSummary(
+            importedCount,
+            insertedCount,
+            updatedCount,
+            skippedCount,
+            workbookCount,
+            rowCount,
+            structuredAddressCount,
+            fallbackAddressCount,
+            BuildUtilityCustomerImportStatus(importedCount, insertedCount, updatedCount, skippedCount, workbookCount, rowCount, structuredAddressCount, fallbackAddressCount));
     }
 
     private async Task<LedgerImportSummary> ImportSampleLedgerDataAsync(string importDataPath, CancellationToken cancellationToken)
@@ -486,42 +632,72 @@ internal sealed class WorkspaceReferenceDataImportService
 
     private static CustomerWorkbookInspection InspectCustomerWorkbook(string filePath, WorkbookMetadata workbookMetadata)
     {
+        var workbookData = ReadCustomerWorkbookData(filePath, workbookMetadata);
+        return new CustomerWorkbookInspection(
+            workbookData.Rows.Count,
+            workbookData.Rows.Count > 0,
+            workbookData.Headers);
+    }
+
+    private static CustomerWorkbookData ReadCustomerWorkbookData(string filePath, WorkbookMetadata workbookMetadata)
+    {
         var worksheet = workbookMetadata.Worksheets.FirstOrDefault(sheet => !sheet.Name.Contains("Tips", StringComparison.OrdinalIgnoreCase));
         if (worksheet == null)
         {
-            return new CustomerWorkbookInspection(0, false, []);
+            return new CustomerWorkbookData([], []);
         }
 
         using var archive = ZipFile.OpenRead(filePath);
         var worksheetEntry = archive.GetEntry(worksheet.EntryName);
         if (worksheetEntry == null)
         {
-            return new CustomerWorkbookInspection(0, false, []);
+            return new CustomerWorkbookData([], []);
         }
 
         var sharedStrings = ReadSharedStrings(archive);
         var worksheetDocument = XDocument.Load(worksheetEntry.Open());
         var rows = worksheetDocument.Root?
             .Descendants(SpreadsheetNamespace + "row")
-            .Select(row => row.Elements(SpreadsheetNamespace + "c").Select(cell => ReadCellValue(cell, sharedStrings)).ToList())
-            .Where(values => values.Any(value => !string.IsNullOrWhiteSpace(value)))
+            .Select(row => ReadWorksheetRow(row, sharedStrings))
+            .Where(values => values.Count > 0)
             .ToList()
             ?? [];
 
         if (rows.Count == 0)
         {
-            return new CustomerWorkbookInspection(0, false, []);
+            return new CustomerWorkbookData([], []);
         }
 
-        var headers = rows[0]
-            .Select(value => value.Trim())
+        var headerRow = rows[0];
+        var headers = headerRow.Values
+            .Select(value => NormalizeWhitespace(value))
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToArray();
 
-        var canPopulateUtilityCustomers = headers.Any(header => header.Contains("Account", StringComparison.OrdinalIgnoreCase))
-            && headers.Any(header => header.Contains("Service", StringComparison.OrdinalIgnoreCase) || header.Contains("Address", StringComparison.OrdinalIgnoreCase));
+        var normalizedHeaderColumns = headerRow
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Value))
+            .GroupBy(entry => NormalizeHeader(entry.Value), StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First().Key, StringComparer.Ordinal);
 
-        return new CustomerWorkbookInspection(Math.Max(0, rows.Count - 1), canPopulateUtilityCustomers, headers);
+        var workbookRows = new List<CustomerWorkbookRow>();
+        foreach (var row in rows.Skip(1))
+        {
+            var displayName = GetWorkbookValue(row, normalizedHeaderColumns, "customer", "C");
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                continue;
+            }
+
+            workbookRows.Add(new CustomerWorkbookRow(
+                displayName,
+                GetWorkbookValue(row, normalizedHeaderColumns, "billto", "E"),
+                GetWorkbookValue(row, normalizedHeaderColumns, "primarycontact", "G"),
+                GetWorkbookValue(row, normalizedHeaderColumns, "mainphone", "I"),
+                GetWorkbookValue(row, normalizedHeaderColumns, "fax", "K"),
+                ParseWorkbookDecimal(GetWorkbookValue(row, normalizedHeaderColumns, "balancetotal", "M"))));
+        }
+
+        return new CustomerWorkbookData(headers, workbookRows);
     }
 
     private static List<string> ReadSharedStrings(ZipArchive archive)
@@ -558,6 +734,68 @@ internal sealed class WorkspaceReferenceDataImportService
         }
 
         return rawValue;
+    }
+
+    private static Dictionary<string, string> ReadWorksheetRow(XElement row, IReadOnlyList<string> sharedStrings)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var cell in row.Elements(SpreadsheetNamespace + "c"))
+        {
+            var reference = (string?)cell.Attribute("r");
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                continue;
+            }
+
+            var columnName = GetColumnName(reference);
+            if (string.IsNullOrWhiteSpace(columnName))
+            {
+                continue;
+            }
+
+            var value = NormalizeWhitespace(ReadCellValue(cell, sharedStrings));
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                values[columnName] = value;
+            }
+        }
+
+        return values;
+    }
+
+    private static string GetColumnName(string cellReference)
+        => new(cellReference.TakeWhile(char.IsLetter).ToArray());
+
+    private static string GetWorkbookValue(
+        IReadOnlyDictionary<string, string> row,
+        IReadOnlyDictionary<string, string> normalizedHeaderColumns,
+        string normalizedHeader,
+        string fallbackColumn)
+    {
+        if (normalizedHeaderColumns.TryGetValue(normalizedHeader, out var columnName)
+            && row.TryGetValue(columnName, out var headerValue))
+        {
+            return headerValue;
+        }
+
+        return row.TryGetValue(fallbackColumn, out var fallbackValue)
+            ? fallbackValue
+            : string.Empty;
+    }
+
+    private static string NormalizeHeader(string value)
+        => NonAlphaNumericRegex.Replace(value, string.Empty).ToLowerInvariant();
+
+    private static decimal ParseWorkbookDecimal(string value)
+    {
+        return decimal.TryParse(
+            value,
+            NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign | NumberStyles.AllowThousands,
+            CultureInfo.InvariantCulture,
+            out var parsed)
+            ? parsed
+            : 0m;
     }
 
     private static string NormalizeWorksheetTarget(string? target)
@@ -706,29 +944,390 @@ internal sealed class WorkspaceReferenceDataImportService
         }
 
         var customerNote = source.DiscoveredCustomerReferenceRows > 0
-            ? $"Detected {source.DiscoveredCustomerReferenceRows} QuickBooks customer reference rows for this enterprise, but the export lacks the account and service-address fields needed for automatic UtilityCustomer import."
+            ? $"Detected {source.DiscoveredCustomerReferenceRows} QuickBooks customer reference rows for this enterprise. UtilityCustomer records can be synthesized from the customer name and bill-to fields when structured utility account data is missing."
             : "No QuickBooks utility-customer roster was imported for this enterprise.";
 
         return $"Source files: {fileSummary}. {customerNote}";
     }
 
-    private static string BuildUtilityCustomerImportStatus(IEnumerable<EnterpriseReferenceSource> sources)
+    private PreparedUtilityCustomer? PrepareUtilityCustomer(string filePath, string enterpriseName, CustomerWorkbookRow row, DateTime importedAtUtc)
     {
-        var customerSources = sources.Where(source => source.DiscoveredCustomerReferenceRows > 0).ToList();
-        if (customerSources.Count == 0)
+        var displayName = NormalizeWhitespace(row.DisplayName);
+        if (string.IsNullOrWhiteSpace(displayName))
         {
-            return "No QuickBooks customer workbook was found. Use /api/utility-customers to add customer records manually.";
+            return null;
         }
 
-        var headers = customerSources
-            .SelectMany(source => source.CustomerWorkbookHeaders)
-            .Where(header => !string.IsNullOrWhiteSpace(header))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(header => header, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var identity = ResolveCustomerIdentity(displayName, row.PrimaryContact);
+        var address = ResolveCustomerAddress(displayName, row.BillTo);
+        var accountNumber = BuildSyntheticAccountNumber(enterpriseName, displayName, row.BillTo);
+        var customer = new UtilityCustomer
+        {
+            AccountNumber = accountNumber,
+            FirstName = Truncate(identity.FirstName, 50) ?? "Imported",
+            LastName = Truncate(identity.LastName, 50) ?? "Customer",
+            CompanyName = Truncate(identity.CompanyName, 100),
+            CustomerType = identity.CustomerType,
+            ServiceAddress = Truncate(address.ServiceAddress, 200) ?? "Imported customer reference",
+            ServiceCity = Truncate(address.ServiceCity, 50) ?? "Wiley",
+            ServiceState = Truncate(address.ServiceState, 2) ?? "CO",
+            ServiceZipCode = Truncate(address.ServiceZipCode, 10) ?? "81092",
+            MailingAddress = Truncate(address.MailingAddress, 200),
+            MailingCity = Truncate(address.MailingCity, 50),
+            MailingState = Truncate(address.MailingState, 2),
+            MailingZipCode = Truncate(address.MailingZipCode, 10),
+            PhoneNumber = NormalizePhoneNumber(row.MainPhone),
+            ServiceLocation = address.ServiceLocation,
+            Status = CustomerStatus.Active,
+            AccountOpenDate = importedAtUtc.Date,
+            CurrentBalance = row.BalanceTotal,
+            Notes = BuildCustomerImportNotes(Path.GetFileName(filePath), enterpriseName, row, address.UsedFallbackAddress),
+            CreatedDate = importedAtUtc,
+            LastModifiedDate = importedAtUtc
+        };
 
-        var headerSummary = headers.Length == 0 ? "no recognizable headers" : string.Join(", ", headers);
-        return $"Detected {customerSources.Sum(source => source.DiscoveredCustomerReferenceRows)} QuickBooks customer reference rows, but skipped automatic UtilityCustomer import because the workbook headers ({headerSummary}) do not include utility account and service-address fields. Use /api/utility-customers for manual CRUD or a dedicated upload later.";
+        if (!TryValidateUtilityCustomer(customer, out var validationErrors))
+        {
+            logger.LogWarning(
+                "Skipping imported QuickBooks customer row '{CustomerName}' from {FileName} because the synthesized UtilityCustomer record was invalid: {ValidationErrors}",
+                displayName,
+                Path.GetFileName(filePath),
+                validationErrors);
+            return null;
+        }
+
+        return new PreparedUtilityCustomer(customer, address.UsedFallbackAddress);
+    }
+
+    private static ParsedCustomerIdentity ResolveCustomerIdentity(string displayName, string primaryContact)
+    {
+        if (LooksLikeIndividualName(displayName))
+        {
+            var (firstName, lastName) = SplitPersonName(displayName);
+            return new ParsedCustomerIdentity(firstName, lastName, null, CustomerType.Residential);
+        }
+
+        var customerType = ResolveCustomerType(displayName);
+        if (LooksLikeIndividualName(primaryContact))
+        {
+            var (firstName, lastName) = SplitPersonName(primaryContact);
+            return new ParsedCustomerIdentity(firstName, lastName, displayName, customerType);
+        }
+
+        return new ParsedCustomerIdentity("Imported", "Customer", displayName, customerType);
+    }
+
+    private static CustomerType ResolveCustomerType(string displayName)
+    {
+        if (displayName.Contains("TOWN OF", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("CITY OF", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("STATE OF", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("COUNTY OF", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("DISTRICT", StringComparison.OrdinalIgnoreCase))
+        {
+            return CustomerType.Government;
+        }
+
+        if (displayName.Contains("SCHOOL", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("CHURCH", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("HOSPITAL", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("LIBRARY", StringComparison.OrdinalIgnoreCase))
+        {
+            return CustomerType.Institutional;
+        }
+
+        if (displayName.Contains("APARTMENT", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("APTS", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("MOBILE HOME", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("TRAILER PARK", StringComparison.OrdinalIgnoreCase))
+        {
+            return CustomerType.MultiFamily;
+        }
+
+        return LooksLikeIndividualName(displayName)
+            ? CustomerType.Residential
+            : CustomerType.Commercial;
+    }
+
+    private static bool LooksLikeIndividualName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeWhitespace(value);
+        if (normalized.IndexOfAny([',', '&', '/', '\\', '(', ')']) >= 0)
+        {
+            return false;
+        }
+
+        if (CorporateKeywords.Any(keyword => normalized.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        var tokens = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length < 2 || tokens.Length > 4)
+        {
+            return false;
+        }
+
+        return tokens.All(token => PersonNameTokenRegex.IsMatch(token));
+    }
+
+    private static (string FirstName, string LastName) SplitPersonName(string value)
+    {
+        var tokens = NormalizeWhitespace(value).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length == 0)
+        {
+            return ("Imported", "Customer");
+        }
+
+        if (tokens.Length == 1)
+        {
+            return (tokens[0], "Customer");
+        }
+
+        return (tokens[0], string.Join(' ', tokens.Skip(1)));
+    }
+
+    private static ParsedCustomerAddress ResolveCustomerAddress(string displayName, string billTo)
+    {
+        var normalizedBillTo = NormalizeWhitespace(billTo);
+        var trimmedBillTo = RemoveLeadingDisplayName(normalizedBillTo, displayName);
+
+        if (TryParseStructuredAddress(trimmedBillTo, normalizedBillTo, out var structuredAddress)
+            || TryParseStructuredAddress(normalizedBillTo, normalizedBillTo, out structuredAddress))
+        {
+            return structuredAddress;
+        }
+
+        var fallbackAddress = !string.IsNullOrWhiteSpace(trimmedBillTo)
+            && !string.Equals(trimmedBillTo, displayName, StringComparison.OrdinalIgnoreCase)
+            ? trimmedBillTo
+            : "Imported customer reference";
+
+        return new ParsedCustomerAddress(
+            fallbackAddress,
+            "Wiley",
+            "CO",
+            "81092",
+            string.IsNullOrWhiteSpace(normalizedBillTo) ? null : normalizedBillTo,
+            null,
+            null,
+            null,
+            ServiceLocation.InsideCityLimits,
+            true);
+    }
+
+    private static bool TryParseStructuredAddress(string candidate, string originalBillTo, out ParsedCustomerAddress address)
+    {
+        address = default!;
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return false;
+        }
+
+        var match = CityStateZipRegex.Match(candidate);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        var street = NormalizeWhitespace(match.Groups["street"].Value.Trim(',', ' '));
+        var city = NormalizeWhitespace(match.Groups["city"].Value);
+        var state = match.Groups["state"].Value.ToUpperInvariant();
+        var zip = match.Groups["zip"].Value;
+        if (string.IsNullOrWhiteSpace(street) || string.IsNullOrWhiteSpace(city))
+        {
+            return false;
+        }
+
+        address = new ParsedCustomerAddress(
+            street,
+            city,
+            state,
+            zip,
+            street,
+            city,
+            state,
+            zip,
+            city.Contains("Wiley", StringComparison.OrdinalIgnoreCase)
+                ? ServiceLocation.InsideCityLimits
+                : ServiceLocation.OutsideCityLimits,
+            false);
+        return true;
+    }
+
+    private static string RemoveLeadingDisplayName(string billTo, string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(billTo) || string.IsNullOrWhiteSpace(displayName))
+        {
+            return billTo;
+        }
+
+        return billTo.StartsWith(displayName, StringComparison.OrdinalIgnoreCase)
+            ? billTo[displayName.Length..].TrimStart(',', ' ')
+            : billTo;
+    }
+
+    private static string BuildSyntheticAccountNumber(string enterpriseName, string displayName, string billTo)
+    {
+        var normalizedSource = $"{ResolveEnterpriseCode(enterpriseName)}|{NormalizeWhitespace(displayName)}|{NormalizeWhitespace(billTo)}";
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedSource)));
+        return $"QB-{ResolveEnterpriseCode(enterpriseName)}-{hash[..10]}";
+    }
+
+    private static string ResolveEnterpriseCode(string enterpriseName)
+    {
+        if (enterpriseName.Contains("Sanitation", StringComparison.OrdinalIgnoreCase)
+            || enterpriseName.Contains("District", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WSD";
+        }
+
+        if (enterpriseName.Contains("Water", StringComparison.OrdinalIgnoreCase)
+            || enterpriseName.Contains("Utility", StringComparison.OrdinalIgnoreCase))
+        {
+            return "WTR";
+        }
+
+        var normalized = new string(enterpriseName.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
+        if (normalized.Length >= 3)
+        {
+            return normalized[..3];
+        }
+
+        return normalized.PadRight(3, 'X');
+    }
+
+    private static string? NormalizePhoneNumber(string value)
+    {
+        var digits = new string(value.Where(char.IsDigit).ToArray());
+        return digits.Length switch
+        {
+            7 => $"{digits[..3]}-{digits[3..]}",
+            10 => $"({digits[..3]}) {digits[3..6]}-{digits[6..]}",
+            11 when digits[0] == '1' => $"+1 {digits[1..4]}-{digits[4..7]}-{digits[7..]}",
+            _ => null
+        };
+    }
+
+    private static string BuildCustomerImportNotes(string fileName, string enterpriseName, CustomerWorkbookRow row, bool usedFallbackAddress)
+    {
+        var notes = new List<string>
+        {
+            $"Imported from QuickBooks customer workbook '{fileName}' for {enterpriseName}."
+        };
+
+        var billTo = NormalizeWhitespace(row.BillTo);
+        if (!string.IsNullOrWhiteSpace(billTo)
+            && !string.Equals(billTo, NormalizeWhitespace(row.DisplayName), StringComparison.OrdinalIgnoreCase))
+        {
+            notes.Add($"Bill-to: {billTo}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(row.Fax))
+        {
+            notes.Add($"Fax: {NormalizeWhitespace(row.Fax)}.");
+        }
+
+        if (usedFallbackAddress)
+        {
+            notes.Add("Structured utility service-address fields were not present in the workbook, so the service location defaults were inferred.");
+        }
+
+        return Truncate(string.Join(' ', notes), 500) ?? string.Empty;
+    }
+
+    private static bool TryValidateUtilityCustomer(UtilityCustomer customer, out string validationErrors)
+    {
+        var results = new List<ValidationResult>();
+        var isValid = Validator.TryValidateObject(customer, new ValidationContext(customer), results, validateAllProperties: true);
+        validationErrors = string.Join(
+            "; ",
+            results
+                .Select(result => result.ErrorMessage)
+                .Where(message => !string.IsNullOrWhiteSpace(message))
+                .Select(message => message!));
+
+        return isValid;
+    }
+
+    private static void CopyImportedCustomer(UtilityCustomer source, UtilityCustomer target, DateTime importedAtUtc)
+    {
+        target.AccountNumber = source.AccountNumber;
+        target.FirstName = source.FirstName;
+        target.LastName = source.LastName;
+        target.CompanyName = source.CompanyName;
+        target.CustomerType = source.CustomerType;
+        target.ServiceAddress = source.ServiceAddress;
+        target.ServiceCity = source.ServiceCity;
+        target.ServiceState = source.ServiceState;
+        target.ServiceZipCode = source.ServiceZipCode;
+        target.MailingAddress = source.MailingAddress;
+        target.MailingCity = source.MailingCity;
+        target.MailingState = source.MailingState;
+        target.MailingZipCode = source.MailingZipCode;
+        target.PhoneNumber = source.PhoneNumber;
+        target.ServiceLocation = source.ServiceLocation;
+        target.Status = source.Status;
+        target.AccountOpenDate = source.AccountOpenDate;
+        target.CurrentBalance = source.CurrentBalance;
+        target.Notes = source.Notes;
+        if (target.CreatedDate == default)
+        {
+            target.CreatedDate = importedAtUtc;
+        }
+
+        target.LastModifiedDate = importedAtUtc;
+    }
+
+    private static string BuildUtilityCustomerImportStatus(
+        int importedCount,
+        int insertedCount,
+        int updatedCount,
+        int skippedCount,
+        int workbookCount,
+        int rowCount,
+        int structuredAddressCount,
+        int fallbackAddressCount)
+    {
+        if (workbookCount == 0)
+        {
+            return "No QuickBooks customer workbook was found. UtilityCustomers were left unchanged.";
+        }
+
+        if (importedCount == 0)
+        {
+            return $"Detected {rowCount} QuickBooks customer row(s) across {workbookCount} workbook(s), but none could be synchronized into UtilityCustomers.";
+        }
+
+        var status = $"Imported {importedCount} UtilityCustomer record(s) from {workbookCount} QuickBooks customer workbook(s) ({insertedCount} inserted, {updatedCount} updated).";
+        if (structuredAddressCount > 0)
+        {
+            status += $" Parsed {structuredAddressCount} structured address row(s).";
+        }
+
+        if (fallbackAddressCount > 0)
+        {
+            status += $" {fallbackAddressCount} row(s) used inferred Wiley service defaults because the workbook did not include structured utility service-address fields.";
+        }
+
+        if (skippedCount > 0)
+        {
+            status += $" Skipped {skippedCount} invalid or empty row(s).";
+        }
+
+        return status;
+    }
+
+    private static string NormalizeWhitespace(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : MultiWhitespaceRegex.Replace(value.Trim(), " ");
     }
 
     private static string? Truncate(string? value, int maximumLength)
@@ -791,6 +1390,32 @@ internal sealed class WorkspaceReferenceDataImportService
 
     private sealed record CustomerWorkbookInspection(int RowCount, bool CanPopulateUtilityCustomers, IReadOnlyList<string> Headers);
 
+    private sealed record CustomerWorkbookData(IReadOnlyList<string> Headers, IReadOnlyList<CustomerWorkbookRow> Rows);
+
+    private sealed record CustomerWorkbookRow(
+        string DisplayName,
+        string BillTo,
+        string PrimaryContact,
+        string MainPhone,
+        string Fax,
+        decimal BalanceTotal);
+
+    private sealed record ParsedCustomerIdentity(string FirstName, string LastName, string? CompanyName, CustomerType CustomerType);
+
+    private sealed record ParsedCustomerAddress(
+        string ServiceAddress,
+        string ServiceCity,
+        string ServiceState,
+        string ServiceZipCode,
+        string? MailingAddress,
+        string? MailingCity,
+        string? MailingState,
+        string? MailingZipCode,
+        ServiceLocation ServiceLocation,
+        bool UsedFallbackAddress);
+
+    private sealed record PreparedUtilityCustomer(UtilityCustomer Customer, bool UsedFallbackAddress);
+
     private sealed record EnterpriseReferenceSource(
         string Name,
         string Type,
@@ -800,6 +1425,17 @@ internal sealed class WorkspaceReferenceDataImportService
         IReadOnlyList<string> CustomerWorkbookHeaders);
 
     private sealed record EnterpriseBaselineSeed(decimal CurrentRate, decimal MonthlyExpenses, int CitizenCount);
+
+    private sealed record UtilityCustomerImportSummary(
+        int ImportedCount,
+        int InsertedCount,
+        int UpdatedCount,
+        int SkippedCount,
+        int WorkbookCount,
+        int RowCount,
+        int StructuredAddressCount,
+        int FallbackAddressCount,
+        string Status);
 
     private sealed record LedgerImportSummary(int ImportedFileCount, int ImportedRowCount, string Status)
     {

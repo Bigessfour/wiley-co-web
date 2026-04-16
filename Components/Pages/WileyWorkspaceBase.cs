@@ -419,6 +419,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         persistenceInitialized = true;
         Console.WriteLine("[startup] WileyWorkspaceBase.OnAfterRenderAsync first render.");
+        WorkspaceLoadStatus = "Finalizing workspace state and restoring saved selections...";
+        StateHasChanged();
+
         try
         {
             await WorkspacePersistenceService.InitializeAsync();
@@ -439,7 +442,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         if (!WorkspaceLoadStatus.Contains("failed", StringComparison.OrdinalIgnoreCase))
         {
-            WorkspaceLoadStatus = "Workspace ready.";
+            WorkspaceLoadStatus = BuildWorkspaceReadyStatus();
         }
 
         lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
@@ -455,7 +458,30 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     private void HandleWorkspaceStateChanged()
     {
+        if (persistenceInitialized
+            && !IsLoadingWorkspace
+            && WorkspaceLoadStatus.StartsWith("Workspace ready.", StringComparison.Ordinal))
+        {
+            WorkspaceLoadStatus = BuildWorkspaceReadyStatus();
+        }
+
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string BuildWorkspaceReadyStatus()
+    {
+        if (IsUsingBrowserRestoredState && !string.IsNullOrWhiteSpace(CurrentStateSourceStatus))
+        {
+            return $"Workspace ready. {CurrentStateSourceStatus}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(StartupSourceStatus)
+            && !StartupSourceStatus.Contains("pending", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Workspace ready. {StartupSourceStatus}";
+        }
+
+        return "Workspace ready.";
     }
 
     private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)

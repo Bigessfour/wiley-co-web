@@ -3,6 +3,7 @@
     "ms-dotnettools.csdevkit",
     "ms-dotnettools.csharp",
     "ms-dotnettools.blazorwasm-companion",
+    "JakubKozera.csharp-dev-tools",
     "ms-dotnettools.vscode-dotnet-pack"
   ]
 }
