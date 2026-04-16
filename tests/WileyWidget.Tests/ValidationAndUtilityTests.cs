@@ -102,7 +102,7 @@ public sealed class ValidationAndUtilityTests
         var currentDirectory = Directory.GetCurrentDirectory();
         var tempRoot = Path.Combine(Path.GetTempPath(), $"wiley-logs-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
-        File.WriteAllText(Path.Combine(tempRoot, "WileyWidget.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(tempRoot, "WileyCoWeb.slnx"), string.Empty);
 
         try
         {
@@ -116,6 +116,62 @@ public sealed class ValidationAndUtilityTests
         finally
         {
             Directory.SetCurrentDirectory(currentDirectory);
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LogPathResolver_FallsBack_WhenPrimaryLogsPathIsNotWritableDirectory()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"wiley-logs-blocked-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        File.WriteAllText(Path.Combine(tempRoot, "WileyCoWeb.slnx"), string.Empty);
+
+        var blockedLogsPath = Path.Combine(tempRoot, "logs");
+        File.WriteAllText(blockedLogsPath, "blocked");
+
+        var expectedFallback = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "wiley-widget", "logs"));
+
+        try
+        {
+            var logsDirectory = LogPathResolver.GetLogsDirectory(tempRoot, tempRoot, configuredLogsDir: null);
+
+            Assert.Equal(expectedFallback, logsDirectory, ignoreCase: true);
+            Assert.True(Directory.Exists(logsDirectory));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, true);
+            }
+
+            if (Directory.Exists(expectedFallback))
+            {
+                Directory.Delete(expectedFallback, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LogPathResolver_UsesConfiguredOverride_WhenProvided()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"wiley-logs-override-{Guid.NewGuid():N}");
+        var overridePath = Path.Combine(tempRoot, "custom-logs");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var logsDirectory = LogPathResolver.GetLogsDirectory(tempRoot, tempRoot, overridePath);
+
+            Assert.Equal(Path.GetFullPath(overridePath), logsDirectory, ignoreCase: true);
+            Assert.True(Directory.Exists(logsDirectory));
+        }
+        finally
+        {
             if (Directory.Exists(tempRoot))
             {
                 Directory.Delete(tempRoot, true);
