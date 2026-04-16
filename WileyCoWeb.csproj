@@ -5,6 +5,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeFrameworkVersion>9.0.14</RuntimeFrameworkVersion>
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
     <UserSecretsId>f6ce628b-59d0-4238-ad1f-5b6f977fd5b9</UserSecretsId>
     <SyncfusionLocalSettingsFile>$(ProjectDir)appsettings.Syncfusion.local.json</SyncfusionLocalSettingsFile>
