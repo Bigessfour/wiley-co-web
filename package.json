@@ -9,16 +9,16 @@
     "copilot:cli": "npx -y @github/copilot --experimental",
     "copilot:cli:update": "npm install -g @github/copilot@latest"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.20.1",
-    "@modelcontextprotocol/server-everything": "^2025.9.25"
-  },
   "engines": {
     "node": ">=18.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/server-filesystem": "^2026.1.14",
-    "prettier": "^3.7.4",
-    "repomix": "^1.8.0"
+    "prettier": "^3.8.3",
+    "repomix": "^1.13.1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/server-everything": "^2026.1.26"
   }
 }
