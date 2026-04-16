@@ -19,6 +19,10 @@
 				"AWS_DOCUMENTATION_PARTITION": "aws"
 			}
 		},
+		"xai-docs-mcp": {
+			"type": "http",
+			"url": "https://docs.x.ai/api/mcp"
+		},
 		"sf-blazor-mcp": {
 			"type": "stdio",
 			"command": "npx",

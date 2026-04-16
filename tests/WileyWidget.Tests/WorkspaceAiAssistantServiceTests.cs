@@ -6,6 +6,27 @@ using WileyWidget.Services.Abstractions;
 
 namespace WileyWidget.Tests;
 
+[CollectionDefinition("WorkspaceAiAssistantService environment", DisableParallelization = true)]
+public sealed class WorkspaceAiAssistantServiceEnvironmentCollection : ICollectionFixture<WorkspaceAiAssistantServiceEnvironmentFixture>
+{
+}
+
+public sealed class WorkspaceAiAssistantServiceEnvironmentFixture : IDisposable
+{
+    private readonly string? previousApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+
+    public WorkspaceAiAssistantServiceEnvironmentFixture()
+    {
+        Environment.SetEnvironmentVariable("XAI_API_KEY", null);
+    }
+
+    public void Dispose()
+    {
+        Environment.SetEnvironmentVariable("XAI_API_KEY", previousApiKey);
+    }
+}
+
+[Collection("WorkspaceAiAssistantService environment")]
 public sealed class WorkspaceAiAssistantServiceTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

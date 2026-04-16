@@ -60,6 +60,12 @@
                             </div>
                         </div>
 
+                        <div id="jarvis-runtime-status" class="mt-3 rounded-xl border px-3 py-3 text-sm @(IsChatFallbackActive ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900")">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] @(IsChatFallbackActive ? "text-amber-700" : "text-emerald-700")">Jarvis runtime</div>
+                            <div class="mt-1 font-semibold">@ChatRuntimeStatusTitle</div>
+                            <div class="mt-1 text-xs leading-5 @(IsChatFallbackActive ? "text-amber-800" : "text-emerald-800")">@ChatRuntimeStatusDetail</div>
+                        </div>
+
                         <div class="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-2">
                             <div id="jarvis-chat-ui" class="h-[19rem] sm:h-[24rem] overflow-hidden rounded-xl border border-slate-200 bg-white">
                                 <SfAIAssistView ID="jarvis-chat-surface"

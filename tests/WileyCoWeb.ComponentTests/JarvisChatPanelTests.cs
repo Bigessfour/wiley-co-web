@@ -112,6 +112,34 @@ public sealed class JarvisChatPanelTests : TestContext
 		Assert.Contains(handler.Paths, path => path.EndsWith("/api/ai/chat/reset", StringComparison.Ordinal));
 	}
 
+	[Fact]
+	public async Task AskJarvis_FallbackResponse_ShowsRuntimeUnavailableBanner()
+	{
+		var state = new WorkspaceState();
+		var handler = new RecordingHttpMessageHandler(firstResponseUsedFallback: true);
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(new WorkspaceAiApiService(new HttpClient(handler)
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		}));
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<JarvisChatPanel>();
+
+		await AskJarvisAsync(cut, "Summarize the current scenario pressure.");
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("Jarvis runtime", cut.Markup);
+			Assert.Contains("AI runtime unavailable", cut.Markup);
+			Assert.Contains("fallback guidance", cut.Markup, StringComparison.OrdinalIgnoreCase);
+		});
+	}
+
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		PropertyNameCaseInsensitive = true
@@ -133,12 +161,14 @@ public sealed class JarvisChatPanelTests : TestContext
 	{
 		private readonly string firstResponseAnswer;
 		private readonly string firstResponseProfileSummary;
+		private readonly bool firstResponseUsedFallback;
 		private int chatCallCount;
 
-		public RecordingHttpMessageHandler(string? firstResponseAnswer = null, string? firstResponseProfileSummary = null)
+		public RecordingHttpMessageHandler(string? firstResponseAnswer = null, string? firstResponseProfileSummary = null, bool firstResponseUsedFallback = false)
 		{
 			this.firstResponseAnswer = firstResponseAnswer ?? "First answer";
 			this.firstResponseProfileSummary = firstResponseProfileSummary ?? "Preferences summary";
+			this.firstResponseUsedFallback = firstResponseUsedFallback;
 		}
 
 		public List<string> Requests { get; } = [];
@@ -181,7 +211,7 @@ public sealed class JarvisChatPanelTests : TestContext
 			var response = new WorkspaceChatResponse(
 				chatCallCount == 1 ? "What is the current status?" : "What did I just ask you?",
 				currentAnswer,
-				false,
+				chatCallCount == 1 ? firstResponseUsedFallback : false,
 				"Test context")
 			{
 				UserDisplayName = "Alex Morgan",
