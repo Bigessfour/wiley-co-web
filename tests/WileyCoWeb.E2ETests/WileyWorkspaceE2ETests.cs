@@ -168,6 +168,62 @@ public sealed class WileyWorkspaceE2ETests
 	}
 
 	[Fact]
+	public async Task Workspace_QuickBooksImportPanel_AssistantAnswersQuestion_ForLoadedPreview()
+	{
+		var tempFile = Path.Combine(Path.GetTempPath(), $"quickbooks-assistant-e2e-{Guid.NewGuid():N}.csv");
+		await File.WriteAllTextAsync(tempFile, CreateQuickBooksCsv());
+
+		try
+		{
+			await RunWorkspaceTestAsync(async page =>
+			{
+				await OpenPanelAsync(page, "quickbooks-import");
+
+				var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });
+				var fileChooser = await page.RunAndWaitForFileChooserAsync(() => browseButton.ClickAsync());
+				await fileChooser.SetFilesAsync(tempFile);
+
+				await page.GetByRole(AriaRole.Button, new() { Name = "Analyze file" }).ClickAsync();
+
+				try
+				{
+					await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("Preview ready", new() { Timeout = 30000 });
+				}
+				catch (PlaywrightException)
+				{
+					await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("Duplicate detected", new() { Timeout = 30000 });
+				}
+
+				var assistantQuestionInput = page.Locator("#quickbooks-assistant-question");
+				var assistantAnswer = page.Locator("#quickbooks-assistant-answer");
+				var initialAnswer = (await assistantAnswer.InnerTextAsync()).Trim();
+				const string question = "Why would this file be blocked as a duplicate?";
+
+				await assistantQuestionInput.FillAsync(question);
+				await Expect(assistantQuestionInput).ToHaveValueAsync(question, new() { Timeout = 30000 });
+				await page.GetByRole(AriaRole.Button, new() { Name = "Ask assistant" }).ClickAsync();
+
+				await Expect(page.Locator("#quickbooks-assistant-context-summary")).ToContainTextAsync("quickbooks-ledger.csv", new() { Timeout = 30000 });
+				await page.WaitForFunctionAsync(
+					"([selector, initialText]) => { const element = document.querySelector(selector); return !!element && element.innerText.trim() !== initialText; }",
+					new object[] { "#quickbooks-assistant-answer", initialAnswer },
+					new() { Timeout = 30000 });
+
+				var updatedAnswer = (await assistantAnswer.InnerTextAsync()).Trim();
+				Assert.NotEqual(initialAnswer, updatedAnswer);
+				Assert.False(string.IsNullOrWhiteSpace(updatedAnswer));
+			});
+		}
+		finally
+		{
+			if (File.Exists(tempFile))
+			{
+				File.Delete(tempFile);
+			}
+		}
+	}
+
+	[Fact]
 	public async Task Workspace_JarvisChatPanel_SendsQuestion_AndShowsTranscript()
 	{
 		await RunWorkspaceTestAsync(async page =>
