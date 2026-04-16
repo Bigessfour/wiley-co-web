@@ -68,7 +68,7 @@ public sealed class ComponentPageTests
 		Assert.Contains("Break-Even", cut.Markup);
 		Assert.Contains("Rates", cut.Markup);
 		Assert.Contains("QuickBooks Import", cut.Markup);
-		Assert.Contains("Trends & Projections", cut.Markup);
+		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
 	}
 
@@ -236,6 +236,7 @@ public sealed class ComponentPageTests
 	[InlineData("customers", "customers", false)]
 	[InlineData("trends", "trends", false)]
 	[InlineData("decision-support", "decision-support", false)]
+	[InlineData("data-dashboard", "data-dashboard", false)]
 	[InlineData("BREAK-EVEN", "break-even", false)]
 	[InlineData("unknown-panel", "overview", true)]
 	public void WileyWorkspaceBaseHarness_PanelRouting_NormalizesPanelKeyCorrectly(
@@ -338,6 +339,7 @@ public sealed class ComponentPageTests
 	[InlineData("customers", "Customer Viewer")]
 	[InlineData("trends", "Trends")]
 	[InlineData("decision-support", "Decision Support")]
+	[InlineData("data-dashboard", "Data Dashboard")]
 	public void WileyWorkspaceBaseHarness_ActivePanelLabel_ReturnsCorrectLabelForEachPanel(
 		string panelKey, string expectedLabel)
 	{
@@ -395,6 +397,7 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new WorkspaceBootstrapService(workspaceState, snapshotService));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
+		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));
 		context.Services.AddScoped(_ => new BrowserDownloadService(jsRuntime));
 		context.Services.AddSyncfusionBlazor();
@@ -456,6 +459,59 @@ public sealed class ComponentPageTests
 			{
 				Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, "Saved workspace snapshot", "2026-04-05T12:00:00Z")), Encoding.UTF8, "application/json")
 			});
+		}))
+		{
+			BaseAddress = new Uri("https://example.test/")
+		};
+	}
+
+	private static HttpClient CreateKnowledgeClient()
+	{
+		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		{
+			if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/knowledge", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				var response = new WorkspaceKnowledgeResponse(
+					WorkspaceTestData.WaterUtility,
+					WorkspaceTestData.WaterFiscalYear,
+					"Action needed",
+					"Water Utility FY 2026 is below the adjusted break-even target and needs a rate or cost correction before publication.",
+					"The modeled rate is below break-even after scenario costs and reserve targets are included.",
+					WorkspaceTestData.ApiCurrentRate,
+					WorkspaceTestData.ApiTotalCosts,
+					WorkspaceTestData.ApiProjectedVolume,
+					1500m,
+					21.78m,
+					22.11m,
+					-9.47m,
+					-9.14m,
+					140625m,
+					42625m,
+					1.43m,
+					120000m,
+					95000m,
+					"Stable",
+					"2026-04-05T12:00:00Z",
+					[
+						new WorkspaceKnowledgeInsightResponse("Adjusted gap", "$9.14", "Current rate remains below the adjusted break-even target."),
+						new WorkspaceKnowledgeInsightResponse("Coverage", "1.43x", "Operating coverage stays above the modeled minimum."),
+						new WorkspaceKnowledgeInsightResponse("Reserve risk", "Stable", "Reserve balance is above the recommended level.")
+					],
+					[
+						new WorkspaceKnowledgeActionResponse("Close the gap", "Increase the rate or cut modeled costs before publishing.", "High"),
+						new WorkspaceKnowledgeActionResponse("Save the scenario", "Persist the active scenario so the recommendation is auditable.", "Medium")
+					],
+					[
+						new WorkspaceKnowledgeVarianceResponse("Chemicals", 10000m, 12500m, 2500m, 25m)
+					]);
+
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				{
+					Content = new StringContent(JsonSerializer.Serialize(response, JsonOptions), Encoding.UTF8, "application/json")
+				});
+			}
+
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
 		}))
 		{
 			BaseAddress = new Uri("https://example.test/")

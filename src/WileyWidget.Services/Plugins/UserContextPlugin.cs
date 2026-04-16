@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.SemanticKernel;
 using WileyWidget.Services.Abstractions;
 using WileyWidget.Models.Models;
@@ -18,13 +19,19 @@ namespace WileyWidget.Services.Plugins
         private readonly IUserContext _userContext;
         private readonly IConversationRepository _conversationRepository;
         private readonly IWileyWidgetContextService _contextService;
+        private readonly IWorkspaceKnowledgeService _workspaceKnowledgeService;
         private readonly AIContextStore _contextStore = new();
 
-        public UserContextPlugin(IUserContext userContext, IConversationRepository conversationRepository, IWileyWidgetContextService contextService)
+        public UserContextPlugin(
+            IUserContext userContext,
+            IConversationRepository conversationRepository,
+            IWileyWidgetContextService contextService,
+            IWorkspaceKnowledgeService workspaceKnowledgeService)
         {
             _userContext = userContext ?? throw new ArgumentNullException(nameof(userContext));
             _conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
             _contextService = contextService ?? throw new ArgumentNullException(nameof(contextService));
+            _workspaceKnowledgeService = workspaceKnowledgeService ?? throw new ArgumentNullException(nameof(workspaceKnowledgeService));
         }
 
         [KernelFunction("get_user_profile")]
@@ -85,21 +92,68 @@ namespace WileyWidget.Services.Plugins
             return "Retention policy applied: old conversations archived, stale guest onboarding records cleaned. Database growth controlled.";
         }
 
+        [KernelFunction("get_workspace_knowledge_summary")]
+        [Description("Returns a live financial summary for the specified enterprise and fiscal year using the same workspace knowledge service that powers the API and UI.")]
+        public string GetWorkspaceKnowledgeSummary(
+            [Description("Target enterprise or utility e.g. 'Water Utility'")] string enterpriseName,
+            [Description("Fiscal year for the live analysis e.g. 2026")] int fiscalYear)
+        {
+            var knowledge = TryLoadKnowledge(enterpriseName, fiscalYear, enterpriseName);
+            if (knowledge is null)
+            {
+                return $"Live workspace knowledge is unavailable for {enterpriseName} FY {fiscalYear}. Confirm the enterprise exists and that the analytics repositories are available.";
+            }
+
+            return BuildKnowledgeSummary(knowledge);
+        }
+
         [KernelFunction("explain_financial_issue")]
         [Description("Delivers detailed 'why is this the case' analysis for utility rates, subsidization, break-even gaps or anomalies. Uses real operational data, historical trends, rural community context and municipal best practices. Impresses auditors with transparent methodology.")]
         public string ExplainFinancialIssue(
             [Description("Specific financial issue or question from council/user e.g. 'why is water subsidizing sewer' or 'why did rates increase 12%'")] string issueDescription,
-            [Description("Target enterprise or utility e.g. 'Water Utility' or 'Sewer Department'")] string enterpriseName)
+            [Description("Target enterprise or utility e.g. 'Water Utility' or 'Sewer Department'")] string enterpriseName,
+            [Description("Optional fiscal year when the request is specific to a single year. Use 0 to infer from the question or current context.")] int fiscalYear = 0)
         {
             var context = _contextService.BuildCurrentSystemContextAsync().GetAwaiter().GetResult();
+            var knowledge = TryLoadKnowledge(enterpriseName, fiscalYear, issueDescription, context);
             var sb = new StringBuilder();
             sb.AppendLine($"=== Auditor-Level Explanation for {enterpriseName}: {issueDescription} ===");
-            sb.AppendLine("Grounded Analysis (Real Data + Operational Methods):");
-            sb.AppendLine("1. Data Sources: Current fiscal ledger, historical 5-yr trends from BudgetAnalyticsRepository, imported QuickBooks actuals as canonical.");
-            sb.AppendLine("2. Key Metrics: Subsidization delta calculated via break-even model; reserves at 25% of O&M per GASB/rural utility guidelines.");
-            sb.AppendLine("3. Why This Way: Rural utilities face higher per-capita infrastructure costs + weather volatility; recent capex for main replacements drove 12% adjustment to maintain 1.2x coverage ratio.");
-            sb.AppendLine("4. Real-World Ops: Recommend phased equipment replacement reserve vs. one-time rate shock; aligns with council fluency goals for defensible decisions.");
-            sb.AppendLine("\nThis methodology mirrors how state auditors validate municipal rate studies. How else can I clarify for the council?");
+
+            if (knowledge is not null)
+            {
+                var adjustedGapMagnitude = Math.Abs(knowledge.AdjustedRateGap);
+                var gapDirection = knowledge.AdjustedRateGap < 0
+                    ? "below"
+                    : knowledge.AdjustedRateGap > 0
+                        ? "above"
+                        : "aligned with";
+
+                sb.AppendLine("Grounded Analysis (Live Data + Operational Methods):");
+                sb.AppendLine($"1. Data Sources: Enterprise ledger, analytics repositories, reserve forecast, and budget variance data for {knowledge.SelectedEnterprise} FY {knowledge.SelectedFiscalYear}.");
+                sb.AppendLine($"2. Key Metrics: Current rate {knowledge.CurrentRate:C2}; adjusted break-even {knowledge.AdjustedBreakEvenRate:C2}; current rate is {gapDirection} target by {adjustedGapMagnitude:C2}.");
+                sb.AppendLine($"3. Financial Position: Monthly revenue {knowledge.MonthlyRevenue:C0}; net position {knowledge.NetPosition:C0}; coverage ratio {knowledge.CoverageRatio:N2}x.");
+                sb.AppendLine($"4. Reserve Posture: {knowledge.CurrentReserveBalance:C0} on hand versus {knowledge.RecommendedReserveLevel:C0} recommended ({knowledge.ReserveRiskAssessment}).");
+
+                if (knowledge.TopVariances.Count > 0)
+                {
+                    var topVariance = knowledge.TopVariances[0];
+                    sb.AppendLine($"5. Largest variance driver: {topVariance.AccountName} at {topVariance.VarianceAmount:C0} ({topVariance.VariancePercentage:N1}%).");
+                }
+
+                if (knowledge.RecommendedActions.Count > 0)
+                {
+                    sb.AppendLine($"6. Operational takeaway: {knowledge.RecommendedActions[0].Title} - {knowledge.RecommendedActions[0].Description}");
+                }
+            }
+            else
+            {
+                sb.AppendLine("Grounded Analysis (Context Fallback):");
+                sb.AppendLine("1. Live workspace knowledge was unavailable, so this explanation is based on current system context only.");
+                sb.AppendLine("2. Confirm the enterprise/fiscal-year scope and analytics connectivity before presenting this rationale as an audited rate-study explanation.");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("This methodology mirrors how state auditors validate municipal rate studies. How else can I clarify for the council?");
             _contextStore.ScenarioSummary = sb.ToString();
             return sb.ToString();
         }
@@ -108,16 +162,33 @@ namespace WileyWidget.Services.Plugins
         [Description("Generates practical, council-comfortable recommendations to address utility financial issues. Focuses on rural ops realities, reserve building, efficiency gains, rate timing to build confidence in AI suggestions.")]
         public string SuggestOperationalActions(
             [Description("The financial gap or issue e.g. 'sewer operating deficit of $45k' or 'reserve shortfall'")] string financialIssue,
-            [Description("Enterprise context e.g. 'Apartments utility serving 2400 rural customers'")] string context)
+            [Description("Enterprise context e.g. 'Apartments utility serving 2400 rural customers'")] string context,
+            [Description("Optional enterprise name for direct live-data lookup.")] string enterpriseName = "",
+            [Description("Optional fiscal year when recommendations should use a specific planning cycle. Use 0 to infer from the context.")] int fiscalYear = 0)
         {
+            var resolvedEnterpriseName = string.IsNullOrWhiteSpace(enterpriseName) ? TryResolveEnterpriseName(context) ?? context : enterpriseName;
+            var knowledge = TryLoadKnowledge(resolvedEnterpriseName, fiscalYear, financialIssue, context);
             var sb = new StringBuilder();
             sb.AppendLine($"=== Action Plan for {financialIssue} ({context}) ===");
-            sb.AppendLine("Council-Friendly Recommendations (Financial Fluency + Real Ops):");
-            sb.AppendLine("• Build targeted reserves: Allocate 15% of next rate adjustment to Equipment Replacement Fund (avoids future debt in rural setting).");
-            sb.AppendLine("• Operational efficiency: Implement quarterly QuickBooks variance reviews + leak detection program to cut unaccounted-for water by 8-12%.");
-            sb.AppendLine("• Rate strategy: Stagger 4% annual increases over 3 years with public dashboard (SfChart) showing impact on typical residential bill - builds trust.");
-            sb.AppendLine("• Long-term: Partner with state revolving fund for low-interest infra loans; model in scenario planner to show 10-yr break-even.");
-            sb.AppendLine("\nThese steps are grounded in AWWA rural utility benchmarks and GFOA best practices. Auditor would note the transparent linkage between data, ops, and policy.");
+            sb.AppendLine("Council-Friendly Recommendations (Live Data + Real Ops):");
+
+            if (knowledge is not null && knowledge.RecommendedActions.Count > 0)
+            {
+                foreach (var action in knowledge.RecommendedActions.Take(4))
+                {
+                    sb.AppendLine($"• {action.Title}: {action.Description}");
+                }
+
+                sb.AppendLine($"• Rate context: current {knowledge.CurrentRate:C2}, adjusted break-even {knowledge.AdjustedBreakEvenRate:C2}, reserve posture {knowledge.ReserveRiskAssessment}.");
+            }
+            else
+            {
+                sb.AppendLine("• Confirm analytics connectivity and workspace scope before issuing an operational plan.");
+                sb.AppendLine("• Re-run the analysis with enterprise, fiscal-year, and scenario details so Jarvis can return live actions instead of generic guidance.");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("These steps are grounded in the same workspace knowledge service used by the API and UI, so the policy story stays tied to live financial data.");
             return sb.ToString();
         }
 
@@ -125,15 +196,101 @@ namespace WileyWidget.Services.Plugins
         [Description("Produces 'wow, how did you figure that out' style rationale for AI rate recommendations. Combines data, context store, operational methods, rural factors for full transparency and council comfort.")]
         public string GenerateRateRationale(
             [Description("Proposed rate or scenario e.g. '8.5% water rate adjustment for FY2027'")] string recommendation,
-            [Description("Supporting context from workspace snapshot or user query")] string supportingData)
+            [Description("Supporting context from workspace snapshot or user query")] string supportingData,
+            [Description("Optional enterprise name for direct live-data lookup.")] string enterpriseName = "",
+            [Description("Optional fiscal year when recommendations should use a specific planning cycle. Use 0 to infer from the recommendation or supporting data.")] int fiscalYear = 0)
         {
+            var resolvedEnterpriseName = string.IsNullOrWhiteSpace(enterpriseName) ? TryResolveEnterpriseName(supportingData) : enterpriseName;
+            var knowledge = TryLoadKnowledge(resolvedEnterpriseName ?? string.Empty, fiscalYear, recommendation, supportingData);
             var rationale = _contextStore.ScenarioSummary ?? _contextService.GetEnterpriseContextAsync(1).GetAwaiter().GetResult();
+
+            if (knowledge is null)
+            {
+                return $"Rationale for {recommendation}:\n\nLive workspace knowledge was unavailable, so this answer is limited to current system context. Context from store: {rationale.Substring(0, Math.Min(150, rationale.Length))}. Confirm enterprise and fiscal-year scope before using this as a production recommendation.";
+            }
+
             return $"Rationale for {recommendation}:\n\n" +
-                   "Methodology: Aggregated FY ledger (canonical QuickBooks imports) + 5-yr trend from AnalyticsRepository + subsidization model (total cost / projected volume). " +
-                   "Rural Adjustment: +6% for higher O&M volatility in low-density service area. " +
-                   "Operational Tie-In: Funds main replacement without tax subsidy, maintaining 1.25x debt coverage per bond covenants. " +
+                   $"Methodology: live ledger and analytics data for {knowledge.SelectedEnterprise} FY {knowledge.SelectedFiscalYear}, break-even model ({knowledge.TotalCosts:C0} / {knowledge.ProjectedVolume:N0}), reserve forecast, and variance analysis. " +
+                   $"Financial position: current rate {knowledge.CurrentRate:C2}, adjusted break-even {knowledge.AdjustedBreakEvenRate:C2}, adjusted gap {knowledge.AdjustedRateGap:C2}, coverage ratio {knowledge.CoverageRatio:N2}x. " +
+                   $"Operational tie-in: {knowledge.ExecutiveSummary} " +
                    $"Context from store: {rationale.Substring(0, Math.Min(150, rationale.Length))}. " +
                    "This is how we arrive at defensible, explainable suggestions that councils and auditors can trust.";
+        }
+
+        private WorkspaceKnowledgeResult? TryLoadKnowledge(string enterpriseName, int fiscalYear, params string?[] hints)
+        {
+            if (string.IsNullOrWhiteSpace(enterpriseName))
+            {
+                return null;
+            }
+
+            var resolvedFiscalYear = fiscalYear > 0 ? fiscalYear : TryResolveFiscalYear(hints) ?? DateTime.UtcNow.Year;
+
+            try
+            {
+                return _workspaceKnowledgeService.BuildAsync(enterpriseName.Trim(), resolvedFiscalYear).GetAwaiter().GetResult();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string BuildKnowledgeSummary(WorkspaceKnowledgeResult knowledge)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine($"Workspace summary for {knowledge.SelectedEnterprise} FY {knowledge.SelectedFiscalYear}:");
+            builder.AppendLine($"- Operational status: {knowledge.OperationalStatus}");
+            builder.AppendLine($"- Current rate: {knowledge.CurrentRate:C2}");
+            builder.AppendLine($"- Adjusted break-even: {knowledge.AdjustedBreakEvenRate:C2}");
+            builder.AppendLine($"- Adjusted rate gap: {knowledge.AdjustedRateGap:C2}");
+            builder.AppendLine($"- Net position: {knowledge.NetPosition:C0}");
+            builder.AppendLine($"- Reserve posture: {knowledge.CurrentReserveBalance:C0} on hand vs {knowledge.RecommendedReserveLevel:C0} recommended ({knowledge.ReserveRiskAssessment})");
+
+            if (knowledge.RecommendedActions.Count > 0)
+            {
+                builder.AppendLine($"- Primary action: {knowledge.RecommendedActions[0].Title} - {knowledge.RecommendedActions[0].Description}");
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
+        private static int? TryResolveFiscalYear(IEnumerable<string?> hints)
+        {
+            foreach (var hint in hints)
+            {
+                if (string.IsNullOrWhiteSpace(hint))
+                {
+                    continue;
+                }
+
+                var match = Regex.Match(hint, @"\b(?:FY\s*)?(20\d{2})\b", RegexOptions.IgnoreCase);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var fiscalYear))
+                {
+                    return fiscalYear;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? TryResolveEnterpriseName(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            var enterpriseWithFiscalYear = Regex.Match(text, @"(?<enterprise>[A-Za-z][A-Za-z\s&/-]+?)\s+FY\s*20\d{2}", RegexOptions.IgnoreCase);
+            if (enterpriseWithFiscalYear.Success)
+            {
+                return enterpriseWithFiscalYear.Groups["enterprise"].Value.Trim();
+            }
+
+            var utilityMatch = Regex.Match(text, @"(?<enterprise>[A-Za-z][A-Za-z\s&/-]*Utility)", RegexOptions.IgnoreCase);
+            return utilityMatch.Success
+                ? utilityMatch.Groups["enterprise"].Value.Trim()
+                : null;
         }
     }
 }

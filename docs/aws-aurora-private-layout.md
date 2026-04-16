@@ -28,9 +28,11 @@ This note records the private AWS footprint used for the Wiley.co database and t
 
 ## Schema target
 
-Apply the canonical schema from [docs/amplify-db-schema.sql](amplify-db-schema.sql) to the `wileyco` database after the writer instance becomes available.
+Apply the canonical schema from the EF Core PostgreSQL migration in `src/WileyWidget.Data/Migrations/20260415122817_InitialCreate.cs`.
 
-The schema is already normalized for the import pipeline:
+Use [docs/aurora-postgresql-reset-runbook.md](aurora-postgresql-reset-runbook.md) for the approved Aurora reset and migration-apply workflow.
+
+The migration includes both the import pipeline tables and the workspace-analysis tables the API currently reads:
 
 - `import_batches`
 - `source_files`
@@ -43,6 +45,11 @@ The schema is already normalized for the import pipeline:
 - `trial_balance_lines`
 - `profit_loss_monthly_lines`
 - `budget_snapshots`
+- `budget_snapshot_artifacts`
+- `Enterprises`
+- `BudgetEntries`
+- `MunicipalAccounts`
+- `UtilityCustomers`
 
 ## Deployment rule
 

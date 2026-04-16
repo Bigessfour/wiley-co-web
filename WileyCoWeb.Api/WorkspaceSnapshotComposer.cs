@@ -10,6 +10,7 @@ namespace WileyCoWeb.Api;
 
 internal sealed class WorkspaceSnapshotComposer
 {
+    private const string RateSnapshotRecordPrefix = "RecordType:RateSnapshot";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDbContextFactory<AppDbContext> contextFactory;
     private readonly ILogger<WorkspaceSnapshotComposer> logger;
@@ -44,18 +45,23 @@ internal sealed class WorkspaceSnapshotComposer
             .ToListAsync(cancellationToken);
 
         var selectedFiscalYear = ResolveFiscalYear(fiscalYear, budgetYears);
+        var persistedSnapshot = await LoadLatestRateSnapshotAsync(context, selectedEnterprise.Name, selectedFiscalYear, cancellationToken);
 
         var customers = await context.UtilityCustomers
             .AsNoTracking()
             .OrderBy(customer => customer.AccountNumber)
             .ToListAsync(cancellationToken);
 
-        var customerRows = customers
-            .Select(customer => new CustomerRow(
-                string.IsNullOrWhiteSpace(customer.DisplayName) ? customer.AccountNumber : customer.DisplayName,
-                customer.CustomerTypeDescription,
-                customer.ServiceLocation == WileyWidget.Models.ServiceLocation.InsideCityLimits ? "Yes" : "No"))
-            .ToList();
+        var customerRows = persistedSnapshot?.CustomerRows is { Count: > 0 }
+            ? persistedSnapshot.CustomerRows
+                .Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits))
+                .ToList()
+            : customers
+                .Select(customer => new CustomerRow(
+                    string.IsNullOrWhiteSpace(customer.DisplayName) ? customer.AccountNumber : customer.DisplayName,
+                    customer.CustomerTypeDescription,
+                    customer.ServiceLocation == WileyWidget.Models.ServiceLocation.InsideCityLimits ? "Yes" : "No"))
+                .ToList();
 
         var serviceOptions = customerRows
             .Select(customer => customer.Service)
@@ -64,14 +70,28 @@ internal sealed class WorkspaceSnapshotComposer
             .ToList();
         serviceOptions.Insert(0, "All Services");
 
-        var currentRate = selectedEnterprise.CurrentRate > 0 ? selectedEnterprise.CurrentRate : 0m;
-        var totalCosts = selectedEnterprise.MonthlyExpenses > 0 ? selectedEnterprise.MonthlyExpenses : 0m;
-        var projectedVolume = selectedEnterprise.CitizenCount > 0 ? selectedEnterprise.CitizenCount : 0m;
+        var currentRate = persistedSnapshot?.CurrentRate is > 0m
+            ? persistedSnapshot.CurrentRate.Value
+            : selectedEnterprise.CurrentRate > 0 ? selectedEnterprise.CurrentRate : 0m;
+        var totalCosts = persistedSnapshot?.TotalCosts is > 0m
+            ? persistedSnapshot.TotalCosts.Value
+            : selectedEnterprise.MonthlyExpenses > 0 ? selectedEnterprise.MonthlyExpenses : 0m;
+        var projectedVolume = persistedSnapshot?.ProjectedVolume is > 0m
+            ? persistedSnapshot.ProjectedVolume.Value
+            : selectedEnterprise.CitizenCount > 0 ? selectedEnterprise.CitizenCount : 0m;
         var recommendedRate = projectedVolume == 0 ? 0m : Math.Round(totalCosts / projectedVolume, 2, MidpointRounding.AwayFromZero);
         var rateHistory = await LoadRateHistoryAsync(context, selectedEnterprise.Name, selectedFiscalYear, cancellationToken);
 
-        var projectionRows = BuildProjectionRows(selectedFiscalYear, currentRate, recommendedRate, rateHistory);
-        var scenarioItems = await BuildScenarioItemsAsync(context, selectedFiscalYear, cancellationToken);
+        var projectionRows = persistedSnapshot?.ProjectionRows is { Count: > 0 }
+            ? persistedSnapshot.ProjectionRows
+                .Select(row => new ProjectionRow(row.Year, row.Rate))
+                .ToList()
+            : BuildProjectionRows(selectedFiscalYear, currentRate, recommendedRate, rateHistory);
+        var scenarioItems = persistedSnapshot?.ScenarioItems is { Count: > 0 }
+            ? persistedSnapshot.ScenarioItems
+                .Select(item => new WorkspaceScenarioItemData(item.Id, item.Name, item.Cost))
+                .ToList()
+            : await BuildScenarioItemsAsync(context, selectedFiscalYear, cancellationToken);
 
         logger.LogInformation(
             "Workspace snapshot composed for {Enterprise} FY {FiscalYear}: enterprises={EnterpriseCount}, customers={CustomerCount}, scenarios={ScenarioCount}, items={ScenarioItemCount}",
@@ -137,9 +157,14 @@ internal sealed class WorkspaceSnapshotComposer
             historicalPreviousRate = currentRate;
         }
 
-        var projectedStep = CalculateProjectionStep(rateHistory, currentRate, recommendedRate);
-        var nextYearRate = Math.Round(currentRate + projectedStep, 2, MidpointRounding.AwayFromZero);
-        var followingYearRate = Math.Round(nextYearRate + projectedStep, 2, MidpointRounding.AwayFromZero);
+        if (historicalPreviousRate > currentRate)
+        {
+            historicalPreviousRate = currentRate;
+        }
+
+        var projectedStep = Math.Max(0m, CalculateProjectionStep(rateHistory, currentRate, recommendedRate));
+        var nextYearRate = Math.Round(Math.Max(currentRate, currentRate + projectedStep), 2, MidpointRounding.AwayFromZero);
+        var followingYearRate = Math.Round(Math.Max(nextYearRate, nextYearRate + projectedStep), 2, MidpointRounding.AwayFromZero);
 
         return
         [
@@ -176,7 +201,9 @@ internal sealed class WorkspaceSnapshotComposer
     {
         var snapshots = await context.BudgetSnapshots
             .AsNoTracking()
-            .Where(snapshot => snapshot.Payload != null)
+            .Where(snapshot => snapshot.Payload != null
+                && snapshot.Notes != null
+                && snapshot.Notes.Contains(RateSnapshotRecordPrefix))
             .OrderBy(snapshot => snapshot.CreatedAt)
             .Select(snapshot => new { snapshot.SnapshotDate, snapshot.Payload })
             .ToListAsync(cancellationToken);
@@ -212,6 +239,41 @@ internal sealed class WorkspaceSnapshotComposer
             .Select(group => group.OrderByDescending(point => point.Rate).First())
             .OrderBy(point => point.FiscalYear)
             .ToList();
+    }
+
+    private static async Task<WorkspaceBootstrapData?> LoadLatestRateSnapshotAsync(AppDbContext context, string enterpriseName, int fiscalYear, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(enterpriseName) || fiscalYear <= 0)
+        {
+            return null;
+        }
+
+        var snapshots = await context.BudgetSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.Payload != null
+                && snapshot.Notes != null
+                && snapshot.Notes.Contains(RateSnapshotRecordPrefix))
+            .OrderByDescending(snapshot => snapshot.CreatedAt)
+            .Select(snapshot => snapshot.Payload)
+            .ToListAsync(cancellationToken);
+
+        foreach (var payload in snapshots)
+        {
+            if (!TryReadBootstrap(payload, out var bootstrapData))
+            {
+                continue;
+            }
+
+            if (!string.Equals(bootstrapData.SelectedEnterprise, enterpriseName, StringComparison.OrdinalIgnoreCase)
+                || bootstrapData.SelectedFiscalYear != fiscalYear)
+            {
+                continue;
+            }
+
+            return bootstrapData;
+        }
+
+        return null;
     }
 
     private static bool TryReadBootstrap(string? payload, out WorkspaceBootstrapData bootstrapData)

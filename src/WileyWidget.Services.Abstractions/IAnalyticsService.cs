@@ -25,7 +25,7 @@ namespace WileyWidget.Services.Abstractions
         /// <summary>
         /// Generates predictive forecast for budget reserves
         /// </summary>
-        Task<ReserveForecastResult> GenerateReserveForecastAsync(int yearsAhead, CancellationToken cancellationToken = default);
+        Task<ReserveForecastResult> GenerateReserveForecastAsync(int yearsAhead, string? entryScope = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets budget overview data for the specified fiscal year

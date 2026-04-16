@@ -14,12 +14,12 @@ namespace WileyWidget.Services.Abstractions
         /// <summary>
         /// Gets historical reserve data points for forecasting
         /// </summary>
-        Task<IEnumerable<ReserveDataPoint>> GetHistoricalReserveDataAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+        Task<IEnumerable<ReserveDataPoint>> GetHistoricalReserveDataAsync(DateTime startDate, DateTime endDate, string? entryScope = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets the current reserve balance
         /// </summary>
-        Task<decimal> GetCurrentReserveBalanceAsync(CancellationToken cancellationToken = default);
+        Task<decimal> GetCurrentReserveBalanceAsync(string? entryScope = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets municipal account information for analytics

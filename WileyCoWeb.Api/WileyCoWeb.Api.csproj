@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.SecretsManager" />
     <PackageReference Include="AWSXRayRecorder.Handlers.AspNetCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <ProjectReference Include="..\src\WileyWidget.Data\WileyWidget.Data.csproj" />
     <ProjectReference Include="..\src\WileyWidget.Models\WileyWidget.Models.csproj" />
     <ProjectReference Include="..\src\WileyWidget.Services\WileyWidget.Services.csproj" />
@@ -17,6 +18,8 @@
 
   <ItemGroup>
     <Compile Include="..\Contracts\WorkspaceContracts.cs" Link="Contracts/WorkspaceContracts.cs" />
+    <Compile Include="..\Contracts\WorkspaceKnowledgeContracts.cs"
+      Link="Contracts/WorkspaceKnowledgeContracts.cs" />
   </ItemGroup>
 
 </Project>

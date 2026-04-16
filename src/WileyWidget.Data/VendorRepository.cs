@@ -16,12 +16,12 @@ namespace WileyWidget.Data;
 /// </summary>
 public class VendorRepository : IVendorRepository
 {
-    private readonly AppDbContext _context;
+    private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly ILogger<VendorRepository> _logger;
 
-    public VendorRepository(AppDbContext context, ILogger<VendorRepository> logger)
+    public VendorRepository(IDbContextFactory<AppDbContext> contextFactory, ILogger<VendorRepository> logger)
     {
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -33,7 +33,9 @@ public class VendorRepository : IVendorRepository
     public async Task<IReadOnlyList<Vendor>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("VendorRepository: Getting all vendors");
-        return await _context.Vendors
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Vendors
             .AsNoTracking()
             .OrderBy(v => v.Name)
             .ToListAsync(cancellationToken);
@@ -42,7 +44,9 @@ public class VendorRepository : IVendorRepository
     public async Task<IReadOnlyList<Vendor>> GetActiveAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("VendorRepository: Getting active vendors");
-        return await _context.Vendors
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Vendors
             .AsNoTracking()
             .Where(v => v.IsActive)
             .OrderBy(v => v.Name)
@@ -52,7 +56,9 @@ public class VendorRepository : IVendorRepository
     public async Task<Vendor?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("VendorRepository: Getting vendor by ID {Id}", id);
-        return await _context.Vendors
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Vendors
             .AsNoTracking()
             .OrderByDescending(v => v.Id)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
@@ -68,10 +74,14 @@ public class VendorRepository : IVendorRepository
         var normalized = name.Trim();
         _logger.LogDebug("VendorRepository: Getting vendor by name {Name}", normalized);
 
-        return await _context.Vendors
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var vendors = await context.Vendors
             .AsNoTracking()
             .OrderByDescending(v => v.Id)
-            .FirstOrDefaultAsync(v => v.Name.ToLower() == normalized.ToLower(), cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        return vendors.FirstOrDefault(v => string.Equals(v.Name, normalized, StringComparison.OrdinalIgnoreCase));
     }
 
     public async Task<IReadOnlyList<Vendor>> SearchByNameAsync(string searchTerm, CancellationToken cancellationToken = default)
@@ -84,7 +94,9 @@ public class VendorRepository : IVendorRepository
         var normalized = searchTerm.Trim();
         _logger.LogDebug("VendorRepository: Searching vendors by term {SearchTerm}", normalized);
 
-        return await _context.Vendors
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await context.Vendors
             .AsNoTracking()
             .Where(v => EF.Functions.Like(v.Name, $"%{normalized}%"))
             .OrderBy(v => v.Name)
@@ -121,8 +133,10 @@ public class VendorRepository : IVendorRepository
             throw new InvalidOperationException($"Vendor '{vendor.Name}' already exists");
         }
 
-        _context.Vendors.Add(vendor);
-        await _context.SaveChangesAsync(cancellationToken);
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        context.Vendors.Add(vendor);
+        await context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("VendorRepository: Vendor {Id} added successfully", vendor.Id);
         return vendor;
@@ -141,7 +155,9 @@ public class VendorRepository : IVendorRepository
             throw new ArgumentException("Vendor name is required", nameof(vendor));
         }
 
-        var existing = await _context.Vendors.FindAsync(new object[] { vendor.Id }, cancellationToken);
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var existing = await context.Vendors.FindAsync(new object[] { vendor.Id }, cancellationToken);
         if (existing == null)
         {
             throw new InvalidOperationException($"Vendor {vendor.Id} not found");
@@ -169,18 +185,20 @@ public class VendorRepository : IVendorRepository
         existing.QuickBooksId = NormalizeOptional(vendor.QuickBooksId);
         existing.IsActive = vendor.IsActive;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
-        var vendor = await _context.Vendors.FindAsync(new object[] { id }, cancellationToken);
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var vendor = await context.Vendors.FindAsync(new object[] { id }, cancellationToken);
         if (vendor == null)
         {
             throw new InvalidOperationException($"Vendor {id} not found");
         }
 
-        _context.Vendors.Remove(vendor);
-        await _context.SaveChangesAsync(cancellationToken);
+        context.Vendors.Remove(vendor);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

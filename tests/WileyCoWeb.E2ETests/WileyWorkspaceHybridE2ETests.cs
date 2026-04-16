@@ -4,6 +4,7 @@ using Applitools.Playwright.Fluent;
 using Applitools.Utils.Geometry;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
+using System.Text.RegularExpressions;
 
 namespace WileyCoWeb.E2ETests;
 

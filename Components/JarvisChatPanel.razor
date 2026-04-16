@@ -32,9 +32,9 @@
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Recommended actions</div>
-                            <div class="mt-1 text-sm text-slate-600">Prioritized from the active workspace state.</div>
+                            <div class="mt-1 text-sm text-slate-600">@KnowledgeStatus</div>
                         </div>
-                        <SfButton CssClass="e-flat" OnClick="() => InvokeAsync(StateHasChanged)">Refresh</SfButton>
+                        <SfButton CssClass="e-flat" Disabled="@IsKnowledgeBusy" OnClick="RefreshKnowledgeFromButtonAsync">Refresh</SfButton>
                     </div>
                     <div class="mt-3 space-y-3">
                         @foreach (var action in RecommendedActions)

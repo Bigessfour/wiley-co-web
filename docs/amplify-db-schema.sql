@@ -1,3 +1,8 @@
+-- Import-pipeline reference schema only.
+-- The canonical Aurora PostgreSQL schema now comes from the EF Core migration in
+-- src/WileyWidget.Data/Migrations/20260415122817_InitialCreate.cs and the
+-- reset/apply runbook in docs/aurora-postgresql-reset-runbook.md.
+
 create table if not exists import_batches (
     id bigint generated always as identity primary key,
     batch_name text not null,

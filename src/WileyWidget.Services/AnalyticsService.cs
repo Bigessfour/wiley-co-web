@@ -138,19 +138,25 @@ namespace WileyWidget.Services
         /// <summary>
         /// Generates predictive forecast for budget reserves
         /// </summary>
-        public async Task<ReserveForecastResult> GenerateReserveForecastAsync(int yearsAhead, CancellationToken cancellationToken = default)
+        public async Task<ReserveForecastResult> GenerateReserveForecastAsync(int yearsAhead, string? entryScope = null, CancellationToken cancellationToken = default)
         {
             return await ExecuteAsync(async ct =>
             {
                 ct.ThrowIfCancellationRequested();
 
-                _logger.LogInformation("Generating reserve forecast for {Years} years ahead", yearsAhead);
+                _logger.LogInformation("Generating reserve forecast for {Years} years ahead (EntryScope={EntryScope})", yearsAhead, entryScope);
 
-                var endDate = DateTime.Now;
+                var endDate = DateTime.UtcNow;
                 var startDate = endDate.AddYears(-2); // Look back 2 years for historical data
 
-                var historicalData = await _budgetAnalyticsRepository.GetReserveHistoryAsync(startDate, endDate, ct);
-                var currentReserves = await _analyticsRepository.GetCurrentReserveBalanceAsync(ct);
+                var historicalData = await LoadReserveForecastDependencyAsync(
+                    "reserve history",
+                    () => _budgetAnalyticsRepository.GetReserveHistoryAsync(startDate, endDate, entryScope, ct),
+                    ct);
+                var currentReserves = await LoadReserveForecastDependencyAsync(
+                    "current reserve balance",
+                    () => _analyticsRepository.GetCurrentReserveBalanceAsync(entryScope, ct),
+                    ct);
 
                 var result = new ReserveForecastResult
                 {
@@ -182,7 +188,10 @@ namespace WileyWidget.Services
                     }
 
                     // Calculate recommended reserve level (typically 25-50% of annual budget)
-                    var annualBudget = await GetAnnualBudgetAsync(ct);
+                    var annualBudget = await LoadReserveForecastDependencyAsync(
+                        "annual budget baseline",
+                        () => GetAnnualBudgetAsync(ct),
+                        ct);
                     result.RecommendedReserveLevel = annualBudget * 0.25m; // 25% of annual budget
 
                     result.RiskAssessment = AssessRiskLevel(trend, currentReserves, result.RecommendedReserveLevel);
@@ -195,6 +204,24 @@ namespace WileyWidget.Services
 
                 return result;
             }, cancellationToken);
+        }
+
+        private async Task<T> LoadReserveForecastDependencyAsync<T>(string dependencyName, Func<Task<T>> operation, CancellationToken cancellationToken)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return await operation().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unable to load reserve forecast dependency {DependencyName}", dependencyName);
+                throw new InvalidOperationException($"Reserve forecast dependency '{dependencyName}' could not be loaded.", ex);
+            }
         }
 
         private static List<string> BuildAvailableEntities(IEnumerable<BudgetEntry> budgetEntries, IEnumerable<Enterprise> enterprises)
@@ -274,9 +301,9 @@ namespace WileyWidget.Services
 
         private async Task<decimal> GetAnnualBudgetAsync(CancellationToken cancellationToken)
         {
-            var currentYear = DateTime.Now.Year;
-            var startDate = new DateTime(currentYear, 7, 1);
-            var endDate = new DateTime(currentYear + 1, 6, 30);
+            var currentYear = DateTime.UtcNow.Year;
+            var startDate = new DateTime(currentYear, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+            var endDate = new DateTime(currentYear + 1, 6, 30, 0, 0, 0, DateTimeKind.Utc);
 
             var budgetEntries = await _budgetRepository.GetByDateRangeAsync(startDate, endDate, cancellationToken);
             return budgetEntries.Sum(be => be.BudgetedAmount);

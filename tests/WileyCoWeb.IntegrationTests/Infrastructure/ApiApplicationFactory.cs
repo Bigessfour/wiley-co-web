@@ -14,6 +14,8 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            services.RemoveAll<AppDbContext>();
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextFactory<AppDbContext>>();
 
             var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -21,6 +23,8 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
                 .EnableSensitiveDataLogging()
                 .Options;
 
+            services.AddSingleton(options);
+            services.AddScoped(_ => new AppDbContext(options));
             services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(options));
         });
     }
@@ -30,7 +34,7 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
         await ResetDatabaseAsync();
     }
 
-    public async Task ResetDatabaseAsync()
+    public async Task ResetDatabaseAsync(bool seedData = true)
     {
         var contextFactory = Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
 
@@ -38,6 +42,9 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
         await context.Database.EnsureDeletedAsync();
         await context.Database.EnsureCreatedAsync();
 
-        await TestDataSeeder.SeedAsync(context);
+        if (seedData)
+        {
+            await TestDataSeeder.SeedAsync(context);
+        }
     }
 }

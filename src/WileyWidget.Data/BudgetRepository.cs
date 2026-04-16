@@ -73,7 +73,7 @@ public class BudgetRepository : IBudgetRepository
                 System.Collections.ICollection collection => collection.Count,
                 _ => 1
             };
-            options.SetSize(size);
+            options.SetSize(Math.Max(1, size));
 
             _cache.Set(key, value, options);
         }

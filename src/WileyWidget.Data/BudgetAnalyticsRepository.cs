@@ -20,6 +20,8 @@ namespace WileyWidget.Data;
 /// </summary>
 public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
 {
+    private sealed record ReserveLedgerRow(DateOnly EntryDate, int SourceRowNumber, decimal Amount, string? AccountName, string? OriginalFileName);
+
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly IMemoryCache _cache;
     private readonly ILogger<BudgetAnalyticsRepository> _logger;
@@ -45,11 +47,19 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
 
             await using var context = await _contextFactory.CreateDbContextAsync(ct);
 
-            // Server-side ordering and top-N selection
-            var topVariances = await context.BudgetEntries
+            IQueryable<BudgetEntry> fiscalYearEntries = context.BudgetEntries
                 .AsNoTracking()
-                .Where(b => b.FiscalYear == fiscalYear)
+                .Where(b => b.FiscalYear == fiscalYear);
+
+            var hasImportedActuals = await fiscalYearEntries.AnyAsync(b => b.ActualAmount != 0, ct);
+            if (hasImportedActuals)
+            {
+                fiscalYearEntries = fiscalYearEntries.Where(b => b.ActualAmount != 0);
+            }
+
+            var topVariances = await fiscalYearEntries
                 .OrderByDescending(b => Math.Abs(b.Variance))
+                .ThenByDescending(b => Math.Abs(b.ActualAmount))
                 .Take(topN)
                 .Select(e => new VarianceAnalysis
                 {
@@ -62,7 +72,7 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
                 })
                 .ToListAsync(ct);
 
-            _logger.LogInformation("Retrieved top {Count} variances for fiscal year {FiscalYear}", topVariances.Count, fiscalYear);
+            _logger.LogInformation("Retrieved top {Count} variances for fiscal year {FiscalYear} (HasImportedActuals={HasImportedActuals})", topVariances.Count, fiscalYear, hasImportedActuals);
             return topVariances;
         }
         catch (OperationCanceledException)
@@ -77,39 +87,62 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
         }
     }
 
-    public async Task<List<ReserveDataPoint>> GetReserveHistoryAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<List<ReserveDataPoint>> GetReserveHistoryAsync(DateTime from, DateTime to, string? entryScope = null, CancellationToken ct = default)
     {
         try
         {
             ct.ThrowIfCancellationRequested();
 
             await using var context = await _contextFactory.CreateDbContextAsync(ct);
+            var normalizedFrom = NormalizeUtc(from);
+            var normalizedTo = NormalizeUtc(to);
+            var fromDate = DateOnly.FromDateTime(normalizedFrom);
+            var toDate = DateOnly.FromDateTime(normalizedTo);
+            var normalizedEntryScope = NormalizeEntryScope(entryScope);
+
+            var ledgerEntries = await context.LedgerEntries
+                .AsNoTracking()
+                .Where(entry => entry.EntryDate.HasValue)
+                .Where(entry => entry.EntryDate!.Value >= fromDate && entry.EntryDate.Value <= toDate)
+                .Where(entry => normalizedEntryScope == null || entry.EntryScope == normalizedEntryScope)
+                .Select(entry => new ReserveLedgerRow(
+                    entry.EntryDate!.Value,
+                    entry.SourceRowNumber,
+                    entry.Amount ?? 0m,
+                    entry.AccountName,
+                    entry.SourceFile.OriginalFileName))
+                .ToListAsync(ct);
+
+            var filteredLedgerEntries = PreferGeneralLedgerRows(
+                ledgerEntries.Where(entry => IsReserveAccount(entry.AccountName)).ToList(),
+                row => row.OriginalFileName);
+
+            if (filteredLedgerEntries.Count > 0)
+            {
+                var ledgerDataPoints = BuildReserveDataPoints(filteredLedgerEntries.Select(entry => (entry.EntryDate.ToDateTime(TimeOnly.MinValue), entry.Amount)));
+                _logger.LogInformation("Retrieved {Count} reserve data points from imported ledger entries for {From} to {To} (EntryScope={EntryScope})", ledgerDataPoints.Count, normalizedFrom, normalizedTo, normalizedEntryScope);
+                return ledgerDataPoints;
+            }
+
+            if (normalizedEntryScope != null)
+            {
+                _logger.LogInformation("No imported ledger reserve history found for {From} to {To} (EntryScope={EntryScope})", normalizedFrom, normalizedTo, normalizedEntryScope);
+                return [];
+            }
 
             // Query reserve transactions (equity accounts starting with 3)
             var transactions = await context.Transactions
                 .AsNoTracking()
                 .Include(t => t.BudgetEntry)
-                .Where(t => t.TransactionDate >= from && t.TransactionDate <= to)
+                .Where(t => t.TransactionDate >= normalizedFrom && t.TransactionDate <= normalizedTo)
                 .Where(t => t.BudgetEntry.AccountNumber.StartsWith("3"))
                 .OrderBy(t => t.TransactionDate)
                 .Select(t => new { t.TransactionDate, t.Amount })
                 .ToListAsync(ct);
 
-            // Calculate running balance
-            var dataPoints = new List<ReserveDataPoint>();
-            decimal runningBalance = 0;
+            var dataPoints = BuildReserveDataPoints(transactions.Select(txn => (txn.TransactionDate, txn.Amount)));
 
-            foreach (var txn in transactions)
-            {
-                runningBalance += txn.Amount;
-                dataPoints.Add(new ReserveDataPoint
-                {
-                    Date = txn.TransactionDate,
-                    Reserves = runningBalance
-                });
-            }
-
-            _logger.LogInformation("Retrieved {Count} reserve data points from {From} to {To}", dataPoints.Count, from, to);
+            _logger.LogInformation("Retrieved {Count} reserve data points from legacy transactions for {From} to {To}", dataPoints.Count, normalizedFrom, normalizedTo);
             return dataPoints;
         }
         catch (OperationCanceledException)
@@ -123,6 +156,63 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
             throw;
         }
     }
+
+    private static List<ReserveDataPoint> BuildReserveDataPoints(IEnumerable<(DateTime Date, decimal Amount)> entries)
+    {
+        var dataPoints = new List<ReserveDataPoint>();
+        decimal runningBalance = 0;
+
+        foreach (var entry in entries)
+        {
+            runningBalance += entry.Amount;
+            dataPoints.Add(new ReserveDataPoint
+            {
+                Date = entry.Date,
+                Reserves = runningBalance
+            });
+        }
+
+        return dataPoints;
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static string? NormalizeEntryScope(string? entryScope)
+        => string.IsNullOrWhiteSpace(entryScope)
+            ? null
+            : entryScope.Trim();
+
+    private static bool IsReserveAccount(string? accountName)
+        => !string.IsNullOrWhiteSpace(accountName)
+            && (accountName.StartsWith("1", StringComparison.Ordinal)
+                || accountName.StartsWith("2", StringComparison.Ordinal)
+                || accountName.StartsWith("3", StringComparison.Ordinal));
+
+    private static List<T> PreferGeneralLedgerRows<T>(List<T> rows, Func<T, string?> fileNameSelector)
+    {
+        if (rows.Count == 0)
+        {
+            return rows;
+        }
+
+        var generalLedgerRows = rows
+            .Where(row => LooksLikeGeneralLedgerFile(fileNameSelector(row)))
+            .ToList();
+
+        return generalLedgerRows.Count > 0 ? generalLedgerRows : rows;
+    }
+
+    private static bool LooksLikeGeneralLedgerFile(string? fileName)
+        => !string.IsNullOrWhiteSpace(fileName)
+            && fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase);
 
     public async Task<Dictionary<string, decimal>> GetCategoryBreakdownAsync(DateTime start, DateTime end, string? entityName, CancellationToken ct = default)
     {

@@ -1,0 +1,22 @@
+.git
+.github
+.vscode
+bin/
+obj/
+**/bin/
+**/obj/
+TestResults/
+coverage/
+publish_output/
+node_modules/
+__remote_check__/
+Blazor Documentation/
+Import Data/
+account-info.json
+appsettings.Syncfusion.local.json
+wwwroot/appsettings.Syncfusion.local.json
+wwwroot/appsettings.Workspace.local.json
+*.user
+*.suo
+*.tmp
+*.temp

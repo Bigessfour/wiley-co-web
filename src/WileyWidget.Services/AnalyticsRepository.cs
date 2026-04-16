@@ -17,6 +17,8 @@ namespace WileyWidget.Services
     /// </summary>
     public class AnalyticsRepository : IAnalyticsRepository
     {
+        private sealed record ReserveLedgerRow(DateOnly EntryDate, int SourceRowNumber, decimal Amount, decimal? RunningBalance, string? AccountName, string? OriginalFileName);
+
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
         private readonly ILogger<AnalyticsRepository> _logger;
 
@@ -31,26 +33,36 @@ namespace WileyWidget.Services
         /// <summary>
         /// Gets historical reserve data points for forecasting
         /// </summary>
-        public async Task<IEnumerable<ReserveDataPoint>> GetHistoricalReserveDataAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        public async Task<IEnumerable<ReserveDataPoint>> GetHistoricalReserveDataAsync(DateTime startDate, DateTime endDate, string? entryScope = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalizedEntryScope = NormalizeEntryScope(entryScope);
+            var startDateOnly = DateOnly.FromDateTime(startDate);
+            var endDateOnly = DateOnly.FromDateTime(endDate);
 
-            // Use Amplify ledger entries as the source of truth for reserve movement.
             var reserveTransactions = await context.LedgerEntries
                 .AsNoTracking()
                 .Where(t => t.EntryDate.HasValue)
-                .Where(t => t.EntryDate!.Value.ToDateTime(TimeOnly.MinValue) >= startDate && t.EntryDate.Value.ToDateTime(TimeOnly.MinValue) <= endDate)
-                .Where(t => t.AccountName != null && (t.AccountName.StartsWith("1") || // Assets
-                           t.AccountName.StartsWith("2") || // Liabilities
-                           t.AccountName.StartsWith("3")))   // Equity/Reserves
-                .OrderBy(t => t.EntryDate)
+                .Where(t => t.EntryDate!.Value >= startDateOnly && t.EntryDate.Value <= endDateOnly)
+                .Where(t => normalizedEntryScope == null || t.EntryScope == normalizedEntryScope)
+                .Select(t => new ReserveLedgerRow(
+                    t.EntryDate!.Value,
+                    t.SourceRowNumber,
+                    t.Amount ?? 0m,
+                    t.RunningBalance,
+                    t.AccountName,
+                    t.SourceFile.OriginalFileName))
                 .ToListAsync(cancellationToken);
+
+            reserveTransactions = PreferGeneralLedgerRows(
+                reserveTransactions.Where(t => IsReserveAccount(t.AccountName)).ToList(),
+                row => row.OriginalFileName);
 
             if (!reserveTransactions.Any())
             {
-                _logger.LogInformation("No reserve transactions found for period {Start} to {End}", startDate, endDate);
+                _logger.LogInformation("No reserve transactions found for period {Start} to {End} (EntryScope={EntryScope})", startDate, endDate, normalizedEntryScope);
                 return Array.Empty<ReserveDataPoint>();
             }
 
@@ -60,46 +72,66 @@ namespace WileyWidget.Services
 
             foreach (var transaction in reserveTransactions)
             {
-                runningBalance += transaction.Amount ?? 0;
+                runningBalance += transaction.Amount;
 
                 dataPoints.Add(new ReserveDataPoint
                 {
-                    Date = transaction.EntryDate!.Value.ToDateTime(TimeOnly.MinValue),
+                    Date = transaction.EntryDate.ToDateTime(TimeOnly.MinValue),
                     Reserves = runningBalance
                 });
             }
 
-            _logger.LogInformation("Retrieved {Count} reserve data points for forecasting", dataPoints.Count);
+            _logger.LogInformation("Retrieved {Count} reserve data points for forecasting (EntryScope={EntryScope})", dataPoints.Count, normalizedEntryScope);
             return dataPoints;
         }
 
         /// <summary>
         /// Gets current reserve balance
         /// </summary>
-        public async Task<decimal> GetCurrentReserveBalanceAsync(CancellationToken cancellationToken = default)
+        public async Task<decimal> GetCurrentReserveBalanceAsync(string? entryScope = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            var normalizedEntryScope = NormalizeEntryScope(entryScope);
 
-            // Calculate current reserves from latest transactions
-            var latestTransactions = await context.LedgerEntries
+            var reserveTransactions = await context.LedgerEntries
                 .AsNoTracking()
-                .Where(t => t.AccountName != null && t.AccountName.StartsWith("3")) // Equity/Reserves accounts
-                .OrderByDescending(t => t.EntryDate)
-                .Take(100) // Get recent transactions for calculation
+                .Where(t => t.EntryDate.HasValue)
+                .Where(t => normalizedEntryScope == null || t.EntryScope == normalizedEntryScope)
+                .Select(t => new ReserveLedgerRow(
+                    t.EntryDate!.Value,
+                    t.SourceRowNumber,
+                    t.Amount ?? 0m,
+                    t.RunningBalance,
+                    t.AccountName,
+                    t.SourceFile.OriginalFileName))
                 .ToListAsync(cancellationToken);
 
-            if (!latestTransactions.Any())
+            reserveTransactions = PreferGeneralLedgerRows(
+                reserveTransactions.Where(t => IsReserveAccount(t.AccountName)).ToList(),
+                row => row.OriginalFileName);
+
+            if (!reserveTransactions.Any())
             {
-                _logger.LogInformation("No reserve transactions found for current balance calculation");
+                _logger.LogInformation("No reserve transactions found for current balance calculation (EntryScope={EntryScope})", normalizedEntryScope);
                 return 0;
             }
 
-            // Calculate balance from most recent transactions
-            var balance = latestTransactions.Sum(t => t.Amount ?? 0);
+            var latestRunningBalances = reserveTransactions
+                .Where(t => t.RunningBalance.HasValue && !string.IsNullOrWhiteSpace(t.AccountName))
+                .GroupBy(t => t.AccountName!, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group
+                    .OrderByDescending(t => t.EntryDate)
+                    .ThenByDescending(t => t.SourceRowNumber)
+                    .First())
+                .ToList();
 
-            _logger.LogInformation("Calculated current reserve balance: {Balance:C}", balance);
+            var balance = latestRunningBalances.Count > 0
+                ? latestRunningBalances.Sum(t => t.RunningBalance ?? 0m)
+                : reserveTransactions.Sum(t => t.Amount);
+
+            _logger.LogInformation("Calculated current reserve balance {Balance:C} (EntryScope={EntryScope})", balance, normalizedEntryScope);
             return balance;
         }
 
@@ -387,5 +419,34 @@ namespace WileyWidget.Services
 
             return new ScenarioResult(description, projectedNet, varianceToTarget);
         }
+
+        private static string? NormalizeEntryScope(string? entryScope)
+            => string.IsNullOrWhiteSpace(entryScope)
+                ? null
+                : entryScope.Trim();
+
+        private static bool IsReserveAccount(string? accountName)
+            => !string.IsNullOrWhiteSpace(accountName)
+                && (accountName.StartsWith("1", StringComparison.Ordinal)
+                    || accountName.StartsWith("2", StringComparison.Ordinal)
+                    || accountName.StartsWith("3", StringComparison.Ordinal));
+
+        private static List<T> PreferGeneralLedgerRows<T>(List<T> rows, Func<T, string?> fileNameSelector)
+        {
+            if (rows.Count == 0)
+            {
+                return rows;
+            }
+
+            var generalLedgerRows = rows
+                .Where(row => LooksLikeGeneralLedgerFile(fileNameSelector(row)))
+                .ToList();
+
+            return generalLedgerRows.Count > 0 ? generalLedgerRows : rows;
+        }
+
+        private static bool LooksLikeGeneralLedgerFile(string? fileName)
+            => !string.IsNullOrWhiteSpace(fileName)
+                && fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase);
     }
 }

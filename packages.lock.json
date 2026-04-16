@@ -37,15 +37,15 @@
       },
       "Microsoft.NET.ILLink.Tasks": {
         "type": "Direct",
-        "requested": "[9.0.14, )",
-        "resolved": "9.0.14",
-        "contentHash": "+MeWjj5sGq6Oj/l0E9RPMgXDyCIPxczzCbGuvuVTZFEGiy2S/atsfoAoKUnkEin/GeGpN+HenCzRmiQKSc99eQ=="
+        "requested": "[9.0.15, )",
+        "resolved": "9.0.15",
+        "contentHash": "EejcbfCMR77Dthy77qxRbEShmzLApHZUPqXMBVQK+A0pNrRThkaHoGGMGvbq/gTkC/waKcDEgjBkbaejB58Wtw=="
       },
       "Microsoft.NET.Sdk.WebAssembly.Pack": {
         "type": "Direct",
-        "requested": "[9.0.14, )",
-        "resolved": "9.0.14",
-        "contentHash": "C69h2ZW0zQf5K389hwVP3oRccYvGaTueidbvsXXcjcLzpFG920Ut4DIF9OsE6AwxdxTGYumGF1kSjHT3VM6t/w=="
+        "requested": "[9.0.15, )",
+        "resolved": "9.0.15",
+        "contentHash": "DE4Z/tttKeJp6fXwgbeqcidI7FHKBBFYIC2gCXtm9Aa7FjDYmWKFlAPVXhWK0250DRNlhJwtkq9ziim1QRViyw=="
       },
       "Syncfusion.Blazor.Buttons": {
         "type": "Direct",

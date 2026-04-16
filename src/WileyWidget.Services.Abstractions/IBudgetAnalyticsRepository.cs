@@ -19,7 +19,7 @@ namespace WileyWidget.Services.Abstractions
         /// <summary>
         /// Gets reserve history data points for forecasting.
         /// </summary>
-        Task<List<ReserveDataPoint>> GetReserveHistoryAsync(DateTime from, DateTime to, CancellationToken ct = default);
+        Task<List<ReserveDataPoint>> GetReserveHistoryAsync(DateTime from, DateTime to, string? entryScope = null, CancellationToken ct = default);
 
         /// <summary>
         /// Gets category breakdown for a date range and optional entity filter.

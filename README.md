@@ -69,9 +69,10 @@ The API host now attempts to load the Grok secret from AWS Secrets Manager at st
 
 ## Aurora Database
 
-The private Aurora PostgreSQL database is now provisioned in the dedicated `wiley-co-aurora-vpc` network and uses the canonical schema in [docs/amplify-db-schema.sql](docs/amplify-db-schema.sql).
+The private Aurora PostgreSQL database is now provisioned in the dedicated `wiley-co-aurora-vpc` network and uses the canonical EF Core PostgreSQL migration under [src/WileyWidget.Data/Migrations](src/WileyWidget.Data/Migrations).
 
 - Layout note: [docs/aws-aurora-private-layout.md](docs/aws-aurora-private-layout.md)
+- Reset/apply runbook: [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md)
 - Cluster: `wiley-co-aurora-db`
 - Writer instance: `wiley-co-aurora-db-1`
 - Database name: `wileyco`
@@ -79,6 +80,7 @@ The private Aurora PostgreSQL database is now provisioned in the dedicated `wile
 ## UI Rebuild Roadmap
 
 The restored Wiley Widget rebuild plan is documented in [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md).
+The AWS server-side closure sequence for connecting the thin API to the widget is documented in [docs/aws-server-side-closure-plan.md](docs/aws-server-side-closure-plan.md).
 
 - Focus: Syncfusion panel-first rate study workspace
 - Backend: shared models, Aurora persistence, thin API, AI recommendations
@@ -86,7 +88,56 @@ The restored Wiley Widget rebuild plan is documented in [docs/wileyco-ui-rebuild
 
 ## Local Snapshot Host
 
-The workspace client prefers a live snapshot endpoint at `api/workspace/snapshot` when it is available. Set `WILEY_WORKSPACE_API_BASE_ADDRESS` to point the Blazor client at the thin API host during local development, for example when running `WileyCoWeb.Api` separately.
+The workspace client prefers a live snapshot endpoint at `api/workspace/snapshot` when it is available. Set `WILEY_WORKSPACE_API_BASE_ADDRESS` to point the Blazor client at the thin API host during local development, for example when running `WileyCoWeb.Api` separately. Amplify now writes that value into `wwwroot/appsettings.Workspace.local.json` during build; if no value is provided, the client falls back to same-origin API routing instead of the Grok gateway.
+
+## QuickBooks Desktop Import
+
+The current clerk-facing QuickBooks import path is the QuickBooks Import panel in the Wiley Widget workspace.
+
+- Supported report families: `Transaction List by Date` and `General Ledger`
+- Supported upload types: `.csv`, `.xlsx`, `.xls`
+- Target table: `ledger_entries` through the thin API import endpoints
+
+Use [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md) for the operating procedure, required columns, export rules, and the guardrails the town clerk needs to follow before importing into Aurora through Wiley Widget.
+
+Current data-path note:
+
+- QuickBooks Desktop imports persist into `import_batches`, `source_files`, and `ledger_entries`.
+- Reserve and historical-ledger analytics read from `ledger_entries`.
+- Workspace baseline, top-variance, and scenario composition still depend on `Enterprises`, `BudgetEntries`, `MunicipalAccounts`, and `BudgetSnapshots`.
+- Rebuilding Aurora with only import-pipeline tables is not sufficient for the full workspace analysis surface.
+
+
+## Workspace Knowledge Layer
+
+The server-side knowledge layer is the shared calculation surface for Decision Support and Jarvis.
+
+- `IWorkspaceKnowledgeService` and `WorkspaceKnowledgeService` build live financial guidance from the selected enterprise, fiscal year, current rate, costs, projected volume, scenario pressure, reserve analytics, and top variances.
+- `WileyCoWeb.Api` exposes that analysis at `/api/workspace/knowledge` using the shared contracts in [Contracts/WorkspaceKnowledgeContracts.cs](Contracts/WorkspaceKnowledgeContracts.cs).
+- The browser client consumes that endpoint through [Services/WorkspaceKnowledgeApiService.cs](Services/WorkspaceKnowledgeApiService.cs).
+- The Decision Support rail in [Components/JarvisChatPanel.razor.cs](Components/JarvisChatPanel.razor.cs) and the Semantic Kernel plugin in [src/WileyWidget.Services/Plugins/UserContextPlugin.cs](src/WileyWidget.Services/Plugins/UserContextPlugin.cs) now use the same server-backed knowledge so UI guidance and Jarvis recommendations stay grounded in the same facts.
+
+Maintainer rule: do not reintroduce client-only financial heuristics or canned AI rationale where live knowledge is expected. New recommendation, scenario, and council-facing explanation work should extend the knowledge service and its thin API contract rather than bypassing it.
+
+## AWS Backend Validation
+
+AWS CLI validation on April 15, 2026 confirms the current production support picture:
+
+- Amplify app `d2ellat1y3ljd9` remains the static `WEB` deployment for the Blazor WebAssembly client.
+- Aurora PostgreSQL cluster `wiley-co-aurora-db` remains the system of record in private VPC `vpc-0b4e1d7362da22c17`.
+- Secrets Manager contains the existing `Grok` secret for server-side xAI access and now also contains App Runner runtime secrets for the API database connection string, xAI key, and Syncfusion license.
+- API Gateway `WileyJarvisApi` (`w544vrvb3i`) still serves only as the xAI proxy and is not the workspace API host.
+- AWS CLI provisioning created the thin API runtime path:
+	- ECR repository `wiley-widget-api`
+	- App Runner service `wiley-widget-api` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`
+	- App Runner VPC connector `wiley-widget-api-vpc-connector`
+	- API security group `sg-050b6a6ae154820d5` with Aurora ingress on `5432`
+	- Interface VPC endpoints for `execute-api` and `xray`
+- Amplify app-level and `main` branch environment variables now include `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com`, and the Amplify app build spec was resynced from [amplify.yml](amplify.yml).
+
+Production implication: the missing compute host is now provisioned, but final cutover is not complete until the App Runner service finishes healthy startup validation and Amplify performs a release using the staged API base address. Until that release happens, the public client can still reflect the previous routing behavior.
+
+Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with public ingress and VPC egress to Aurora. For the May 11 City Council working session, `1 vCPU / 2 GB`, minimum one warm instance, remains the safer baseline if load or export activity increases.
 
 ## Applitools Eyes E2E
 

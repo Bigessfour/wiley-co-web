@@ -62,6 +62,7 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Equal(4, secondResponse.ConversationMessageCount);
         Assert.Equal("jarvis:user-123:water-utility:2026", secondResponse.ConversationId);
         Assert.Contains("fallback mode is active", secondResponse.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Runtime diagnostics", secondResponse.Answer, StringComparison.OrdinalIgnoreCase);
 
         Assert.Equal(2, repository.SavedConversations.Count);
 
@@ -159,6 +160,7 @@ public sealed class WorkspaceAiAssistantServiceTests
         var response = await service.AskAsync(new WorkspaceChatRequest(question, "Current workspace context", "Water Utility", 2026));
 
         Assert.Contains(expectedFragment, response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Runtime diagnostics", response.Answer, StringComparison.OrdinalIgnoreCase);
         Assert.False(response.IsFirstConversation);
     }
 
@@ -210,7 +212,45 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         var logger = LoggerFactory.Create(builder => { }).CreateLogger<WorkspaceAiAssistantService>();
         var contextService = new TestWileyWidgetContextService();
-        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService);
+        var knowledgeService = new TestWorkspaceKnowledgeService();
+        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService, knowledgeService);
+    }
+
+    private sealed class TestWorkspaceKnowledgeService : IWorkspaceKnowledgeService
+    {
+        public Task<WorkspaceKnowledgeResult> BuildAsync(string enterpriseName, int fiscalYear, CancellationToken cancellationToken = default)
+            => Task.FromResult(CreateResult(enterpriseName, fiscalYear));
+
+        public Task<WorkspaceKnowledgeResult> BuildAsync(WorkspaceKnowledgeInput input, CancellationToken cancellationToken = default)
+            => Task.FromResult(CreateResult(input.SelectedEnterprise, input.SelectedFiscalYear));
+
+        private static WorkspaceKnowledgeResult CreateResult(string enterpriseName, int fiscalYear)
+        {
+            return new WorkspaceKnowledgeResult(
+                enterpriseName,
+                fiscalYear,
+                "Action needed",
+                $"{enterpriseName} FY {fiscalYear} is below adjusted break-even and needs corrective action.",
+                "Live rate rationale based on ledger, reserve, and variance analytics.",
+                31.25m,
+                98000m,
+                4500m,
+                1500m,
+                21.78m,
+                22.11m,
+                9.47m,
+                9.14m,
+                140625m,
+                42625m,
+                1.43m,
+                120000m,
+                95000m,
+                "Stable",
+                DateTime.UtcNow,
+                [new WorkspaceKnowledgeInsight("Adjusted gap", "$9.14", "Current rate remains below the adjusted break-even target.")],
+                [new WorkspaceKnowledgeAction("Close the gap", "Increase the rate or lower modeled costs.", "High")],
+                [new WorkspaceKnowledgeVariance("Chemicals", 10000m, 12500m, 2500m, 25m)]);
+        }
     }
 
     private sealed class TestWileyWidgetContextService : IWileyWidgetContextService

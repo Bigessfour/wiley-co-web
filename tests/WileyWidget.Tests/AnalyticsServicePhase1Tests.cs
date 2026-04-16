@@ -116,17 +116,17 @@ public class AnalyticsServicePhase1Tests
             new ReserveDataPoint { Date = new DateTime(2025, 2, 1), Reserves = 110000 }
         };
 
-        _budgetAnalyticsRepositoryMock.Setup(r => r.GetReserveHistoryAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+        _budgetAnalyticsRepositoryMock.Setup(r => r.GetReserveHistoryAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(historicalData);
 
-        _analyticsRepositoryMock.Setup(r => r.GetCurrentReserveBalanceAsync(It.IsAny<CancellationToken>()))
+        _analyticsRepositoryMock.Setup(r => r.GetCurrentReserveBalanceAsync(It.Is<string?>(scope => scope == "Water Utility"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(110000m);
 
         _budgetRepositoryMock.Setup(r => r.GetByDateRangeAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<BudgetEntry> { new BudgetEntry { BudgetedAmount = 500000 } });
 
         // Act
-        var result = await _service.GenerateReserveForecastAsync(1); // 1 year
+        var result = await _service.GenerateReserveForecastAsync(1, "Water Utility"); // 1 year
 
         // Assert
         Assert.NotNull(result);
@@ -151,5 +151,7 @@ public class AnalyticsServicePhase1Tests
         // Confidence interval should remain 10% of the predicted reserve in current implementation.
         var expectedFirstCi = Math.Abs(result.ForecastPoints[0].PredictedReserves * 0.1m);
         Assert.InRange(result.ForecastPoints[0].ConfidenceInterval, expectedFirstCi - tolerance, expectedFirstCi + tolerance);
+
+        _budgetAnalyticsRepositoryMock.Verify(r => r.GetReserveHistoryAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.Is<string?>(scope => scope == "Water Utility"), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

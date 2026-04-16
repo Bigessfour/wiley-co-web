@@ -22,7 +22,12 @@ if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
 }
 
 var apiBaseAddress = Environment.GetEnvironmentVariable("WILEY_WORKSPACE_API_BASE_ADDRESS")
-    ?? "https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod"; // Production Grok portal (updated per plan for Amplify hardening)
+    ?? builder.Configuration["WILEY_WORKSPACE_API_BASE_ADDRESS"]
+    ?? builder.Configuration["WorkspaceApiBaseAddress"];
+if (string.IsNullOrWhiteSpace(apiBaseAddress))
+{
+    apiBaseAddress = await LoadWorkspaceApiBaseAddressFromLocalSettingsAsync(builder.HostEnvironment.BaseAddress);
+}
 var resolvedApiBaseAddress = !string.IsNullOrWhiteSpace(apiBaseAddress) && Uri.TryCreate(apiBaseAddress, UriKind.Absolute, out var apiUri)
     ? apiUri
     : ResolveLocalApiBaseAddress(builder.HostEnvironment.BaseAddress);
@@ -48,6 +53,7 @@ builder.Services.AddSingleton<WorkspaceState>();
 builder.Services.AddScoped<WorkspaceBootstrapService>();
 builder.Services.AddScoped<WorkspacePersistenceService>();
 builder.Services.AddScoped<WorkspaceSnapshotApiService>();
+builder.Services.AddScoped<WorkspaceKnowledgeApiService>();
 builder.Services.AddScoped<QuickBooksImportApiService>();
 builder.Services.AddScoped<WorkspaceAiApiService>();
 builder.Services.AddScoped<WorkspaceDocumentExportService>();
@@ -135,6 +141,30 @@ async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(string baseAd
         }
 
         return NormalizeSyncfusionLicenseKey(licenseKeyElement.GetString());
+    }
+    catch
+    {
+        return null;
+    }
+}
+
+async Task<string?> LoadWorkspaceApiBaseAddressFromLocalSettingsAsync(string baseAddress)
+{
+    try
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri(baseAddress) };
+        var localSettingsJson = await httpClient.GetStringAsync("appsettings.Workspace.local.json");
+        using var document = JsonDocument.Parse(localSettingsJson);
+
+        if (!document.RootElement.TryGetProperty("WorkspaceApiBaseAddress", out var apiBaseAddressElement))
+        {
+            return null;
+        }
+
+        var apiBaseAddress = apiBaseAddressElement.GetString()?.Trim();
+        return string.IsNullOrWhiteSpace(apiBaseAddress)
+            ? null
+            : apiBaseAddress;
     }
     catch
     {

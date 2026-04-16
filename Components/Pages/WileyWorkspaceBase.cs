@@ -437,7 +437,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             ScenarioPersistenceStatus = $"Saved scenario list could not be loaded: {ex.Message}";
         }
 
-        WorkspaceLoadStatus = "Workspace ready.";
+        if (!WorkspaceLoadStatus.Contains("failed", StringComparison.OrdinalIgnoreCase))
+        {
+            WorkspaceLoadStatus = "Workspace ready.";
+        }
+
         lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
         StateHasChanged();
     }
@@ -573,6 +577,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "customers" => "customers",
             "trends" => "trends",
             "decision-support" => "decision-support",
+            "data-dashboard" => "data-dashboard",
             _ => "overview"
         };
     }

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
+using System.Globalization;
 using Syncfusion.Blazor.InteractiveChat;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
@@ -19,6 +21,8 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     ];
 
     private Action? workspaceChangedHandler;
+    private string? lastKnowledgeFingerprint;
+    private WorkspaceKnowledgeResponse? workspaceKnowledge;
 
     [Inject]
     protected WorkspaceState WorkspaceState { get; set; } = default!;
@@ -26,28 +30,34 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     [Inject]
     protected WorkspaceAiApiService AiApi { get; set; } = default!;
 
+    [Inject]
+    protected IServiceProvider ServiceProvider { get; set; } = default!;
+
     protected List<AssistViewPrompt> ChatPrompts => chatPrompts;
     public List<string> PromptSuggestions => promptSuggestions;
-    protected string StatusText => GetStatusText();
-    protected string PrimaryBrief => BuildPrimaryBrief();
-    protected IReadOnlyList<InsightCard> Insights => BuildInsights();
-    protected IReadOnlyList<RecommendationItem> RecommendedActions => BuildRecommendations();
+    protected string StatusText { get; set; } = "Live guidance pending";
+    protected string PrimaryBrief { get; set; } = "Loading live workspace guidance.";
+    protected IReadOnlyList<InsightCard> Insights { get; set; } = [];
+    protected IReadOnlyList<RecommendationItem> RecommendedActions { get; set; } = [];
     public IReadOnlyList<WorkspaceRecommendationHistoryItem> RecommendationHistory => recommendationHistory;
     protected IReadOnlyList<WorkspaceChatMessage> ChatTranscript => chatTranscript;
     protected string ChatQuestion { get; set; } = "What should I know about the current workspace?";
     protected string ChatAnswer { get; set; } = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
     protected string ChatContextSummary => BuildChatContextSummary();
+    protected string KnowledgeStatus { get; set; } = "Waiting for live workspace guidance.";
     protected string RecommendationHistoryStatus { get; set; } = "Recommendation history will appear here after Jarvis saves a recommendation.";
     protected string CurrentUserLabel { get; set; } = "Guest";
     protected string CurrentConversationLabel { get; set; } = "Local session";
     protected string CurrentProfileSummary { get; set; } = "Jarvis will ask a few setup questions on first contact.";
     protected bool IsChatBusy { get; set; }
+    protected bool IsKnowledgeBusy { get; set; }
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
     public bool IsSecureJarvisEnabled => !string.Equals(Environment.GetEnvironmentVariable("UI__UseSecureJarvis"), "false", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnInitialized()
     {
-        workspaceChangedHandler = () => _ = InvokeAsync(StateHasChanged);
+        ApplyFallbackKnowledge("Waiting for live workspace guidance.");
+        workspaceChangedHandler = () => _ = InvokeAsync(HandleWorkspaceChangedAsync);
         WorkspaceState.Changed += workspaceChangedHandler;
     }
 
@@ -59,8 +69,11 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         }
 
         await LoadRecommendationHistoryAsync().ConfigureAwait(false); // Persists via EfConversationRepository + UserContextPlugin (history now auditable)
+        await RefreshKnowledgeAsync(force: true).ConfigureAwait(false);
         await InvokeAsync(StateHasChanged);
     }
+
+    protected Task RefreshKnowledgeFromButtonAsync() => RefreshKnowledgeAsync(force: true);
 
     protected async Task OnPromptRequestedAsync(AssistViewPromptRequestedEventArgs args)
     {
@@ -227,8 +240,126 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
     private string BuildChatContextSummary()
     {
+        if (workspaceKnowledge is not null)
+        {
+            return $"{WorkspaceState.ContextSummary}; operational status {workspaceKnowledge.OperationalStatus}; adjusted rate gap {workspaceKnowledge.AdjustedRateGap:C2}; net position {workspaceKnowledge.NetPosition:C0}; reserve risk {workspaceKnowledge.ReserveRiskAssessment}.";
+        }
+
         var rateGap = WorkspaceState.AdjustedRecommendedRate - WorkspaceState.CurrentRate;
         return $"{WorkspaceState.ContextSummary}; rate gap {rateGap:C2}; scenario costs {WorkspaceState.ScenarioCostTotal:C0}; customers {WorkspaceState.FilteredCustomerCount}.";
+    }
+
+    private async Task HandleWorkspaceChangedAsync()
+    {
+        await RefreshKnowledgeAsync().ConfigureAwait(false);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshKnowledgeAsync(bool force = false)
+    {
+        var fingerprint = BuildKnowledgeFingerprint();
+        if (!force && string.Equals(lastKnowledgeFingerprint, fingerprint, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(WorkspaceState.SelectedEnterprise) || WorkspaceState.SelectedFiscalYear <= 0)
+        {
+            lastKnowledgeFingerprint = fingerprint;
+            workspaceKnowledge = null;
+            ApplyFallbackKnowledge("Select an enterprise and fiscal year to load live workspace guidance.");
+            return;
+        }
+
+        var knowledgeApi = ServiceProvider.GetService<WorkspaceKnowledgeApiService>();
+        if (knowledgeApi is null)
+        {
+            lastKnowledgeFingerprint = fingerprint;
+            workspaceKnowledge = null;
+            ApplyFallbackKnowledge("Live guidance unavailable: Workspace knowledge service is not registered for this host.");
+            return;
+        }
+
+        try
+        {
+            IsKnowledgeBusy = true;
+            KnowledgeStatus = "Refreshing live workspace guidance...";
+            await InvokeAsync(StateHasChanged);
+
+            var knowledge = await knowledgeApi.GetAsync(new WorkspaceKnowledgeRequest(WorkspaceState.ToBootstrapData())).ConfigureAwait(false);
+            workspaceKnowledge = knowledge;
+            lastKnowledgeFingerprint = fingerprint;
+            ApplyKnowledge(knowledge);
+        }
+        catch (Exception ex)
+        {
+            workspaceKnowledge = null;
+            lastKnowledgeFingerprint = fingerprint;
+            ApplyFallbackKnowledge($"Live guidance unavailable: {ex.Message}");
+        }
+        finally
+        {
+            IsKnowledgeBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string BuildKnowledgeFingerprint()
+    {
+        var snapshot = WorkspaceState.ToBootstrapData();
+        var scenarioCostTotal = snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m;
+        var scenarioCount = snapshot.ScenarioItems?.Count ?? 0;
+
+        return string.Join("|",
+            snapshot.SelectedEnterprise,
+            snapshot.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture),
+            snapshot.CurrentRate?.ToString(CultureInfo.InvariantCulture) ?? "0",
+            snapshot.TotalCosts?.ToString(CultureInfo.InvariantCulture) ?? "0",
+            snapshot.ProjectedVolume?.ToString(CultureInfo.InvariantCulture) ?? "0",
+            scenarioCostTotal.ToString(CultureInfo.InvariantCulture),
+            scenarioCount.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private void ApplyKnowledge(WorkspaceKnowledgeResponse knowledge)
+    {
+        StatusText = knowledge.OperationalStatus;
+        PrimaryBrief = knowledge.ExecutiveSummary;
+        Insights = knowledge.Insights
+            .Select(item => new InsightCard(item.Label, item.Value, item.Description))
+            .ToArray();
+        RecommendedActions = knowledge.RecommendedActions
+            .Select(item => new RecommendationItem(
+                string.IsNullOrWhiteSpace(item.Priority) ? item.Title : $"{item.Title} ({item.Priority})",
+                item.Description))
+            .ToArray();
+
+        if (Insights.Count == 0)
+        {
+            Insights = BuildInsights();
+        }
+
+        if (RecommendedActions.Count == 0)
+        {
+            RecommendedActions = BuildRecommendations();
+        }
+
+        KnowledgeStatus = $"Live guidance refreshed {FormatGeneratedAt(knowledge.GeneratedAtUtc)}.";
+    }
+
+    private void ApplyFallbackKnowledge(string status)
+    {
+        StatusText = GetStatusText();
+        PrimaryBrief = BuildPrimaryBrief();
+        Insights = BuildInsights();
+        RecommendedActions = BuildRecommendations();
+        KnowledgeStatus = status;
+    }
+
+    private static string FormatGeneratedAt(string generatedAtUtc)
+    {
+        return DateTimeOffset.TryParse(generatedAtUtc, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+            ? parsed.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+            : "just now";
     }
 
     protected static bool IsAssistantMessage(string role)

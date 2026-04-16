@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Diagnostics;
+using System.ComponentModel.DataAnnotations;
+using System.Net;
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
@@ -14,6 +16,7 @@ using Syncfusion.Licensing;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Business.Interfaces;
+using WileyWidget.Models;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
@@ -35,7 +38,7 @@ public partial class Program
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
+        var xaiSecretResolution = await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
 
         // AWS X-Ray: distributed tracing for all incoming requests.
         // Credentials are resolved from the IAM execution role (Amplify / ECS task role) — no connection string needed.
@@ -91,24 +94,53 @@ public partial class Program
         }
 
         // Capture xAI key resolution state after ConfigureXaiSecretAsync has run
+        var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+        var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
+        var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
         var xaiKeyResolved = !string.IsNullOrWhiteSpace(
-            builder.Configuration["XAI_API_KEY"]
-            ?? builder.Configuration["XAI:ApiKey"]
-            ?? Environment.GetEnvironmentVariable("XAI_API_KEY"));
-        var xaiKeySource = xaiKeyResolved
-            ? (Environment.GetEnvironmentVariable("XAI_API_KEY") != null ? "env:XAI_API_KEY"
-                : builder.Configuration["XAI_API_KEY"] != null ? "config:XAI_API_KEY"
-                : "config:XAI:ApiKey-or-secrets-manager")
-            : "not-found";
+            xaiEnvironmentApiKey
+            ?? xaiConfigDirectApiKey
+            ?? xaiConfigNamedApiKey);
+        var xaiKeySource = !string.IsNullOrWhiteSpace(xaiEnvironmentApiKey)
+            ? "env:XAI_API_KEY"
+            : !string.IsNullOrWhiteSpace(xaiSecretResolution.ResolvedKeySource)
+                && !string.Equals(xaiSecretResolution.ResolvedKeySource, "not-found", StringComparison.OrdinalIgnoreCase)
+                ? xaiSecretResolution.ResolvedKeySource
+                : !string.IsNullOrWhiteSpace(xaiConfigDirectApiKey)
+                    ? "config:XAI_API_KEY"
+                    : !string.IsNullOrWhiteSpace(xaiConfigNamedApiKey)
+                        ? "config:XAI:ApiKey"
+                        : "not-found";
 
         var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
             ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
             ?? builder.Configuration["DATABASE_URL"]
             ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 
+        var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
+            || builder.Configuration.GetValue<bool>("Database:AllowDegradedStartup");
+        var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
+
+        if (!allowDegradedStartup)
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:EnableInMemoryFallback"] = "false"
+            });
+        }
+
         if (string.IsNullOrWhiteSpace(configuredConnectionString))
         {
-            AppDbStartupState.ActivateFallback("No database connection string was configured for the API host.");
+            const string missingConnectionStringMessage = "No database connection string was configured for the API host.";
+
+            if (allowDegradedStartup)
+            {
+                AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
+            }
+            else
+            {
+                throw new InvalidOperationException($"{missingConnectionStringMessage} Configure ConnectionStrings:DefaultConnection or DATABASE_URL before starting the workspace API.");
+            }
         }
 
         builder.Logging.ClearProviders();
@@ -126,6 +158,8 @@ public partial class Program
             builder.Logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
         }
 
+        var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
+
         builder.Services.AddCors(options =>
         {
             options.AddPolicy("OpenWorkspaceClient", policy =>
@@ -133,7 +167,7 @@ public partial class Program
                 // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
                 policy.AllowAnyHeader()
                     .AllowAnyMethod()
-                    .SetIsOriginAllowed(static origin => IsAllowedWorkspaceClientOrigin(origin))
+                        .SetIsOriginAllowed(origin => IsAllowedWorkspaceClientOrigin(origin, allowedWorkspaceClientOrigins))
                     .AllowCredentials();
             });
         });
@@ -141,6 +175,7 @@ public partial class Program
         builder.Services.AddMemoryCache();
 
         builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
+        builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
         builder.Services.AddSingleton<BusinessActivityLogRepository, ActivityLogRepository>();
         builder.Services.AddSingleton<IAccountsRepository, AccountsRepository>();
         builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
@@ -151,8 +186,13 @@ public partial class Program
         builder.Services.AddSingleton<IVendorRepository, VendorRepository>();
         builder.Services.AddSingleton<IScenarioSnapshotRepository, ScenarioSnapshotRepository>();
         builder.Services.AddSingleton<IDataAnonymizerService, DataAnonymizerService>();
+        builder.Services.AddTransient<IAnalyticsRepository, AnalyticsRepository>();
+        builder.Services.AddTransient<IBudgetAnalyticsRepository, BudgetAnalyticsRepository>();
+        builder.Services.AddTransient<IAnalyticsService, AnalyticsService>();
+        builder.Services.AddTransient<IWorkspaceKnowledgeService, WorkspaceKnowledgeService>();
         builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
         builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
+        builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
         builder.Services.AddSingleton<WorkspaceAiAssistantService>();
@@ -163,7 +203,7 @@ public partial class Program
 
         // Deterministic license tracking via health check (covers the new registration logic in this file)
         builder.Services.AddHealthChecks()
-            .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", HealthStatus.Degraded);
+            .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
 
         var app = builder.Build();
         var logger = app.Logger;
@@ -176,12 +216,20 @@ public partial class Program
             syncfusionLicenseKey,
             xaiKeySource,
             xaiKeyResolved,
+            xaiSecretResolution,
             builder.Environment.EnvironmentName);
 
         if (AppDbStartupState.IsDegradedMode)
         {
-            await SeedDevelopmentDataAsync(app.Services);
-            logger.LogWarning("Workspace API is running in degraded in-memory mode for local development.");
+            if (seedDevelopmentData)
+            {
+                await SeedDevelopmentDataAsync(app.Services);
+                logger.LogWarning("Workspace API is running in degraded mode with explicitly seeded development data.");
+            }
+            else
+            {
+                logger.LogWarning("Workspace API is running in degraded mode without seeded sample data. Configure a real database or disable degraded startup.");
+            }
         }
 
         logger.LogInformation("Workspace API host initialized.");
@@ -238,7 +286,7 @@ public partial class Program
         await app.RunAsync();
     }
 
-    private static bool IsAllowedWorkspaceClientOrigin(string origin)
+    private static bool IsAllowedWorkspaceClientOrigin(string origin, IReadOnlySet<string> allowedOrigins)
     {
         if (string.IsNullOrWhiteSpace(origin)
             || !Uri.TryCreate(origin, UriKind.Absolute, out var uri))
@@ -247,7 +295,8 @@ public partial class Program
         }
 
         if (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-            && uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+            && (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                || IPAddress.TryParse(uri.Host, out var ipAddress) && IPAddress.IsLoopback(ipAddress)))
         {
             return true;
         }
@@ -257,31 +306,82 @@ public partial class Program
             return false;
         }
 
-        const string amplifyDomain = "d2ellat1y3ljd9.amplifyapp.com";
-
-        return uri.Host.Equals(amplifyDomain, StringComparison.OrdinalIgnoreCase)
-            || uri.Host.Equals($"main.{amplifyDomain}", StringComparison.OrdinalIgnoreCase)
-            || uri.Host.EndsWith($".{amplifyDomain}", StringComparison.OrdinalIgnoreCase);
+        var normalizedOrigin = $"{uri.Scheme}://{uri.Authority}";
+        return allowedOrigins.Contains(normalizedOrigin)
+            || IsAllowedAmplifyPreviewOrigin(uri, allowedOrigins);
     }
 
-    private static async Task ConfigureXaiSecretAsync(ConfigurationManager configuration, IWebHostEnvironment environment)
+    private static IReadOnlySet<string> BuildAllowedWorkspaceClientOrigins(IConfiguration configuration)
+    {
+        var origins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var configuredOrigins = configuration["WorkspaceClientOrigins"];
+        if (!string.IsNullOrWhiteSpace(configuredOrigins))
+        {
+            foreach (var origin in configuredOrigins.Split([';', ',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                origins.Add(origin);
+            }
+        }
+
+        foreach (var configuredOrigin in configuration.GetSection("WorkspaceClientOrigins").GetChildren())
+        {
+            if (!string.IsNullOrWhiteSpace(configuredOrigin.Value))
+            {
+                origins.Add(configuredOrigin.Value.Trim());
+            }
+        }
+
+        return origins;
+    }
+
+    private static bool IsAllowedAmplifyPreviewOrigin(Uri originUri, IReadOnlySet<string> allowedOrigins)
+    {
+        if (!originUri.Host.EndsWith(".amplifyapp.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        foreach (var allowedOrigin in allowedOrigins)
+        {
+            if (!Uri.TryCreate(allowedOrigin, UriKind.Absolute, out var allowedUri)
+                || !allowedUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var allowedAmplifySuffix = GetAmplifyPreviewHostSuffix(allowedUri.Host);
+            if (string.IsNullOrWhiteSpace(allowedAmplifySuffix))
+            {
+                continue;
+            }
+
+            if (originUri.Host.Equals(allowedAmplifySuffix, StringComparison.OrdinalIgnoreCase)
+                || originUri.Host.EndsWith($".{allowedAmplifySuffix}", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? GetAmplifyPreviewHostSuffix(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host)
+            || !host.EndsWith(".amplifyapp.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var labels = host.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return labels.Length < 3 ? null : string.Join('.', labels[^3..]);
+    }
+
+    private static async Task<XaiSecretResolutionResult> ConfigureXaiSecretAsync(ConfigurationManager configuration, IWebHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
-
-        var existingApiKey = configuration["XAI_API_KEY"]
-            ?? configuration["XAI:ApiKey"]
-            ?? Environment.GetEnvironmentVariable("XAI_API_KEY");
-
-        if (!string.IsNullOrWhiteSpace(existingApiKey))
-        {
-            return;
-        }
-
-        if (environment.IsEnvironment("IntegrationTest"))
-        {
-            return;
-        }
 
         var secretName = configuration["XAI:SecretName"]
             ?? configuration["XAI_SECRET_NAME"]
@@ -291,16 +391,106 @@ public partial class Program
             ?? configuration["AWS_DEFAULT_REGION"]
             ?? "us-east-2";
 
-        var secretValue = await TryGetSecretAsync(secretName, regionName).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(secretValue))
+        var environmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+        var configDirectApiKey = configuration["XAI_API_KEY"];
+        var configNamedApiKey = configuration["XAI:ApiKey"];
+
+        if (!string.IsNullOrWhiteSpace(environmentApiKey))
         {
-            return;
+            return new XaiSecretResolutionResult(
+                ResolvedKeySource: "env:XAI_API_KEY",
+                EnvironmentKeyPresent: true,
+                ConfigDirectKeyPresent: !string.IsNullOrWhiteSpace(configDirectApiKey),
+                ConfigNamedKeyPresent: !string.IsNullOrWhiteSpace(configNamedApiKey),
+                SecretFetchAttempted: false,
+                SecretName: secretName,
+                RegionName: regionName,
+                SecretFetchStatus: "skipped_existing_environment_key",
+                SecretFetchErrorCode: null,
+                SecretFetchErrorMessage: null,
+                ConfigurationInjected: false);
         }
 
-        var normalizedApiKey = TryExtractApiKey(secretValue);
+        if (!string.IsNullOrWhiteSpace(configDirectApiKey))
+        {
+            return new XaiSecretResolutionResult(
+                ResolvedKeySource: "config:XAI_API_KEY",
+                EnvironmentKeyPresent: false,
+                ConfigDirectKeyPresent: true,
+                ConfigNamedKeyPresent: !string.IsNullOrWhiteSpace(configNamedApiKey),
+                SecretFetchAttempted: false,
+                SecretName: secretName,
+                RegionName: regionName,
+                SecretFetchStatus: "skipped_existing_direct_config_key",
+                SecretFetchErrorCode: null,
+                SecretFetchErrorMessage: null,
+                ConfigurationInjected: false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(configNamedApiKey))
+        {
+            return new XaiSecretResolutionResult(
+                ResolvedKeySource: "config:XAI:ApiKey",
+                EnvironmentKeyPresent: false,
+                ConfigDirectKeyPresent: false,
+                ConfigNamedKeyPresent: true,
+                SecretFetchAttempted: false,
+                SecretName: secretName,
+                RegionName: regionName,
+                SecretFetchStatus: "skipped_existing_named_config_key",
+                SecretFetchErrorCode: null,
+                SecretFetchErrorMessage: null,
+                ConfigurationInjected: false);
+        }
+
+        if (environment.IsEnvironment("IntegrationTest"))
+        {
+            return new XaiSecretResolutionResult(
+                ResolvedKeySource: "not-found",
+                EnvironmentKeyPresent: false,
+                ConfigDirectKeyPresent: false,
+                ConfigNamedKeyPresent: false,
+                SecretFetchAttempted: false,
+                SecretName: secretName,
+                RegionName: regionName,
+                SecretFetchStatus: "skipped_integration_test",
+                SecretFetchErrorCode: null,
+                SecretFetchErrorMessage: null,
+                ConfigurationInjected: false);
+        }
+
+        var secretLookup = await TryGetSecretAsync(secretName, regionName).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(secretLookup.SecretValue))
+        {
+            return new XaiSecretResolutionResult(
+                ResolvedKeySource: "not-found",
+                EnvironmentKeyPresent: false,
+                ConfigDirectKeyPresent: false,
+                ConfigNamedKeyPresent: false,
+                SecretFetchAttempted: true,
+                SecretName: secretName,
+                RegionName: regionName,
+                SecretFetchStatus: secretLookup.Status,
+                SecretFetchErrorCode: secretLookup.ErrorCode,
+                SecretFetchErrorMessage: secretLookup.ErrorMessage,
+                ConfigurationInjected: false);
+        }
+
+        var normalizedApiKey = TryExtractApiKey(secretLookup.SecretValue);
         if (string.IsNullOrWhiteSpace(normalizedApiKey))
         {
-            return;
+            return new XaiSecretResolutionResult(
+                ResolvedKeySource: "not-found",
+                EnvironmentKeyPresent: false,
+                ConfigDirectKeyPresent: false,
+                ConfigNamedKeyPresent: false,
+                SecretFetchAttempted: true,
+                SecretName: secretName,
+                RegionName: regionName,
+                SecretFetchStatus: "secret_loaded_but_api_key_extraction_failed",
+                SecretFetchErrorCode: null,
+                SecretFetchErrorMessage: "The resolved secret did not contain a usable API key value.",
+                ConfigurationInjected: false);
         }
 
         configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -309,6 +499,19 @@ public partial class Program
             ["XAI:ApiKey"] = normalizedApiKey,
             ["XAI:SecretName"] = secretName
         });
+
+        return new XaiSecretResolutionResult(
+            ResolvedKeySource: $"secrets-manager:{secretName}",
+            EnvironmentKeyPresent: false,
+            ConfigDirectKeyPresent: false,
+            ConfigNamedKeyPresent: false,
+            SecretFetchAttempted: true,
+            SecretName: secretName,
+            RegionName: regionName,
+            SecretFetchStatus: "secret_loaded_and_injected",
+            SecretFetchErrorCode: null,
+            SecretFetchErrorMessage: null,
+            ConfigurationInjected: true);
     }
 
     private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(IWebHostEnvironment environment)
@@ -357,6 +560,7 @@ public partial class Program
         string? syncfusionLicenseKey,
         string xaiKeySource,
         bool xaiKeyResolved,
+        XaiSecretResolutionResult xaiSecretResolution,
         string environmentName)
     {
         // Only surface a safe truncated fingerprint — never the full value
@@ -365,26 +569,52 @@ public partial class Program
                 ? "(empty)"
                 : (key.Trim().Length > 8 ? key.Trim()[..8] + "..." : "(too-short)");
 
+        static string? TruncateForLog(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return normalized.Length > 200 ? normalized[..200] : normalized;
+        }
+
         logger.LogInformation(
             "WileyWidget.Startup.KeyResolution Environment={Environment} SyncfusionKeySource={SyncfusionKeySource} " +
             "SyncfusionKeyPresent={SyncfusionKeyPresent} SyncfusionKeyLength={SyncfusionKeyLength} " +
-            "SyncfusionKeyFingerprint={SyncfusionKeyFingerprint} XaiKeySource={XaiKeySource} XaiKeyPresent={XaiKeyPresent}",
+            "SyncfusionKeyFingerprint={SyncfusionKeyFingerprint} XaiKeySource={XaiKeySource} XaiKeyPresent={XaiKeyPresent} " +
+            "XaiEnvironmentKeyPresent={XaiEnvironmentKeyPresent} XaiConfigDirectKeyPresent={XaiConfigDirectKeyPresent} " +
+            "XaiConfigNamedKeyPresent={XaiConfigNamedKeyPresent} XaiSecretFetchAttempted={XaiSecretFetchAttempted} " +
+            "XaiSecretName={XaiSecretName} XaiAwsRegion={XaiAwsRegion} XaiSecretFetchStatus={XaiSecretFetchStatus} " +
+            "XaiSecretFetchErrorCode={XaiSecretFetchErrorCode} XaiSecretFetchErrorMessage={XaiSecretFetchErrorMessage} " +
+            "XaiConfigurationInjected={XaiConfigurationInjected}",
             environmentName,
             syncfusionKeySource,
             !string.IsNullOrWhiteSpace(syncfusionLicenseKey),
             syncfusionLicenseKey?.Trim().Length ?? 0,
             KeyFingerprint(syncfusionLicenseKey),
             xaiKeySource,
-            xaiKeyResolved);
+            xaiKeyResolved,
+            xaiSecretResolution.EnvironmentKeyPresent,
+            xaiSecretResolution.ConfigDirectKeyPresent,
+            xaiSecretResolution.ConfigNamedKeyPresent,
+            xaiSecretResolution.SecretFetchAttempted,
+            xaiSecretResolution.SecretName,
+            xaiSecretResolution.RegionName,
+            xaiSecretResolution.SecretFetchStatus,
+            xaiSecretResolution.SecretFetchErrorCode,
+            TruncateForLog(xaiSecretResolution.SecretFetchErrorMessage),
+            xaiSecretResolution.ConfigurationInjected);
     }
 
 
 
-    private static async Task<string?> TryGetSecretAsync(string secretName, string regionName)
+    private static async Task<SecretLookupResult> TryGetSecretAsync(string secretName, string regionName)
     {
         if (string.IsNullOrWhiteSpace(secretName) || string.IsNullOrWhiteSpace(regionName))
         {
-            return null;
+            return new SecretLookupResult("invalid_lookup_configuration", null, "invalid_lookup_configuration", "Secret name or AWS region was missing.");
         }
 
         try
@@ -396,23 +626,27 @@ public partial class Program
                 VersionStage = "AWSCURRENT"
             }).ConfigureAwait(false);
 
-            return response.SecretString;
+            return new SecretLookupResult("secret_loaded", response.SecretString);
         }
-        catch (ResourceNotFoundException)
+        catch (ResourceNotFoundException ex)
         {
-            return null;
+            return new SecretLookupResult("resource_not_found", null, nameof(ResourceNotFoundException), ex.Message);
         }
-        catch (InvalidRequestException)
+        catch (InvalidRequestException ex)
         {
-            return null;
+            return new SecretLookupResult("invalid_request", null, nameof(InvalidRequestException), ex.Message);
         }
-        catch (InvalidParameterException)
+        catch (InvalidParameterException ex)
         {
-            return null;
+            return new SecretLookupResult("invalid_parameter", null, nameof(InvalidParameterException), ex.Message);
         }
-        catch (AmazonSecretsManagerException)
+        catch (AmazonSecretsManagerException ex)
         {
-            return null;
+            return new SecretLookupResult("amazon_secrets_manager_exception", null, ex.ErrorCode ?? nameof(AmazonSecretsManagerException), ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return new SecretLookupResult("unexpected_secret_resolution_exception", null, ex.GetType().Name, ex.Message);
         }
     }
 
@@ -459,6 +693,7 @@ public partial class Program
     {
         MapWorkspaceSnapshotGetEndpoint(app);
         MapWorkspaceSnapshotPostEndpoint(app);
+        MapWorkspaceKnowledgeEndpoint(app);
         MapWorkspaceBaselinePutEndpoint(app);
         MapWorkspaceScenarioListEndpoint(app);
         MapWorkspaceScenarioGetEndpoint(app);
@@ -466,9 +701,30 @@ public partial class Program
         MapWorkspaceSnapshotExportsPostEndpoint(app);
         MapWorkspaceSnapshotExportsGetEndpoint(app);
         MapWorkspaceExportDownloadEndpoint(app);
+        MapWorkspaceReferenceDataImportEndpoint(app);
+        MapUtilityCustomerEndpoints(app);
         MapWorkspaceAiChatEndpoint(app);
         MapQuickBooksImportEndpoints(app);
     }
+
+    private sealed record XaiSecretResolutionResult(
+        string ResolvedKeySource,
+        bool EnvironmentKeyPresent,
+        bool ConfigDirectKeyPresent,
+        bool ConfigNamedKeyPresent,
+        bool SecretFetchAttempted,
+        string SecretName,
+        string RegionName,
+        string SecretFetchStatus,
+        string? SecretFetchErrorCode,
+        string? SecretFetchErrorMessage,
+        bool ConfigurationInjected);
+
+    private sealed record SecretLookupResult(
+        string Status,
+        string? SecretValue,
+        string? ErrorCode = null,
+        string? ErrorMessage = null);
 
     private static void MapWorkspaceAiChatEndpoint(WebApplication app)
     {
@@ -693,6 +949,283 @@ public partial class Program
     }
 
     private sealed record QuickBooksImportRequest(byte[] FileBytes, string FileName, string SelectedEnterprise, int SelectedFiscalYear);
+
+    private static void MapWorkspaceReferenceDataImportEndpoint(WebApplication app)
+    {
+        app.MapPost("/api/workspace/reference-data/import", async (
+            WorkspaceReferenceDataImportRequest? request,
+            WorkspaceReferenceDataImportService importService,
+            IWebHostEnvironment environment,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var response = await importService.ImportAsync(request, environment.ContentRootPath, cancellationToken);
+                return Results.Ok(response);
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                return Results.BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(ex.Message);
+            }
+        });
+    }
+
+    private static void MapUtilityCustomerEndpoints(WebApplication app)
+    {
+        var customers = app.MapGroup("/api/utility-customers");
+
+        customers.MapGet(string.Empty, async (
+            IDbContextFactory<AppDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var records = await context.UtilityCustomers
+                .AsNoTracking()
+                .OrderBy(customer => customer.AccountNumber)
+                .ThenBy(customer => customer.LastName)
+                .ThenBy(customer => customer.FirstName)
+                .Select(customer => ToUtilityCustomerRecord(customer))
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(records);
+        });
+
+        customers.MapGet("/{id:int}", async (
+            int id,
+            IDbContextFactory<AppDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var customer = await context.UtilityCustomers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+            return customer == null
+                ? Results.NotFound()
+                : Results.Ok(ToUtilityCustomerRecord(customer));
+        });
+
+        customers.MapPost(string.Empty, async (
+            UtilityCustomerUpsertRequest request,
+            IDbContextFactory<AppDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            if (await context.UtilityCustomers.AnyAsync(item => item.AccountNumber == request.AccountNumber, cancellationToken))
+            {
+                return Results.Conflict($"A utility customer with account number '{request.AccountNumber}' already exists.");
+            }
+
+            var customer = new UtilityCustomer();
+            ApplyUtilityCustomerRequest(customer, request, isNew: true);
+
+            var validationErrors = ValidateModel(customer);
+            if (validationErrors != null)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            context.UtilityCustomers.Add(customer);
+            await context.SaveChangesAsync(cancellationToken);
+
+            return Results.Created($"/api/utility-customers/{customer.Id}", ToUtilityCustomerRecord(customer));
+        });
+
+        customers.MapPut("/{id:int}", async (
+            int id,
+            UtilityCustomerUpsertRequest request,
+            IDbContextFactory<AppDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var customer = await context.UtilityCustomers.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+            if (customer == null)
+            {
+                return Results.NotFound();
+            }
+
+            if (await context.UtilityCustomers.AnyAsync(item => item.Id != id && item.AccountNumber == request.AccountNumber, cancellationToken))
+            {
+                return Results.Conflict($"A utility customer with account number '{request.AccountNumber}' already exists.");
+            }
+
+            ApplyUtilityCustomerRequest(customer, request, isNew: false);
+
+            var validationErrors = ValidateModel(customer);
+            if (validationErrors != null)
+            {
+                return Results.ValidationProblem(validationErrors);
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+            return Results.Ok(ToUtilityCustomerRecord(customer));
+        });
+
+        customers.MapDelete("/{id:int}", async (
+            int id,
+            IDbContextFactory<AppDbContext> contextFactory,
+            CancellationToken cancellationToken) =>
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var customer = await context.UtilityCustomers.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+            if (customer == null)
+            {
+                return Results.NotFound();
+            }
+
+            context.UtilityCustomers.Remove(customer);
+            await context.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        });
+    }
+
+    private static void MapWorkspaceKnowledgeEndpoint(WebApplication app)
+    {
+        var logger = app.Logger;
+
+        app.MapPost("/api/workspace/knowledge", async (
+            WorkspaceKnowledgeRequest request,
+            IWorkspaceKnowledgeService knowledgeService,
+            CancellationToken cancellationToken) =>
+        {
+            if (request.Snapshot is null)
+            {
+                return Results.BadRequest("A workspace snapshot is required to calculate live knowledge.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Snapshot.SelectedEnterprise))
+            {
+                return Results.BadRequest("A workspace enterprise is required to calculate live knowledge.");
+            }
+
+            if (request.Snapshot.SelectedFiscalYear <= 0)
+            {
+                return Results.BadRequest("A valid fiscal year is required to calculate live knowledge.");
+            }
+
+            var snapshot = request.Snapshot;
+            var knowledgeInput = new WorkspaceKnowledgeInput(
+                snapshot.SelectedEnterprise,
+                snapshot.SelectedFiscalYear,
+                snapshot.CurrentRate ?? 0m,
+                snapshot.TotalCosts ?? 0m,
+                snapshot.ProjectedVolume ?? 0m,
+                snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
+                Math.Clamp(request.TopVarianceCount, 1, 20),
+                Math.Clamp(request.ForecastYears, 1, 10));
+
+            try
+            {
+                var knowledge = await knowledgeService.BuildAsync(knowledgeInput, cancellationToken);
+                return Results.Ok(ToWorkspaceKnowledgeResponse(knowledge));
+            }
+            catch (WorkspaceKnowledgeNotFoundException ex)
+            {
+                return Results.NotFound(ex.Message);
+            }
+            catch (WorkspaceKnowledgeUnavailableException ex)
+            {
+                logger.LogError(ex, "Workspace knowledge request failed for {Enterprise} FY {FiscalYear}", snapshot.SelectedEnterprise, snapshot.SelectedFiscalYear);
+                return Results.Problem(
+                    title: "Workspace knowledge unavailable",
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        });
+    }
+
+    private static UtilityCustomerRecord ToUtilityCustomerRecord(UtilityCustomer customer)
+        => new(
+            customer.Id,
+            customer.AccountNumber,
+            customer.FirstName,
+            customer.LastName,
+            customer.CompanyName,
+            customer.DisplayName,
+            customer.CustomerTypeDescription,
+            customer.ServiceAddress,
+            customer.ServiceCity,
+            customer.ServiceState,
+            customer.ServiceZipCode,
+            customer.ServiceLocationDescription,
+            customer.StatusDescription,
+            customer.CurrentBalance,
+            customer.AccountOpenDate.ToString("O"),
+            customer.PhoneNumber,
+            customer.EmailAddress,
+            customer.MeterNumber,
+            customer.Notes);
+
+    private static void ApplyUtilityCustomerRequest(UtilityCustomer customer, UtilityCustomerUpsertRequest request, bool isNew)
+    {
+        customer.AccountNumber = request.AccountNumber.Trim();
+        customer.FirstName = request.FirstName.Trim();
+        customer.LastName = request.LastName.Trim();
+        customer.CompanyName = request.CompanyName;
+        customer.CustomerType = request.CustomerType;
+        customer.ServiceAddress = request.ServiceAddress.Trim();
+        customer.ServiceCity = request.ServiceCity.Trim();
+        customer.ServiceState = request.ServiceState.Trim().ToUpperInvariant();
+        customer.ServiceZipCode = request.ServiceZipCode.Trim();
+        customer.ServiceLocation = request.ServiceLocation;
+        customer.Status = request.Status;
+        customer.CurrentBalance = decimal.Round(request.CurrentBalance, 2, MidpointRounding.AwayFromZero);
+        customer.AccountOpenDate = NormalizeUtcDate(request.AccountOpenDate) ?? DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        customer.PhoneNumber = request.PhoneNumber;
+        customer.EmailAddress = request.EmailAddress;
+        customer.MeterNumber = request.MeterNumber;
+        customer.Notes = request.Notes;
+        customer.LastModifiedDate = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Utc);
+
+        if (isNew)
+        {
+            customer.CreatedDate = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Utc);
+        }
+    }
+
+    private static DateTime? NormalizeUtcDate(DateTime? value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        var normalized = value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
+
+        return normalized;
+    }
+
+    private static Dictionary<string, string[]>? ValidateModel(object model)
+    {
+        var validationContext = new ValidationContext(model);
+        var validationResults = new List<ValidationResult>();
+        if (Validator.TryValidateObject(model, validationContext, validationResults, validateAllProperties: true))
+        {
+            return null;
+        }
+
+        return validationResults
+            .SelectMany(result => result.MemberNames.DefaultIfEmpty(string.Empty).Select(member => new
+            {
+                Member = string.IsNullOrWhiteSpace(member) ? "model" : member,
+                Error = result.ErrorMessage ?? "The supplied value is invalid."
+            }))
+            .GroupBy(item => item.Member, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(item => item.Error).Distinct(StringComparer.Ordinal).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     private static void MapWorkspaceSnapshotGetEndpoint(WebApplication app)
     {
         app.MapGet("/api/workspace/snapshot", async (
@@ -1082,6 +1615,34 @@ public partial class Program
             payload.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
             payload.ScenarioItems?.Count ?? 0,
             description);
+    }
+
+    private static WorkspaceKnowledgeResponse ToWorkspaceKnowledgeResponse(WorkspaceKnowledgeResult knowledge)
+    {
+        return new WorkspaceKnowledgeResponse(
+            knowledge.SelectedEnterprise,
+            knowledge.SelectedFiscalYear,
+            knowledge.OperationalStatus,
+            knowledge.ExecutiveSummary,
+            knowledge.RateRationale,
+            knowledge.CurrentRate,
+            knowledge.TotalCosts,
+            knowledge.ProjectedVolume,
+            knowledge.ScenarioCostTotal,
+            knowledge.BreakEvenRate,
+            knowledge.AdjustedBreakEvenRate,
+            knowledge.RateGap,
+            knowledge.AdjustedRateGap,
+            knowledge.MonthlyRevenue,
+            knowledge.NetPosition,
+            knowledge.CoverageRatio,
+            knowledge.CurrentReserveBalance,
+            knowledge.RecommendedReserveLevel,
+            knowledge.ReserveRiskAssessment,
+                knowledge.GeneratedAtUtc.ToString("O"),
+            knowledge.Insights.Select(item => new WorkspaceKnowledgeInsightResponse(item.Label, item.Value, item.Description)).ToArray(),
+            knowledge.RecommendedActions.Select(item => new WorkspaceKnowledgeActionResponse(item.Title, item.Description, item.Priority)).ToArray(),
+            knowledge.TopVariances.Select(item => new WorkspaceKnowledgeVarianceResponse(item.AccountName, item.BudgetedAmount, item.ActualAmount, item.VarianceAmount, item.VariancePercentage)).ToArray());
     }
 
     private static string? ExtractDescription(string notes)

@@ -2,6 +2,8 @@
 
 This document turns the restored Wiley Widget vision into an implementation plan for the current Blazor WebAssembly app.
 
+The AWS runtime closure sequence that connects the thin API to the live widget is tracked separately in [docs/aws-server-side-closure-plan.md](aws-server-side-closure-plan.md).
+
 ## Overall Goals
 
 - QuickBooks Desktop exports are the canonical source of truth for actuals.
@@ -24,9 +26,9 @@ Wiley Widget exists to help the Town of Wiley understand the financial performan
 
 ## Completeness Review
 
-Date: April 11, 2026 (updated post-Amazon Q static eval)
+Date: April 15, 2026
 
-Status: 100% COMPLETE for web rebuild + AI centerpiece. The AI layer is the undisputed centerpiece (enhanced UserContextPlugin with explain_financial_issue/suggest_operational_actions/generate_rate_rationale KernelFunctions + AIContextStore.cs + enriched WorkspaceAiAssistantService prompt for financial 'why', operational rationale, rural utility/council fluency that impresses auditors). CI is green, components at 100% coverage, overall >=80% across projects. Amazon Q static evaluation (12 findings) validated: 8/12 accurate or partially accurate (projections stub, contracts partial duplication, open CORS, logging, silent exceptions, reflection fragility, Console.WriteLine, recomputes); 4 outdated (some patterns already hardened via middleware/UserContextPlugin). Actions taken: tightened CORS in `WileyCoWeb.Api/Program.cs` to WithOrigins(Amplify domain from config), fixed `WileyCoWeb.slnx` (folder syntax for MSB4025), cleared trailing-whitespace lint via trunk, created `.amazonq/rules/wileyco-project-rules.md` consolidating copilot-instructions.md/SKILL.md/policy (Grok, Syncfusion 33.1.44 mandatory, no hardcodes, Jarvis priority, Amplify d2ellat1y3ljd9), expanded ComponentPageTests.cs for full WorkspaceState mutations/persistence/harness (components now 100%). Contract unification advanced in `Contracts/WorkspaceContracts.cs` + thin API host. EF/shared promotion and full ProjectionService remain in src/ archive per rules (no new active code there). No critical deferred items for current scope; Phase 6/Amplify visual test next after clean push. Production-ready Jarvis for rural communities/city councils with transparent Grok-powered financial AI.
+Status: Repo-level web rebuild and the AI centerpiece are functionally far along, but operational production readiness is not complete yet. AWS validation on April 15, 2026 confirmed that App Runner now exists for `WileyCoWeb.Api` and `/health` responds successfully, but end-to-end public cutover is still incomplete: the live snapshot payload is empty of enterprise bootstrap data, `/api/workspace/knowledge` returns `500`, the deployed App Runner revision appears behind the repository because `/api/workspace/reference-data/import` returns `404`, and Amplify needed a build-spec correction so it installs the SDK pinned by `global.json` before the public release can complete. The workspace now contains that `amplify.yml` fix, but release job `33` proved the tracked GitHub branch used by Amplify still needs the same change before production can publish it. The remaining blockers are now deployment drift, bootstrap data, and release validation rather than missing server-side application code.
 
 ### Current State
 
@@ -35,6 +37,8 @@ Status: 100% COMPLETE for web rebuild + AI centerpiece. The AI layer is the undi
 - [x] Target architecture and boundary rules are being enforced through the thin client, Application, Shared, and Data layers.
 - [x] Frontend shell work is in place, with the clerk import panel, customer export flow, trends/projections panel, scenario shell, and secure JARVIS API-backed chat seam all implemented.
 - [x] Backend persistence for rates, scenarios, and baseline updates is working; shared model promotion and EF Core mappings remain the primary backlog.
+- [x] The server-side knowledge layer now exists in code (`IWorkspaceKnowledgeService`, `WorkspaceKnowledgeService`, shared contracts, and the `/api/workspace/knowledge` endpoint) and drives both the Decision Support rail and Jarvis financial reasoning.
+- [ ] The thin API host is provisioned in AWS App Runner, but live server-side knowledge is still not fully available from the public Amplify site because the deployed runtime is not yet validated end-to-end and production bootstrap data is still missing.
 - [x] The AI layer is production-safe in deterministic mode, while the full Semantic Kernel + xAI + per-user onboarding path is complete (including new `AIContextStore` for scenario summaries/recommendation history).
 - [x] The clerk import panel is now a first-class Syncfusion workflow in the shell and includes preview-first validation plus proof tests (all checklist items [x]).
 - [x] The customer export center and trends/projections panel are implemented in the workspace shell and have validation coverage.
@@ -104,17 +108,32 @@ Status: 100% COMPLETE for web rebuild + AI centerpiece. The AI layer is the undi
 - [x] Custom domains, SSL, and the global CDN support the council-facing production shell.
 - [x] Branch deployments and previews are useful for testing the clerk import panel and JARVIS changes without affecting production.
 - [x] Monitoring and logging through the Amplify console and CloudWatch support the Phase 6 hardening work.
+- [ ] Amplify by itself does not provide the always-on thin API compute required for live workspace snapshot composition, workspace knowledge calculations, or Semantic Kernel orchestration against Aurora.
+
+### AWS Validation Snapshot (April 15, 2026)
+
+- [x] Amplify app `d2ellat1y3ljd9` is a static `WEB` host for the Blazor client.
+- [x] Aurora cluster `wiley-co-aurora-db` is available in `us-east-2`.
+- [x] Secrets Manager secret `Grok` exists for server-side xAI access.
+- [x] API Gateway `WileyJarvisApi` (`w544vrvb3i`) only exposes `/{proxy+}` as an HTTP proxy to `https://api.x.ai/v1`.
+- [x] App Runner service `wiley-widget-api` currently hosts the thin API runtime path at `https://mr7zeizxxd.us-east-2.awsapprunner.com`.
+- [x] No ECS service currently hosts `WileyCoWeb.Api`.
+- [x] No Lambda function currently hosts `WileyCoWeb.Api`.
+- [ ] The live App Runner revision is not yet aligned with the current repo routes and data bootstrap: `/api/workspace/reference-data/import` returns `404`, `/api/workspace/knowledge` returns `500`, and `/api/workspace/snapshot` returns an empty-enterprise payload.
+- [ ] Public `api/workspace/snapshot` cutover is still incomplete from the live Amplify site until Amplify publishes a successful release against the App Runner base address and the runtime serves non-empty enterprise data.
 
 ### Immediate Next Actions
 
-- [x] Unify the workspace contracts and remove hardcoded client defaults (WorkspaceDefaults now stays empty until live API data arrives; WorkspaceBootstrapService fails fast when the API snapshot is unavailable; portal URL now defaults to the Grok API gateway in Program.cs).
+- [x] Unify the workspace contracts and remove hardcoded client defaults (WorkspaceDefaults now stays empty until live API data arrives; WorkspaceBootstrapService fails fast when the API snapshot is unavailable; the client now uses `WILEY_WORKSPACE_API_BASE_ADDRESS`, generated public config, or same-origin routing instead of defaulting to the Grok gateway).
 - [x] Add the coverage gate for all four test platforms and ratchet each in-process platform to a defendable scoped baseline.
 - [x] Wire the secure JARVIS API path and user-context plugin.
 - [x] Finish customer export and trends chart polish.
 - [x] Configure AWS API Gateway REST API (WileyJarvisApi ID w544vrvb3i) tagged to Wiley-Widget resource group for xAI/Jarvis functions and resolve "no Rest api found".
 - [x] Fully configured per xAI docs (<https://docs.x.ai/docs> + models page): grok-4 alias (for Grok 4.20 0309 Reasoning), OpenAI-compatible /v1/chat/completions endpoint, Bearer $XAI_API_KEY auth. API key securely stored in AWS Secrets Manager secret named "Grok" (loaded via ConfigureXaiSecretAsync in Program.cs; no hardcoding).
 - [x] Solid Grok portal implemented: proxy+ resource (ID gl43sm), ANY method (NONE auth), HTTP_PROXY integration to <https://api.x.ai/v1>, prod deployment (ID rd3j25). Live at <https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod/{proxy+}> (e.g. /v1/chat/completions). Updated account-info.json with all details. Ready for Jarvis/Semantic Kernel calls and Wiley Widget.
-- [x] Apply Amplify Auth and secrets for production hardening (WILEY_WORKSPACE_API_BASE_ADDRESS now defaults to portal in Program.cs; next: Cognito + full env in amplify.yml).
+- [x] Apply Amplify Auth and secrets for production hardening (Amplify now emits `wwwroot/appsettings.Workspace.local.json` when `WILEY_WORKSPACE_API_BASE_ADDRESS` is provided; otherwise the client stays on same-origin API routing. Next: Cognito + full env alignment for the thin API host).
+- [x] Provision the thin API AWS foundation: ECR repository `wiley-widget-api`, App Runner service `wiley-widget-api`, VPC connector `wiley-widget-api-vpc-connector`, API security group `sg-050b6a6ae154820d5`, interface endpoints for `execute-api` and `xray`, and runtime secrets for database/xAI/Syncfusion.
+- [ ] Validate the current App Runner deployment against the live repo routes, seed the required enterprise baseline data, and complete the Amplify release that points `WILEY_WORKSPACE_API_BASE_ADDRESS` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`. The workspace `amplify.yml` now installs the SDK pinned by `global.json`, but the tracked GitHub branch used by Amplify still needs that same change before production can publish it. Recommended Council-session baseline remains `1 vCPU / 2 GB` if the initial `0.5 vCPU / 1 GB` footprint shows startup or workload pressure.
 
 ## Baseline
 

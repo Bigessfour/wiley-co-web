@@ -393,7 +393,7 @@ public sealed class PanelSmokeTests : IClassFixture<ApiApplicationFactory>
         return payload;
     }
 
-    private static Task<HttpResponseMessage> PostCsvImportAsync(HttpClient client, string path)
+    private static async Task<HttpResponseMessage> PostCsvImportAsync(HttpClient client, string path)
     {
         const string csv =
             "Date,Type,Num,Name,Memo,Account,Split,Amount,Balance,Clr\n" +
@@ -402,9 +402,11 @@ public sealed class PanelSmokeTests : IClassFixture<ApiApplicationFactory>
 
         var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
         using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(bytes);
+        using var fileContent = new ByteArrayContent(bytes);
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/csv");
         form.Add(fileContent, "file", "quickbooks-ledger.csv");
-        return client.PostAsync(path, form);
+        form.Add(new StringContent("Water Utility"), "selectedEnterprise");
+        form.Add(new StringContent("2026"), "selectedFiscalYear");
+        return await client.PostAsync(path, form);
     }
 }

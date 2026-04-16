@@ -13,7 +13,7 @@ namespace WileyWidget.Services;
 
 public sealed class WorkspaceAiAssistantService
 {
-    private const string SystemPrompt = "You are Jarvis, the centerpiece municipal finance AI for rural utility communities. Excel at natural-language conversation: answer 'why is this a certain way?', 'what do we need to do to address this financial issue?' with auditor-impressing, transparent rationales grounded in real ledger data, QuickBooks imports, break-even models, operational methods (reserve building, infrastructure phasing, efficiency gains), GASB/AWWA rural benchmarks, and 5/10-yr trends. Help city councils with limited financial background feel confident in AI suggestions by explaining fluency concepts simply while showing rigorous methodology. Always tie to workspace context, AIContextStore, and UserContextPlugin. Use new functions explain_financial_issue, suggest_operational_actions, generate_rate_rationale for depth. Keep responses practical, human, non-creepy, and actionable for quality council decisions.";
+    private const string SystemPrompt = "You are Jarvis, the centerpiece municipal finance AI for rural utility communities. Excel at natural-language conversation: answer 'why is this a certain way?', 'what do we need to do to address this financial issue?' with auditor-impressing, transparent rationales grounded in real ledger data, QuickBooks imports, break-even models, operational methods (reserve building, infrastructure phasing, efficiency gains), GASB/AWWA rural benchmarks, and 5/10-yr trends. Help city councils with limited financial background feel confident in AI suggestions by explaining fluency concepts simply while showing rigorous methodology. Always tie to workspace context, AIContextStore, and UserContextPlugin. Use get_workspace_knowledge_summary, explain_financial_issue, suggest_operational_actions, and generate_rate_rationale for live financial depth. Keep responses practical, human, non-creepy, and actionable for quality council decisions.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -26,13 +26,20 @@ public sealed class WorkspaceAiAssistantService
     private readonly IUserContext userContext;
     private readonly IConversationRepository conversationRepository;
     private readonly IWileyWidgetContextService contextService;
+    private readonly IWorkspaceKnowledgeService workspaceKnowledgeService;
     private readonly Lazy<KernelContext?> kernelContext;
     private readonly bool legacyXaiEnabled;
+    private readonly Uri chatCompletionEndpoint;
     private readonly Uri legacyXaiEndpoint;
     private readonly string legacyXaiModel;
     private readonly double legacyXaiTemperature;
     private readonly int legacyXaiMaxTokens;
     private readonly int legacyXaiTimeoutSeconds;
+    private bool semanticKernelAvailable;
+    private bool apiKeyVisibleToProcess;
+    private string semanticKernelStatusCode = "not_initialized";
+    private string semanticKernelStatusMessage = "Semantic Kernel has not been initialized yet.";
+    private string resolvedApiKeySource = "not-evaluated";
 
     public WorkspaceAiAssistantService(
         IConfiguration configuration,
@@ -40,6 +47,7 @@ public sealed class WorkspaceAiAssistantService
         IUserContext userContext,
         IConversationRepository conversationRepository,
         IWileyWidgetContextService contextService,
+        IWorkspaceKnowledgeService workspaceKnowledgeService,
         IHttpClientFactory? httpClientFactory = null,
         IGrokApiKeyProvider? apiKeyProvider = null)
     {
@@ -48,9 +56,11 @@ public sealed class WorkspaceAiAssistantService
         this.userContext = userContext ?? throw new ArgumentNullException(nameof(userContext));
         this.conversationRepository = conversationRepository ?? throw new ArgumentNullException(nameof(conversationRepository));
         this.contextService = contextService ?? throw new ArgumentNullException(nameof(contextService));
+        this.workspaceKnowledgeService = workspaceKnowledgeService ?? throw new ArgumentNullException(nameof(workspaceKnowledgeService));
         this.httpClientFactory = httpClientFactory;
         this.apiKeyProvider = apiKeyProvider;
         legacyXaiEnabled = configuration.GetValue<bool>("XAI:Enabled", true);
+        chatCompletionEndpoint = NormalizeChatCompletionEndpoint(configuration["XAI:ChatEndpoint"] ?? configuration["XAI:Endpoint"]);
         legacyXaiEndpoint = NormalizeResponsesEndpoint(configuration["XAI:Endpoint"]);
         // Per xAI docs (docs.x.ai/developers/models): use 'grok-4' alias for Grok 4.20 (flagship with 2M context, function calling, low hallucination). Key via Bearer token from AWS Secrets Manager "Grok" (already configured).
         legacyXaiModel = configuration["XAI:Model"] ?? configuration["Grok:Model"] ?? "grok-4";
@@ -96,7 +106,16 @@ public sealed class WorkspaceAiAssistantService
         }
 
         var assistant = kernelContext.Value;
-        if (assistant is not null)
+        string? fallbackDiagnosticCode = null;
+        string? fallbackDiagnosticMessage = null;
+
+        if (assistant is null)
+        {
+            fallbackDiagnosticCode = semanticKernelStatusCode;
+            fallbackDiagnosticMessage = semanticKernelStatusMessage;
+            LogLiveAssistantUnavailable(request);
+        }
+        else
         {
             try
             {
@@ -137,29 +156,46 @@ public sealed class WorkspaceAiAssistantService
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Workspace AI assistant request fell back to legacy xAI responses");
+                fallbackDiagnosticCode = "semantic_kernel_request_failed";
+                fallbackDiagnosticMessage = $"{ex.GetType().Name}: {ex.Message}";
+                logger.LogWarning(
+                    ex,
+                    "Workspace AI assistant request fell back to legacy xAI responses for {Enterprise} FY {FiscalYear} (model: {Model}, chatEndpoint: {ChatEndpoint}, legacyEndpoint: {LegacyEndpoint})",
+                    request.SelectedEnterprise,
+                    request.SelectedFiscalYear,
+                    legacyXaiModel,
+                    chatCompletionEndpoint,
+                    legacyXaiEndpoint);
             }
         }
 
-        var legacyAnswer = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(legacyAnswer))
+        var legacyResult = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(legacyResult.Answer))
         {
-            conversationHistory = AppendTurn(conversationHistory, question, legacyAnswer);
+            conversationHistory = AppendTurn(conversationHistory, question, legacyResult.Answer);
             await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-            await SaveRecommendationAsync(conversationId, activeUser, request, question, legacyAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
+            await SaveRecommendationAsync(conversationId, activeUser, request, question, legacyResult.Answer, usedFallback: true, cancellationToken).ConfigureAwait(false);
 
-            var legacyResponse = new WorkspaceChatResponse(question, legacyAnswer, true, contextSummary);
+            var legacyResponse = new WorkspaceChatResponse(question, legacyResult.Answer, true, contextSummary);
             logger.LogInformation("Workspace AI returned legacy xAI fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
             return ApplyUserMetadata(legacyResponse, activeUser, conversationId, conversationHistory.Count);
         }
 
-        var fallbackAnswer = BuildFallbackAnswer(question, request, activeUser);
+        fallbackDiagnosticCode ??= legacyResult.FailureCode;
+        fallbackDiagnosticMessage ??= legacyResult.FailureMessage;
+
+        var fallbackAnswer = BuildFallbackAnswer(question, request, activeUser, fallbackDiagnosticCode, fallbackDiagnosticMessage);
         conversationHistory = AppendTurn(conversationHistory, question, fallbackAnswer);
         await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
         await SaveRecommendationAsync(conversationId, activeUser, request, question, fallbackAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
 
         var fallbackChatResponse = new WorkspaceChatResponse(question, fallbackAnswer, true, contextSummary);
-        logger.LogInformation("Workspace AI returned deterministic fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
+        logger.LogWarning(
+            "Workspace AI returned deterministic fallback answer for conversation {ConversationId} with {TurnCount} stored turns (ReasonCode={ReasonCode}, Reason={Reason})",
+            conversationId,
+            conversationHistory.Count,
+            fallbackDiagnosticCode ?? semanticKernelStatusCode,
+            fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
         return ApplyUserMetadata(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count);
     }
 
@@ -205,15 +241,24 @@ public sealed class WorkspaceAiAssistantService
 
     private KernelContext? InitializeKernelContext()
     {
+        var apiKeyResolution = ResolveApiKeyResolution();
+
         try
         {
-            var apiKey = apiKeyProvider?.ApiKey
-                ?? configuration["XAI:ApiKey"]
-                ?? configuration["xAI:ApiKey"]
-                ?? configuration["XAI_API_KEY"];
-            if (string.IsNullOrWhiteSpace(apiKey))
+            if (string.IsNullOrWhiteSpace(apiKeyResolution.ApiKey))
             {
-                logger.LogWarning("Workspace AI assistant is running without an API key; falling back to deterministic responses.");
+                UpdateAvailability(apiKeyResolution, isAvailable: false, "missing_api_key", "No usable XAI_API_KEY value was visible to the process.");
+                logger.LogWarning(
+                    "Workspace AI assistant is running without a usable API key and will fall back to deterministic responses (ApiKeySource={ApiKeySource}, EnvironmentKeyPresent={EnvironmentKeyPresent}, ConfigDirectKeyPresent={ConfigDirectKeyPresent}, ConfigNamedKeyPresent={ConfigNamedKeyPresent}, SecretName={SecretName}, ChatEndpoint={ChatEndpoint}, LegacyEndpoint={LegacyEndpoint}, Model={Model}, LegacyXaiEnabled={LegacyXaiEnabled})",
+                    apiKeyResolution.ApiKeySource,
+                    apiKeyResolution.EnvironmentPresent,
+                    apiKeyResolution.ConfigDirectPresent,
+                    apiKeyResolution.ConfigNamedPresent,
+                    apiKeyResolution.SecretName,
+                    chatCompletionEndpoint,
+                    legacyXaiEndpoint,
+                    legacyXaiModel,
+                    legacyXaiEnabled);
                 return null;
             }
 
@@ -222,8 +267,8 @@ public sealed class WorkspaceAiAssistantService
             var kernelBuilder = Kernel.CreateBuilder();
             kernelBuilder.AddOpenAIChatCompletion(
                 modelId: model,
-                apiKey: apiKey,
-                endpoint: new Uri("https://api.x.ai/v1"));
+                apiKey: apiKeyResolution.ApiKey,
+                endpoint: chatCompletionEndpoint);
 
             kernelBuilder.Plugins.AddFromType<Plugins.System.TimePlugin>();
             kernelBuilder.Plugins.AddFromType<Plugins.Development.CodebaseInsightPlugin>();
@@ -231,27 +276,38 @@ public sealed class WorkspaceAiAssistantService
 
             // Jarvis User Context Plugin - now the AI centerpiece with financial fluency, 'why' explanations,
             // operational recommendations for rural utilities, and auditor-level rate rationales via new functions.
-            var userContextPlugin = new UserContextPlugin(userContext, conversationRepository, contextService);
+            var userContextPlugin = new UserContextPlugin(userContext, conversationRepository, contextService, workspaceKnowledgeService);
             kernelBuilder.Plugins.AddFromObject(userContextPlugin, "JarvisUserContext");
 
             var kernel = kernelBuilder.Build();
             var chatService = kernel.GetRequiredService<IChatCompletionService>();
+            UpdateAvailability(apiKeyResolution, isAvailable: true, "available", "Semantic Kernel initialized successfully.");
 
             logger.LogInformation(
-                "Workspace AI assistant initialized with Semantic Kernel (model: {Model}, apiKeySource: {ApiKeySource}, plugins: Time+Codebase+Anomaly+JarvisUserContext+FinancialInsights)",
+                "Workspace AI assistant initialized with Semantic Kernel (model: {Model}, apiKeySource: {ApiKeySource}, chatEndpoint: {ChatEndpoint}, legacyEndpoint: {LegacyEndpoint}, plugins: Time+Codebase+Anomaly+JarvisUserContext+WorkspaceKnowledge)",
                 model,
-                apiKeyProvider?.GetConfigurationSource() ?? "configuration");
+                apiKeyResolution.ApiKeySource,
+                chatCompletionEndpoint,
+                legacyXaiEndpoint);
 
             return new KernelContext(kernel, chatService);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Workspace AI assistant could not initialize Semantic Kernel");
+            UpdateAvailability(apiKeyResolution, isAvailable: false, "kernel_initialization_failed", $"{ex.GetType().Name}: {ex.Message}");
+            logger.LogError(
+                ex,
+                "Workspace AI assistant could not initialize Semantic Kernel (apiKeySource: {ApiKeySource}, chatEndpoint: {ChatEndpoint}, legacyEndpoint: {LegacyEndpoint}, model: {Model}, legacyXaiEnabled: {LegacyXaiEnabled})",
+                apiKeyResolution.ApiKeySource,
+                chatCompletionEndpoint,
+                legacyXaiEndpoint,
+                legacyXaiModel,
+                legacyXaiEnabled);
             return null;
         }
     }
 
-    private async Task<string?> TryGetLegacyXaiAnswerAsync(
+    private async Task<LegacyAnswerResult> TryGetLegacyXaiAnswerAsync(
         ResolvedUserContext user,
         WorkspaceChatRequest request,
         string question,
@@ -260,16 +316,22 @@ public sealed class WorkspaceAiAssistantService
     {
         if (!legacyXaiEnabled)
         {
-            return null;
+            return new LegacyAnswerResult(null, "legacy_disabled", "Legacy xAI fallback is disabled in configuration.");
         }
 
-        var apiKey = apiKeyProvider?.ApiKey
-            ?? configuration["XAI:ApiKey"]
-            ?? configuration["xAI:ApiKey"]
-            ?? configuration["XAI_API_KEY"];
-        if (string.IsNullOrWhiteSpace(apiKey))
+        var apiKeyResolution = ResolveApiKeyResolution();
+        if (string.IsNullOrWhiteSpace(apiKeyResolution.ApiKey))
         {
-            return null;
+            logger.LogWarning(
+                "Workspace AI legacy xAI fallback skipped because no usable API key was resolved (ApiKeySource={ApiKeySource}, EnvironmentKeyPresent={EnvironmentKeyPresent}, ConfigDirectKeyPresent={ConfigDirectKeyPresent}, ConfigNamedKeyPresent={ConfigNamedKeyPresent}, SecretName={SecretName}, ChatEndpoint={ChatEndpoint}, LegacyEndpoint={LegacyEndpoint})",
+                apiKeyResolution.ApiKeySource,
+                apiKeyResolution.EnvironmentPresent,
+                apiKeyResolution.ConfigDirectPresent,
+                apiKeyResolution.ConfigNamedPresent,
+                apiKeyResolution.SecretName,
+                chatCompletionEndpoint,
+                legacyXaiEndpoint);
+            return new LegacyAnswerResult(null, "missing_api_key", "No usable XAI_API_KEY value was visible to the process.");
         }
 
         var requestBody = new
@@ -302,7 +364,7 @@ public sealed class WorkspaceAiAssistantService
             {
                 Content = JsonContent.Create(requestBody, options: JsonOptions)
             };
-            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKeyResolution.ApiKey);
 
             var response = await client.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
@@ -312,23 +374,23 @@ public sealed class WorkspaceAiAssistantService
                     "Workspace AI legacy xAI fallback returned {StatusCode} for conversation prompt: {Body}",
                     response.StatusCode,
                     responseBody);
-                return null;
+                return new LegacyAnswerResult(null, "legacy_request_failed", $"Legacy xAI fallback returned HTTP {(int)response.StatusCode}.");
             }
 
             var xaiResponse = await response.Content.ReadFromJsonAsync<LegacyXaiResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
             var answer = xaiResponse?.output?.FirstOrDefault()?.content?.FirstOrDefault()?.text?.Trim();
             if (!string.IsNullOrWhiteSpace(answer))
             {
-                return answer;
+                return new LegacyAnswerResult(answer);
             }
 
             logger.LogWarning("Workspace AI legacy xAI fallback returned an empty response.");
-            return null;
+            return new LegacyAnswerResult(null, "legacy_empty_response", "Legacy xAI fallback returned an empty response.");
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Workspace AI legacy xAI fallback could not produce an answer.");
-            return null;
+            return new LegacyAnswerResult(null, "legacy_request_exception", $"{ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -353,6 +415,23 @@ public sealed class WorkspaceAiAssistantService
         }
 
         return new Uri($"{candidate}/responses", UriKind.Absolute);
+    }
+
+    private static Uri NormalizeChatCompletionEndpoint(string? endpoint)
+    {
+        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
+
+        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate[..^"/responses".Length];
+        }
+
+        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate[..^"/chat/completions".Length];
+        }
+
+        return new Uri(candidate, UriKind.Absolute);
     }
 
     private static int ParseInt(string? value, int fallback)
@@ -585,29 +664,125 @@ public sealed class WorkspaceAiAssistantService
     private static bool IsAssistantMessage(string role)
         => string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase) || string.Equals(role, "jarvis", StringComparison.OrdinalIgnoreCase);
 
-    private static string BuildFallbackAnswer(string question, WorkspaceChatRequest request, ResolvedUserContext user)
+    private string BuildFallbackAnswer(string question, WorkspaceChatRequest request, ResolvedUserContext user, string? diagnosticCode, string? diagnosticMessage)
     {
         var lowered = question.ToLowerInvariant();
+        var diagnosticSummary = BuildFallbackDiagnosticSummary(diagnosticCode, diagnosticMessage);
 
         if (lowered.Contains("time"))
         {
-            return $"{user.DisplayName}, current workspace context: {BuildContextSummary(request)}. The live kernel is running in fallback mode, so tool-based answers are limited until an API key is configured.";
+            return $"{user.DisplayName}, current workspace context: {BuildContextSummary(request)}. The live kernel is running in fallback mode, so tool-based answers are limited. {diagnosticSummary}";
         }
 
         if (lowered.Contains("code") || lowered.Contains("plugin") || lowered.Contains("kernel"))
         {
-            return $"{user.DisplayName}, the codebase insight plugin is available in the services archive and can be used once the API key is configured. Ask for source files, AI architecture, or plugin inventory details.";
+            return $"{user.DisplayName}, the codebase insight plugin is available in the services archive and can be used once the live AI path is restored. Ask for source files, AI architecture, or plugin inventory details. {diagnosticSummary}";
         }
 
         if (lowered.Contains("anomal") || lowered.Contains("variance"))
         {
-            return $"{user.DisplayName}, the anomaly detection plugin is available for dataset and variance analysis. Once xAI is configured, the assistant can call it through Semantic Kernel for live results.";
+            return $"{user.DisplayName}, the anomaly detection plugin is available for dataset and variance analysis. Once the live xAI path is restored, the assistant can call it through Semantic Kernel for live results. {diagnosticSummary}";
         }
 
-        return $"{user.DisplayName}, Jarvis fallback mode is active for {BuildContextSummary(request)}. Configure the xAI key to enable full Semantic Kernel chat with tool invocation.";
+        return $"{user.DisplayName}, Jarvis fallback mode is active for {BuildContextSummary(request)}. {diagnosticSummary}";
+    }
+
+    private ApiKeyResolution ResolveApiKeyResolution()
+    {
+        var environmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+        var providerApiKey = apiKeyProvider?.ApiKey;
+        var directConfigApiKey = configuration["XAI_API_KEY"];
+        var namedConfigApiKey = configuration["XAI:ApiKey"] ?? configuration["xAI:ApiKey"];
+        var secretName = configuration["XAI:SecretName"] ?? configuration["XAI_SECRET_NAME"];
+
+        if (!string.IsNullOrWhiteSpace(environmentApiKey))
+        {
+            return new ApiKeyResolution(environmentApiKey, "env:XAI_API_KEY", !string.IsNullOrWhiteSpace(providerApiKey), !string.IsNullOrWhiteSpace(namedConfigApiKey), !string.IsNullOrWhiteSpace(directConfigApiKey), true, secretName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(providerApiKey))
+        {
+            return new ApiKeyResolution(providerApiKey, apiKeyProvider?.GetConfigurationSource() ?? "provider", true, !string.IsNullOrWhiteSpace(namedConfigApiKey), !string.IsNullOrWhiteSpace(directConfigApiKey), false, secretName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(directConfigApiKey))
+        {
+            return new ApiKeyResolution(directConfigApiKey, "config:XAI_API_KEY", false, !string.IsNullOrWhiteSpace(namedConfigApiKey), true, false, secretName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(namedConfigApiKey))
+        {
+            return new ApiKeyResolution(namedConfigApiKey, "config:XAI:ApiKey", false, true, false, false, secretName);
+        }
+
+        return new ApiKeyResolution(null, "not-found", !string.IsNullOrWhiteSpace(providerApiKey), !string.IsNullOrWhiteSpace(namedConfigApiKey), !string.IsNullOrWhiteSpace(directConfigApiKey), !string.IsNullOrWhiteSpace(environmentApiKey), secretName);
+    }
+
+    private void UpdateAvailability(ApiKeyResolution apiKeyResolution, bool isAvailable, string statusCode, string statusMessage)
+    {
+        semanticKernelAvailable = isAvailable;
+        apiKeyVisibleToProcess = !string.IsNullOrWhiteSpace(apiKeyResolution.ApiKey);
+        resolvedApiKeySource = apiKeyResolution.ApiKeySource;
+        semanticKernelStatusCode = statusCode;
+        semanticKernelStatusMessage = statusMessage;
+    }
+
+    private void LogLiveAssistantUnavailable(WorkspaceChatRequest request)
+    {
+        logger.LogWarning(
+            "Workspace AI live assistant unavailable for {Enterprise} FY {FiscalYear} (ReasonCode={ReasonCode}, Reason={Reason}, SemanticKernelAvailable={SemanticKernelAvailable}, ApiKeyPresent={ApiKeyPresent}, ApiKeySource={ApiKeySource}, ChatEndpoint={ChatEndpoint}, LegacyEndpoint={LegacyEndpoint}, Model={Model}, LegacyXaiEnabled={LegacyXaiEnabled})",
+            request.SelectedEnterprise,
+            request.SelectedFiscalYear,
+            semanticKernelStatusCode,
+            semanticKernelStatusMessage,
+            semanticKernelAvailable,
+            apiKeyVisibleToProcess,
+            resolvedApiKeySource,
+            chatCompletionEndpoint,
+            legacyXaiEndpoint,
+            legacyXaiModel,
+            legacyXaiEnabled);
+    }
+
+    private string BuildFallbackDiagnosticSummary(string? diagnosticCode, string? diagnosticMessage)
+    {
+        var effectiveCode = string.IsNullOrWhiteSpace(diagnosticCode) ? semanticKernelStatusCode : diagnosticCode;
+        var effectiveMessage = string.IsNullOrWhiteSpace(diagnosticMessage) ? semanticKernelStatusMessage : diagnosticMessage;
+
+        return effectiveCode switch
+        {
+            "missing_api_key" => "Runtime diagnostics: no usable XAI_API_KEY value was visible to the process, so Semantic Kernel chat did not initialize.",
+            "kernel_initialization_failed" => $"Runtime diagnostics: Semantic Kernel initialization failed before live chat became available ({SanitizeDiagnosticMessage(effectiveMessage)}).",
+            "semantic_kernel_request_failed" => $"Runtime diagnostics: live Semantic Kernel execution failed and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
+            "legacy_disabled" => "Runtime diagnostics: the legacy xAI fallback path is disabled, so Jarvis remained on deterministic guidance after live initialization failed.",
+            "legacy_request_failed" or "legacy_request_exception" or "legacy_empty_response" => $"Runtime diagnostics: the live xAI fallback path failed after the Semantic Kernel attempt ({SanitizeDiagnosticMessage(effectiveMessage)}).",
+            _ => $"Runtime diagnostics: live xAI/Semantic Kernel is unavailable ({SanitizeDiagnosticMessage(effectiveMessage)})."
+        };
+    }
+
+    private static string SanitizeDiagnosticMessage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "no additional detail was recorded";
+        }
+
+        var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return normalized.Length > 160 ? normalized[..160] : normalized;
     }
 
     private sealed record ResolvedUserContext(string UserId, string DisplayName, string? Email, string PreferencesSummary);
 
     private sealed record KernelContext(Kernel Kernel, IChatCompletionService ChatService);
+
+    private sealed record ApiKeyResolution(
+        string? ApiKey,
+        string ApiKeySource,
+        bool ProviderPresent,
+        bool ConfigNamedPresent,
+        bool ConfigDirectPresent,
+        bool EnvironmentPresent,
+        string? SecretName);
+
+    private sealed record LegacyAnswerResult(string? Answer, string? FailureCode = null, string? FailureMessage = null);
 }

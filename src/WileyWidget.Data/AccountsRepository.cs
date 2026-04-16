@@ -47,7 +47,7 @@ public class AccountsRepository : IAccountsRepository
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var result = await context.Set<MunicipalAccount>()
                 .AsNoTracking()
-                .OrderBy(a => a.AccountNumber_Value)
+                .OrderBy(a => a.AccountNumber!.Value)
                 .ToListAsync(cancellationToken);
 
             activity?.SetTag("result.count", result.Count);
@@ -82,7 +82,7 @@ public class AccountsRepository : IAccountsRepository
             var result = await context.Set<MunicipalAccount>()
                 .AsNoTracking()
                 .Where(a => a.FundType == fundType)
-                .OrderBy(a => a.AccountNumber_Value)
+                .OrderBy(a => a.AccountNumber!.Value)
                 .ToListAsync(cancellationToken);
 
             activity?.SetTag("result.count", result.Count);
@@ -111,7 +111,7 @@ public class AccountsRepository : IAccountsRepository
         return await context.Set<MunicipalAccount>()
             .AsNoTracking()
             .Where(a => a.Type == accountType)
-            .OrderBy(a => a.AccountNumber_Value)
+            .OrderBy(a => a.AccountNumber!.Value)
             .ToListAsync(cancellationToken);
     }
 
@@ -129,7 +129,7 @@ public class AccountsRepository : IAccountsRepository
         return await context.Set<MunicipalAccount>()
             .AsNoTracking()
             .Where(a => a.FundType == fundType && a.Type == accountType)
-            .OrderBy(a => a.AccountNumber_Value)
+            .OrderBy(a => a.AccountNumber!.Value)
             .ToListAsync(cancellationToken);
     }
 
@@ -170,9 +170,9 @@ public class AccountsRepository : IAccountsRepository
             .AsNoTracking()
             .Where(a =>
                 EF.Functions.Like(a.Name, searchPattern) ||
-                (a.AccountNumber_Value != null && EF.Functions.Like(a.AccountNumber_Value, searchPattern)) ||
+                (a.AccountNumber != null && EF.Functions.Like(a.AccountNumber.Value, searchPattern)) ||
                 (a.FundDescription != null && EF.Functions.Like(a.FundDescription, searchPattern)))
-            .OrderBy(a => a.AccountNumber_Value)
+            .OrderBy(a => a.AccountNumber!.Value)
             .ToListAsync(cancellationToken);
     }
 

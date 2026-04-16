@@ -157,31 +157,27 @@ public sealed class QuickBooksImportService
 	{
 		await using var stream = new MemoryStream(fileBytes, writable: false);
 		using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-		using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+		using var parser = new CsvParser(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
 		{
-			HasHeaderRecord = true,
+			HasHeaderRecord = false,
 			MissingFieldFound = null,
 			BadDataFound = context => throw new InvalidOperationException($"Bad QuickBooks CSV data near row '{context.RawRecord}'")
 		});
 
-		csv.Context.RegisterClassMap<QuickBooksImportRowMap>();
-		var rows = new List<QuickBooksImportPreviewRow>();
-
 		try
 		{
-			var records = csv.GetRecords<QuickBooksImportRow>().ToList();
-			for (var index = 0; index < records.Count; index++)
+			if (!parser.Read())
 			{
-				var record = records[index];
-				rows.Add(ToPreviewRow(index + 2, record));
+				return [];
 			}
+
+			var headerRow = parser.Record ?? [];
+			return ParseTabularRows(headerRow, ReadCsvRows(parser));
 		}
 		catch (Exception ex)
 		{
 			throw new InvalidOperationException($"Unable to read the QuickBooks CSV export: {ex.Message}", ex);
 		}
-
-		return await Task.FromResult(rows);
 	}
 
 	private static async Task<List<QuickBooksImportPreviewRow>> ParseExcelAsync(byte[] fileBytes)
@@ -190,7 +186,7 @@ public sealed class QuickBooksImportService
 		using var reader = ExcelReaderFactory.CreateReader(stream);
 		var dataSet = reader.AsDataSet(new ExcelDataSetConfiguration
 		{
-			ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = true }
+			ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = false }
 		});
 
 		if (dataSet.Tables.Count == 0)
@@ -198,45 +194,204 @@ public sealed class QuickBooksImportService
 			return [];
 		}
 
-		var table = dataSet.Tables[0];
-		var rows = new List<QuickBooksImportPreviewRow>(table.Rows.Count);
-
-		for (var index = 0; index < table.Rows.Count; index++)
+		foreach (System.Data.DataTable table in dataSet.Tables)
 		{
-			var row = table.Rows[index];
-			rows.Add(ToPreviewRow(index + 2, new QuickBooksImportRow
+			var rawRows = table.Rows.Cast<System.Data.DataRow>()
+				.Select((row, index) => (RowNumber: index + 1, Values: (IReadOnlyList<string?>)row.ItemArray.Select(ConvertExcelCellValue).ToArray()))
+				.ToList();
+
+			if (TryParseExcelWorksheet(rawRows, out var parsedRows))
 			{
-				EntryDate = row["Date"]?.ToString() ?? row["Transaction Date"]?.ToString(),
-				EntryType = row["Type"]?.ToString() ?? row["Transaction Type"]?.ToString(),
-				TransactionNumber = row["Num"]?.ToString() ?? row["Transaction Number"]?.ToString(),
-				Name = row["Name"]?.ToString(),
-				Memo = row["Memo"]?.ToString() ?? row["Description"]?.ToString(),
-				AccountName = row["Account"]?.ToString(),
-				SplitAccount = row["Split"]?.ToString(),
-				Amount = TryParseDecimal(row["Amount"]?.ToString()),
-				RunningBalance = TryParseDecimal(row["Balance"]?.ToString()),
-				ClearedFlag = row["Clr"]?.ToString()
-			}));
+				return parsedRows;
+			}
+		}
+
+		return [];
+	}
+
+	private static bool TryParseExcelWorksheet(
+		IReadOnlyList<(int RowNumber, IReadOnlyList<string?> Values)> rawRows,
+		out List<QuickBooksImportPreviewRow> parsedRows)
+	{
+		for (var index = 0; index < rawRows.Count; index++)
+		{
+			var headerLookup = CreateHeaderLookup(rawRows[index].Values);
+			if (!IsRecognizedQuickBooksHeader(headerLookup))
+			{
+				continue;
+			}
+
+			parsedRows = ParseTabularRows(rawRows[index].Values, rawRows.Skip(index + 1));
+			return true;
+		}
+
+		parsedRows = [];
+		return false;
+	}
+
+	private static List<QuickBooksImportPreviewRow> ParseTabularRows(IReadOnlyList<string?> headerRow, IEnumerable<(int RowNumber, IReadOnlyList<string?> Values)> rawRows)
+	{
+		var headerLookup = CreateHeaderLookup(headerRow);
+		var rows = new List<QuickBooksImportPreviewRow>();
+		string? currentAccountContext = null;
+
+		foreach (var rawRow in rawRows)
+		{
+			var previewRow = TryCreatePreviewRow(rawRow.RowNumber, rawRow.Values, headerLookup, ref currentAccountContext);
+			if (previewRow is not null)
+			{
+				rows.Add(previewRow);
+			}
 		}
 
 		return rows;
 	}
 
-	private static QuickBooksImportPreviewRow ToPreviewRow(int rowNumber, QuickBooksImportRow row)
+	private static IEnumerable<(int RowNumber, IReadOnlyList<string?> Values)> ReadCsvRows(CsvParser parser)
 	{
+		var rowNumber = 2;
+		while (parser.Read())
+		{
+			yield return (rowNumber, (parser.Record ?? []).Cast<string?>().ToArray());
+			rowNumber++;
+		}
+	}
+
+	private static QuickBooksImportPreviewRow? TryCreatePreviewRow(int rowNumber, IReadOnlyList<string?> values, HeaderLookup headerLookup, ref string? currentAccountContext)
+	{
+		var leadingLabel = GetLeadingLabel(values, headerLookup.FirstMappedColumnIndex);
+		var entryType = GetCellValue(values, headerLookup.TypeIndex);
+		var entryDate = NormalizeEntryDate(GetCellValue(values, headerLookup.DateIndex));
+		var amount = TryParseDecimal(GetCellValue(values, headerLookup.AmountIndex));
+		var runningBalance = TryParseDecimal(GetCellValue(values, headerLookup.BalanceIndex));
+
+		if (string.IsNullOrWhiteSpace(entryType) || string.IsNullOrWhiteSpace(entryDate))
+		{
+			if (headerLookup.AccountIndex < 0
+				&& !string.IsNullOrWhiteSpace(leadingLabel)
+				&& (amount is not null || runningBalance is not null)
+				&& !leadingLabel.StartsWith("Total ", StringComparison.OrdinalIgnoreCase))
+			{
+				currentAccountContext = leadingLabel;
+			}
+
+			return null;
+		}
+
+		var accountName = GetCellValue(values, headerLookup.AccountIndex) ?? currentAccountContext;
+
 		return new QuickBooksImportPreviewRow(
 			rowNumber,
-			row.EntryDate,
-			row.EntryType,
-			row.TransactionNumber,
-			row.Name,
-			row.Memo,
-			row.AccountName,
-			row.SplitAccount,
-			row.Amount,
-			row.RunningBalance,
-			row.ClearedFlag,
+			entryDate,
+			entryType,
+			GetCellValue(values, headerLookup.TransactionNumberIndex),
+			GetCellValue(values, headerLookup.NameIndex),
+			GetCellValue(values, headerLookup.MemoIndex),
+			accountName,
+			GetCellValue(values, headerLookup.SplitIndex),
+			amount,
+			runningBalance,
+			GetCellValue(values, headerLookup.ClearedFlagIndex),
 			false);
+	}
+
+	private static HeaderLookup CreateHeaderLookup(IReadOnlyList<string?> headerRow)
+	{
+		return new HeaderLookup(
+			FindHeaderIndex(headerRow, "Type", "Transaction Type"),
+			FindHeaderIndex(headerRow, "Date", "Transaction Date"),
+			FindHeaderIndex(headerRow, "Num", "Transaction Number"),
+			FindHeaderIndex(headerRow, "Name", "Customer", "Vendor"),
+			FindHeaderIndex(headerRow, "Memo", "Description"),
+			FindHeaderIndex(headerRow, "Account"),
+			FindHeaderIndex(headerRow, "Split"),
+			FindHeaderIndex(headerRow, "Amount"),
+			FindHeaderIndex(headerRow, "Balance"),
+			FindHeaderIndex(headerRow, "Clr"));
+	}
+
+	private static bool IsRecognizedQuickBooksHeader(HeaderLookup headerLookup)
+		=> headerLookup.TypeIndex >= 0
+			&& headerLookup.DateIndex >= 0
+			&& (headerLookup.AmountIndex >= 0
+				|| headerLookup.BalanceIndex >= 0
+				|| headerLookup.AccountIndex >= 0
+				|| headerLookup.SplitIndex >= 0);
+
+	private static int FindHeaderIndex(IReadOnlyList<string?> headers, params string[] aliases)
+	{
+		for (var index = 0; index < headers.Count; index++)
+		{
+			var normalizedHeader = NormalizeHeader(headers[index]);
+			if (aliases.Any(alias => string.Equals(normalizedHeader, alias, StringComparison.OrdinalIgnoreCase)))
+			{
+				return index;
+			}
+		}
+
+		return -1;
+	}
+
+	private static string? GetCellValue(IReadOnlyList<string?> values, int index)
+	{
+		if (index < 0 || index >= values.Count)
+		{
+			return null;
+		}
+
+		return NormalizeCellValue(values[index]);
+	}
+
+	private static string? GetLeadingLabel(IReadOnlyList<string?> values, int firstMappedColumnIndex)
+	{
+		if (firstMappedColumnIndex <= 0)
+		{
+			return null;
+		}
+
+		for (var index = 0; index < Math.Min(firstMappedColumnIndex, values.Count); index++)
+		{
+			var value = NormalizeCellValue(values[index]);
+			if (!string.IsNullOrWhiteSpace(value))
+			{
+				return value;
+			}
+		}
+
+		return null;
+	}
+
+	private static string? NormalizeHeader(string? value)
+		=> string.IsNullOrWhiteSpace(value)
+			? null
+			: value.Trim().Trim('\uFEFF');
+
+	private static string? NormalizeCellValue(string? value)
+		=> string.IsNullOrWhiteSpace(value)
+			? null
+			: value.Trim();
+
+	private static string? NormalizeEntryDate(string? value)
+	{
+		var normalized = NormalizeCellValue(value);
+		if (TryParseExcelSerialDate(normalized, out var date))
+		{
+			return date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+		}
+
+		return normalized;
+	}
+
+	private static string? ConvertExcelCellValue(object? value)
+	{
+		return value switch
+		{
+			null => null,
+			DateTime dateTime => dateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+			DateOnly dateOnly => dateOnly.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+			IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+			_ => value.ToString()
+		};
 	}
 
 	private static DateOnly? TryParseDateOnly(string? value)
@@ -248,7 +403,31 @@ public sealed class QuickBooksImportService
 
 		return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate)
 			? parsedDate
-			: null;
+			: TryParseExcelSerialDate(value, out parsedDate)
+				? parsedDate
+				: null;
+	}
+
+	private static bool TryParseExcelSerialDate(string? value, out DateOnly parsedDate)
+	{
+		parsedDate = default;
+
+		if (!double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var serialDate)
+			|| serialDate <= 0
+			|| serialDate >= 2958466)
+		{
+			return false;
+		}
+
+		try
+		{
+			parsedDate = DateOnly.FromDateTime(DateTime.FromOADate(serialDate));
+			return true;
+		}
+		catch (ArgumentException)
+		{
+			return false;
+		}
 	}
 
 	private static decimal? TryParseDecimal(string? value)
@@ -266,36 +445,30 @@ public sealed class QuickBooksImportService
 	private static string ComputeFileHash(byte[] fileBytes)
 		=> Convert.ToHexString(SHA256.HashData(fileBytes));
 
-	private sealed class QuickBooksImportRow
+	private sealed record HeaderLookup(
+		int TypeIndex,
+		int DateIndex,
+		int TransactionNumberIndex,
+		int NameIndex,
+		int MemoIndex,
+		int AccountIndex,
+		int SplitIndex,
+		int AmountIndex,
+		int BalanceIndex,
+		int ClearedFlagIndex)
 	{
-		public string? EntryDate { get; set; }
-		public string? EntryType { get; set; }
-		public string? TransactionNumber { get; set; }
-		public string? Name { get; set; }
-		public string? Memo { get; set; }
-		public string? AccountName { get; set; }
-		public string? SplitAccount { get; set; }
-		public decimal? Amount { get; set; }
-		public decimal? RunningBalance { get; set; }
-		public string? ClearedFlag { get; set; }
-	}
-
-#pragma warning disable S1144
-	private sealed class QuickBooksImportRowMap : ClassMap<QuickBooksImportRow>
-	{
-		public QuickBooksImportRowMap()
+		public int FirstMappedColumnIndex => new[]
 		{
-			Map(m => m.EntryDate).Name("Date", "Transaction Date");
-			Map(m => m.EntryType).Name("Type", "Transaction Type");
-			Map(m => m.TransactionNumber).Name("Num", "Transaction Number");
-			Map(m => m.Name).Name("Name", "Customer", "Vendor");
-			Map(m => m.Memo).Name("Memo", "Description");
-			Map(m => m.AccountName).Name("Account");
-			Map(m => m.SplitAccount).Name("Split");
-			Map(m => m.Amount).Name("Amount");
-			Map(m => m.RunningBalance).Name("Balance");
-			Map(m => m.ClearedFlag).Name("Clr");
-		}
+			TypeIndex,
+			DateIndex,
+			TransactionNumberIndex,
+			NameIndex,
+			MemoIndex,
+			AccountIndex,
+			SplitIndex,
+			AmountIndex,
+			BalanceIndex,
+			ClearedFlagIndex
+		}.Where(index => index >= 0).DefaultIfEmpty(0).Min();
 	}
-#pragma warning restore S1144
 }
