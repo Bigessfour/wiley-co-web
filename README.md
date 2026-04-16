@@ -136,6 +136,7 @@ AWS CLI validation on April 15, 2026 confirms the current production support pic
 - Aurora PostgreSQL cluster `wiley-co-aurora-db` remains the system of record in private VPC `vpc-0b4e1d7362da22c17`.
 - Secrets Manager contains the existing `Grok` secret for server-side xAI access and now also contains App Runner runtime secrets for the API database connection string, xAI key, and Syncfusion license.
 - API Gateway `WileyJarvisApi` (`w544vrvb3i`) still serves only as the xAI proxy and is not the workspace API host.
+- The xAI proxy now follows the AWS HTTP proxy pattern for greedy resources: API Gateway exposes `/{proxy+}` and forwards that path to `https://api.x.ai/{proxy}`. This allows the API host to use xAI's documented `/v1/chat/completions` and `/v1/responses` paths through the same gateway.
 - AWS CLI provisioning created the thin API runtime path:
 	- ECR repository `wiley-widget-api`
 	- App Runner service `wiley-widget-api` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`

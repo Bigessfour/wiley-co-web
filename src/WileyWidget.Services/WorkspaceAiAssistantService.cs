@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -156,7 +157,7 @@ public sealed class WorkspaceAiAssistantService
             }
             catch (Exception ex)
             {
-                fallbackDiagnosticCode = "semantic_kernel_request_failed";
+                fallbackDiagnosticCode = TryClassifySemanticKernelFailure(ex);
                 fallbackDiagnosticMessage = $"{ex.GetType().Name}: {ex.Message}";
                 logger.LogWarning(
                     ex,
@@ -167,6 +168,22 @@ public sealed class WorkspaceAiAssistantService
                     chatCompletionEndpoint,
                     legacyXaiEndpoint);
             }
+        }
+
+        if (string.Equals(fallbackDiagnosticCode, "rate_limited", StringComparison.Ordinal))
+        {
+            var rateLimitedAnswer = BuildFallbackAnswer(question, request, activeUser, fallbackDiagnosticCode, fallbackDiagnosticMessage);
+            conversationHistory = AppendTurn(conversationHistory, question, rateLimitedAnswer);
+            await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+            await SaveRecommendationAsync(conversationId, activeUser, request, question, rateLimitedAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
+
+            var rateLimitedResponse = new WorkspaceChatResponse(question, rateLimitedAnswer, true, contextSummary);
+            logger.LogWarning(
+                "Workspace AI returned rate-limit fallback for conversation {ConversationId} with {TurnCount} stored turns (Reason={Reason})",
+                conversationId,
+                conversationHistory.Count,
+                fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
+            return ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
         }
 
         var legacyResult = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
@@ -345,7 +362,8 @@ public sealed class WorkspaceAiAssistantService
             stream = false,
             temperature = legacyXaiTemperature,
             max_output_tokens = legacyXaiMaxTokens,
-            store = true
+            store = true,
+            prompt_cache_key = BuildConversationId(user, request)
         };
 
         var client = httpClientFactory?.CreateClient(nameof(WorkspaceAiAssistantService));
@@ -374,6 +392,11 @@ public sealed class WorkspaceAiAssistantService
                     "Workspace AI legacy xAI fallback returned {StatusCode} for conversation prompt: {Body}",
                     response.StatusCode,
                     responseBody);
+                if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    return new LegacyAnswerResult(null, "rate_limited", "xAI returned HTTP 429 Too Many Requests.");
+                }
+
                 return new LegacyAnswerResult(null, "legacy_request_failed", $"Legacy xAI fallback returned HTTP {(int)response.StatusCode}.");
             }
 
@@ -752,12 +775,27 @@ public sealed class WorkspaceAiAssistantService
         return effectiveCode switch
         {
             "missing_api_key" => "Runtime diagnostics: no usable XAI_API_KEY value was visible to the process, so Semantic Kernel chat did not initialize.",
+            "rate_limited" => "Runtime diagnostics: xAI accepted the request but returned HTTP 429 Too Many Requests. Jarvis is connected, but the current xAI key or team tier is out of rate-limit headroom. Reduce request frequency, use xAI Console to review limits, or move to a higher tier.",
             "kernel_initialization_failed" => $"Runtime diagnostics: Semantic Kernel initialization failed before live chat became available ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "semantic_kernel_request_failed" => $"Runtime diagnostics: live Semantic Kernel execution failed and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "legacy_disabled" => "Runtime diagnostics: the legacy xAI fallback path is disabled, so Jarvis remained on deterministic guidance after live initialization failed.",
             "legacy_request_failed" or "legacy_request_exception" or "legacy_empty_response" => $"Runtime diagnostics: the live xAI fallback path failed after the Semantic Kernel attempt ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             _ => $"Runtime diagnostics: live xAI/Semantic Kernel is unavailable ({SanitizeDiagnosticMessage(effectiveMessage)})."
         };
+    }
+
+    private static string TryClassifySemanticKernelFailure(Exception exception)
+    {
+        var message = exception.Message;
+
+        if (message.Contains("429", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("too many requests", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("rate limit", StringComparison.OrdinalIgnoreCase))
+        {
+            return "rate_limited";
+        }
+
+        return "semantic_kernel_request_failed";
     }
 
     private static string SanitizeDiagnosticMessage(string? value)

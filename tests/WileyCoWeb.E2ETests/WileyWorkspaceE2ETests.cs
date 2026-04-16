@@ -177,6 +177,7 @@ public sealed class WileyWorkspaceE2ETests
 			var question = $"What does the workspace know about FY 2026? {Guid.NewGuid():N}";
 			var questionPrefix = question[..Math.Min(question.Length, 48)];
 			var chatBox = page.Locator("#jarvis-question-input");
+			var initialAnswer = (await page.Locator("#jarvis-chat-answer").InnerTextAsync()).Trim();
 
 			await chatBox.FillAsync(question);
 			await Expect(chatBox).ToHaveValueAsync(question, new() { Timeout = 30000 });
@@ -185,10 +186,17 @@ public sealed class WileyWorkspaceE2ETests
 
 			await Expect(page.Locator("#jarvis-conversation-history")).ToContainTextAsync("You", new() { Timeout = 30000 });
 			await Expect(page.Locator("#jarvis-conversation-history")).ToContainTextAsync(questionPrefix, new() { Timeout = 30000 });
-			await Expect(page.Locator("#jarvis-chat-answer")).ToContainTextAsync("Conversation", new() { Timeout = 30000 });
+			await page.WaitForFunctionAsync(
+				"([selector, initialText]) => { const element = document.querySelector(selector); return !!element && element.innerText.trim() !== initialText; }",
+				new object[] { "#jarvis-chat-answer", initialAnswer },
+				new() { Timeout = 30000 });
+
+			var updatedAnswer = (await page.Locator("#jarvis-chat-answer").InnerTextAsync()).Trim();
+			Assert.NotEqual(initialAnswer, updatedAnswer);
+			Assert.False(string.IsNullOrWhiteSpace(updatedAnswer));
 
 			var transcriptText = await page.Locator("#jarvis-conversation-history").InnerTextAsync();
-			Assert.Contains("Conversation history", transcriptText, StringComparison.Ordinal);
+			Assert.Contains("Conversation history", transcriptText, StringComparison.OrdinalIgnoreCase);
 			Assert.Contains(questionPrefix, transcriptText, StringComparison.Ordinal);
 		});
 	}

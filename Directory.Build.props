@@ -5,6 +5,7 @@
     <RestoreConfigFile>$(MSBuildThisFileDirectory)NuGet.Config</RestoreConfigFile>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <EnableSourceLink Condition="'$(ContinuousIntegrationBuild)' != 'true'">false</EnableSourceLink>
 
     <!-- Web-focused settings only -->
     <EnableWindowsTargeting>false</EnableWindowsTargeting>  <!-- Disable for pure web build -->

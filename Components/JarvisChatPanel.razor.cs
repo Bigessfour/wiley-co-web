@@ -44,12 +44,15 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected string ChatQuestion { get; set; } = "What should I know about the current workspace?";
     protected string ChatAnswer { get; set; } = "Ask Jarvis a question about the workspace, codebase, or AI tools.";
     protected string ChatContextSummary => BuildChatContextSummary();
+    protected string ChatRuntimeStatusTitle { get; set; } = "Awaiting Jarvis response";
+    protected string ChatRuntimeStatusDetail { get; set; } = "Submit a prompt to verify whether the server is returning live AI guidance or fallback mode.";
     protected string KnowledgeStatus { get; set; } = "Waiting for live workspace guidance.";
     protected string RecommendationHistoryStatus { get; set; } = "Recommendation history will appear here after Jarvis saves a recommendation.";
     protected string CurrentUserLabel { get; set; } = "Guest";
     protected string CurrentConversationLabel { get; set; } = "Local session";
     protected string CurrentProfileSummary { get; set; } = "Jarvis will ask a few setup questions on first contact.";
     protected bool IsChatBusy { get; set; }
+    protected bool IsChatFallbackActive { get; set; }
     protected bool IsKnowledgeBusy { get; set; }
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
     public bool IsSecureJarvisEnabled => !string.Equals(Environment.GetEnvironmentVariable("UI__UseSecureJarvis"), "false", StringComparison.OrdinalIgnoreCase);
@@ -169,6 +172,8 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
                 ConversationHistory = BuildConversationHistory()
             }).ConfigureAwait(false);
 
+            UpdateChatRuntimeStatus(response.UsedFallback);
+
             AppendAssistantMessage(response.Answer);
             chatPrompts.Add(new AssistViewPrompt
             {
@@ -194,6 +199,9 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            IsChatFallbackActive = true;
+            ChatRuntimeStatusTitle = "AI runtime unavailable";
+            ChatRuntimeStatusDetail = $"Jarvis reached the panel, but the server did not return a usable AI response. {ex.Message}";
             ChatAnswer = ex.Message;
             AppendAssistantMessage(ex.Message);
             if (args is not null)
@@ -389,6 +397,8 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             recommendationHistory.Clear();
             recommendationHistory.AddRange(history.Items);
 
+            UpdateChatRuntimeStatusFromHistory();
+
             RecommendationHistoryStatus = recommendationHistory.Count == 0
                 ? "No saved recommendations yet for this workspace scope."
                 : $"Loaded {recommendationHistory.Count} saved recommendation{(recommendationHistory.Count == 1 ? string.Empty : "s")} for this workspace scope.";
@@ -397,6 +407,31 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         {
             RecommendationHistoryStatus = $"Recommendation history is unavailable right now: {ex.Message}";
         }
+    }
+
+    private void UpdateChatRuntimeStatus(bool usedFallback)
+    {
+        IsChatFallbackActive = usedFallback;
+
+        if (usedFallback)
+        {
+            ChatRuntimeStatusTitle = "AI runtime unavailable";
+            ChatRuntimeStatusDetail = "Jarvis is reaching the server, but the server is returning fallback guidance instead of a live xAI or Semantic Kernel response. Check xAI key and endpoint configuration.";
+            return;
+        }
+
+        ChatRuntimeStatusTitle = "Live AI available";
+        ChatRuntimeStatusDetail = "Jarvis returned a live AI response for this workspace scope.";
+    }
+
+    private void UpdateChatRuntimeStatusFromHistory()
+    {
+        if (recommendationHistory.Count == 0)
+        {
+            return;
+        }
+
+        UpdateChatRuntimeStatus(recommendationHistory[0].UsedFallback);
     }
 
     private void AppendUserMessage(string message)
