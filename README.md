@@ -148,40 +148,17 @@ Production implication: the missing compute host is now provisioned, but final c
 
 Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with public ingress and VPC egress to Aurora. For the May 11 City Council working session, `1 vCPU / 2 GB`, minimum one warm instance, remains the safer baseline if load or export activity increases.
 
-## Applitools Eyes E2E
+## Browser E2E Tests
 
-The Playwright-based visual and hybrid browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) use Applitools Eyes, not Applitools Autonomous.
+The Playwright-based browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) run directly against the hosted site.
 
-- Eyes handles visual checkpoints from code and baseline review in the Eyes dashboard.
-- Autonomous is a separate no-code product and is optional for broader hosted smoke coverage.
-
-Supported Eyes environment variables:
-
-- `APPLITOOLS_API_KEY` required for all Eyes runs.
-- `WILEYCO_E2E_BASE_URL` required for live browser tests against the hosted app.
-- `APPLITOOLS_APP_NAME` optional, defaults to `Wiley Widget`.
-- `APPLITOOLS_BATCH_NAME` optional, defaults to `Wiley Widget Visual Suite`.
-- `APPLITOOLS_BRANCH` optional Eyes branch name.
-- `APPLITOOLS_PARENT_BRANCH` optional parent branch for Eyes baseline inheritance.
-- `APPLITOOLS_BASELINE_BRANCH` optional explicit baseline branch.
-- `APPLITOOLS_BASELINE_ENV_NAME` optional baseline environment name.
-- `APPLITOOLS_SERVER_URL` optional Eyes server override.
-- `APPLITOOLS_MATCH_LEVEL` optional match level, for example `Strict`.
-- `APPLITOOLS_VIEWPORT_WIDTH` and `APPLITOOLS_VIEWPORT_HEIGHT` optional viewport overrides.
-- `APPLITOOLS_FAIL_ON_UNRESOLVED` optional, defaults to `true`; set to `false` only when intentionally seeding or updating baselines without failing the test job.
-
-Local result summaries:
-
-- The Eyes dashboard remains the source of truth for accepting or rejecting baseline changes.
-- The test project also writes a small JSON session summary for CI or log review.
-- Set `WILEYCO_APPLITOOLS_RESULTS_DIR` or `APPLITOOLS_RESULTS_DIR` to control where that summary is written.
+- `WILEYCO_E2E_BASE_URL` points the tests at the deployed app.
+- The suites use ordinary Playwright assertions and do not require a visual-regression service.
 
 Example PowerShell invocation:
 
 ```powershell
-$env:APPLITOOLS_API_KEY = [Environment]::GetEnvironmentVariable('APPLITOOLS_API_KEY', 'Machine')
 $env:WILEYCO_E2E_BASE_URL = 'https://main.d2ellat1y3ljd9.amplifyapp.com'
-$env:APPLITOOLS_BRANCH = 'main'
 dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "FullyQualifiedName~Visual_WorkspaceOverview_MatchesBaseline"
 ```
 

@@ -7,7 +7,7 @@ namespace WileyCoWeb.E2ETests;
 /// Data-fidelity E2E tests: import a known QuickBooks CSV fixture then assert that
 /// specific values propagate correctly into each panel. Proves the full pipeline:
 /// QuickBooks CSV -> thin API -> Aurora DB -> Blazor panels rendered with live data.
-/// Tests gate on WILEYCO_E2E_BASE_URL only (no Applitools key required).
+/// Tests gate on WILEYCO_E2E_BASE_URL only.
 /// </summary>
 public sealed class WileyWorkspaceDataFidelityTests
 {
