@@ -21,13 +21,11 @@ if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
     SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
 }
 
-var apiBaseAddress = Environment.GetEnvironmentVariable("WILEY_WORKSPACE_API_BASE_ADDRESS")
+// Prefer the deployed public settings file so Amplify runtime cutovers are driven by the artifact the browser actually downloads.
+var apiBaseAddress = await LoadWorkspaceApiBaseAddressFromLocalSettingsAsync(builder.HostEnvironment.BaseAddress)
+    ?? Environment.GetEnvironmentVariable("WILEY_WORKSPACE_API_BASE_ADDRESS")
     ?? builder.Configuration["WILEY_WORKSPACE_API_BASE_ADDRESS"]
     ?? builder.Configuration["WorkspaceApiBaseAddress"];
-if (string.IsNullOrWhiteSpace(apiBaseAddress))
-{
-    apiBaseAddress = await LoadWorkspaceApiBaseAddressFromLocalSettingsAsync(builder.HostEnvironment.BaseAddress);
-}
 var resolvedApiBaseAddress = !string.IsNullOrWhiteSpace(apiBaseAddress) && Uri.TryCreate(apiBaseAddress, UriKind.Absolute, out var apiUri)
     ? apiUri
     : ResolveLocalApiBaseAddress(builder.HostEnvironment.BaseAddress);
