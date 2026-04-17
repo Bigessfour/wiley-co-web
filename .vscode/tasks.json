@@ -122,6 +122,31 @@
 			}
 		},
 		{
+			"label": "🔨 Debug Build API",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"${workspaceFolder}/WileyCoWeb.Api/WileyCoWeb.Api.csproj",
+				"-c",
+				"Debug",
+				"--nologo",
+				"--verbosity",
+				"minimal"
+			],
+			"type": "shell",
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
+		},
+		{
 			"label": "ai-manifest: generate",
 			"command": "pwsh",
 			"args": [
@@ -136,18 +161,37 @@
 		},
 		{
 			"label": "run",
-			"dependsOn": [
-				"build: fast"
-			],
 			"command": "dotnet",
 			"args": [
 				"run",
-				"--no-build",
 				"--project",
-				"${workspaceFolder}/src/WileyWidget.WinForms/WileyWidget.WinForms.csproj"
+				"${workspaceFolder}/WileyCoWeb.csproj",
+				"--launch-profile",
+				"http"
 			],
 			"type": "shell",
 			"group": "build",
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": true,
+				"clear": false
+			}
+		},
+		{
+			"label": "run: api",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/WileyCoWeb.Api/WileyCoWeb.Api.csproj",
+				"--launch-profile",
+				"WileyCoWeb.Api"
+			],
+			"type": "shell",
 			"problemMatcher": "$msCompile",
 			"presentation": {
 				"echo": true,
@@ -256,10 +300,19 @@
 				"watch",
 				"run",
 				"--project",
-				"${workspaceFolder}/src/WileyWidget.WinForms/WileyWidget.WinForms.csproj"
+				"${workspaceFolder}/WileyCoWeb.csproj",
+				"--launch-profile",
+				"http"
 			],
 			"type": "shell",
-			"problemMatcher": "$msCompile",
+			"problemMatcher": {
+				"pattern": "$msCompile",
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".*",
+					"endsPattern": "Now listening on:\\s+http://localhost:5230"
+				}
+			},
 			"presentation": {
 				"panel": "dedicated",
 				"reveal": "always",
@@ -268,15 +321,47 @@
 			"isBackground": true
 		},
 		{
-			"label": "👀 Watch & Debug",
+			"label": "watch: debug client",
 			"command": "dotnet",
 			"args": [
 				"watch",
 				"run",
 				"--project",
-				"${workspaceFolder}/src/WileyWidget.WinForms/WileyWidget.WinForms.csproj",
-				"--",
-				"--debug"
+				"${workspaceFolder}/WileyCoWeb.csproj",
+				"--launch-profile",
+				"http"
+			],
+			"type": "shell",
+			"options": {
+				"env": {
+					"DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER": "1"
+				}
+			},
+			"problemMatcher": {
+				"pattern": "$msCompile",
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".*",
+					"endsPattern": "Now listening on:\\s+http://localhost:5230"
+				}
+			},
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "always",
+				"focus": false
+			},
+			"isBackground": true
+		},
+		{
+			"label": "watch: api",
+			"command": "dotnet",
+			"args": [
+				"watch",
+				"run",
+				"--project",
+				"${workspaceFolder}/WileyCoWeb.Api/WileyCoWeb.Api.csproj",
+				"--launch-profile",
+				"WileyCoWeb.Api"
 			],
 			"type": "shell",
 			"problemMatcher": {
@@ -284,7 +369,7 @@
 				"background": {
 					"activeOnStart": true,
 					"beginsPattern": ".*",
-					"endsPattern": ".*"
+					"endsPattern": "Now listening on:\\s+http://localhost:5231"
 				}
 			},
 			"presentation": {
@@ -294,6 +379,66 @@
 				"echo": true
 			},
 			"isBackground": true
+		},
+		{
+			"label": "👀 Watch & Debug",
+			"dependsOn": [
+				"watch: api",
+				"watch"
+			],
+			"dependsOrder": "parallel",
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "always",
+				"focus": false,
+				"echo": true
+			}
+		},
+		{
+			"label": "🛑 Kill Local Debug Web Stack",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/Scripts/kill-dotnet.ps1",
+				"-Force",
+				"-Pattern",
+				"WileyCoWeb(\\.Api)?\\.csproj"
+			],
+			"type": "shell",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "🐞 Agentic Runtime Smoke",
+			"dependsOn": [
+				"maintenance: Kill Test Processes",
+				"🛑 Kill Local Debug Web Stack"
+			],
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/Scripts/debug-local-runtime.ps1"
+			],
+			"type": "shell",
+			"group": "test",
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
 		},
 		{
 			"label": "test:coverage",
