@@ -32,10 +32,10 @@
     "^__remote_check__/",
     "^wwwroot/",
     "^schemas/",
-    "/bin/",
-    "/obj/",
-    "/\\.vs/",
-    "/\\.git/"
+    "(^|/)bin/",
+    "(^|/)obj/",
+    "(^|/)\\.vs/",
+    "(^|/)\\.git/"
   ],
 
   "focus_mode": false,
@@ -57,17 +57,9 @@
   "tree_max_depth": 5,
   "max_tree_entries_per_dir": 50,
 
-  "focus_directories": [
-    "Components",
-    "Services",
-    "WileyCoWeb.Api"
-  ],
+  "focus_directories": ["Components", "Services", "WileyCoWeb.Api"],
 
-  "always_include_dirs": [
-    "Components",
-    "Services",
-    "WileyCoWeb.Api"
-  ],
+  "always_include_dirs": ["Components", "Services", "WileyCoWeb.Api"],
 
   "priority_patterns": {
     "MainForm": 100,
@@ -122,11 +114,7 @@
     "di_container": "Microsoft.Extensions.DependencyInjection",
     "async_init_pattern": "IAsyncDisposable and initialization patterns",
     "control_factory": "Syncfusion Blazor components",
-    "key_base_classes": [
-      "ComponentBase",
-      "OwningComponentBase",
-      "ServiceBase"
-    ],
+    "key_base_classes": ["ComponentBase", "OwningComponentBase", "ServiceBase"],
     "di_extension_files": "*ServiceCollectionExtensions.cs",
     "ribbon_config": "SfDashboardLayout for workspace organization"
   },

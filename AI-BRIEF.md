@@ -1,5 +1,5 @@
 # WileyCoWeb — AI Briefing
-> Generated: 2026-04-16 17:02  |  Branch: `main`  |  Commit: `017c3e5013`
+> Generated: 2026-04-16 19:41  |  Branch: `main`  |  Commit: `8620cf72f5`
 
 ## Project Purpose
 WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor component suite and MVVM-inspired with dependency injection.
@@ -24,56 +24,56 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 - `Components/JarvisChatPanel.razor` — Panel — priority 100
 - `Components/JarvisChatPanel.razor.cs` — Panel — priority 100
 - `Components/QuickBooksImportPanel.razor` — Panel — priority 100
-- `Components/Panels/CustomerViewerPanel.razor` — Panel — priority 100
 - `Components/Panels/BreakEvenPanel.razor` — Panel — priority 100
-- `Components/Panels/DataDashboardPanel.razor` — Panel — priority 100
+- `Components/Panels/CustomerViewerPanel.razor` — Panel — priority 100
 - `Components/Panels/DecisionSupportPanel.razor` — Panel — priority 100
-- `Components/Panels/RatesPanel.razor` — Panel — priority 100
+- `Components/Panels/DataDashboardPanel.razor` — Panel — priority 100
 - `Components/Panels/QuickBooksImportPanelWrapper.razor` — Panel — priority 100
+- `Components/Panels/RatesPanel.razor` — Panel — priority 100
 - `Components/Panels/ScenarioPlannerPanel.razor` — Panel — priority 100
 - `Components/Panels/TrendsPanel.razor` — Panel — priority 100
 - `WileyCoWeb.Api/Program.cs` — Program — priority 100
-- `Services/QuickBooksImportApiService.cs` — Service — priority 95
 - `Services/BrowserDownloadService.cs` — Service — priority 95
+- `Services/QuickBooksImportApiService.cs` — Service — priority 95
 - `Services/WorkspaceAiApiService.cs` — Service — priority 95
 - `Services/WorkspaceBootstrapService.cs` — Service — priority 95
 - `Services/WorkspaceDocumentExportService.cs` — Service — priority 95
-- `Services/WorkspaceSnapshotApiService.cs` — Service — priority 95
 - `Services/WorkspaceKnowledgeApiService.cs` — Service — priority 95
 - `Services/WorkspacePersistenceService.cs` — Service — priority 95
+- `Services/WorkspaceSnapshotApiService.cs` — Service — priority 95
 
 ## Recommended Reading Order
 1. `Components/JarvisChatPanel.razor`
 2. `Components/JarvisChatPanel.razor.cs`
 3. `Components/QuickBooksImportPanel.razor`
-4. `Components/Panels/CustomerViewerPanel.razor`
-5. `Components/Panels/BreakEvenPanel.razor`
-6. `Components/Panels/DataDashboardPanel.razor`
-7. `Components/Panels/DecisionSupportPanel.razor`
-8. `Components/Panels/RatesPanel.razor`
-9. `Components/Panels/QuickBooksImportPanelWrapper.razor`
+4. `Components/Panels/BreakEvenPanel.razor`
+5. `Components/Panels/CustomerViewerPanel.razor`
+6. `Components/Panels/DecisionSupportPanel.razor`
+7. `Components/Panels/DataDashboardPanel.razor`
+8. `Components/Panels/QuickBooksImportPanelWrapper.razor`
+9. `Components/Panels/RatesPanel.razor`
 10. `Components/Panels/ScenarioPlannerPanel.razor`
 11. `Components/Panels/TrendsPanel.razor`
 12. `WileyCoWeb.Api/Program.cs`
-13. `Services/QuickBooksImportApiService.cs`
-14. `Services/BrowserDownloadService.cs`
+13. `Services/BrowserDownloadService.cs`
+14. `Services/QuickBooksImportApiService.cs`
 15. `Services/WorkspaceAiApiService.cs`
 16. `Services/WorkspaceBootstrapService.cs`
 17. `Services/WorkspaceDocumentExportService.cs`
-18. `Services/WorkspaceSnapshotApiService.cs`
-19. `Services/WorkspaceKnowledgeApiService.cs`
-20. `Services/WorkspacePersistenceService.cs`
+18. `Services/WorkspaceKnowledgeApiService.cs`
+19. `Services/WorkspacePersistenceService.cs`
+20. `Services/WorkspaceSnapshotApiService.cs`
 
 ## Architecture Summary
 | Component | Count |
 |-----------|-------|
 | Views | 0 |
-| Viewmodels | 0 |
-| Panels | 11 |
-| Services | 9 |
+| Viewmodels | 1 |
+| Panels | 2 |
+| Services | 89 |
 | Controls | 0 |
-| Repositories | 0 |
-| Factories | 0 |
+| Repositories | 24 |
+| Factories | 3 |
 
 ## Key Base Classes
 ### ComponentBase
@@ -105,39 +105,52 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 - `Syncfusion.XlsIO.Net.Core`
 
 ## ViewModels
+- `src/WileyWidget.Abstractions/ILazyLoadViewModel.cs`
 
 ## Panels
 - `Components/JarvisChatPanel.razor.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_JarvisChatPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_CustomerViewerPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_BreakEvenPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_DecisionSupportPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_DataDashboardPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_QuickBooksImportPanelWrapper_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_RatesPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_ScenarioPlannerPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_Panels_TrendsPanel_razor.g.cs`
-- `obj/Debug/net9.0/Microsoft.CodeAnalysis.Razor.Compiler/Microsoft.NET.Sdk.Razor.SourceGenerators.RazorSourceGenerator/Components_QuickBooksImportPanel_razor.g.cs`
+- `src/WileyWidget.Models/Models/PanelItem.cs`
 
 ## Services
-- `Services/QuickBooksImportApiService.cs`
 - `Services/BrowserDownloadService.cs`
+- `Services/QuickBooksImportApiService.cs`
 - `Services/WorkspaceAiApiService.cs`
 - `Services/WorkspaceBootstrapService.cs`
 - `Services/WorkspaceDocumentExportService.cs`
-- `Services/WorkspaceSnapshotApiService.cs`
 - `Services/WorkspaceKnowledgeApiService.cs`
 - `Services/WorkspacePersistenceService.cs`
+- `Services/WorkspaceSnapshotApiService.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.cs`
+- `src/WileyWidget.Abstractions/IApplicationStateService.cs`
+- `src/WileyWidget.Abstractions/ICacheService.cs`
+- `src/WileyWidget.Abstractions/IViewRegistrationService.cs`
+- `src/WileyWidget.Business/Interfaces/IDepartmentExpenseService.cs`
+- `src/WileyWidget.Business/Interfaces/IGrokRecommendationService.cs`
+- `src/WileyWidget.Business/Services/AuditService.cs`
+- `src/WileyWidget.Business/Services/GrokRecommendationService.cs`
+- `src/WileyWidget.Models/ServiceChargeRecommendation.cs`
+- `src/WileyWidget.Services/AICacheWarmingService.cs`
+- `src/WileyWidget.Services/ActivityFallbackDataService.cs`
+- `src/WileyWidget.Services/AILoggingService.cs`
+- `src/WileyWidget.Services/AdaptiveTimeoutService.cs`
+- `src/WileyWidget.Services/AnalyticsService.cs`
+- `src/WileyWidget.Services/AnomalyDetectionService.cs`
+- `src/WileyWidget.Services/ApplicationMetricsService.cs`
+- `src/WileyWidget.Services/AuditService.cs`
+- `src/WileyWidget.Services/CacheServiceCollectionExtensions.cs`
+- `src/WileyWidget.Services/CorrelationIdService.cs`
+- `src/WileyWidget.Services/ChatBridgeService.cs`
+- `src/WileyWidget.Services/CsvExcelImportService.cs`
+- `src/WileyWidget.Services/DashboardService.cs`
 
 ## Controls
 
 ## Key NuGet Dependencies
 
 ## Manifest Stats
-- Total files indexed: **11995**
-- Files with embedded content: **11972**
-- Total source size: **1,532,286 KB**
+- Total files indexed: **2213**
+- Files with embedded content: **400**
+- Total source size: **738,490 KB**
 - Manifest mode: **full-context**
 
 ---

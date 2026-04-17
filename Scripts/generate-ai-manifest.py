@@ -50,7 +50,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -78,7 +78,7 @@ class ProgressBar:
         with self.lock:
             self.current += n
             now = time.time()
-            
+
             # Only update display when percentage changes by at least 1%
             current_percent = int((self.current / self.total) * 100)
             if current_percent > self.last_percent:
@@ -211,6 +211,15 @@ DEFAULT_PRIORITY_PATTERNS: Dict[str, int] = {
     "Test": 65,
 }
 
+DEFAULT_EXCLUDED_PATH_PARTS = {
+    ".git",
+    ".vs",
+    "bin",
+    "obj",
+    "node_modules",
+    "WebView2Runtime",
+}
+
 
 class AIManifestGenerator:
     """Generates an AI-optimised fetchable manifest for repository visibility."""
@@ -302,6 +311,12 @@ class AIManifestGenerator:
                 print(f"Warning: Invalid regex pattern '{pat}': {exc}", file=sys.stderr)
         return patterns
 
+    def _is_builtin_excluded_path(self, rel_path: str) -> bool:
+        """Exclude common generated directories even when config regexes miss them."""
+        parts = {part.lower() for part in PurePosixPath(rel_path).parts}
+        excluded = {part.lower() for part in DEFAULT_EXCLUDED_PATH_PARTS}
+        return bool(parts & excluded)
+
     def _git(self, *args: str) -> str:
         """Run a git command in repo_root and return stdout (stripped)."""
         result = subprocess.run(
@@ -364,6 +379,8 @@ class AIManifestGenerator:
     def _should_include_path(self, path: Path, is_dir: bool = False) -> bool:
         """Broad path filter used for the folder-tree walk."""
         rel = self._norm(path)
+        if self._is_builtin_excluded_path(rel):
+            return False
         for pattern in self.exclude_patterns:
             if pattern.search(rel):
                 return False
@@ -377,6 +394,9 @@ class AIManifestGenerator:
     def _should_include_file(self, path: Path) -> bool:
         """Determine whether a file should appear in the manifest files list."""
         rel = self._norm(path)
+
+        if self._is_builtin_excluded_path(rel):
+            return False
 
         # Always include files in always_include_dirs (even in focus mode)
         if any(rel.startswith(d.replace("\\", "/")) for d in self.always_include_dirs):
@@ -529,6 +549,35 @@ class AIManifestGenerator:
         """Alias kept for any callers that use the old name."""
         return self._should_include_file(path)
 
+    def _read_text_file(self, file_path: Path) -> str:
+        """Read a text file for analysis helpers without mutating manifest entries."""
+        try:
+            return file_path.read_text(encoding="utf-8")
+        except Exception:
+            return ""
+
+    def _attach_content_blocks(self, files: List[Dict[str, Any]]) -> int:
+        """Attach content blocks to the highest-priority files within the configured cap."""
+        if self.manifest_mode == "compact" or self.max_embedded_files <= 0:
+            return 0
+
+        embedded_count = 0
+        for file_info in files:
+            if embedded_count >= self.max_embedded_files:
+                break
+
+            rel_str = file_info["metadata"]["path"]
+            file_path = self.repo_root / Path(rel_str)
+            size_kb = float(file_info["metadata"]["size_kb"])
+            content_block = self._get_content(file_path, rel_str, size_kb)
+            if content_block is None:
+                continue
+
+            file_info["content_info"] = content_block
+            embedded_count += 1
+
+        return embedded_count
+
     # ------------------------------------------------------------------
     # File scanning
     # ------------------------------------------------------------------
@@ -560,11 +609,7 @@ class AIManifestGenerator:
                     continue
 
                 rel_path = self._norm(file_path)
-                if (
-                    ".git" in rel_path
-                    or "WebView2Runtime" in rel_path
-                    or rel_path.endswith(".secret")
-                ):
+                if self._is_builtin_excluded_path(rel_path) or rel_path.endswith(".secret"):
                     continue
 
                 if self._should_include_file(file_path):
@@ -588,35 +633,33 @@ class AIManifestGenerator:
                     continue
 
                 rel_path = self._norm(file_path)
-                if (
-                    ".git" in rel_path
-                    or "WebView2Runtime" in rel_path
-                    or rel_path.endswith(".secret")
-                ):
+                if self._is_builtin_excluded_path(rel_path) or rel_path.endswith(".secret"):
                     continue
 
                 if self._should_include_file(file_path):
                     file_paths_to_process.append(file_path)
-                    
+
                     if self.max_files and len(file_paths_to_process) >= self.max_files:
                         self._files_truncated = True
                         break
-            
+
             if self.max_files and len(file_paths_to_process) >= self.max_files:
                 break
 
         # Process files with multithreading if enabled
         if self.max_threads > 0:
-            print(f"🔄 Using {self.max_threads} threads for parallel file processing...")
+            print(
+                f"🔄 Using {self.max_threads} threads for parallel file processing..."
+            )
             start_time = time.time()
-            
+
             def process_file(file_path: Path) -> Optional[Dict[str, Any]]:
                 """Process a single file and return its info dict."""
                 try:
                     rel_path = self._norm(file_path)
                     stat = file_path.stat()
                     size = stat.st_size
-                    
+
                     if self.max_file_size_bytes and size > self.max_file_size_bytes:
                         return None
 
@@ -643,7 +686,14 @@ class AIManifestGenerator:
                         category = "source_code"
                     elif "test" in rel_str.lower():
                         category = "test"
-                    elif ext in {".csproj", ".sln", ".json", ".xml", ".props", ".targets"}:
+                    elif ext in {
+                        ".csproj",
+                        ".sln",
+                        ".json",
+                        ".xml",
+                        ".props",
+                        ".targets",
+                    }:
                         category = "config"
                     else:
                         category = "other"
@@ -677,41 +727,39 @@ class AIManifestGenerator:
                         },
                     }
 
-                    # Content embedding — v2.0 (will be handled in main thread to control count)
-                    content_block = self._get_content(file_path, rel_str, size_kb)
-                    if content_block is not None:
-                        file_info["content_info"] = content_block
-
                     return file_info
-                    
+
                 except (OSError, IOError) as exc:
-                    print(f"Warning: Could not process {file_path}: {exc}", file=sys.stderr)
+                    print(
+                        f"Warning: Could not process {file_path}: {exc}",
+                        file=sys.stderr,
+                    )
                     return None
 
             # Use ThreadPoolExecutor for parallel processing
             with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
-                future_to_file = {executor.submit(process_file, fp): fp for fp in file_paths_to_process}
-                
+                future_to_file = {
+                    executor.submit(process_file, fp): fp
+                    for fp in file_paths_to_process
+                }
+
                 for future in as_completed(future_to_file):
                     file_info = future.result()
                     if file_info is not None:
                         files.append(file_info)
-                        
+
                         # Update shared counters (thread-safe since we're in main thread)
                         size = file_info["metadata"]["size_bytes"]
                         total_size += size
-                        
+
                         category = file_info["context"]["category"]
                         categories[category] = categories.get(category, 0) + 1
-                        
+
                         language = file_info["metadata"]["language"]
                         languages[language] = languages.get(language, 0) + 1
-                        
-                        if "content_info" in file_info:
-                            embedded_count += 1
-                    
+
                     progress.update()
-            
+
             elapsed = time.time() - start_time
             print(f"✅ Parallel processing completed in {elapsed:.1f}s")
             progress.close()
@@ -750,7 +798,14 @@ class AIManifestGenerator:
                         category = "source_code"
                     elif "test" in rel_str.lower():
                         category = "test"
-                    elif ext in {".csproj", ".sln", ".json", ".xml", ".props", ".targets"}:
+                    elif ext in {
+                        ".csproj",
+                        ".sln",
+                        ".json",
+                        ".xml",
+                        ".props",
+                        ".targets",
+                    }:
                         category = "config"
                     else:
                         category = "other"
@@ -788,19 +843,15 @@ class AIManifestGenerator:
                         },
                     }
 
-                    # Content embedding — v2.0
-                    if embedded_count < self.max_embedded_files:
-                        content_block = self._get_content(file_path, rel_str, size_kb)
-                        if content_block is not None:
-                            file_info["content_info"] = content_block
-                            embedded_count += 1
-
                     files.append(file_info)
                     processed_count += 1
                     progress.update()
 
                 except (OSError, IOError) as exc:
-                    print(f"Warning: Could not process {file_path}: {exc}", file=sys.stderr)
+                    print(
+                        f"Warning: Could not process {file_path}: {exc}",
+                        file=sys.stderr,
+                    )
                     processed_count += 1
                     progress.update()
 
@@ -808,6 +859,7 @@ class AIManifestGenerator:
 
         # Sort by priority descending so most important files surface first
         files.sort(key=lambda x: x["metadata"]["priority"], reverse=True)
+        embedded_count = self._attach_content_blocks(files)
 
         self._total_files = len(files)
         self._total_size = total_size
@@ -901,7 +953,7 @@ class AIManifestGenerator:
         """Auto-detect ViewModels, Panels, Services, Controls, etc. from file paths and C# content."""
         print("🔬 Analyzing codebase architecture...")
         analysis_progress = ProgressBar(5, "🔍 Architecture analysis")
-        
+
         views: List[str] = []
         viewmodels: List[str] = []
         services: List[str] = []
@@ -951,35 +1003,45 @@ class AIManifestGenerator:
                     """Analyze a single C# file for inheritance and DI patterns."""
                     if not f["metadata"]["path"].endswith(".cs"):
                         return None
-                    
+
                     file_path = self.repo_root / f["metadata"]["path"]
-                    try:
-                        content = file_path.read_text(encoding="utf-8")
-                        f["content"] = {"text": content}  # Add content for analysis
-                    except Exception:
-                        content = ""
-                    
+                    content = self._read_text_file(file_path)
+
                     if not content:
                         return None
-                    
-                    results = {"path": f["metadata"]["path"], "bases": [], "di_registrations": []}
-                    
+
+                    results = {
+                        "path": f["metadata"]["path"],
+                        "bases": [],
+                        "di_registrations": [],
+                    }
+
                     # Parse class inheritance
                     for base in key_bases:
                         if f" : {base}" in content or f": {base}<" in content:
                             results["bases"].append(base)
 
                     # Parse DI registrations
-                    if "AddTransient" in content or "AddScoped" in content or "AddSingleton" in content:
+                    if (
+                        "AddTransient" in content
+                        or "AddScoped" in content
+                        or "AddSingleton" in content
+                    ):
                         results["di_registrations"].append(f["metadata"]["path"])
-                    
+
                     return results
 
                 # Process C# files in parallel
-                cs_files = [f for f in self._files if f["metadata"]["path"].endswith(".cs")]
-                with ThreadPoolExecutor(max_workers=min(self.max_threads, len(cs_files))) as executor:
-                    futures = [executor.submit(analyze_csharp_file, f) for f in cs_files]
-                    
+                cs_files = [
+                    f for f in self._files if f["metadata"]["path"].endswith(".cs")
+                ]
+                with ThreadPoolExecutor(
+                    max_workers=min(self.max_threads, len(cs_files))
+                ) as executor:
+                    futures = [
+                        executor.submit(analyze_csharp_file, f) for f in cs_files
+                    ]
+
                     for future in as_completed(futures):
                         result = future.result()
                         if result:
@@ -993,12 +1055,8 @@ class AIManifestGenerator:
                         continue
                     # Read content directly for analysis
                     file_path = self.repo_root / f["metadata"]["path"]
-                    try:
-                        content = file_path.read_text(encoding="utf-8")
-                        f["content"] = {"text": content}  # Add content for analysis
-                    except Exception:
-                        content = ""
-                    
+                    content = self._read_text_file(file_path)
+
                     if not content:
                         continue
 
@@ -1008,7 +1066,11 @@ class AIManifestGenerator:
                             base_classes[base].append(f["metadata"]["path"])
 
                     # Parse DI registrations
-                    if "AddTransient" in content or "AddScoped" in content or "AddSingleton" in content:
+                    if (
+                        "AddTransient" in content
+                        or "AddScoped" in content
+                        or "AddSingleton" in content
+                    ):
                         di_registrations.append(f["metadata"]["path"])
 
         analysis_progress.update()
@@ -1085,7 +1147,7 @@ class AIManifestGenerator:
                 matches = re.findall(
                     r'<PackageReference\s+Include="([^"]*Syncfusion[^"]*)"',
                     content,
-                    re.IGNORECASE
+                    re.IGNORECASE,
                 )
                 packages.update(matches)
             except Exception:
@@ -1102,7 +1164,9 @@ class AIManifestGenerator:
         try:
             sln_content = sln_files[0].read_text(encoding="utf-8")
             # Extract project references (simplified parsing)
-            project_pattern = r'Project\("\{[^}]+\}"\)\s*=\s*"([^"]+)",\s*"([^"]+)",\s*"\{[^}]+\}"'
+            project_pattern = (
+                r'Project\("\{[^}]+\}"\)\s*=\s*"([^"]+)",\s*"([^"]+)",\s*"\{[^}]+\}"'
+            )
             projects = re.findall(project_pattern, sln_content, re.MULTILINE)
 
             for name, path in projects:
@@ -1119,7 +1183,7 @@ class AIManifestGenerator:
             try:
                 content = xaml_file.read_text(encoding="utf-8")
                 # Look for Syncfusion controls (xmlns:sf="..." or sf:ControlName)
-                sf_controls = re.findall(r'<sf:([A-Za-z]+)', content)
+                sf_controls = re.findall(r"<sf:([A-Za-z]+)", content)
                 for control in sf_controls:
                     controls[control] = controls.get(control, 0) + 1
             except Exception:
@@ -1132,7 +1196,8 @@ class AIManifestGenerator:
         for f in self._files:
             if not f["metadata"]["path"].endswith(".cs"):
                 continue
-            content = f.get("content", {}).get("text", "")
+            file_path = self.repo_root / f["metadata"]["path"]
+            content = self._read_text_file(file_path)
             if not content:
                 continue
 
@@ -1140,7 +1205,7 @@ class AIManifestGenerator:
             deps = []
 
             # Look for service injections or usages
-            service_matches = re.findall(r'(\w+Service)\s', content)
+            service_matches = re.findall(r"(\w+Service)\s", content)
             for match in service_matches:
                 if match != "Service":  # Avoid generic matches
                     deps.append(match)
@@ -1378,11 +1443,11 @@ class AIManifestGenerator:
         """Generate the complete v2.0 manifest."""
         print("🚀 Starting AI manifest generation...")
         overall_progress = ProgressBar(6, "📊 Overall progress")
-        
+
         repo_info = self._get_repo_info()
         overall_progress.update()
         overall_progress.set_description("📁 Scanning files")
-        
+
         files = self._scan_files()
         self._files = files
         overall_progress.update()
@@ -1518,17 +1583,19 @@ def main() -> None:
     """Main entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate AI-optimized manifest for repository")
+    parser = argparse.ArgumentParser(
+        description="Generate AI-optimized manifest for repository"
+    )
     parser.add_argument(
         "--compact",
         action="store_true",
-        help="Skip content embedding for faster generation on large repos"
+        help="Skip content embedding for faster generation on large repos",
     )
     parser.add_argument(
         "--threads",
         type=int,
         default=4,
-        help="Number of threads for parallel processing (default: 4, use 0 to disable)"
+        help="Number of threads for parallel processing (default: 4, use 0 to disable)",
     )
     args = parser.parse_args()
 

@@ -4,6 +4,9 @@
     "PATH": "/opt/homebrew/bin:${env:PATH}",
     "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
   },
+  "terminal.integrated.env.windows": {
+    "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
+  },
   "terminal.integrated.profiles.osx": {
     "PowerShell 7.6": {
       "path": "/opt/homebrew/bin/pwsh",
@@ -14,8 +17,13 @@
     }
   },
   "terminal.integrated.defaultProfile.osx": "PowerShell 7.6",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
   "terminal.integrated.automationProfile.osx": {
     "path": "/opt/homebrew/bin/pwsh",
+    "args": ["-NoLogo"]
+  },
+  "terminal.integrated.automationProfile.windows": {
+    "source": "PowerShell",
     "args": ["-NoLogo"]
   },
   "chat.mcp.autostart": "newAndOutdated",
