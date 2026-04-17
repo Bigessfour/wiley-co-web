@@ -1,104 +1,217 @@
 @using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Calendars
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Popups
 @using WileyCoWeb.Contracts
-@using WileyCoWeb.State
 
 <div id="customer-viewer-panel" class="space-y-4">
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SfCard>
-            <CardHeader Title="Visible Customers" SubTitle="@FilteredCustomerCountDisplay" />
-            <CardContent Content="Rows matching the active customer filters." />
+            <CardHeader Title="Visible Customers" SubTitle="@LiveFilteredCustomerCountDisplay" />
+            <CardContent Content="Live utility-customer rows matching the active customer filters." />
         </SfCard>
         <SfCard>
-            <CardHeader Title="Service Filter" SubTitle="@SelectedCustomerService" />
-            <CardContent Content="Limit the list to one service line." />
+            <CardHeader Title="Active Accounts" SubTitle="@ActiveCustomerCountDisplay" />
+            <CardContent Content="Accounts currently marked Active in the utility-customer directory." />
         </SfCard>
         <SfCard>
-            <CardHeader Title="City Limits" SubTitle="@SelectedCustomerCityLimits" />
-            <CardContent Content="Show city-limits status at a glance." />
+            <CardHeader Title="Customer Type" SubTitle="@SelectedCustomerServiceDisplay" />
+            <CardContent Content="Filter the directory by the persisted customer classification." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="City Limits" SubTitle="@SelectedCustomerCityLimitsDisplay" />
+            <CardContent Content="Review inside-versus-outside city service locations at a glance." />
         </SfCard>
     </div>
 
     <div class="grid gap-3 md:grid-cols-3">
-        <SfTextBox ID="customer-search-input" Placeholder="Search customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
-        <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@CustomerServiceOptions" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Service" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-        <SfDropDownList TValue="string" TItem="string" DataSource="@CustomerCityLimitOptions" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+        <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
+        <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@CustomerServiceOptions" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Customer Type" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+        <SfDropDownList ID="customer-city-limits-filter" TValue="string" TItem="string" DataSource="@CustomerCityLimitOptions" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
     </div>
 
-    <div class="flex justify-end">
-        <SfButton OnClick="OnClearCustomerFilters">Clear filters</SfButton>
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div id="customer-directory-status" class="text-sm text-slate-600">
+            <span class="font-semibold text-slate-700">Directory status:</span> @CustomerDirectoryStatus
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <SfButton ID="refresh-customer-directory-button" IconCss="e-icons e-refresh" Disabled="@IsBusy" OnClick="RefreshCustomerDirectoryAsync">Refresh</SfButton>
+            <SfButton ID="clear-customer-filters-button" Disabled="@IsBusy" OnClick="ClearFiltersAsync">Clear filters</SfButton>
+            <SfButton ID="add-customer-button" CssClass="e-primary" IconCss="e-icons e-plus" IsPrimary="true" Disabled="@IsBusy" OnClick="BeginCreateCustomer">Add customer</SfButton>
+        </div>
     </div>
+
+    @if (HasApiFeedback)
+    {
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div class="font-semibold">@CustomerApiError</div>
+            @if (ValidationSummaryItems.Count > 0)
+            {
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    @foreach (var validationMessage in ValidationSummaryItems)
+                    {
+                        <li>@validationMessage</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
 
     <div>
-        <SfGrid TValue="CustomerRow" DataSource="@Customers" AllowFiltering="true" AllowSorting="true" AllowPaging="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="520">
-            <GridPageSettings PageSize="8" PageCount="5" />
+        <SfGrid TValue="UtilityCustomerRecord" DataSource="@FilteredCustomers" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
+            <GridPageSettings PageSize="10" PageCount="5" />
             <GridColumns>
-                <GridColumn Field=@nameof(CustomerRow.Name) HeaderText="Name" Width="160" />
-                <GridColumn Field=@nameof(CustomerRow.Service) HeaderText="Service" Width="110" />
-                <GridColumn Field=@nameof(CustomerRow.CityLimits) HeaderText="City Limits" Width="100" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.AccountNumber) HeaderText="Account #" Width="125" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.DisplayName) HeaderText="Customer" Width="190" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.CustomerType) HeaderText="Customer Type" Width="140" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.ServiceLocation) HeaderText="Location" Width="150" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.Status) HeaderText="Status" Width="110" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.CurrentBalance) HeaderText="Balance" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
+                <GridColumn Field=@nameof(UtilityCustomerRecord.PhoneNumber) HeaderText="Phone" Width="135" />
+                <GridColumn HeaderText="Actions" Width="180" AllowSorting="false" AllowFiltering="false">
+                    <Template Context="customerContext">
+                        @{
+                            var customer = (UtilityCustomerRecord)customerContext;
+                        }
+                        <div class="flex flex-wrap gap-2">
+                            <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
+                            <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
+                        </div>
+                    </Template>
+                </GridColumn>
             </GridColumns>
         </SfGrid>
     </div>
+
+    <p class="text-xs text-slate-500">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
+
+    @if (IsEditorDialogOpen)
+    {
+        <SfDialog Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="false" AllowDragging="true" Visible="true">
+            <DialogTemplates>
+                <Header>@EditorDialogTitle</Header>
+                <Content>
+                    @if (EditorEditContext is not null)
+                    {
+                        <EditForm EditContext="@EditorEditContext">
+                            <DataAnnotationsValidator />
+                            <div class="space-y-4">
+                                <ValidationSummary class="text-sm text-rose-700" />
+
+                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                    <div>
+                                        <SfTextBox ID="customer-editor-account-number" Placeholder="Account number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.AccountNumber" />
+                                        <ValidationMessage For="() => EditorModel.AccountNumber" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox ID="customer-editor-first-name" Placeholder="First name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.FirstName" />
+                                        <ValidationMessage For="() => EditorModel.FirstName" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox ID="customer-editor-last-name" Placeholder="Last name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.LastName" />
+                                        <ValidationMessage For="() => EditorModel.LastName" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox ID="customer-editor-company-name" Placeholder="Company name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.CompanyName" />
+                                        <ValidationMessage For="() => EditorModel.CompanyName" />
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                    <div>
+                                        <SfDropDownList TValue="CustomerType" TItem="EnumOption<CustomerType>" DataSource="@CustomerTypeOptions" @bind-Value="EditorModel.CustomerType" Placeholder="Customer type" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                            <DropDownListFieldSettings Text="Text" Value="Value" />
+                                        </SfDropDownList>
+                                    </div>
+                                    <div>
+                                        <SfDropDownList TValue="ServiceLocation" TItem="EnumOption<ServiceLocation>" DataSource="@ServiceLocationOptions" @bind-Value="EditorModel.ServiceLocation" Placeholder="Service location" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                            <DropDownListFieldSettings Text="Text" Value="Value" />
+                                        </SfDropDownList>
+                                    </div>
+                                    <div>
+                                        <SfDropDownList TValue="CustomerStatus" TItem="EnumOption<CustomerStatus>" DataSource="@CustomerStatusOptions" @bind-Value="EditorModel.Status" Placeholder="Account status" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                            <DropDownListFieldSettings Text="Text" Value="Value" />
+                                        </SfDropDownList>
+                                    </div>
+                                    <div>
+                                        <SfDatePicker TValue="DateTime?" Placeholder="Account open date" FloatLabelType="FloatLabelType.Auto" Width="100%" @bind-Value="EditorModel.AccountOpenDate" />
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                    <div class="md:col-span-2 xl:col-span-2">
+                                        <SfTextBox ID="customer-editor-service-address" Placeholder="Service address" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceAddress" />
+                                        <ValidationMessage For="() => EditorModel.ServiceAddress" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox ID="customer-editor-service-city" Placeholder="City" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceCity" />
+                                        <ValidationMessage For="() => EditorModel.ServiceCity" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox ID="customer-editor-service-state" Placeholder="State" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceState" />
+                                        <ValidationMessage For="() => EditorModel.ServiceState" />
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                    <div>
+                                        <SfTextBox ID="customer-editor-service-zip-code" Placeholder="ZIP code" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceZipCode" />
+                                        <ValidationMessage For="() => EditorModel.ServiceZipCode" />
+                                    </div>
+                                    <div>
+                                        <SfNumericTextBox TValue="decimal" Placeholder="Current balance" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" @bind-Value="EditorModel.CurrentBalance" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox Placeholder="Phone number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.PhoneNumber" />
+                                        <ValidationMessage For="() => EditorModel.PhoneNumber" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox Placeholder="Email address" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.EmailAddress" />
+                                        <ValidationMessage For="() => EditorModel.EmailAddress" />
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    <div>
+                                        <SfTextBox Placeholder="Meter number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.MeterNumber" />
+                                    </div>
+                                    <div>
+                                        <SfTextBox Placeholder="Notes" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.Notes" />
+                                        <ValidationMessage For="() => EditorModel.Notes" />
+                                    </div>
+                                </div>
+                            </div>
+                        </EditForm>
+                    }
+                </Content>
+                <FooterTemplate>
+                    <div class="flex justify-end gap-2">
+                        <SfButton ID="customer-editor-cancel-button" Disabled="@isSavingCustomer" OnClick="CloseEditorDialog">Cancel</SfButton>
+                        <SfButton ID="customer-editor-save-button" CssClass="e-primary" IsPrimary="true" Disabled="@isSavingCustomer" OnClick="SaveCustomerAsync">@(isSavingCustomer ? "Saving..." : EditorSaveButtonText)</SfButton>
+                    </div>
+                </FooterTemplate>
+            </DialogTemplates>
+        </SfDialog>
+    }
+
+    @if (IsDeleteDialogOpen && PendingDeleteCustomer is not null)
+    {
+        <SfDialog Width="28rem" IsModal="true" ShowCloseIcon="false" AllowDragging="false" Visible="true">
+            <DialogTemplates>
+                <Header>Delete Customer</Header>
+                <Content>
+                    <p class="text-sm text-slate-700">Delete @PendingDeleteCustomer.DisplayName from the utility-customer directory? This saves immediately and cannot be undone from the workspace.</p>
+                </Content>
+                <FooterTemplate>
+                    <div class="flex justify-end gap-2">
+                        <SfButton ID="customer-delete-cancel-button" Disabled="@isDeletingCustomer" OnClick="CloseDeleteDialog">Cancel</SfButton>
+                        <SfButton ID="customer-delete-confirm-button" CssClass="e-danger" Disabled="@isDeletingCustomer" OnClick="DeleteCustomerAsync">@(isDeletingCustomer ? "Deleting..." : "Delete")</SfButton>
+                    </div>
+                </FooterTemplate>
+            </DialogTemplates>
+        </SfDialog>
+    }
 </div>
-
-@code {
-    [Parameter] public string FilteredCustomerCountDisplay { get; set; } = string.Empty;
-    [Parameter] public string SelectedCustomerService { get; set; } = string.Empty;
-    [Parameter] public string SelectedCustomerCityLimits { get; set; } = string.Empty;
-    [Parameter] public string CustomerSearchTerm { get; set; } = string.Empty;
-    [Parameter] public IReadOnlyList<string> CustomerServiceOptions { get; set; } = [];
-    [Parameter] public IReadOnlyList<string> CustomerCityLimitOptions { get; set; } = [];
-    [Parameter] public IReadOnlyList<CustomerRow> Customers { get; set; } = [];
-    [Parameter] public EventCallback<string> CustomerSearchTermChanged { get; set; }
-    [Parameter] public EventCallback<string> SelectedCustomerServiceChanged { get; set; }
-    [Parameter] public EventCallback<string> SelectedCustomerCityLimitsChanged { get; set; }
-    [Parameter] public EventCallback OnClearCustomerFilters { get; set; }
-
-    private string SearchTermProxy
-    {
-        get => CustomerSearchTerm;
-        set
-        {
-            if (CustomerSearchTerm == value)
-            {
-                return;
-            }
-
-            CustomerSearchTerm = value;
-            _ = CustomerSearchTermChanged.InvokeAsync(value);
-        }
-    }
-
-    private string SelectedCustomerServiceProxy
-    {
-        get => SelectedCustomerService;
-        set
-        {
-            if (SelectedCustomerService == value)
-            {
-                return;
-            }
-
-            SelectedCustomerService = value;
-            _ = SelectedCustomerServiceChanged.InvokeAsync(value);
-        }
-    }
-
-    private string SelectedCustomerCityLimitsProxy
-    {
-        get => SelectedCustomerCityLimits;
-        set
-        {
-            if (SelectedCustomerCityLimits == value)
-            {
-                return;
-            }
-
-            SelectedCustomerCityLimits = value;
-            _ = SelectedCustomerCityLimitsChanged.InvokeAsync(value);
-        }
-    }
-}

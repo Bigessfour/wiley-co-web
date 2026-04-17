@@ -20,6 +20,8 @@
     <Compile Include="..\Contracts\WorkspaceContracts.cs" Link="Contracts/WorkspaceContracts.cs" />
     <Compile Include="..\Contracts\WorkspaceKnowledgeContracts.cs"
       Link="Contracts/WorkspaceKnowledgeContracts.cs" />
+    <Compile Include="..\Contracts\UtilityCustomerContracts.cs"
+      Link="Contracts/UtilityCustomerContracts.cs" />
   </ItemGroup>
 
 </Project>

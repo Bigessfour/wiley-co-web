@@ -347,6 +347,47 @@ public sealed class WorkspaceState
         }
     }
 
+    public void ReplaceCustomerDirectory(IReadOnlyList<CustomerRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        var normalizedRows = rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.Name))
+            .Select(row => new CustomerRow(
+                row.Name.Trim(),
+                string.IsNullOrWhiteSpace(row.Service) ? "Unknown" : row.Service.Trim(),
+                string.IsNullOrWhiteSpace(row.CityLimits) ? "No" : row.CityLimits.Trim()))
+            .ToList();
+
+        var normalizedServiceOptions = normalizedRows
+            .Select(row => row.Service)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(service => service, StringComparer.Ordinal)
+            .ToList();
+        normalizedServiceOptions.Insert(0, AllServicesOption);
+
+        var hasChanged = SetCustomerRowsWithoutNotify(normalizedRows);
+        hasChanged |= SetStringListWithoutNotify(customerServiceOptions, normalizedServiceOptions, [AllServicesOption]);
+        hasChanged |= SetStringListWithoutNotify(customerCityLimitOptions, [AllCityLimitsOption, "Yes", "No"], [AllCityLimitsOption, "Yes", "No"]);
+
+        if (!customerServiceOptions.Contains(selectedCustomerService, StringComparer.Ordinal))
+        {
+            selectedCustomerService = AllServicesOption;
+            hasChanged = true;
+        }
+
+        if (!customerCityLimitOptions.Contains(selectedCustomerCityLimits, StringComparer.Ordinal))
+        {
+            selectedCustomerCityLimits = AllCityLimitsOption;
+            hasChanged = true;
+        }
+
+        if (hasChanged)
+        {
+            NotifyChanged();
+        }
+    }
+
     public void AddScenarioItem(string name, decimal cost)
     {
         var normalizedName = string.IsNullOrWhiteSpace(name) ? "Scenario item" : name.Trim();
@@ -479,18 +520,15 @@ public sealed class WorkspaceState
 
     private bool SetCustomerRowsWithoutNotify(IReadOnlyList<CustomerRow>? rows)
     {
-        if (rows is null || rows.Count == 0)
-        {
-            return false;
-        }
+        var normalizedRows = rows?.Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits)).ToList() ?? [];
 
-        if (customerRows.Count == rows.Count && customerRows.SequenceEqual(rows))
+        if (customerRows.SequenceEqual(normalizedRows))
         {
             return false;
         }
 
         customerRows.Clear();
-        foreach (var row in rows)
+        foreach (var row in normalizedRows)
         {
             customerRows.Add(new CustomerRow(row.Name, row.Service, row.CityLimits));
         }

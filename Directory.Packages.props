@@ -55,6 +55,7 @@
     <PackageVersion Include="System.Management" Version="10.0.5" />
     <PackageVersion Include="System.Numerics.Tensors" Version="10.0.5" />
     <PackageVersion Include="Syncfusion.Blazor.Buttons" Version="33.1.44" />
+    <PackageVersion Include="Syncfusion.Blazor.Calendars" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.Cards" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.Charts" Version="33.1.44" />
     <PackageVersion Include="Syncfusion.Blazor.CircularGauge" Version="33.1.44" />

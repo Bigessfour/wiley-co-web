@@ -18,6 +18,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Syncfusion.Blazor.InteractiveChat" />
     <PackageReference Include="Syncfusion.Blazor.Buttons" />
+    <PackageReference Include="Syncfusion.Blazor.Calendars" />
     <PackageReference Include="Syncfusion.Blazor.Cards" />
     <PackageReference Include="Syncfusion.Blazor.Charts" />
     <PackageReference Include="Syncfusion.Blazor.CircularGauge" />

@@ -1351,13 +1351,13 @@ public partial class Program
         customer.FirstName = request.FirstName.Trim();
         customer.LastName = request.LastName.Trim();
         customer.CompanyName = request.CompanyName;
-        customer.CustomerType = request.CustomerType;
+        customer.CustomerType = MapCustomerType(request.CustomerType);
         customer.ServiceAddress = request.ServiceAddress.Trim();
         customer.ServiceCity = request.ServiceCity.Trim();
         customer.ServiceState = request.ServiceState.Trim().ToUpperInvariant();
         customer.ServiceZipCode = request.ServiceZipCode.Trim();
-        customer.ServiceLocation = request.ServiceLocation;
-        customer.Status = request.Status;
+        customer.ServiceLocation = MapServiceLocation(request.ServiceLocation);
+        customer.Status = MapCustomerStatus(request.Status);
         customer.CurrentBalance = decimal.Round(request.CurrentBalance, 2, MidpointRounding.AwayFromZero);
         customer.AccountOpenDate = NormalizeUtcDate(request.AccountOpenDate) ?? DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
         customer.PhoneNumber = request.PhoneNumber;
@@ -1371,6 +1371,34 @@ public partial class Program
             customer.CreatedDate = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Utc);
         }
     }
+
+    private static WileyWidget.Models.CustomerType MapCustomerType(WileyCoWeb.Contracts.CustomerType customerType)
+        => customerType switch
+        {
+            WileyCoWeb.Contracts.CustomerType.Commercial => WileyWidget.Models.CustomerType.Commercial,
+            WileyCoWeb.Contracts.CustomerType.Industrial => WileyWidget.Models.CustomerType.Industrial,
+            WileyCoWeb.Contracts.CustomerType.Agricultural => WileyWidget.Models.CustomerType.Agricultural,
+            WileyCoWeb.Contracts.CustomerType.Institutional => WileyWidget.Models.CustomerType.Institutional,
+            WileyCoWeb.Contracts.CustomerType.Government => WileyWidget.Models.CustomerType.Government,
+            WileyCoWeb.Contracts.CustomerType.MultiFamily => WileyWidget.Models.CustomerType.MultiFamily,
+            _ => WileyWidget.Models.CustomerType.Residential
+        };
+
+    private static WileyWidget.Models.ServiceLocation MapServiceLocation(WileyCoWeb.Contracts.ServiceLocation serviceLocation)
+        => serviceLocation switch
+        {
+            WileyCoWeb.Contracts.ServiceLocation.OutsideCityLimits => WileyWidget.Models.ServiceLocation.OutsideCityLimits,
+            _ => WileyWidget.Models.ServiceLocation.InsideCityLimits
+        };
+
+    private static WileyWidget.Models.CustomerStatus MapCustomerStatus(WileyCoWeb.Contracts.CustomerStatus status)
+        => status switch
+        {
+            WileyCoWeb.Contracts.CustomerStatus.Inactive => WileyWidget.Models.CustomerStatus.Inactive,
+            WileyCoWeb.Contracts.CustomerStatus.Suspended => WileyWidget.Models.CustomerStatus.Suspended,
+            WileyCoWeb.Contracts.CustomerStatus.Closed => WileyWidget.Models.CustomerStatus.Closed,
+            _ => WileyWidget.Models.CustomerStatus.Active
+        };
 
     private static DateTime? NormalizeUtcDate(DateTime? value)
     {

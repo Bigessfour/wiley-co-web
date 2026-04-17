@@ -83,6 +83,7 @@ builder.Services.AddSingleton<WorkspaceState>();
 builder.Services.AddScoped<WorkspaceBootstrapService>();
 builder.Services.AddScoped<WorkspacePersistenceService>();
 builder.Services.AddScoped<WorkspaceSnapshotApiService>();
+builder.Services.AddScoped<UtilityCustomerApiService>();
 builder.Services.AddScoped<WorkspaceKnowledgeApiService>();
 builder.Services.AddScoped<QuickBooksImportApiService>();
 builder.Services.AddScoped<WorkspaceAiApiService>();

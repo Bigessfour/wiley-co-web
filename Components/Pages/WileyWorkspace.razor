@@ -291,18 +291,7 @@
                                                   OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
                             break;
                         case "customers":
-                            <CustomerViewerPanel @key="ActivePanelKey"
-                                                 FilteredCustomerCountDisplay="@FilteredCustomerCountDisplay"
-                                                 SelectedCustomerService="@SelectedCustomerService"
-                                                 SelectedCustomerCityLimits="@SelectedCustomerCityLimits"
-                                                 CustomerSearchTerm="@CustomerSearchTerm"
-                                                 CustomerSearchTermChanged="@(value => CustomerSearchTerm = value)"
-                                                 CustomerServiceOptions="@CustomerServiceOptions"
-                                                 CustomerCityLimitOptions="@CustomerCityLimitOptions"
-                                                 SelectedCustomerServiceChanged="@(value => SelectedCustomerService = value)"
-                                                 SelectedCustomerCityLimitsChanged="@(value => SelectedCustomerCityLimits = value)"
-                                                 Customers="@Customers"
-                                                 OnClearCustomerFilters="ClearCustomerFilters" />
+                            <CustomerViewerPanel @key="ActivePanelKey" />
                             break;
                         case "trends":
                             <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />

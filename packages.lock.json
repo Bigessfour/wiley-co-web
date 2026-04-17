@@ -56,6 +56,18 @@
           "Syncfusion.Blazor.Core": "33.1.44"
         }
       },
+      "Syncfusion.Blazor.Calendars": {
+        "type": "Direct",
+        "requested": "[33.1.44, )",
+        "resolved": "33.1.44",
+        "contentHash": "84CPZlKvJM6gMljVbceRv2c+jhFHtgT+SA2o30ALJFHo/EhjOF/BEfAL4DqBExYkTetfznHBaR5/0m5VCFrO1g==",
+        "dependencies": {
+          "Syncfusion.Blazor.Buttons": "33.1.44",
+          "Syncfusion.Blazor.Core": "33.1.44",
+          "Syncfusion.Blazor.Inputs": "33.1.44",
+          "Syncfusion.Blazor.Lists": "33.1.44"
+        }
+      },
       "Syncfusion.Blazor.Cards": {
         "type": "Direct",
         "requested": "[33.1.44, )",
@@ -546,17 +558,6 @@
         "type": "Transitive",
         "resolved": "3.119.1",
         "contentHash": "8C4GSXVJqSr0y3Tyyv5jz6MJSTVUyYkMjeKrzK+VyZPGLo89MNoUEclVuYahzOCDdtbfXrd2HtxXfDuvoSXrUw=="
-      },
-      "Syncfusion.Blazor.Calendars": {
-        "type": "Transitive",
-        "resolved": "33.1.44",
-        "contentHash": "84CPZlKvJM6gMljVbceRv2c+jhFHtgT+SA2o30ALJFHo/EhjOF/BEfAL4DqBExYkTetfznHBaR5/0m5VCFrO1g==",
-        "dependencies": {
-          "Syncfusion.Blazor.Buttons": "33.1.44",
-          "Syncfusion.Blazor.Core": "33.1.44",
-          "Syncfusion.Blazor.Inputs": "33.1.44",
-          "Syncfusion.Blazor.Lists": "33.1.44"
-        }
       },
       "Syncfusion.Blazor.Data": {
         "type": "Transitive",
