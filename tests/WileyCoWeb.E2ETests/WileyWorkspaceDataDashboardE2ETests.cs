@@ -15,9 +15,9 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_NavLink_IsVisible_InSidebar()
     {
-        await RunWorkspaceTestAsync(async page =>
+        await RunWorkspaceTestAsync(static async page =>
         {
-            var navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
+            ILocator navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
             await Expect(navLink).ToBeVisibleAsync();
             await Expect(navLink).ToContainTextAsync("Data Dashboard");
         });
@@ -26,9 +26,9 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_NavLink_NavigatesToPanel()
     {
-        await RunWorkspaceTestAsync(async page =>
+        await RunWorkspaceTestAsync(static async page =>
         {
-            var navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
+            ILocator navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
             await navLink.ClickAsync();
 
             await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/wiley-workspace/data-dashboard"));
@@ -39,7 +39,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_DirectUrl_LoadsPanel()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             await Expect(page.Locator("#data-dashboard-panel")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
         });
@@ -48,17 +48,14 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_Breadcrumb_ShowsPanelLabel()
     {
-        await RunDashboardTestAsync(async page =>
-        {
-            var breadcrumb = page.Locator(".wiley-workspace main .border-b");
-            await Expect(breadcrumb).ToContainTextAsync("Data Dashboard");
-        });
+        await RunDashboardTestAsync(static page =>
+            Expect(page.Locator(".wiley-workspace main .border-b")).ToContainTextAsync("Data Dashboard"));
     }
 
     [Fact]
     public async Task DataDashboard_KpiCards_AreVisible()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             await Expect(page.Locator("#kpi-net-position")).ToBeVisibleAsync();
             await Expect(page.Locator("#kpi-coverage-ratio")).ToBeVisibleAsync();
@@ -70,7 +67,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_KpiCards_ContainNumericValues()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             // Net position card shows a dollar amount
             var netPositionText = await page.Locator("#kpi-net-position").InnerTextAsync();
@@ -89,19 +86,15 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_CoverageRatioGauge_IsRendered()
     {
-        await RunDashboardTestAsync(async page =>
-        {
-            await Expect(page.Locator("#coverage-ratio-gauge")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
-        });
+        await RunDashboardTestAsync(static page =>
+            Expect(page.Locator("#coverage-ratio-gauge")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds }));
     }
 
     [Fact]
     public async Task DataDashboard_RateAdequacyGauge_IsRendered()
     {
-        await RunDashboardTestAsync(async page =>
-        {
-            await Expect(page.Locator("#rate-adequacy-gauge")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
-        });
+        await RunDashboardTestAsync(static page =>
+            Expect(page.Locator("#rate-adequacy-gauge")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds }));
     }
 
     // Rate comparison is state-computed (always 2 points: "Current" + "Break-Even").
@@ -109,7 +102,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_RateComparisonChart_AlwaysRenders()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             await Expect(page.Locator("#rate-comparison-section")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
             await Expect(page.Locator("#budget-variance-chart")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
@@ -121,7 +114,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_RateTrendSection_WhenPresent_ContainsChart()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             var sectionCount = await page.Locator("#rate-trend-section").CountAsync();
             if (sectionCount == 0)
@@ -136,7 +129,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_WaterfallSection_WhenPresent_ContainsChart()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             var sectionCount = await page.Locator("#waterfall-section").CountAsync();
             if (sectionCount == 0)
@@ -152,7 +145,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_CustomerDonutsSection_WhenPresent_ContainsBothCharts()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             var sectionCount = await page.Locator("#customer-donuts-section").CountAsync();
             if (sectionCount == 0)
@@ -168,7 +161,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_KpiNetPosition_SubtitleContainsFiscalYear()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             // Subtitle format is "<enterprise> · FY<year>" — proves data-bound render.
             var subtitleText = await page.Locator("#kpi-net-position .e-card-sub-title").InnerTextAsync();
@@ -179,10 +172,10 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_OverviewTile_IsVisibleOnOverviewPage()
     {
-        await RunWorkspaceTestAsync(async page =>
+        await RunWorkspaceTestAsync(static async page =>
         {
             // Overview tile renders on the main overview dashboard
-            var tile = page.Locator("#overview-data-dashboard");
+            ILocator tile = page.Locator("#overview-data-dashboard");
             await Expect(tile).ToBeVisibleAsync();
             await Expect(tile).ToContainTextAsync("Data Dashboard");
         });
@@ -191,9 +184,9 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_OverviewTile_OpenFullView_NavigatesToPanel()
     {
-        await RunWorkspaceTestAsync(async page =>
+        await RunWorkspaceTestAsync(static async page =>
         {
-            var openButton = page.Locator("#overview-data-dashboard a[href='/wiley-workspace/data-dashboard']").First;
+            ILocator openButton = page.Locator("#overview-data-dashboard a[href='/wiley-workspace/data-dashboard']").First;
             await openButton.ClickAsync();
 
             await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/wiley-workspace/data-dashboard"));
@@ -204,7 +197,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     [Fact]
     public async Task DataDashboard_LoadsWithoutUnhandledPageErrors()
     {
-        await RunDashboardTestAsync(async page =>
+        await RunDashboardTestAsync(static async page =>
         {
             // Wait for chart-heavy elements to settle using stable locators — no fragile timing wait.
             await Expect(page.Locator("#coverage-ratio-gauge")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
@@ -237,16 +230,16 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
         var pageErrors = new List<string>();
         var networkEvents = new List<string>();
 
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        using IPlaywright playwright = await Playwright.CreateAsync();
+        await using IBrowser browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = true
         });
 
-        await using var context = await browser.NewContextAsync();
+        await using IBrowserContext context = await browser.NewContextAsync();
         await context.AddInitScriptAsync("window.localStorage.clear(); window.sessionStorage.clear();");
 
-        var page = await context.NewPageAsync();
+        IPage page = await context.NewPageAsync();
         page.Request += (_, request) =>
         {
             if (ShouldCaptureNetworkEvent(request.Url))
@@ -308,14 +301,14 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
         IReadOnlyCollection<string> pageErrors,
         IReadOnlyCollection<string> networkEvents)
     {
-        var safeConsoleMessages = consoleMessages.Count > 0
-            ? consoleMessages.Select(message => $"- {message}")
+        IEnumerable<string> safeConsoleMessages = consoleMessages.Count > 0
+            ? consoleMessages.Select(static message => $"- {message}")
             : ["- <none>"];
-        var safePageErrors = pageErrors.Count > 0
-            ? pageErrors.Select(error => $"- {error}")
+        IEnumerable<string> safePageErrors = pageErrors.Count > 0
+            ? pageErrors.Select(static error => $"- {error}")
             : ["- <none>"];
-        var safeNetworkEvents = networkEvents.Count > 0
-            ? networkEvents.Select(entry => $"- {entry}")
+        IEnumerable<string> safeNetworkEvents = networkEvents.Count > 0
+            ? networkEvents.Select(static entry => $"- {entry}")
             : ["- <none>"];
 
         return string.Join(Environment.NewLine, [
