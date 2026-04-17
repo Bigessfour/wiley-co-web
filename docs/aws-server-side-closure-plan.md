@@ -25,9 +25,9 @@ Validated on April 15, 2026 using the AWS CLI and the current repository:
 - App Runner private egress is provisioned through VPC connector `wiley-widget-api-vpc-connector` and API security group `sg-050b6a6ae154820d5`.
 - Interface VPC endpoints now exist for `com.amazonaws.us-east-2.execute-api` and `com.amazonaws.us-east-2.xray`.
 - App Runner runtime secrets now exist in Secrets Manager:
-	- `wiley-widget/api/database-url`
-	- `wiley-widget/api/xai-api-key`
-	- `wiley-widget/api/syncfusion-license-key`
+  - `wiley-widget/api/database-url`
+  - `wiley-widget/api/xai-api-key`
+  - `wiley-widget/api/syncfusion-license-key`
 - Amplify app `d2ellat1y3ljd9` and branch `main` now carry `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com` without storing the Syncfusion license in Amplify environment variables.
 - The Syncfusion build-time license is now stored in the Amplify Gen 1 environment-secret path `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY`.
 - App Runner `/health` currently returns `200 Healthy`.
