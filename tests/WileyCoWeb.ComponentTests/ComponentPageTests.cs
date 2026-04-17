@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Globalization;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -396,6 +398,22 @@ public sealed class ComponentPageTests
 		Assert.Contains("QuickBooks Import", cut.Markup);
 	}
 
+	[Fact]
+	public void WileyWorkspace_CustomersRoute_RendersLiveCustomerMaintenancePanel()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "customers"));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("Add customer", cut.Markup);
+			Assert.Contains("Directory status:", cut.Markup);
+			Assert.Contains("Account #", cut.Markup);
+		});
+	}
+
 	private static TestContext CreateContext()
 	{
 		var context = new TestContext();
@@ -409,6 +427,7 @@ public sealed class ComponentPageTests
 		var snapshotClient = CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
 		context.Services.AddScoped(_ => snapshotService);
+		context.Services.AddScoped(_ => new UtilityCustomerApiService(snapshotClient));
 		context.Services.AddScoped(_ => new WorkspaceBootstrapService(workspaceState, snapshotService));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
@@ -423,8 +442,92 @@ public sealed class ComponentPageTests
 
 	private static HttpClient CreateSnapshotClient()
 	{
-		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		var utilityCustomers = new List<UtilityCustomerRecord>
 		{
+			CreateUtilityCustomerRecord(1, new UtilityCustomerUpsertRequest(
+				"2001",
+				"Alex",
+				"Morgan",
+				"Wiley Feed & Supply",
+				CustomerType.Commercial,
+				"12 Main St",
+				"Wiley",
+				"CO",
+				"81092",
+				ServiceLocation.InsideCityLimits,
+				CustomerStatus.Active,
+				125.50m,
+				new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc),
+				"555-0100",
+				"alex@example.com",
+				"M-2001",
+				"Initial onboarding")),
+			CreateUtilityCustomerRecord(2, new UtilityCustomerUpsertRequest(
+				"1002",
+				"Dana",
+				"Reed",
+				null,
+				CustomerType.Residential,
+				"44 Cedar Ave",
+				"Wiley",
+				"CO",
+				"81092",
+				ServiceLocation.OutsideCityLimits,
+				CustomerStatus.Inactive,
+				0m,
+				new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+				"555-0102",
+				"dana@example.com",
+				"M-1002",
+				"Seasonal account"))
+		};
+
+		return new HttpClient(new RoutedHttpMessageHandler(async request =>
+		{
+			var requestPath = request.RequestUri?.AbsolutePath ?? string.Empty;
+
+			if (request.Method == HttpMethod.Get && requestPath.EndsWith("/api/utility-customers", StringComparison.OrdinalIgnoreCase))
+			{
+				return CreateJsonResponse(HttpStatusCode.OK, utilityCustomers);
+			}
+
+			if (request.Method == HttpMethod.Post && requestPath.EndsWith("/api/utility-customers", StringComparison.OrdinalIgnoreCase))
+			{
+				var createRequest = await request.Content!.ReadFromJsonAsync<UtilityCustomerUpsertRequest>(JsonOptions);
+				var nextId = utilityCustomers.Count == 0 ? 1 : utilityCustomers.Max(item => item.Id) + 1;
+				var created = CreateUtilityCustomerRecord(nextId, createRequest!);
+				utilityCustomers.Add(created);
+				return CreateJsonResponse(HttpStatusCode.Created, created);
+			}
+
+			if (request.Method == HttpMethod.Put && requestPath.Contains("/api/utility-customers/", StringComparison.OrdinalIgnoreCase))
+			{
+				var updateRequest = await request.Content!.ReadFromJsonAsync<UtilityCustomerUpsertRequest>(JsonOptions);
+				var customerId = ParseCustomerId(requestPath);
+				var customerIndex = utilityCustomers.FindIndex(item => item.Id == customerId);
+				if (customerIndex < 0)
+				{
+					return new HttpResponseMessage(HttpStatusCode.NotFound);
+				}
+
+				var updated = CreateUtilityCustomerRecord(customerId, updateRequest!);
+				utilityCustomers[customerIndex] = updated;
+				return CreateJsonResponse(HttpStatusCode.OK, updated);
+			}
+
+			if (request.Method == HttpMethod.Delete && requestPath.Contains("/api/utility-customers/", StringComparison.OrdinalIgnoreCase))
+			{
+				var customerId = ParseCustomerId(requestPath);
+				var customer = utilityCustomers.FirstOrDefault(item => item.Id == customerId);
+				if (customer is null)
+				{
+					return new HttpResponseMessage(HttpStatusCode.NotFound);
+				}
+
+				utilityCustomers.Remove(customer);
+				return new HttpResponseMessage(HttpStatusCode.NoContent);
+			}
+
 			if (request.Method == HttpMethod.Put && request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/baseline", StringComparison.OrdinalIgnoreCase) == true)
 			{
 				var baselineResponse = new WorkspaceBaselineUpdateResponse(
@@ -439,15 +542,15 @@ public sealed class ComponentPageTests
 						WorkspaceTestData.ApiProjectedVolume,
 						"2026-04-05T12:00:00Z"));
 
-				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				return new HttpResponseMessage(HttpStatusCode.OK)
 				{
 					Content = new StringContent(JsonSerializer.Serialize(baselineResponse, JsonOptions), Encoding.UTF8, "application/json")
-				});
+				};
 			}
 
 			if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) == true)
 			{
-				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				return new HttpResponseMessage(HttpStatusCode.OK)
 				{
 					Content = new StringContent(JsonSerializer.Serialize(new WorkspaceBootstrapData(
 						WorkspaceTestData.WaterUtility,
@@ -459,26 +562,92 @@ public sealed class ComponentPageTests
 						"2026-04-05T12:00:00Z")
 					{
 						ScenarioItems = [new WorkspaceScenarioItemData(Guid.NewGuid(), "Operations reserve", 1500m)],
-						CustomerRows = [new CustomerRow("Dana", "Water", "Yes")],
+						CustomerRows = [.. utilityCustomers.Select(customer => new CustomerRow(customer.DisplayName, customer.CustomerType, customer.ServiceLocation == "Inside City Limits" ? "Yes" : "No"))],
 						ProjectionRows = [new ProjectionRow("FY25", 29.10m), new ProjectionRow("FY26", WorkspaceTestData.ApiCurrentRate)]
 					}, JsonOptions), Encoding.UTF8, "application/json")
-				});
+				};
 			}
 
 			if (request.Method != HttpMethod.Post || request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) != true)
 			{
-				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+				return new HttpResponseMessage(HttpStatusCode.NotFound);
 			}
 
-			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+			return new HttpResponseMessage(HttpStatusCode.OK)
 			{
 				Content = new StringContent(JsonSerializer.Serialize(new WorkspaceSnapshotSaveResponse(42, "Saved workspace snapshot", "2026-04-05T12:00:00Z")), Encoding.UTF8, "application/json")
-			});
+			};
 		}))
 		{
 			BaseAddress = new Uri("https://example.test/")
 		};
 	}
+
+	private static HttpResponseMessage CreateJsonResponse<T>(HttpStatusCode statusCode, T payload)
+	{
+		return new HttpResponseMessage(statusCode)
+		{
+			Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json")
+		};
+	}
+
+	private static int ParseCustomerId(string requestPath)
+	{
+		return int.Parse(requestPath[(requestPath.LastIndexOf('/') + 1)..], CultureInfo.InvariantCulture);
+	}
+
+	private static UtilityCustomerRecord CreateUtilityCustomerRecord(int id, UtilityCustomerUpsertRequest request)
+	{
+		var displayName = string.IsNullOrWhiteSpace(request.CompanyName)
+			? $"{request.FirstName} {request.LastName}".Trim()
+			: request.CompanyName.Trim();
+
+		return new UtilityCustomerRecord(
+			id,
+			request.AccountNumber,
+			request.FirstName,
+			request.LastName,
+			request.CompanyName,
+			displayName,
+			DescribeCustomerType(request.CustomerType),
+			request.ServiceAddress,
+			request.ServiceCity,
+			request.ServiceState,
+			request.ServiceZipCode,
+			DescribeServiceLocation(request.ServiceLocation),
+			DescribeCustomerStatus(request.Status),
+			request.CurrentBalance,
+			(request.AccountOpenDate ?? new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToString("O", CultureInfo.InvariantCulture),
+			request.PhoneNumber,
+			request.EmailAddress,
+			request.MeterNumber,
+			request.Notes);
+	}
+
+	private static string DescribeCustomerType(CustomerType customerType) => customerType switch
+	{
+		CustomerType.Commercial => "Commercial",
+		CustomerType.Industrial => "Industrial",
+		CustomerType.Agricultural => "Agricultural",
+		CustomerType.Institutional => "Institutional",
+		CustomerType.Government => "Government",
+		CustomerType.MultiFamily => "Multi-Family",
+		_ => "Residential"
+	};
+
+	private static string DescribeServiceLocation(ServiceLocation serviceLocation) => serviceLocation switch
+	{
+		ServiceLocation.OutsideCityLimits => "Outside City Limits",
+		_ => "Inside City Limits"
+	};
+
+	private static string DescribeCustomerStatus(CustomerStatus customerStatus) => customerStatus switch
+	{
+		CustomerStatus.Inactive => "Inactive",
+		CustomerStatus.Suspended => "Suspended",
+		CustomerStatus.Closed => "Closed",
+		_ => "Active"
+	};
 
 	private static HttpClient CreateKnowledgeClient()
 	{

@@ -1,9 +1,11 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using ContractCustomerStatus = WileyCoWeb.Contracts.CustomerStatus;
+using ContractCustomerType = WileyCoWeb.Contracts.CustomerType;
+using ContractServiceLocation = WileyCoWeb.Contracts.ServiceLocation;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.IntegrationTests.Infrastructure;
-using WileyWidget.Models;
 
 namespace WileyCoWeb.IntegrationTests;
 
@@ -185,13 +187,13 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
             "Alex",
             "Morgan",
             "Wiley Feed & Supply",
-            CustomerType.Commercial,
+            ContractCustomerType.Commercial,
             "12 Main St",
             "Wiley",
             "CO",
             "81092",
-            ServiceLocation.InsideCityLimits,
-            CustomerStatus.Active,
+            ContractServiceLocation.InsideCityLimits,
+            ContractCustomerStatus.Active,
             125.50m,
             new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc),
             "555-0100",
@@ -219,7 +221,7 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         var updateRequest = createRequest with
         {
             CurrentBalance = 0m,
-            Status = CustomerStatus.Inactive,
+            Status = ContractCustomerStatus.Inactive,
             Notes = "Balance cleared"
         };
 

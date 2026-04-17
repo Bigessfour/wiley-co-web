@@ -87,8 +87,7 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var customerNav = page.GetByText("Customer Viewer", new() { Exact = true });
-            await customerNav.ClickAsync();
+            await OpenPanelAsync(page, "customers");
 
             // Grid must be visible with at least one customer row.
             var customerGrid = page.Locator("#customer-viewer-panel, [data-testid='customer-grid'], .customer-grid").First;
@@ -101,12 +100,97 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var customerNav = page.GetByText("Customer Viewer", new() { Exact = true });
-            await customerNav.ClickAsync();
+            await OpenPanelAsync(page, "customers");
 
             // The service filter dropdown must be present.
             var serviceFilter = page.Locator("#customer-service-filter, [data-testid='service-filter']").First;
             await Expect(serviceFilter).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+        });
+    }
+
+    [Fact]
+    public async Task Workspace_CustomerViewerPanel_CanCreateEditAndDeleteCustomer()
+    {
+        await RunWorkspaceTestAsync(async page =>
+        {
+            await OpenPanelAsync(page, "customers");
+
+            var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+            var accountNumber = $"E2E{suffix}";
+            var firstName = $"Proof{suffix[..4]}";
+            var createdLastName = "Customer";
+            var updatedLastName = "Updated";
+            var createdDisplayName = $"{firstName} {createdLastName}";
+            var updatedDisplayName = $"{firstName} {updatedLastName}";
+            var directoryStatus = page.Locator("#customer-directory-status");
+
+            await Expect(page.Locator("#customer-viewer-panel")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+
+            await page.Locator("#add-customer-button").ClickAsync();
+            await Expect(page.GetByText("Add Utility Customer", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-account-number"), accountNumber);
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-first-name"), firstName);
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-last-name"), createdLastName);
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-service-address"), "123 E2E Ave");
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-service-city"), "Wiley");
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-service-state"), "CO");
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-service-zip-code"), "81092");
+
+            var createResponseTask = page.WaitForResponseAsync(response =>
+                response.Url.Contains("/api/utility-customers", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(response.Request.Method, "POST", StringComparison.OrdinalIgnoreCase));
+
+            await page.Locator("#customer-editor-save-button").ClickAsync();
+
+            var createResponse = await createResponseTask;
+            Assert.Equal(201, createResponse.Status);
+            Assert.True(createResponse.Ok);
+
+            await Expect(directoryStatus).ToContainTextAsync(accountNumber, new() { Timeout = ActionTimeoutMs });
+            await Expect(directoryStatus).ToContainTextAsync("created", new() { Timeout = ActionTimeoutMs });
+
+            var createdRow = FindCustomerGridRow(page, accountNumber);
+            await Expect(createdRow).ToHaveCountAsync(1, new() { Timeout = ActionTimeoutMs });
+            await Expect(createdRow.First).ToContainTextAsync(createdDisplayName, new() { Timeout = ActionTimeoutMs });
+
+            await createdRow.First.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+            await Expect(page.GetByText("Edit Utility Customer", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+
+            await ReplaceSyncfusionTextAsync(page.Locator("#customer-editor-last-name"), updatedLastName);
+
+            var updateResponseTask = page.WaitForResponseAsync(response =>
+                response.Url.Contains($"/api/utility-customers/", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(response.Request.Method, "PUT", StringComparison.OrdinalIgnoreCase));
+
+            await page.Locator("#customer-editor-save-button").ClickAsync();
+
+            var updateResponse = await updateResponseTask;
+            Assert.Equal(200, updateResponse.Status);
+            Assert.True(updateResponse.Ok);
+
+            await Expect(directoryStatus).ToContainTextAsync(accountNumber, new() { Timeout = ActionTimeoutMs });
+            await Expect(directoryStatus).ToContainTextAsync("updated", new() { Timeout = ActionTimeoutMs });
+
+            var updatedRow = FindCustomerGridRow(page, accountNumber);
+            await Expect(updatedRow).ToHaveCountAsync(1, new() { Timeout = ActionTimeoutMs });
+            await Expect(updatedRow.First).ToContainTextAsync(updatedDisplayName, new() { Timeout = ActionTimeoutMs });
+
+            await updatedRow.First.GetByRole(AriaRole.Button, new() { Name = "Delete" }).ClickAsync();
+            await Expect(page.GetByText("Delete Customer", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+
+            var deleteResponseTask = page.WaitForResponseAsync(response =>
+                response.Url.Contains("/api/utility-customers/", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(response.Request.Method, "DELETE", StringComparison.OrdinalIgnoreCase));
+
+            await page.Locator("#customer-delete-confirm-button").ClickAsync();
+
+            var deleteResponse = await deleteResponseTask;
+            Assert.Equal(204, deleteResponse.Status);
+            Assert.True(deleteResponse.Ok);
+
+            await Expect(directoryStatus).ToContainTextAsync($"Deleted {updatedDisplayName}", new() { Timeout = ActionTimeoutMs });
+            await Expect(FindCustomerGridRow(page, accountNumber)).ToHaveCountAsync(0, new() { Timeout = ActionTimeoutMs });
         });
     }
 
@@ -315,6 +399,21 @@ public sealed class WileyWorkspacePanelE2ETests
     private static async Task OpenPanelAsync(IPage page, string panelKey)
     {
         await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
+    }
+
+    private static ILocator FindCustomerGridRow(IPage page, string text)
+    {
+        return page.Locator("#customer-viewer-panel tr.e-row").Filter(new() { HasText = text });
+    }
+
+    private static async Task ReplaceSyncfusionTextAsync(ILocator input, string value)
+    {
+        await input.ClickAsync();
+        await input.FillAsync(value);
+
+        var currentValue = await input.InputValueAsync();
+        Assert.Equal(value, currentValue);
+        await input.PressAsync("Tab");
     }
 
     private static async Task UploadQuickBooksFileAsync(IPage page, string filePath)
