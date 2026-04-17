@@ -155,22 +155,10 @@ public sealed class WileyWorkspacePanelE2ETests
                 // 1. Navigate to and use the QuickBooks import panel.
                 await OpenPanelAsync(page, "quickbooks-import");
 
-                var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });
-                var fileChooser = await page.RunAndWaitForFileChooserAsync(() => browseButton.ClickAsync());
-                await fileChooser.SetFilesAsync(tempFile);
+                await UploadQuickBooksFileAsync(page, tempFile);
 
                 await page.GetByRole(AriaRole.Button, new() { Name = "Analyze file" }).ClickAsync();
-
-                try
-                {
-                    await Expect(page.Locator("#quickbooks-import-status-message"))
-                        .ToContainTextAsync("Preview ready", new() { Timeout = ActionTimeoutMs });
-                }
-                catch (PlaywrightException)
-                {
-                    await Expect(page.Locator("#quickbooks-import-status-message"))
-                        .ToContainTextAsync("Duplicate detected", new() { Timeout = ActionTimeoutMs });
-                }
+                await QuickBooksImportE2EHelpers.WaitForPreviewReadyOrDuplicateAsync(page, ActionTimeoutMs);
 
                 // 2. Navigate to Break-Even panel and verify it is still functional.
                 await OpenPanelAsync(page, "break-even");
@@ -327,5 +315,10 @@ public sealed class WileyWorkspacePanelE2ETests
     private static async Task OpenPanelAsync(IPage page, string panelKey)
     {
         await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
+    }
+
+    private static async Task UploadQuickBooksFileAsync(IPage page, string filePath)
+    {
+        await QuickBooksImportE2EHelpers.UploadQuickBooksFileAsync(page, filePath, ActionTimeoutMs);
     }
 }

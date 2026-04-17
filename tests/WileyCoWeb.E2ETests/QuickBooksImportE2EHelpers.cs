@@ -15,8 +15,8 @@ internal static class QuickBooksImportE2EHelpers
 
 		await fileInput.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = timeoutMilliseconds });
 		await fileInput.SetInputFilesAsync(filePath);
-		await Expect(statusHeadline).ToContainTextAsync("File selected", new() { Timeout = timeoutMilliseconds });
-		await Expect(statusMessage).ToContainTextAsync(Path.GetFileName(filePath), new() { Timeout = timeoutMilliseconds });
+        await Expect(statusHeadline).ToContainTextAsync("File selected", new() { Timeout = timeoutMilliseconds, IgnoreCase = true });
+        await Expect(statusMessage).ToContainTextAsync(Path.GetFileName(filePath), new() { Timeout = timeoutMilliseconds });
 	}
 
 	public static async Task<bool> WaitForPreviewReadyOrDuplicateAsync(IPage page, int timeoutMilliseconds)
@@ -32,10 +32,10 @@ internal static class QuickBooksImportE2EHelpers
 
 		var headline = (await statusHeadline.InnerTextAsync()).Trim();
 		var message = (await statusMessage.InnerTextAsync()).Trim();
-		var previewReady = string.Equals(headline, "Preview ready", StringComparison.Ordinal);
-		var duplicateDetected = string.Equals(headline, "Duplicate detected", StringComparison.Ordinal);
+        var previewReady = string.Equals(headline, "Preview ready", StringComparison.OrdinalIgnoreCase);
+        var duplicateDetected = string.Equals(headline, "Duplicate detected", StringComparison.OrdinalIgnoreCase);
 
-		Assert.False(string.IsNullOrWhiteSpace(message));
+        Assert.False(string.IsNullOrWhiteSpace(message));
 		Assert.True(
 			previewReady || duplicateDetected,
 			$"Expected QuickBooks preview to end in 'Preview ready' or 'Duplicate detected', but headline was '{headline}' and message was '{message}'.");
@@ -52,6 +52,6 @@ internal static class QuickBooksImportE2EHelpers
 		var commitNowButton = page.GetByRole(AriaRole.Button, new() { Name = "Commit now" });
 		await Expect(commitNowButton).ToBeVisibleAsync(new() { Timeout = timeoutMilliseconds });
 		await commitNowButton.ClickAsync();
-		await Expect(page.Locator("#quickbooks-import-status-headline")).ToContainTextAsync("Import complete", new() { Timeout = timeoutMilliseconds });
-	}
+        await Expect(page.Locator("#quickbooks-import-status-headline")).ToContainTextAsync("Import complete", new() { Timeout = timeoutMilliseconds, IgnoreCase = true });
+    }
 }

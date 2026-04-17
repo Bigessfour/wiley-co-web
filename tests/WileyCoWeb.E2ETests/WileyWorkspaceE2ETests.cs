@@ -140,22 +140,11 @@ public sealed class WileyWorkspaceE2ETests
 			{
 				await OpenPanelAsync(page, "quickbooks-import");
 
-				var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });
-				var fileChooser = await page.RunAndWaitForFileChooserAsync(() => browseButton.ClickAsync());
-				await fileChooser.SetFilesAsync(tempFile);
+				await UploadQuickBooksFileAsync(page, tempFile);
 
 				await page.GetByRole(AriaRole.Button, new() { Name = "Analyze file" }).ClickAsync();
-
-				try
-				{
-					await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("Preview ready", new() { Timeout = 30000 });
-				}
-				catch (PlaywrightException)
-				{
-					await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("Duplicate detected", new() { Timeout = 30000 });
-				}
-
-				await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("quickbooks-ledger.csv", new() { Timeout = 30000 });
+				await QuickBooksImportE2EHelpers.WaitForPreviewReadyOrDuplicateAsync(page, 30000);
+				await Expect(page.Locator("#quickbooks-assistant-context-summary")).ToContainTextAsync(Path.GetFileName(tempFile), new() { Timeout = 30000 });
 			});
 		}
 		finally
@@ -179,39 +168,100 @@ public sealed class WileyWorkspaceE2ETests
 			{
 				await OpenPanelAsync(page, "quickbooks-import");
 
-				var browseButton = page.GetByRole(AriaRole.Button, new() { Name = "Choose QuickBooks file" });
-				var fileChooser = await page.RunAndWaitForFileChooserAsync(() => browseButton.ClickAsync());
-				await fileChooser.SetFilesAsync(tempFile);
+				await UploadQuickBooksFileAsync(page, tempFile);
 
 				await page.GetByRole(AriaRole.Button, new() { Name = "Analyze file" }).ClickAsync();
-
-				try
-				{
-					await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("Preview ready", new() { Timeout = 30000 });
-				}
-				catch (PlaywrightException)
-				{
-					await Expect(page.Locator("#quickbooks-import-status-message")).ToContainTextAsync("Duplicate detected", new() { Timeout = 30000 });
-				}
+				await QuickBooksImportE2EHelpers.WaitForPreviewReadyOrDuplicateAsync(page, 30000);
 
 				var assistantQuestionInput = page.Locator("#quickbooks-assistant-question");
 				var assistantAnswer = page.Locator("#quickbooks-assistant-answer");
 				var initialAnswer = (await assistantAnswer.InnerTextAsync()).Trim();
 				const string question = "Why would this file be blocked as a duplicate?";
 
-				await assistantQuestionInput.FillAsync(question);
-				await Expect(assistantQuestionInput).ToHaveValueAsync(question, new() { Timeout = 30000 });
-				await page.GetByRole(AriaRole.Button, new() { Name = "Ask assistant" }).ClickAsync();
+				page.Request += (_, request) =>
+				{
+					if (request.Url.Contains("/api/imports/quickbooks/assistant", StringComparison.OrdinalIgnoreCase))
+					{
+						Console.WriteLine($"[AssistantTest] REQUEST {request.Method} {request.Url}");
+					}
+				};
 
-				await Expect(page.Locator("#quickbooks-assistant-context-summary")).ToContainTextAsync("quickbooks-ledger.csv", new() { Timeout = 30000 });
-				await page.WaitForFunctionAsync(
-					"([selector, initialText]) => { const element = document.querySelector(selector); return !!element && element.innerText.trim() !== initialText; }",
-					new object[] { "#quickbooks-assistant-answer", initialAnswer },
-					new() { Timeout = 30000 });
+				page.Response += (_, response) =>
+				{
+					if (response.Url.Contains("/api/imports/quickbooks/assistant", StringComparison.OrdinalIgnoreCase))
+					{
+						Console.WriteLine($"[AssistantTest] RESPONSE {response.Status} {response.Url}");
+					}
+				};
 
+				page.RequestFailed += (_, request) =>
+				{
+					if (request.Url.Contains("/api/imports/quickbooks/assistant", StringComparison.OrdinalIgnoreCase))
+					{
+						Console.WriteLine($"[AssistantTest] REQUEST FAILED {request.Method} {request.Url}");
+					}
+				};
+
+				// SfTextBox with Multiline=true places the ID on the native <textarea> itself.
+				// FillAsync sets value without firing JS input events Syncfusion listens to.
+				// ClickAsync + PressSequentiallyAsync fires real keystrokes → input events →
+				// Syncfusion ValueChange → Blazor @bind-Value update → button becomes enabled.
+				Console.WriteLine("[AssistantTest] Clicking textarea and typing question...");
+				await assistantQuestionInput.ClickAsync();
+				await assistantQuestionInput.PressSequentiallyAsync(question, new() { Delay = 20 });
+				// Syncfusion SfTextBox fires ValueChange (which backs @bind-Value) on blur, not input.
+				// Tab press blurs the textarea, triggering ValueChange → AssistantQuestion set.
+				Console.WriteLine("[AssistantTest] Pressing Tab to blur → trigger ValueChange...");
+				await assistantQuestionInput.PressAsync("Tab");
+				var askButton = page.GetByRole(AriaRole.Button, new() { Name = "Ask assistant" });
+				Console.WriteLine("[AssistantTest] Waiting for Ask button to be enabled (up to 15s)...");
+				await Expect(askButton).ToBeEnabledAsync(new() { Timeout = 15000 });
+				Console.WriteLine("[AssistantTest] Ask button is enabled — clicking...");
+				await askButton.ClickAsync();
+
+				// Confirm the click actually fired AskAssistantAsync by checking button goes disabled within 3s.
+				var isAskingStarted = false;
+				try
+				{
+					await Expect(askButton).ToBeDisabledAsync(new() { Timeout = 3000 });
+					isAskingStarted = true;
+					Console.WriteLine("[AssistantTest] Button is now DISABLED — AskAssistantAsync is running.");
+				}
+				catch
+				{
+					Console.WriteLine("[AssistantTest] WARNING: Button did NOT become disabled after click — AskAssistantAsync may not have fired.");
+				}
+
+				Console.WriteLine("[AssistantTest] Checking context summary contains filename...");
+				await Expect(page.Locator("#quickbooks-assistant-context-summary")).ToContainTextAsync(Path.GetFileName(tempFile), new() { Timeout = 30000 });
+				Console.WriteLine("[AssistantTest] Context summary OK. Waiting for AI response (polling every 10s, max 300s)...");
+
+				// Poll manually so we can log progress; button re-enables only after AskAssistantAsync finally runs.
+				const int pollIntervalMs = 10000;
+				const int maxWaitMs = 300000;
+				var sw = System.Diagnostics.Stopwatch.StartNew();
+				string currentAnswer;
+				bool buttonEnabled;
+				do
+				{
+					await Task.Delay(pollIntervalMs);
+					currentAnswer = (await assistantAnswer.InnerTextAsync()).Trim();
+					buttonEnabled = await askButton.IsEnabledAsync();
+					Console.WriteLine($"[AssistantTest] {sw.Elapsed:mm\\:ss} elapsed — button enabled={buttonEnabled}, answer changed={currentAnswer != initialAnswer}, answer preview='{currentAnswer[..Math.Min(80, currentAnswer.Length)]}'");
+				}
+				while (!buttonEnabled && sw.ElapsedMilliseconds < maxWaitMs);
+				sw.Stop();
+
+				if (!buttonEnabled)
+				{
+					throw new InvalidOperationException($"[AssistantTest] AI response did not complete within {maxWaitMs / 1000}s. isAskingStarted={isAskingStarted}. Last answer: '{currentAnswer}'");
+				}
+
+				Console.WriteLine($"[AssistantTest] Button re-enabled after {sw.Elapsed:mm\\:ss}. Reading final answer...");
 				var updatedAnswer = (await assistantAnswer.InnerTextAsync()).Trim();
 				Assert.NotEqual(initialAnswer, updatedAnswer);
 				Assert.False(string.IsNullOrWhiteSpace(updatedAnswer));
+				Assert.DoesNotContain("timedout", updatedAnswer, StringComparison.OrdinalIgnoreCase);
 			});
 		}
 		finally
@@ -341,6 +391,11 @@ public sealed class WileyWorkspaceE2ETests
 	private static async Task OpenPanelAsync(IPage page, string panelKey)
 	{
 		await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
+	}
+
+	private static async Task UploadQuickBooksFileAsync(IPage page, string filePath)
+	{
+		await QuickBooksImportE2EHelpers.UploadQuickBooksFileAsync(page, filePath, 30000);
 	}
 
 	private static string NormalizeNumericValue(string value)

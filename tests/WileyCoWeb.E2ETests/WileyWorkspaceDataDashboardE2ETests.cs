@@ -17,7 +17,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var navLink = page.Locator("a[href='/wiley-workspace/data-dashboard']");
+            var navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
             await Expect(navLink).ToBeVisibleAsync();
             await Expect(navLink).ToContainTextAsync("Data Dashboard");
         });
@@ -28,7 +28,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var navLink = page.Locator("a[href='/wiley-workspace/data-dashboard']");
+            var navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
             await navLink.ClickAsync();
 
             await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/wiley-workspace/data-dashboard"));

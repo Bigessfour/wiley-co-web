@@ -73,7 +73,11 @@ builder.Logging.AddFilter("WileyWidget.Business", LogLevel.Debug);
 
 builder.Services.AddScoped(sp =>
 {
-    return new HttpClient { BaseAddress = resolvedApiBaseAddress };
+    return new HttpClient
+    {
+        BaseAddress = resolvedApiBaseAddress,
+        Timeout = TimeSpan.FromMinutes(4)
+    };
 });
 builder.Services.AddSingleton<WorkspaceState>();
 builder.Services.AddScoped<WorkspaceBootstrapService>();
