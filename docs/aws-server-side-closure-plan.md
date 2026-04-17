@@ -35,11 +35,11 @@ Validated on April 15, 2026 using the AWS CLI and the current repository:
 - App Runner `/api/workspace/knowledge` currently returns `200` against the current snapshot payload.
 - App Runner `/api/ai/chat` currently returns `200` with a fallback onboarding response.
 - App Runner `/api/workspace/reference-data/import` currently returns `400` with `Import data folder '/app/Import Data' was not found.`, which confirms the route is deployed and that production does not currently bundle the repo-local bootstrap folder.
-- Aurora PostgreSQL remains unencrypted at rest (`StorageEncrypted=false`) and requires a planned migration.
+- Aurora PostgreSQL now runs from encrypted cluster `wiley-co-aurora-db-encrypted` (`StorageEncrypted=true`); the original unencrypted cluster `wiley-co-aurora-db` is retained temporarily for rollback.
 - Amplify release job `32` failed because the build used a floating `.NET 9` SDK while the cloned repo required the exact `global.json` version.
 - The workspace now contains the corrected [amplify.yml](../amplify.yml) that installs the pinned SDK version, but release job `33` confirmed that Amplify is still building from the tracked GitHub branch copy of `amplify.yml`. The branch used for production releases must carry the same file change before the public release can succeed.
 
-Production conclusion: the browser shell is deployed, the thin API runtime infrastructure exists, and the current App Runner revision is serving the main workspace routes. The remaining blockers are final Amplify cutover verification, a durable production reference-data source policy, Aurora encryption migration, and the longer-term API hosting roadmap.
+Production conclusion: the browser shell is deployed, the thin API runtime infrastructure exists, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. The remaining blockers are final Amplify cutover verification, a durable production reference-data source policy, and the longer-term API hosting roadmap. The only Aurora follow-up is retirement of the rollback cluster after the observation window.
 
 ## Provisioned Execution Checklist
 
@@ -142,6 +142,8 @@ Make the thin API operable before the Council session.
 - Keep `/health` exposed and monitored.
 - Send structured application logs to CloudWatch.
 - Keep AWS X-Ray enabled if traces are part of the support workflow.
+- As of 2026-04-16, startup wiring and IAM permissions for X-Ray are present, but the live App Runner service still reports `ObservabilityConfiguration=null` and a same-window `aws xray get-service-graph` check in `us-east-2` returned no Wiley API service nodes even after fresh `/health` traffic. AWS App Runner tracing is disabled by default unless observability configuration enables it, so treat trace emission as not yet proven and likely disabled at the service layer.
+- Capture a post-release observability follow-up to either restore verified live X-Ray emission or migrate the service instrumentation to OpenTelemetry before expanding the production support posture.
 - Add alarms for `5xx` rate, latency, and unhealthy instance count.
 - Retain a deployment log or release note for each pre-meeting push.
 
@@ -165,12 +167,18 @@ Current state:
 
 - App Runner is serving `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, and `/api/workspace/reference-data/import` as expected.
 - The Syncfusion license has been moved out of Amplify environment variables and into the Amplify Gen 1 secret path.
-- The remaining unresolved cutover item is a successful Amplify release from the tracked GitHub branch using the corrected pinned-SDK build spec.
+- Amplify app `d2ellat1y3ljd9` is Git-connected to `https://github.com/Bigessfour/wiley-co-web`, and production job `40` successfully deployed commit `017c3e5013a446ecb5de087c240777b051d29120` from `main`.
+- The hosted browser client is now on the updated release: the public `/_framework/blazor.boot.json` hash is `sha256-RwMqxCQdkIaKM6AosQxBz5hOOkNbTtXFw9HcRvD7UF8=` with `WileyCoWeb.u6y6jaqdar.wasm`.
+- A post-deploy 2026-04-16 hosted Playwright run against `https://main.d2ellat1y3ljd9.amplifyapp.com/wiley-workspace` no longer failed on missing UI, but it did expose the deployed QuickBooks uploader path as the remaining browser blocker.
+- The current working tree now replaces that QuickBooks file-selection path with a Blazor `InputFile` plus an explicit Analyze action, and local QuickBooks component tests pass on the refactored panel.
+- The remaining unresolved cutover item is therefore a new public release of the latest QuickBooks client fix, not a question about whether Amplify can publish from Git.
 
 Closure action:
 
-- Publish the tracked GitHub branch with the corrected [amplify.yml](../amplify.yml) and rerun the Amplify production release.
 - Re-run validation from the public site against `/api/workspace/snapshot`, `/api/workspace/knowledge`, and the workspace shell.
+- Publish the latest QuickBooks client change through the Git-connected Amplify branch so the public site actually contains the `InputFile`-based uploader refactor.
+- After that release, re-run the hosted QuickBooks assistant browser flow against `https://main.d2ellat1y3ljd9.amplifyapp.com/wiley-workspace`.
+- If the post-release hosted run still fails, treat the remaining issue as production-only rather than deployment drift.
 
 ### Gap 2. Production Reference Data Must Stay External To The App Runner Image
 
@@ -187,19 +195,18 @@ Closure action:
 - Treat `Import Data/` as a developer or admin bootstrap set only.
 - If production needs repeatable reference-data bootstrap, provide it through an explicit path or managed source such as S3 plus an admin-only import job, rather than baking files into the App Runner image.
 
-### Gap 3. Aurora Encryption Migration Is Still Pending
+### Gap 3. Aurora Encryption Cutover Is Complete
 
 Current state:
 
-- The current Aurora cluster is serving live data, but storage encryption is still disabled.
-- That is acceptable for short-term validation only; it is not the desired production end state.
+- App Runner runtime secret `wiley-widget/api/database-url` now points at encrypted cluster `wiley-co-aurora-db-encrypted`.
+- Snapshot `wiley-co-aurora-db-preenc-20260416-2340` was restored into encrypted Aurora PostgreSQL cluster `wiley-co-aurora-db-encrypted` in the same private subnet and security-group posture, with `StorageEncrypted=true` and `HttpEndpointEnabled=true`.
+- Post-cutover validation on 2026-04-16: App Runner deployment `106a3bc87c7747da933511eb22e29eba` succeeded, `/health` returned `200 Healthy`, `/api/workspace/snapshot` returned populated enterprise options and projections, and live session checks showed traffic on the encrypted cluster while the original cluster remained idle.
 
 Closure action:
 
-- Create an encrypted snapshot or logical export of the current cluster.
-- Restore to a new encrypted Aurora PostgreSQL cluster in the same VPC and security-group model.
-- Apply the current schema and validate snapshot, knowledge, import preview, and import commit flows against the encrypted target.
-- Update App Runner runtime secrets to the new encrypted writer endpoint, cut traffic during a controlled maintenance window, and retain the old cluster for rollback until acceptance is complete.
+- Keep `wiley-co-aurora-db` available as a rollback target during the short post-cutover observation window.
+- After acceptance, capture the final rollback snapshot and decommission the unencrypted cluster plus any rollback-only artifacts.
 
 ## Operational Decisions Made On April 15, 2026
 
@@ -210,14 +217,30 @@ Closure action:
 - Use the QuickBooks Import panel and API commit flow for recurring monthly analysis files.
 - If production requires centralized bootstrap data, move the curated seed files to an explicit managed source such as S3 and invoke the reference-data import with an explicit path or background job.
 
-### Aurora Encryption Migration Plan
+### Aurora Encryption Cutover Record
 
-1. Freeze non-essential schema changes and capture a fresh restore point from `wiley-co-aurora-db`.
-2. Create a new encrypted Aurora PostgreSQL target in `us-east-2` using the same private-subnet and security-group posture.
-3. Load the current schema and copy data using snapshot restore or a controlled logical migration path, depending on what Aurora permits for the existing unencrypted cluster.
-4. Validate the thin API against the encrypted target: `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, QuickBooks preview, QuickBooks commit, and admin reference-data import with an explicit path.
-5. Rotate the App Runner `DATABASE_URL` secret to the new cluster during a maintenance window and monitor health, latency, and error rate.
-6. Keep the old cluster available for rollback until the encrypted cluster has passed operational acceptance.
+1. Captured manual snapshot `wiley-co-aurora-db-preenc-20260416-2340` from source cluster `wiley-co-aurora-db`.
+2. Restored encrypted target `wiley-co-aurora-db-encrypted` in `us-east-2` with the same private subnet group `wiley-co-aurora-subnets`, security group `sg-0cacdba1850b420f7`, and Aurora PostgreSQL `14.17` engine version.
+3. Created writer instance `wiley-co-aurora-db-encrypted-1` and enabled the Aurora Data API with `aws rds enable-http-endpoint`.
+4. Validated parity on key tables (`Enterprises`, `BudgetEntries`, `MunicipalAccounts`, `UtilityCustomers`, `budget_snapshots`, `budget_snapshot_artifacts`, `ledger_entries`) before cutover.
+5. Rotated App Runner secret `wiley-widget/api/database-url` to the encrypted writer endpoint and started deployment `106a3bc87c7747da933511eb22e29eba`, which completed successfully.
+6. Verified post-cutover runtime behavior with `200 Healthy` on `/health`, populated data from `/api/workspace/snapshot`, and active-session checks showing live traffic on the encrypted cluster while the original cluster stayed idle.
+
+### Observability Follow-Up
+
+- Keep the current X-Ray startup configuration in place for the present App Runner deployment.
+- Treat live trace emission as an unresolved operational verification item until a Wiley service node appears in X-Ray after controlled traffic.
+- Current investigation result: the API host initializes the .NET X-Ray SDK, but the repo contains no X-Ray daemon address or daemon-side configuration, and AWS states that the .NET SDK generates and sends trace data to the X-Ray daemon. This makes the current App Runner deployment a poor place to invest more time unless a daemon delivery path is added deliberately.
+- Create a post-release work item to migrate service instrumentation from the legacy X-Ray SDK chain to OpenTelemetry rather than deepening dependency on the 2026 maintenance-mode path.
+
+## Post-Release Infrastructure Track
+
+These items are intentionally scheduled after the current widget proof closeout so they are owned as infrastructure follow-up work rather than left as implied technical debt.
+
+- Aurora rollback retirement: after the observation window, snapshot and decommission the original unencrypted cluster plus any rollback-only resources.
+- Observability migration: replace or supersede the current X-Ray SDK path with OpenTelemetry, and only keep X-Ray if a supported, proven delivery path is required during the transition.
+- Public cutover hardening: rerun the hosted QuickBooks assistant browser flow and any other public-shell regression checks after the next successful Amplify release.
+- Public cutover hardening: treat boot-manifest and `WileyCoWeb` fingerprint verification as part of release validation so future public E2E failures can be distinguished from stale-browser deployments immediately.
 
 ### App Runner Replacement Review
 

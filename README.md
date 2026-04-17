@@ -149,6 +149,19 @@ Production implication: the missing compute host is now provisioned, but final c
 
 Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with public ingress and VPC egress to Aurora. For the May 11 City Council working session, `1 vCPU / 2 GB`, minimum one warm instance, remains the safer baseline if load or export activity increases.
 
+## Town Email Alias Routing
+
+The `townofwiley.gov` email alias path now has a verified live success case for future reference.
+
+- Live validation on April 16, 2026: a test email sent to `steve.mckitrick@townofwiley.gov` was forwarded to `bigessfour@gmail.com`.
+- Inbound receipt uses Amazon SES in `us-east-1` because the public MX for `townofwiley.gov` points to `inbound-smtp.us-east-1.amazonaws.com`.
+- Outbound forwarding uses Amazon SES in `us-east-2`; the SES dashboard SMTP endpoint `email-smtp.us-east-2.amazonaws.com` is the send path, not the inbound receiving path.
+- The CMS/AppSync write path now lowercases `aliasAddress` on `createEmailAlias` and `updateEmailAlias` before DynamoDB writes.
+- The `EmailAlias-j7b2x3sh7rcezekekkxxiak7hi-main` table now has the `byAliasAddress` global secondary index for normalized alias lookups.
+- `TownOfWileyEmailAliasRouter` in `us-east-1` queries `byAliasAddress` and forwards only aliases where `active=true`.
+
+If a future alias is created in CMS and does not route, check AppSync mutation writes, the `byAliasAddress` index status, and the CloudWatch log group for `TownOfWileyEmailAliasRouter` before changing SES or MX configuration.
+
 ## Browser E2E Tests
 
 The Playwright-based browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) run directly against the hosted site.

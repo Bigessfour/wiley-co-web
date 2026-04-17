@@ -31,6 +31,9 @@ namespace WileyWidget.Services;
 /// <param name="auditRepository">Repository for audit data</param>
 /// <param name="aiLoggingService">AI logging service for tracking operations</param>
 /// <param name="aiService">AI service for Grok API integration</param>
+/// <param name="jarvisPersonality">JARVIS personality service for AI response customization</param>
+/// <param name="cache">Memory cache for performance optimization</param>
+/// <param name="appOptions">Application configuration options</param>
 public class GrokSupercomputer(
     ILogger<GrokSupercomputer> logger,
     IEnterpriseRepository enterpriseRepository,

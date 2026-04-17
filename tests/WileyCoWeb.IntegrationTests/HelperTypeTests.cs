@@ -1,4 +1,7 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace WileyCoWeb.IntegrationTests;
 
@@ -24,6 +27,76 @@ public sealed class HelperTypeTests
             Assert.True(AppDbStartupState.FallbackActivated);
             Assert.Equal("primary database unavailable", AppDbStartupState.FallbackReason);
             Assert.True(AppDbStartupState.IsDegradedMode);
+        }
+        finally
+        {
+            AppDbStartupState.ResetForTests();
+        }
+    }
+
+    [Fact]
+    public async Task Program_ActivatesDegradedMode_WhenDevelopmentDatabaseIsUnavailable()
+    {
+        AppDbStartupState.ResetForTests();
+
+        try
+        {
+            var method = typeof(WileyCoWeb.Api.Program).GetMethod(
+                "TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync",
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            Assert.NotNull(method);
+
+            var task = (Task)method!.Invoke(
+                null,
+                [
+                    "Host=127.0.0.1;Port=1;Database=wileyco_dev;Username=postgres;Password=password;Timeout=1;Command Timeout=1",
+                    true,
+                    new TestWebHostEnvironment { EnvironmentName = "Development" },
+                    NullLogger.Instance,
+                    CancellationToken.None
+                ])!;
+
+            await task;
+
+            Assert.True(AppDbStartupState.FallbackActivated);
+            Assert.True(AppDbStartupState.IsDegradedMode);
+            Assert.Equal("Configured development database was unreachable during startup.", AppDbStartupState.FallbackReason);
+        }
+        finally
+        {
+            AppDbStartupState.ResetForTests();
+        }
+    }
+
+    [Fact]
+    public async Task Program_DoesNotActivateDegradedMode_ForNonDevelopmentEnvironments()
+    {
+        AppDbStartupState.ResetForTests();
+
+        try
+        {
+            var method = typeof(WileyCoWeb.Api.Program).GetMethod(
+                "TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync",
+                BindingFlags.NonPublic | BindingFlags.Static);
+
+            Assert.NotNull(method);
+
+            var task = (Task)method!.Invoke(
+                null,
+                [
+                    "Host=127.0.0.1;Port=1;Database=wileyco_dev;Username=postgres;Password=password;Timeout=1;Command Timeout=1",
+                    true,
+                    new TestWebHostEnvironment { EnvironmentName = "Production" },
+                    NullLogger.Instance,
+                    CancellationToken.None
+                ])!;
+
+            await task;
+
+            Assert.False(AppDbStartupState.FallbackActivated);
+            Assert.False(AppDbStartupState.IsDegradedMode);
+            Assert.Null(AppDbStartupState.FallbackReason);
         }
         finally
         {
@@ -92,5 +165,20 @@ public sealed class HelperTypeTests
         var result = method!.Invoke(null, new object?[] { null });
 
         Assert.Null(result);
+    }
+
+    private sealed class TestWebHostEnvironment : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "WileyCoWeb.Api.Tests";
+
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+
+        public string WebRootPath { get; set; } = string.Empty;
+
+        public string EnvironmentName { get; set; } = string.Empty;
+
+        public string ContentRootPath { get; set; } = string.Empty;
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

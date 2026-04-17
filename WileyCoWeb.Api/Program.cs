@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 using Syncfusion.Licensing;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
@@ -37,253 +38,437 @@ public partial class Program
 
     public static async Task Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
-        var xaiSecretResolution = await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
+        var startupStopwatch = Stopwatch.StartNew();
+        WebApplicationBuilder? builder = null;
+        ILoggerFactory? bootstrapLoggerFactory = null;
+        ILogger? bootstrapLogger = null;
 
-        // AWS X-Ray: distributed tracing for all incoming requests.
-        // Credentials are resolved from the IAM execution role (Amplify / ECS task role) — no connection string needed.
-        AWSXRayRecorder.InitializeInstance(builder.Configuration);
-        Console.WriteLine("[API Startup] AWS X-Ray tracing initialized (service: WileyCoWeb.Api).");
-
-        // --- Syncfusion license resolution (track source for telemetry) ---
-        var syncfusionKeySource = "not-found";
-        string? syncfusionLicenseKey = null;
-
-        var sfFromConfigDirect = builder.Configuration["SYNCFUSION_LICENSE_KEY"];
-        if (!string.IsNullOrWhiteSpace(sfFromConfigDirect))
+        try
         {
-            syncfusionLicenseKey = sfFromConfigDirect;
-            syncfusionKeySource = "config:SYNCFUSION_LICENSE_KEY";
-        }
-        else
-        {
-            var sfFromConfigNamed = builder.Configuration["SyncfusionLicenseKey"];
-            if (!string.IsNullOrWhiteSpace(sfFromConfigNamed))
+            builder = WebApplication.CreateBuilder(args);
+            bootstrapLoggerFactory = CreateStartupLoggerFactory();
+            bootstrapLogger = bootstrapLoggerFactory.CreateLogger("WileyCoWeb.Api.Startup");
+            bootstrapLogger.LogInformation(
+                "Workspace API startup beginning. Environment={Environment} ContentRoot={ContentRoot} ApplicationName={ApplicationName} CurrentDirectory={CurrentDirectory}",
+                builder.Environment.EnvironmentName,
+                builder.Environment.ContentRootPath,
+                builder.Environment.ApplicationName,
+                Environment.CurrentDirectory);
+
+            var xaiSecretResolution = await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
+
+            // AWS X-Ray: distributed tracing for all incoming requests.
+            // Credentials are resolved from the IAM execution role (Amplify / ECS task role) — no connection string needed.
+            AWSXRayRecorder.InitializeInstance(builder.Configuration);
+            Console.WriteLine("[API Startup] AWS X-Ray tracing initialized (service: WileyCoWeb.Api).");
+
+            // --- Syncfusion license resolution (track source for telemetry) ---
+            var syncfusionKeySource = "not-found";
+            string? syncfusionLicenseKey = null;
+
+            var sfFromConfigDirect = builder.Configuration["SYNCFUSION_LICENSE_KEY"];
+            if (!string.IsNullOrWhiteSpace(sfFromConfigDirect))
             {
-                syncfusionLicenseKey = sfFromConfigNamed;
-                syncfusionKeySource = "config:SyncfusionLicenseKey";
+                syncfusionLicenseKey = sfFromConfigDirect;
+                syncfusionKeySource = "config:SYNCFUSION_LICENSE_KEY";
             }
             else
             {
-                var sfFromEnv = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
-                if (!string.IsNullOrWhiteSpace(sfFromEnv))
+                var sfFromConfigNamed = builder.Configuration["SyncfusionLicenseKey"];
+                if (!string.IsNullOrWhiteSpace(sfFromConfigNamed))
                 {
-                    syncfusionLicenseKey = sfFromEnv;
-                    syncfusionKeySource = "env:SYNCFUSION_LICENSE_KEY";
+                    syncfusionLicenseKey = sfFromConfigNamed;
+                    syncfusionKeySource = "config:SyncfusionLicenseKey";
+                }
+                else
+                {
+                    var sfFromEnv = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+                    if (!string.IsNullOrWhiteSpace(sfFromEnv))
+                    {
+                        syncfusionLicenseKey = sfFromEnv;
+                        syncfusionKeySource = "env:SYNCFUSION_LICENSE_KEY";
+                    }
                 }
             }
-        }
 
-        if (string.IsNullOrWhiteSpace(syncfusionLicenseKey)
-            && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("IntegrationTest")))
-        {
-            syncfusionLicenseKey = await LoadSyncfusionLicenseKeyFromLocalSettingsAsync(builder.Environment).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(syncfusionLicenseKey)
+                && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("IntegrationTest")))
+            {
+                syncfusionLicenseKey = await LoadSyncfusionLicenseKeyFromLocalSettingsAsync(builder.Environment).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
+                    syncfusionKeySource = "local-settings-file";
+            }
+
             if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
-                syncfusionKeySource = "local-settings-file";
-        }
-
-        if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
-        {
-            SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey.Trim());
-            Console.WriteLine($"[API Startup] Syncfusion license key registered (source: {syncfusionKeySource}, length: {syncfusionLicenseKey.Trim().Length}).");
-        }
-        else
-        {
-            Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). " +
-                "Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
-        }
-
-        // Capture xAI key resolution state after ConfigureXaiSecretAsync has run
-        var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
-        var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
-        var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
-        var xaiKeyResolved = !string.IsNullOrWhiteSpace(
-            xaiEnvironmentApiKey
-            ?? xaiConfigDirectApiKey
-            ?? xaiConfigNamedApiKey);
-        var xaiKeySource = !string.IsNullOrWhiteSpace(xaiEnvironmentApiKey)
-            ? "env:XAI_API_KEY"
-            : !string.IsNullOrWhiteSpace(xaiSecretResolution.ResolvedKeySource)
-                && !string.Equals(xaiSecretResolution.ResolvedKeySource, "not-found", StringComparison.OrdinalIgnoreCase)
-                ? xaiSecretResolution.ResolvedKeySource
-                : !string.IsNullOrWhiteSpace(xaiConfigDirectApiKey)
-                    ? "config:XAI_API_KEY"
-                    : !string.IsNullOrWhiteSpace(xaiConfigNamedApiKey)
-                        ? "config:XAI:ApiKey"
-                        : "not-found";
-
-        var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-            ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
-            ?? builder.Configuration["DATABASE_URL"]
-            ?? Environment.GetEnvironmentVariable("DATABASE_URL");
-
-        var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
-            || builder.Configuration.GetValue<bool>("Database:AllowDegradedStartup");
-        var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
-
-        if (!allowDegradedStartup)
-        {
-            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Database:EnableInMemoryFallback"] = "false"
-            });
-        }
-
-        if (string.IsNullOrWhiteSpace(configuredConnectionString))
-        {
-            const string missingConnectionStringMessage = "No database connection string was configured for the API host.";
-
-            if (allowDegradedStartup)
-            {
-                AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
+                SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey.Trim());
+                Console.WriteLine($"[API Startup] Syncfusion license key registered (source: {syncfusionKeySource}, length: {syncfusionLicenseKey.Trim().Length}).");
             }
             else
             {
-                throw new InvalidOperationException($"{missingConnectionStringMessage} Configure ConnectionStrings:DefaultConnection or DATABASE_URL before starting the workspace API.");
+                Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). " +
+                    "Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
             }
-        }
 
-        builder.Logging.ClearProviders();
-        builder.Logging.SetMinimumLevel(LogLevel.Debug);
-        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
-        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
-        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Connection", LogLevel.Information);
-        builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Migrations", LogLevel.Information);
-        builder.Logging.AddFilter("WileyWidget", LogLevel.Debug);
-        builder.Logging.AddFilter("WileyWidget.Data", LogLevel.Debug);
-        builder.Logging.AddFilter("WileyWidget.Services", LogLevel.Debug);
-        builder.Logging.AddFilter("WileyWidget.Business", LogLevel.Debug);
-        if (!builder.Environment.IsEnvironment("IntegrationTest"))
-        {
-            builder.Logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
-        }
+            // Capture xAI key resolution state after ConfigureXaiSecretAsync has run
+            var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+            var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
+            var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
+            var xaiKeyResolved = !string.IsNullOrWhiteSpace(
+                xaiEnvironmentApiKey
+                ?? xaiConfigDirectApiKey
+                ?? xaiConfigNamedApiKey);
+            var xaiKeySource = !string.IsNullOrWhiteSpace(xaiEnvironmentApiKey)
+                ? "env:XAI_API_KEY"
+                : !string.IsNullOrWhiteSpace(xaiSecretResolution.ResolvedKeySource)
+                    && !string.Equals(xaiSecretResolution.ResolvedKeySource, "not-found", StringComparison.OrdinalIgnoreCase)
+                    ? xaiSecretResolution.ResolvedKeySource
+                    : !string.IsNullOrWhiteSpace(xaiConfigDirectApiKey)
+                        ? "config:XAI_API_KEY"
+                        : !string.IsNullOrWhiteSpace(xaiConfigNamedApiKey)
+                            ? "config:XAI:ApiKey"
+                            : "not-found";
 
-        var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
+            var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+                ?? builder.Configuration["DATABASE_URL"]
+                ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 
-        builder.Services.AddCors(options =>
-        {
-            options.AddPolicy("OpenWorkspaceClient", policy =>
+            var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
+                || builder.Configuration.GetValue<bool>("Database:AllowDegradedStartup");
+            var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
+
+            await TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
+                configuredConnectionString,
+                allowDegradedStartup,
+                builder.Environment,
+                bootstrapLogger).ConfigureAwait(false);
+
+            if (!allowDegradedStartup)
             {
-                // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
-                policy.AllowAnyHeader()
-                    .AllowAnyMethod()
-                        .SetIsOriginAllowed(origin => IsAllowedWorkspaceClientOrigin(origin, allowedWorkspaceClientOrigins))
-                    .AllowCredentials();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:EnableInMemoryFallback"] = "false"
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(configuredConnectionString))
+            {
+                const string missingConnectionStringMessage = "No database connection string was configured for the API host.";
+
+                if (allowDegradedStartup)
+                {
+                    AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"{missingConnectionStringMessage} Configure ConnectionStrings:DefaultConnection or DATABASE_URL before starting the workspace API.");
+                }
+            }
+
+            ConfigureApiLogging(builder.Logging, !builder.Environment.IsEnvironment("IntegrationTest"));
+
+            var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
+
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("OpenWorkspaceClient", policy =>
+                {
+                    // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
+                    policy.AllowAnyHeader()
+                        .AllowAnyMethod()
+                            .SetIsOriginAllowed(origin => IsAllowedWorkspaceClientOrigin(origin, allowedWorkspaceClientOrigins))
+                        .AllowCredentials();
+                });
             });
-        });
-        builder.Services.AddHttpClient();
-        builder.Services.AddMemoryCache();
+            builder.Services.AddHttpClient();
+            builder.Services.AddMemoryCache();
 
-        builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
-        builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
-        builder.Services.AddSingleton<BusinessActivityLogRepository, ActivityLogRepository>();
-        builder.Services.AddSingleton<IAccountsRepository, AccountsRepository>();
-        builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
-        builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
-        builder.Services.AddSingleton<IEnterpriseRepository, EnterpriseRepository>();
-        builder.Services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
-        builder.Services.AddSingleton<IMunicipalAccountRepository, MunicipalAccountRepository>();
-        builder.Services.AddSingleton<IVendorRepository, VendorRepository>();
-        builder.Services.AddSingleton<IScenarioSnapshotRepository, ScenarioSnapshotRepository>();
-        builder.Services.AddSingleton<IDataAnonymizerService, DataAnonymizerService>();
-        builder.Services.AddTransient<IAnalyticsRepository, AnalyticsRepository>();
-        builder.Services.AddTransient<IBudgetAnalyticsRepository, BudgetAnalyticsRepository>();
-        builder.Services.AddTransient<IAnalyticsService, AnalyticsService>();
-        builder.Services.AddTransient<IWorkspaceKnowledgeService, WorkspaceKnowledgeService>();
-        builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
-        builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
-        builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
-        builder.Services.AddSingleton<QuickBooksImportService>();
-        builder.Services.AddSingleton<QuickBooksImportAssistantService>();
-        builder.Services.AddSingleton<WorkspaceAiAssistantService>();
-        builder.Services.AddSingleton<UserContext>();
-        builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
-        builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
-        builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
+            builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
+            builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
+            builder.Services.AddSingleton<BusinessActivityLogRepository, ActivityLogRepository>();
+            builder.Services.AddSingleton<IAccountsRepository, AccountsRepository>();
+            builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
+            builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
+            builder.Services.AddSingleton<IEnterpriseRepository, EnterpriseRepository>();
+            builder.Services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
+            builder.Services.AddSingleton<IMunicipalAccountRepository, MunicipalAccountRepository>();
+            builder.Services.AddSingleton<IVendorRepository, VendorRepository>();
+            builder.Services.AddSingleton<IScenarioSnapshotRepository, ScenarioSnapshotRepository>();
+            builder.Services.AddSingleton<IDataAnonymizerService, DataAnonymizerService>();
+            builder.Services.AddTransient<IAnalyticsRepository, AnalyticsRepository>();
+            builder.Services.AddTransient<IBudgetAnalyticsRepository, BudgetAnalyticsRepository>();
+            builder.Services.AddTransient<IAnalyticsService, AnalyticsService>();
+            builder.Services.AddTransient<IWorkspaceKnowledgeService, WorkspaceKnowledgeService>();
+            builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
+            builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
+            builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
+            builder.Services.AddSingleton<QuickBooksImportService>();
+            builder.Services.AddSingleton<QuickBooksImportAssistantService>();
+            builder.Services.AddSingleton<WorkspaceAiAssistantService>();
+            builder.Services.AddSingleton<UserContext>();
+            builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
+            builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
+            builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
 
-        // Deterministic license tracking via health check (covers the new registration logic in this file)
-        builder.Services.AddHealthChecks()
-            .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
+            // Deterministic license tracking via health check (covers the new registration logic in this file)
+            builder.Services.AddHealthChecks()
+                .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
 
-        var app = builder.Build();
-        var logger = app.Logger;
+            var app = builder.Build();
+            var logger = app.Logger;
 
-        // Emit startup key-resolution event as a structured log entry.
-        // Amplify ships stdout to CloudWatch Logs automatically; query with CloudWatch Logs Insights.
-        LogStartupKeyResolution(
-            logger,
-            syncfusionKeySource,
-            syncfusionLicenseKey,
-            xaiKeySource,
-            xaiKeyResolved,
-            xaiSecretResolution,
-            builder.Environment.EnvironmentName);
+            // Emit startup key-resolution event as a structured log entry.
+            // Amplify ships stdout to CloudWatch Logs automatically; query with CloudWatch Logs Insights.
+            LogStartupKeyResolution(
+                logger,
+                syncfusionKeySource,
+                syncfusionLicenseKey,
+                xaiKeySource,
+                xaiKeyResolved,
+                xaiSecretResolution,
+                builder.Environment.EnvironmentName);
 
-        if (AppDbStartupState.IsDegradedMode)
+            LogRuntimeBaseline(
+                logger,
+                builder,
+                configuredConnectionString,
+                allowDegradedStartup,
+                seedDevelopmentData,
+                allowedWorkspaceClientOrigins,
+                startupStopwatch.ElapsedMilliseconds);
+
+            if (AppDbStartupState.IsDegradedMode)
+            {
+                if (seedDevelopmentData)
+                {
+                    await SeedDevelopmentDataAsync(app.Services);
+                    logger.LogWarning("Workspace API is running in degraded mode with explicitly seeded development data.");
+                }
+                else
+                {
+                    logger.LogWarning("Workspace API is running in degraded mode without seeded sample data. Configure a real database or disable degraded startup.");
+                }
+            }
+
+            logger.LogInformation("Workspace API host initialized in {ElapsedMs}ms.", startupStopwatch.ElapsedMilliseconds);
+
+            app.Use(async (context, next) =>
+            {
+                var stopwatch = Stopwatch.StartNew();
+                logger.LogInformation("API request started: {Method} {Path}{QueryString}", context.Request.Method, context.Request.Path, context.Request.QueryString);
+
+                try
+                {
+                    await next().ConfigureAwait(false);
+                    logger.LogInformation(
+                        "API request completed: {Method} {Path}{QueryString} -> {StatusCode} in {ElapsedMs}ms",
+                        context.Request.Method,
+                        context.Request.Path,
+                        context.Request.QueryString,
+                        context.Response.StatusCode,
+                        stopwatch.ElapsedMilliseconds);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(
+                        ex,
+                        "API request failed: {Method} {Path}{QueryString} after {ElapsedMs}ms",
+                        context.Request.Method,
+                        context.Request.Path,
+                        context.Request.QueryString,
+                        stopwatch.ElapsedMilliseconds);
+                    throw;
+                }
+            });
+
+            app.Use(async (context, next) =>
+            {
+                var userContext = context.RequestServices.GetRequiredService<UserContext>();
+                PopulateUserContext(context, userContext);
+
+                try
+                {
+                    await next().ConfigureAwait(false);
+                }
+                finally
+                {
+                    userContext.SetCurrentUser(null, null, null);
+                }
+            });
+
+            app.UseXRay("WileyCoWeb.Api");
+            app.UseCors("OpenWorkspaceClient");
+            MapWorkspaceSnapshotEndpoints(app);
+            app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
+
+            await app.RunAsync();
+        }
+        catch (Exception ex)
         {
-            if (seedDevelopmentData)
-            {
-                await SeedDevelopmentDataAsync(app.Services);
-                logger.LogWarning("Workspace API is running in degraded mode with explicitly seeded development data.");
-            }
-            else
-            {
-                logger.LogWarning("Workspace API is running in degraded mode without seeded sample data. Configure a real database or disable degraded startup.");
-            }
+            bootstrapLoggerFactory ??= CreateStartupLoggerFactory();
+            bootstrapLogger ??= bootstrapLoggerFactory.CreateLogger("WileyCoWeb.Api.Startup");
+
+            LogFatalStartupException(
+                bootstrapLogger,
+                ex,
+                builder,
+                startupStopwatch.ElapsedMilliseconds,
+                args.Length);
+
+            throw;
+        }
+        finally
+        {
+            bootstrapLoggerFactory?.Dispose();
+        }
+    }
+
+    private static ILoggerFactory CreateStartupLoggerFactory()
+    {
+        return LoggerFactory.Create(logging => ConfigureApiLogging(logging, includeWorkspaceFileLogger: true));
+    }
+
+    private static void ConfigureApiLogging(ILoggingBuilder logging, bool includeWorkspaceFileLogger)
+    {
+        logging.ClearProviders();
+        logging.SetMinimumLevel(LogLevel.Debug);
+        logging.AddSimpleConsole(options =>
+        {
+            options.TimestampFormat = "HH:mm:ss.fff ";
+            options.SingleLine = true;
+            options.IncludeScopes = false;
+        });
+        logging.AddFilter("Microsoft", LogLevel.Information);
+        logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+        logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
+        logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Information);
+        logging.AddFilter("Microsoft.AspNetCore.Server.Kestrel", LogLevel.Information);
+        logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
+        logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
+        logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Connection", LogLevel.Information);
+        logging.AddFilter("Microsoft.EntityFrameworkCore.Migrations", LogLevel.Information);
+        logging.AddFilter("WileyWidget", LogLevel.Debug);
+        logging.AddFilter("WileyWidget.Data", LogLevel.Debug);
+        logging.AddFilter("WileyWidget.Services", LogLevel.Debug);
+        logging.AddFilter("WileyWidget.Business", LogLevel.Debug);
+
+        if (includeWorkspaceFileLogger)
+        {
+            logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
+        }
+    }
+
+    private static async Task TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
+        string? configuredConnectionString,
+        bool allowDegradedStartup,
+        IWebHostEnvironment environment,
+        ILogger logger,
+        CancellationToken cancellationToken = default)
+    {
+        if (!allowDegradedStartup
+            || AppDbStartupState.IsDegradedMode
+            || string.IsNullOrWhiteSpace(configuredConnectionString)
+            || !environment.IsDevelopment())
+        {
+            return;
         }
 
-        logger.LogInformation("Workspace API host initialized.");
+        const string fallbackReason = "Configured development database was unreachable during startup.";
 
-        app.Use(async (context, next) =>
+        try
         {
-            var stopwatch = Stopwatch.StartNew();
-            logger.LogInformation("API request started: {Method} {Path}{QueryString}", context.Request.Method, context.Request.Path, context.Request.QueryString);
+            var probeConnectionString = BuildConnectivityProbeConnectionString(configuredConnectionString);
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(probeConnectionString)
+                .Options;
 
-            try
+            await using var context = new AppDbContext(options);
+            if (await context.Database.CanConnectAsync(cancellationToken).ConfigureAwait(false))
             {
-                await next().ConfigureAwait(false);
-                logger.LogInformation(
-                    "API request completed: {Method} {Path}{QueryString} -> {StatusCode} in {ElapsedMs}ms",
-                    context.Request.Method,
-                    context.Request.Path,
-                    context.Request.QueryString,
-                    context.Response.StatusCode,
-                    stopwatch.ElapsedMilliseconds);
+                logger.LogInformation("Workspace API validated the configured development database before service registration.");
+                return;
             }
-            catch (Exception ex)
-            {
-                logger.LogError(
-                    ex,
-                    "API request failed: {Method} {Path}{QueryString} after {ElapsedMs}ms",
-                    context.Request.Method,
-                    context.Request.Path,
-                    context.Request.QueryString,
-                    stopwatch.ElapsedMilliseconds);
-                throw;
-            }
-        });
-
-        app.Use(async (context, next) =>
+        }
+        catch (Exception ex)
         {
-            var userContext = context.RequestServices.GetRequiredService<UserContext>();
-            PopulateUserContext(context, userContext);
+            AppDbStartupState.ActivateFallback(fallbackReason);
+            logger.LogWarning(ex, "Workspace API activated degraded mode because the configured development database could not be reached during startup.");
+            return;
+        }
 
-            try
-            {
-                await next().ConfigureAwait(false);
-            }
-            finally
-            {
-                userContext.SetCurrentUser(null, null, null);
-            }
-        });
+        AppDbStartupState.ActivateFallback(fallbackReason);
+        logger.LogWarning("Workspace API activated degraded mode because the configured development database could not be reached during startup.");
+    }
 
-        app.UseXRay("WileyCoWeb.Api");
-        app.UseCors("OpenWorkspaceClient");
-        MapWorkspaceSnapshotEndpoints(app);
-        app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
+    private static string BuildConnectivityProbeConnectionString(string configuredConnectionString)
+    {
+        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(Environment.ExpandEnvironmentVariables(configuredConnectionString))
+        {
+            Pooling = false
+        };
 
-        await app.RunAsync();
+        if (connectionStringBuilder.Timeout <= 0 || connectionStringBuilder.Timeout > 5)
+        {
+            connectionStringBuilder.Timeout = 5;
+        }
+
+        if (connectionStringBuilder.CommandTimeout <= 0 || connectionStringBuilder.CommandTimeout > 5)
+        {
+            connectionStringBuilder.CommandTimeout = 5;
+        }
+
+        return connectionStringBuilder.ConnectionString;
+    }
+
+    private static void LogRuntimeBaseline(
+        ILogger logger,
+        WebApplicationBuilder builder,
+        string? configuredConnectionString,
+        bool allowDegradedStartup,
+        bool seedDevelopmentData,
+        IReadOnlySet<string> allowedWorkspaceClientOrigins,
+        long startupElapsedMilliseconds)
+    {
+        var aspNetCoreUrls = builder.Configuration["ASPNETCORE_URLS"]
+            ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS")
+            ?? "(default)";
+        var allowedOrigins = allowedWorkspaceClientOrigins.Count == 0
+            ? "(none)"
+            : string.Join(',', allowedWorkspaceClientOrigins.OrderBy(origin => origin, StringComparer.OrdinalIgnoreCase));
+
+        logger.LogInformation(
+            "WileyWidget.Startup.RuntimeBaseline Environment={Environment} ContentRoot={ContentRoot} ApplicationName={ApplicationName} CurrentDirectory={CurrentDirectory} AspNetCoreUrls={AspNetCoreUrls} DatabaseConfigured={DatabaseConfigured} AllowDegradedStartup={AllowDegradedStartup} DegradedModeActive={DegradedModeActive} SeedDevelopmentData={SeedDevelopmentData} AllowedWorkspaceClientOriginCount={AllowedWorkspaceClientOriginCount} AllowedWorkspaceClientOrigins={AllowedWorkspaceClientOrigins} StartupElapsedMs={StartupElapsedMs}",
+            builder.Environment.EnvironmentName,
+            builder.Environment.ContentRootPath,
+            builder.Environment.ApplicationName,
+            Environment.CurrentDirectory,
+            aspNetCoreUrls,
+            !string.IsNullOrWhiteSpace(configuredConnectionString),
+            allowDegradedStartup,
+            AppDbStartupState.IsDegradedMode,
+            seedDevelopmentData,
+            allowedWorkspaceClientOrigins.Count,
+            allowedOrigins,
+            startupElapsedMilliseconds);
+    }
+
+    private static void LogFatalStartupException(
+        ILogger logger,
+        Exception exception,
+        WebApplicationBuilder? builder,
+        long startupElapsedMilliseconds,
+        int argsCount)
+    {
+        logger.LogCritical(
+            exception,
+            "Workspace API fatal startup failure after {StartupElapsedMs}ms. Environment={Environment} ContentRoot={ContentRoot} ApplicationName={ApplicationName} CurrentDirectory={CurrentDirectory} ArgsCount={ArgsCount}",
+            startupElapsedMilliseconds,
+            builder?.Environment.EnvironmentName ?? "(unavailable)",
+            builder?.Environment.ContentRootPath ?? "(unavailable)",
+            builder?.Environment.ApplicationName ?? "(unavailable)",
+            Environment.CurrentDirectory,
+            argsCount);
     }
 
     private static bool IsAllowedWorkspaceClientOrigin(string origin, IReadOnlySet<string> allowedOrigins)
