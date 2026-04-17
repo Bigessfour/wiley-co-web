@@ -1,6 +1,6 @@
 @using System.Globalization
-@using System.Reflection
 @using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Grids
@@ -50,23 +50,15 @@
 
             <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
                 <div class="space-y-4">
-                    <SfUploader @ref="UploaderRef"
-                                ID="quickbooks-import-uploader"
-                                AllowedExtensions=".csv,.xlsx,.xls"
-                                AllowMultiple="false"
-                                AutoUpload="false"
-                                SequentialUpload="true"
-                                DropArea="#quickbooks-import-drop-area"
-                                ShowFileList="true"
-                                ShowProgressBar="true"
-                                MaxFileSize="52428800"
-                                CssClass="w-full"
-                                FileSelected="HandleFileSelected"
-                                Success="HandleUploadSuccess"
-                                OnFailure="HandleUploadFailure">
-                        <UploaderAsyncSettings SaveUrl="@PreviewSaveUrl" />
-                        <UploaderButtons Browse="Choose QuickBooks file" Upload="Analyze file" Clear="Clear selection" />
-                    </SfUploader>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <label for="quickbooks-import-uploader" class="e-btn e-control e-lib cursor-pointer">Choose QuickBooks file</label>
+                        <InputFile @key="FileInputRenderKey"
+                                   id="quickbooks-import-uploader"
+                                   class="hidden"
+                                   OnChange="HandleFileSelectedAsync"
+                                   accept=".csv,.xlsx,.xls" />
+                        <span class="text-xs text-slate-500">CSV or Excel, up to 50 MB.</span>
+                    </div>
 
                     <div class="grid gap-3 sm:grid-cols-2">
                         <SfCard>
@@ -84,7 +76,8 @@
                         <div id="quickbooks-import-status-message" class="mt-1 whitespace-pre-line">@StatusMessage</div>
                     </div>
 
-                    <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAnalyze)" OnClick="LoadPreviewAsync">Analyze file</SfButton>
                         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanCommit || IsBusy)" OnClick="OpenCommitDialogAsync">Commit import</SfButton>
                         <SfButton Disabled="@IsBusy" OnClick="ClearSelectionAsync">Reset panel</SfButton>
                     </div>
@@ -189,16 +182,17 @@
         ".xls"
     };
 
+    private const long MaxImportFileSize = 52_428_800;
+
     [Parameter]
     public WorkspaceState WorkspaceState { get; set; } = default!;
 
     private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly List<QuickBooksImportPreviewRow> PreviewRows = [];
-    private SfUploader? UploaderRef;
     private SfToast? ToastRef;
-    private object? SelectedFileData;
     private byte[]? SelectedFileBytes;
     private string SelectedFileName = string.Empty;
+    private string FileInputRenderKey = Guid.NewGuid().ToString("N");
     private QuickBooksImportPreviewResponse? PreviewResponse;
     private string AssistantQuestion = string.Empty;
     private string AssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
@@ -211,13 +205,13 @@
     private string StatusHeadline = "Ready";
     private string StatusMessage = "Choose a QuickBooks export to begin.";
 
-    private string PreviewSaveUrl => $"api/imports/quickbooks/preview?selectedEnterprise={Uri.EscapeDataString(WorkspaceState.SelectedEnterprise)}&selectedFiscalYear={WorkspaceState.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture)}";
-
     private string SelectedFileLabel => string.IsNullOrWhiteSpace(SelectedFileName) ? "No file selected" : SelectedFileName;
 
     private string RowCountDisplay => PreviewResponse?.TotalRows.ToString(CultureInfo.InvariantCulture) ?? "0";
 
     private string DuplicateCountDisplay => PreviewResponse?.DuplicateRows.ToString(CultureInfo.InvariantCulture) ?? "0";
+
+    private bool CanAnalyze => SelectedFileBytes is { Length: > 0 } && !IsBusy;
 
     private bool CanCommit => SelectedFileBytes is { Length: > 0 } && PreviewResponse is not null && !PreviewResponse.IsDuplicate;
 
@@ -231,12 +225,41 @@
         }
     }
 
-    private async Task HandleFileSelected(SelectedEventArgs args)
+    private async Task HandleFileSelectedAsync(InputFileChangeEventArgs args)
     {
-        _ = args;
-        await CaptureSelectedFileAsync().ConfigureAwait(false);
+        var browserFile = args.FileCount > 0 ? args.File : null;
+
+        if (browserFile is null)
+        {
+            await ClearSelectionAsync().ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            await using var fileStream = browserFile.OpenReadStream(MaxImportFileSize);
+            await using var memoryStream = new MemoryStream();
+            await fileStream.CopyToAsync(memoryStream).ConfigureAwait(false);
+
+            SelectedFileBytes = memoryStream.ToArray();
+            SelectedFileName = browserFile.Name;
+        }
+        catch (Exception ex)
+        {
+            SelectedFileBytes = null;
+            SelectedFileName = string.Empty;
+            StatusHeadline = "File selection failed";
+            StatusMessage = ex.Message;
+            ShowCommitDialog = false;
+            await ShowToastAsync("QuickBooks import", StatusMessage).ConfigureAwait(false);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
         PreviewResponse = null;
         PreviewRows.Clear();
+        AssistantQuestion = string.Empty;
+        AssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
         AssistantContextSummary = "No QuickBooks preview has been loaded yet.";
         StatusHeadline = "File selected";
         StatusMessage = string.IsNullOrWhiteSpace(SelectedFileName)
@@ -244,27 +267,8 @@
             : $"{SelectedFileName} is ready for preview.";
         ActiveStep = 0;
         ImportProgress = 20;
+        ShowCommitDialog = false;
         await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task HandleUploadSuccess(SuccessEventArgs args)
-    {
-        _ = args;
-        if (SelectedFileBytes is null || SelectedFileBytes.Length == 0)
-        {
-            return;
-        }
-
-        await LoadPreviewAsync().ConfigureAwait(false);
-    }
-
-    private async Task HandleUploadFailure(Syncfusion.Blazor.Inputs.FailureEventArgs args)
-    {
-        StatusHeadline = "Upload failed";
-        StatusMessage = "The selected file could not be analyzed. Check the file type and try again.";
-        await ShowToastAsync("QuickBooks import failed", StatusMessage).ConfigureAwait(false);
-        await InvokeAsync(StateHasChanged);
-        _ = args;
     }
 
     private async Task OpenCommitDialogAsync()
@@ -318,6 +322,7 @@
                 previewRowsSnapshot);
 
             SelectedFileBytes = null;
+            FileInputRenderKey = Guid.NewGuid().ToString("N");
             AssistantContextSummary = BuildAssistantContextSummary(PreviewResponse);
             StatusHeadline = result.IsDuplicate ? "Duplicate blocked" : "Import complete";
             StatusMessage = result.StatusMessage;
@@ -386,87 +391,6 @@
         }
     }
 
-    private async Task CaptureSelectedFileAsync()
-    {
-        if (UploaderRef is null)
-        {
-            return;
-        }
-
-        var files = await UploaderRef.GetFilesDataAsync(0).ConfigureAwait(false);
-        SelectedFileData = files.FirstOrDefault();
-
-        if (SelectedFileData is null)
-        {
-            SelectedFileBytes = null;
-            SelectedFileName = string.Empty;
-            return;
-        }
-
-        SelectedFileName = TryReadStringProperty(SelectedFileData, "Name") ?? TryReadStringProperty(SelectedFileData, "FileName") ?? "QuickBooks export";
-        SelectedFileBytes = await TryReadBytesAsync(SelectedFileData).ConfigureAwait(false);
-    }
-
-    private async Task<byte[]?> TryReadBytesAsync(object fileData)
-    {
-        var candidatePropertyNames = new[] { "RawFile", "File", "BrowserFile", "Stream", "Content" };
-
-        foreach (var propertyName in candidatePropertyNames)
-        {
-            var property = fileData.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-            if (property == null)
-            {
-                continue;
-            }
-
-            var value = property.GetValue(fileData);
-            if (value is null)
-            {
-                continue;
-            }
-
-            if (value is byte[] bytes)
-            {
-                return bytes;
-            }
-
-            if (value is Stream stream)
-            {
-                await using var memoryStream = new MemoryStream();
-                await stream.CopyToAsync(memoryStream).ConfigureAwait(false);
-                return memoryStream.ToArray();
-            }
-
-            if (value is Microsoft.AspNetCore.Components.Forms.IBrowserFile browserFile)
-            {
-                await using var browserStream = browserFile.OpenReadStream(long.MaxValue);
-                await using var memoryStream = new MemoryStream();
-                await browserStream.CopyToAsync(memoryStream).ConfigureAwait(false);
-                return memoryStream.ToArray();
-            }
-        }
-
-        var openReadStreamMethod = fileData.GetType().GetMethod("OpenReadStream", BindingFlags.Public | BindingFlags.Instance);
-        if (openReadStreamMethod is not null)
-        {
-            var result = openReadStreamMethod.Invoke(fileData, [long.MaxValue]);
-            if (result is Stream openStream)
-            {
-                await using var memoryStream = new MemoryStream();
-                await openStream.CopyToAsync(memoryStream).ConfigureAwait(false);
-                return memoryStream.ToArray();
-            }
-        }
-
-        return null;
-    }
-
-    private static string? TryReadStringProperty(object instance, string propertyName)
-    {
-        var property = instance.GetType().GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-        return property?.GetValue(instance)?.ToString();
-    }
-
     private async Task ShowToastAsync(string title, string content)
     {
         if (ToastRef is null)
@@ -521,9 +445,9 @@
 
     public async Task ClearSelectionAsync()
     {
-        SelectedFileData = null;
         SelectedFileBytes = null;
         SelectedFileName = string.Empty;
+        FileInputRenderKey = Guid.NewGuid().ToString("N");
         PreviewRows.Clear();
         PreviewResponse = null;
         AssistantQuestion = string.Empty;
@@ -534,11 +458,6 @@
         ActiveStep = 0;
         ImportProgress = 0;
         ShowCommitDialog = false;
-
-        if (UploaderRef is not null)
-        {
-            await UploaderRef.ClearAllAsync().ConfigureAwait(false);
-        }
 
         await InvokeAsync(StateHasChanged);
     }

@@ -149,12 +149,12 @@ public sealed class QuickBooksImportPanelTests : TestContext
 	}
 
 	[Fact]
-	public async Task LoadPreviewAsync_ReportsApiFailure()
+	public async Task LoadPreviewAsync_ReportsApiFailureDetails_FromProblemResponse()
 	{
 		var state = new WorkspaceState();
 		var service = CreateImportService(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
 		{
-			Content = new StringContent("preview service unavailable", Encoding.UTF8, "text/plain")
+			Content = new StringContent("{\"title\":\"Preview unavailable\",\"detail\":\"preview service unavailable\"}", Encoding.UTF8, "application/json")
 		});
 
 		Services.AddSingleton(state);
@@ -173,7 +173,7 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		await InvokePrivateAsync(cut, "LoadPreviewAsync");
 
 		Assert.Equal("Preview failed", GetPrivateField<string>(cut.Instance, "StatusHeadline"));
-		Assert.Contains("invalid start of a value", GetPrivateField<string>(cut.Instance, "StatusMessage"));
+		Assert.Equal("QuickBooks preview failed with status 500: preview service unavailable", GetPrivateField<string>(cut.Instance, "StatusMessage"));
 		Assert.Empty(GetPrivateField<List<QuickBooksImportPreviewRow>>(cut.Instance, "PreviewRows"));
 		Assert.Null(GetPrivateField<QuickBooksImportPreviewResponse?>(cut.Instance, "PreviewResponse"));
 	}
@@ -263,6 +263,41 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		Assert.Equal("The file hash matches a prior QuickBooks import.", GetPrivateField<string>(cut.Instance, "AssistantAnswer"));
 		Assert.Equal(WorkspaceTestData.QuickBooksAssistantContextSummary, GetPrivateField<string>(cut.Instance, "AssistantContextSummary"));
 		Assert.Equal(2, GetPrivateField<int>(cut.Instance, "ActiveStep"));
+	}
+
+	[Fact]
+	public async Task AskAssistantAsync_ReportsApiFailureDetails_FromPlainText()
+	{
+		var state = new WorkspaceState();
+		var service = CreateImportService(request =>
+		{
+			if (request.RequestUri?.AbsolutePath.EndsWith("/assistant", StringComparison.Ordinal) == true)
+			{
+				return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+				{
+					Content = new StringContent("assistant service unavailable", Encoding.UTF8, "text/plain")
+				};
+			}
+
+			return CreateJsonResponse(CreatePreviewResponse(isDuplicate: false));
+		});
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(service);
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<QuickBooksImportPanel>(parameters => parameters
+			.Add(panel => panel.WorkspaceState, state));
+
+		SeedPreviewState(cut, includeAssistantQuestion: false);
+		SetPrivateField(cut.Instance, "AssistantQuestion", "Why would this file be blocked as a duplicate?");
+
+		await InvokePrivateAsync(cut, "AskAssistantAsync");
+
+		Assert.Equal("QuickBooks import assistance failed with status 503: assistant service unavailable", GetPrivateField<string>(cut.Instance, "AssistantAnswer"));
 	}
 
 	[Fact]
