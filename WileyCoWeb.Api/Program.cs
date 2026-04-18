@@ -158,7 +158,14 @@ public partial class Program
 
                 if (allowDegradedStartup)
                 {
-                    AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
+                    if (builder.Environment.IsEnvironment("IntegrationTest"))
+                    {
+                        bootstrapLogger.LogInformation("Workspace API skipped degraded fallback activation because the IntegrationTest host supplies its own in-memory database without a connection string.");
+                    }
+                    else
+                    {
+                        AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
+                    }
                 }
                 else
                 {

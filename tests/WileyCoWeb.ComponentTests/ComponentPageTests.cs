@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Globalization;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Syncfusion.Blazor;
@@ -63,6 +64,45 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void LoggingErrorBoundary_RecoversAfterNavigation_WhenConsoleLoggingFails()
+	{
+		var jsRuntime = new FakeJsRuntime(new Dictionary<string, Exception>(StringComparer.Ordinal)
+		{
+			["console.error"] = new JSException("console unavailable")
+		});
+
+		var boundaryFailureState = new BoundaryFailureState();
+		using var context = CreateContext(
+			jsRuntime: jsRuntime,
+			configureServices: services => services.AddSingleton(boundaryFailureState));
+		var navigationManager = context.Services.GetRequiredService<NavigationManager>();
+
+		var cut = context.RenderComponent<LoggingErrorBoundary>(parameters => parameters
+			.Add(p => p.BoundaryName, "Router")
+			.Add(p => p.ChildContent, (RenderFragment)(builder =>
+			{
+				builder.OpenComponent<BoundaryFailureChild>(0);
+				builder.CloseComponent();
+			}))
+			.Add(p => p.ErrorContent, (RenderFragment<Exception>)(exception => builder =>
+			{
+				builder.OpenElement(0, "div");
+				builder.AddAttribute(1, "id", "boundary-fallback");
+				builder.AddContent(2, $"Boundary fallback: {exception.Message}");
+				builder.CloseElement();
+			})));
+
+		Assert.Contains("Boundary fallback: Boundary child failed.", cut.Markup);
+		Assert.Contains("console.error", jsRuntime.Calls);
+
+		boundaryFailureState.ShouldThrow = false;
+		navigationManager.NavigateTo("/recovered-boundary");
+
+		cut.WaitForAssertion(() => Assert.Contains("Recovered child content", cut.Markup));
+		Assert.DoesNotContain("boundary-fallback", cut.Markup, StringComparison.OrdinalIgnoreCase);
+	}
+
+	[Fact]
 	public void ErrorPage_RendersSupportMessage()
 	{
 		using var context = CreateContext();
@@ -87,6 +127,25 @@ public sealed class ComponentPageTests
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
+	}
+
+	[Fact]
+	public void WileyWorkspace_RendersFallbackAndBrowserRestoreStatuses()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.SetStartupSource(
+			WorkspaceStartupSource.LocalBootstrapFallback,
+			"Workspace started from local fallback data because the workspace API was unavailable.");
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+		workspaceState.SetCurrentStateSource(
+			WorkspaceStartupSource.BrowserStorageRestore,
+			"Current workspace state was restored from browser storage.");
+
+		Assert.Contains("Fallback persistence active", cut.Markup);
+		Assert.Contains("Workspace started from local fallback data because the workspace API was unavailable.", cut.Markup);
+		cut.WaitForAssertion(() => Assert.Contains("Current workspace state was restored from browser storage.", cut.Markup));
 	}
 
 	[Fact]
@@ -433,12 +492,12 @@ public sealed class ComponentPageTests
 		});
 	}
 
-	private static TestContext CreateContext(HttpClient? snapshotClient = null)
+	private static TestContext CreateContext(HttpClient? snapshotClient = null, FakeJsRuntime? jsRuntime = null, Action<IServiceCollection>? configureServices = null)
 	{
 		var context = new TestContext();
 
 		var workspaceState = new WorkspaceState();
-		var jsRuntime = new FakeJsRuntime();
+		jsRuntime ??= new FakeJsRuntime();
 
 		context.Services.AddLogging();
 		context.Services.AddSingleton(workspaceState);
@@ -454,6 +513,7 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));
 		context.Services.AddScoped(_ => new BrowserDownloadService(jsRuntime));
+		configureServices?.Invoke(context.Services);
 		context.Services.AddSyncfusionBlazor();
 		context.Renderer.SetRendererInfo(new RendererInfo("WebAssembly", true));
 
@@ -805,6 +865,14 @@ public sealed class ComponentPageTests
 	{
 		private readonly Dictionary<string, string?> storage = new(StringComparer.Ordinal);
 		private readonly List<string> calls = new();
+		private readonly Dictionary<string, Exception> exceptionsByIdentifier;
+
+		public FakeJsRuntime(Dictionary<string, Exception>? exceptionsByIdentifier = null)
+		{
+			this.exceptionsByIdentifier = exceptionsByIdentifier ?? new Dictionary<string, Exception>(StringComparer.Ordinal);
+		}
+
+		public IReadOnlyList<string> Calls => calls;
 
 		public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
 		{
@@ -816,6 +884,11 @@ public sealed class ComponentPageTests
 			cancellationToken.ThrowIfCancellationRequested();
 			var arguments = args ?? Array.Empty<object?>();
 			calls.Add(identifier);
+
+			if (exceptionsByIdentifier.TryGetValue(identifier, out var exception))
+			{
+				throw exception;
+			}
 
 			object? result = identifier switch
 			{
@@ -841,9 +914,33 @@ public sealed class ComponentPageTests
 		}
 	}
 
-	#pragma warning restore
+#pragma warning restore
 
-	#pragma warning disable
+	private sealed class BoundaryFailureState
+	{
+		public bool ShouldThrow { get; set; } = true;
+	}
+
+	private sealed class BoundaryFailureChild : ComponentBase
+	{
+		[Inject]
+		private BoundaryFailureState FailureState { get; set; } = default!;
+
+		protected override void BuildRenderTree(RenderTreeBuilder builder)
+		{
+			if (FailureState.ShouldThrow)
+			{
+				throw new InvalidOperationException("Boundary child failed.");
+			}
+
+			builder.OpenElement(0, "div");
+			builder.AddAttribute(1, "id", "boundary-child-ok");
+			builder.AddContent(2, "Recovered child content");
+			builder.CloseElement();
+		}
+	}
+
+#pragma warning disable
 	private sealed class RoutedHttpMessageHandler : HttpMessageHandler
 	{
 		private readonly Func<HttpRequestMessage, Task<HttpResponseMessage>> responder;

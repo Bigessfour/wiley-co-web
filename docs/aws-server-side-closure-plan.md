@@ -1,6 +1,6 @@
 # AWS Server-Side Closure Plan
 
-This plan closes the remaining AWS and server-side gaps between the current static Wiley Widget deployment and the production-ready system described in [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md).
+This plan records the current AWS and server-side state for Wiley Widget, the remaining pre-meeting hardening items, and the post-release infrastructure follow-up described in [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md).
 
 ## Objective
 
@@ -14,10 +14,10 @@ Connect the thin API to the live Wiley Widget client so the product can achieve 
 
 ## Current Validated State
 
-Validated on April 15, 2026 using the AWS CLI and the current repository:
+Validated through April 17, 2026 using the AWS CLI, hosted browser evidence, and the current repository:
 
 - Amplify app `d2ellat1y3ljd9` is a static `WEB` deployment for the Blazor WebAssembly client.
-- Aurora PostgreSQL cluster `wiley-co-aurora-db` is available in `us-east-2`.
+- Aurora PostgreSQL now runs from encrypted cluster `wiley-co-aurora-db-encrypted` in `us-east-2`, and the original unencrypted cluster `wiley-co-aurora-db` is no longer present.
 - The Aurora footprint is private and has no public ingress path, per [docs/aws-aurora-private-layout.md](docs/aws-aurora-private-layout.md).
 - Secrets Manager contains the `Grok` secret for server-side xAI access.
 - API Gateway `w544vrvb3i` (`WileyJarvisApi`) only exposes `/{proxy+}` as an `HTTP_PROXY` integration to `https://api.x.ai/v1`.
@@ -35,11 +35,10 @@ Validated on April 15, 2026 using the AWS CLI and the current repository:
 - App Runner `/api/workspace/knowledge` currently returns `200` against the current snapshot payload.
 - App Runner `/api/ai/chat` currently returns `200` with a fallback onboarding response.
 - App Runner `/api/workspace/reference-data/import` currently returns `400` with `Import data folder '/app/Import Data' was not found.`, which confirms the route is deployed and that production does not currently bundle the repo-local bootstrap folder.
-- Aurora PostgreSQL now runs from encrypted cluster `wiley-co-aurora-db-encrypted` (`StorageEncrypted=true`); the original unencrypted cluster `wiley-co-aurora-db` is retained temporarily for rollback.
-- Amplify release job `32` failed because the build used a floating `.NET 9` SDK while the cloned repo required the exact `global.json` version.
-- The workspace now contains the corrected [amplify.yml](../amplify.yml) that installs the pinned SDK version, but release job `33` confirmed that Amplify is still building from the tracked GitHub branch copy of `amplify.yml`. The branch used for production releases must carry the same file change before the public release can succeed.
+- Amplify production branch `main` is Git-connected to `https://github.com/Bigessfour/wiley-co-web`, and production job `43` successfully deployed commit `8620cf72f569058a5c72619e9e341e25fb0b34f1` to `https://main.d2ellat1y3ljd9.amplifyapp.com`.
+- Hosted browser proof is complete on the public Amplify site: both QuickBooks preview and QuickBooks assistant flows passed against `https://main.d2ellat1y3ljd9.amplifyapp.com` on 2026-04-16, confirming the shipped client now includes the `InputFile`-based uploader refactor.
 
-Production conclusion: the browser shell is deployed, the thin API runtime infrastructure exists, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. The remaining blockers are final Amplify cutover verification, a durable production reference-data source policy, and the longer-term API hosting roadmap. The only Aurora follow-up is retirement of the rollback cluster after the observation window.
+Production conclusion: the browser shell is deployed, the public Amplify cutover is verified, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. The remaining pre-meeting work is operational hardening only: keep monitoring and release validation in place, decide whether final public API DNS is still needed, and leave observability migration plus the longer-term API hosting roadmap on the post-release track.
 
 ## Provisioned Execution Checklist
 
@@ -51,14 +50,14 @@ Production conclusion: the browser shell is deployed, the thin API runtime infra
 - [x] Create Secrets Manager entries for the App Runner database connection string, xAI API key, and Syncfusion runtime license.
 - [x] Build and push the API container image to ECR.
 - [x] Create App Runner service `wiley-widget-api` with VPC egress and `/health` health checks.
-- [x] Update Amplify app/branch configuration so the next release targets the App Runner URL instead of the Grok proxy.
+- [x] Update Amplify app/branch configuration so releases target the App Runner URL instead of the Grok proxy.
 - [x] Move the Syncfusion build-time license out of Amplify environment variables and into the Amplify Gen 1 environment-secret path.
 - [x] Validate `/health` from the public App Runner hostname.
 - [x] Validate `/api/ai/chat` from the public App Runner hostname.
-- [x] Validate `/api/workspace/snapshot` with live enterprise bootstrap data instead of the current empty-enterprise response.
-- [x] Validate `/api/workspace/knowledge` without the current `500` failure.
+- [x] Validate `/api/workspace/snapshot` with live enterprise bootstrap data.
+- [x] Validate `/api/workspace/knowledge` successfully against the live snapshot payload.
 - [x] Validate that the deployed App Runner revision includes `/api/workspace/reference-data/import` and the other current repo routes.
-- [ ] Start and verify the Amplify release that publishes the staged `WILEY_WORKSPACE_API_BASE_ADDRESS` with the corrected pinned-SDK build spec.
+- [x] Start and verify the Amplify release that publishes `WILEY_WORKSPACE_API_BASE_ADDRESS` with the corrected pinned-SDK build spec.
 - [ ] Replace the raw App Runner hostname with final public API DNS if `api.wileywidget.townofwiley.gov` is required before go-live.
 
 ## Required AWS Additions
@@ -141,9 +140,9 @@ Make the thin API operable before the Council session.
 
 - Keep `/health` exposed and monitored.
 - Send structured application logs to CloudWatch.
-- Keep AWS X-Ray enabled if traces are part of the support workflow.
+- Keep the current X-Ray startup wiring in place for now, but do not treat verified live trace emission as a release prerequisite.
 - As of 2026-04-16, startup wiring and IAM permissions for X-Ray are present, but the live App Runner service still reports `ObservabilityConfiguration=null` and a same-window `aws xray get-service-graph` check in `us-east-2` returned no Wiley API service nodes even after fresh `/health` traffic. AWS App Runner tracing is disabled by default unless observability configuration enables it, so treat trace emission as not yet proven and likely disabled at the service layer.
-- Capture a post-release observability follow-up to either restore verified live X-Ray emission or migrate the service instrumentation to OpenTelemetry before expanding the production support posture.
+- Capture the observability follow-up on the post-release infrastructure track, with OpenTelemetry as the preferred successor instead of spending more release time on the current App Runner X-Ray chain.
 - Add alarms for `5xx` rate, latency, and unhealthy instance count.
 - Retain a deployment log or release note for each pre-meeting push.
 
@@ -153,34 +152,31 @@ These original plan items are now closed in the repository and should not be tre
 
 - CORS is now configuration-driven in [WileyCoWeb.Api/Program.cs](../WileyCoWeb.Api/Program.cs) and [WileyCoWeb.Api/appsettings.json](../WileyCoWeb.Api/appsettings.json), including the town domains.
 - The thin API exposes `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, `/api/workspace/reference-data/import`, scenario endpoints, and utility-customer CRUD in the current repo.
+- Archived snapshot export creation is currently accepted through the API only, backed by `PostSnapshotExports_PersistsArtifacts_AndDownloadEndpointReturnsBinaryContent` in `WorkspaceSnapshotApiTests`. The shipped workspace shell has no archived-export trigger today; if product adds one later, treat it as separate user-facing scope and add browser proof then.
 - The workspace knowledge layer is implemented in code and is shared by the API, the Decision Support rail, and Jarvis.
 - The production migration and Aurora recovery path is documented in [docs/aurora-postgresql-reset-runbook.md](aurora-postgresql-reset-runbook.md) with supporting scripts under [Scripts](../Scripts).
 - API Gateway `w544vrvb3i` is now clearly documented as an xAI proxy only, not the workspace API backend.
 
-## Remaining Server-Side Gaps To Close In Deployment And Data
+## Current Deployment Status And Remaining Open Items
 
-These are the concrete gaps still blocking the stated goals.
+These sections keep the deployed state current and separate true open items from items that are now closed.
 
-### Gap 1. Amplify Public Cutover Is Not Yet Re-verified
+### 1. Amplify Public Cutover Is Verified
 
 Current state:
 
 - App Runner is serving `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, and `/api/workspace/reference-data/import` as expected.
 - The Syncfusion license has been moved out of Amplify environment variables and into the Amplify Gen 1 secret path.
-- Amplify app `d2ellat1y3ljd9` is Git-connected to `https://github.com/Bigessfour/wiley-co-web`, and production job `40` successfully deployed commit `017c3e5013a446ecb5de087c240777b051d29120` from `main`.
-- The hosted browser client is now on the updated release: the public `/_framework/blazor.boot.json` hash is `sha256-RwMqxCQdkIaKM6AosQxBz5hOOkNbTtXFw9HcRvD7UF8=` with `WileyCoWeb.u6y6jaqdar.wasm`.
-- A post-deploy 2026-04-16 hosted Playwright run against `https://main.d2ellat1y3ljd9.amplifyapp.com/wiley-workspace` no longer failed on missing UI, but it did expose the deployed QuickBooks uploader path as the remaining browser blocker.
-- The current working tree now replaces that QuickBooks file-selection path with a Blazor `InputFile` plus an explicit Analyze action, and local QuickBooks component tests pass on the refactored panel.
-- The remaining unresolved cutover item is therefore a new public release of the latest QuickBooks client fix, not a question about whether Amplify can publish from Git.
+- Amplify app `d2ellat1y3ljd9` is Git-connected to `https://github.com/Bigessfour/wiley-co-web`, and production job `43` successfully deployed commit `8620cf72f569058a5c72619e9e341e25fb0b34f1` from `main`.
+- The public build now carries the current workspace configuration and the shipped QuickBooks uploader refactor.
+- Hosted browser proof is complete against `https://main.d2ellat1y3ljd9.amplifyapp.com`: `Workspace_QuickBooksImportPanel_PreviewsUploadedFile` and `Workspace_QuickBooksImportPanel_AssistantAnswersQuestion_ForLoadedPreview` both passed on 2026-04-16.
 
-Closure action:
+Ongoing action:
 
-- Re-run validation from the public site against `/api/workspace/snapshot`, `/api/workspace/knowledge`, and the workspace shell.
-- Publish the latest QuickBooks client change through the Git-connected Amplify branch so the public site actually contains the `InputFile`-based uploader refactor.
-- After that release, re-run the hosted QuickBooks assistant browser flow against `https://main.d2ellat1y3ljd9.amplifyapp.com/wiley-workspace`.
-- If the post-release hosted run still fails, treat the remaining issue as production-only rather than deployment drift.
+- Keep public-site validation against `/api/workspace/snapshot`, `/api/workspace/knowledge`, and the workspace shell in release smoke coverage.
+- Keep the hosted QuickBooks preview and assistant flow in future Amplify release validation so public regressions are caught immediately.
 
-### Gap 2. Production Reference Data Must Stay External To The App Runner Image
+### 2. Production Reference Data Remains External To The App Runner Image
 
 Current state:
 
@@ -189,26 +185,26 @@ Current state:
 - The live App Runner route returns `400` with the missing-folder message, which confirms the container does not currently ship the repo-local sample set.
 - Monthly clerk imports are already handled through the QuickBooks Import panel and the API commit flow into Aurora.
 
-Closure action:
+Ongoing action:
 
 - Keep recurring monthly imports on the QuickBooks panel and API commit path.
 - Treat `Import Data/` as a developer or admin bootstrap set only.
 - If production needs repeatable reference-data bootstrap, provide it through an explicit path or managed source such as S3 plus an admin-only import job, rather than baking files into the App Runner image.
 
-### Gap 3. Aurora Encryption Cutover Is Complete
+### 3. Aurora Encryption Cutover And Rollback Retirement Are Complete
 
 Current state:
 
 - App Runner runtime secret `wiley-widget/api/database-url` now points at encrypted cluster `wiley-co-aurora-db-encrypted`.
 - Snapshot `wiley-co-aurora-db-preenc-20260416-2340` was restored into encrypted Aurora PostgreSQL cluster `wiley-co-aurora-db-encrypted` in the same private subnet and security-group posture, with `StorageEncrypted=true` and `HttpEndpointEnabled=true`.
 - Post-cutover validation on 2026-04-16: App Runner deployment `106a3bc87c7747da933511eb22e29eba` succeeded, `/health` returned `200 Healthy`, `/api/workspace/snapshot` returned populated enterprise options and projections, and live session checks showed traffic on the encrypted cluster while the original cluster remained idle.
+- As of 2026-04-17, `aws rds describe-db-clusters --db-cluster-identifier wiley-co-aurora-db` returns `DBClusterNotFoundFault`, and `aws rds describe-db-instances` shows no instances for `DBClusterIdentifier=='wiley-co-aurora-db'`.
 
-Closure action:
+Current handling:
 
-- Keep `wiley-co-aurora-db` available as a rollback target during the short post-cutover observation window.
-- After acceptance, capture the final rollback snapshot and decommission the unencrypted cluster plus any rollback-only artifacts.
+- Treat `wiley-co-aurora-db-encrypted` as the only live Aurora target in future debugging, release validation, and runbooks.
 
-## Operational Decisions Made On April 15, 2026
+## Operational Decisions And Records Through April 17, 2026
 
 ### Reference-Data Source Policy
 
@@ -225,21 +221,22 @@ Closure action:
 4. Validated parity on key tables (`Enterprises`, `BudgetEntries`, `MunicipalAccounts`, `UtilityCustomers`, `budget_snapshots`, `budget_snapshot_artifacts`, `ledger_entries`) before cutover.
 5. Rotated App Runner secret `wiley-widget/api/database-url` to the encrypted writer endpoint and started deployment `106a3bc87c7747da933511eb22e29eba`, which completed successfully.
 6. Verified post-cutover runtime behavior with `200 Healthy` on `/health`, populated data from `/api/workspace/snapshot`, and active-session checks showing live traffic on the encrypted cluster while the original cluster stayed idle.
+7. Confirmed on 2026-04-17 that the original unencrypted cluster `wiley-co-aurora-db` is no longer present, so rollback-cluster retirement is complete.
 
 ### Observability Follow-Up
 
-- Keep the current X-Ray startup configuration in place for the present App Runner deployment.
-- Treat live trace emission as an unresolved operational verification item until a Wiley service node appears in X-Ray after controlled traffic.
-- Current investigation result: the API host initializes the .NET X-Ray SDK, but the repo contains no X-Ray daemon address or daemon-side configuration, and AWS states that the .NET SDK generates and sends trace data to the X-Ray daemon. This makes the current App Runner deployment a poor place to invest more time unless a daemon delivery path is added deliberately.
+- Keep the current X-Ray startup configuration in place for the present App Runner deployment, but treat it as legacy carry-forward rather than a release sign-off target.
+- Treat live trace emission as a post-release infrastructure verification item, not a release blocker, until a Wiley service node appears in X-Ray after controlled traffic.
+- Current investigation result: the API host initializes the .NET X-Ray SDK, but the repo contains no X-Ray daemon address or daemon-side configuration, and AWS states that the .NET SDK generates and sends trace data to the X-Ray daemon. This makes the current App Runner deployment a poor place to invest more pre-release time unless a deliberate supported delivery path is added.
 - Create a post-release work item to migrate service instrumentation from the legacy X-Ray SDK chain to OpenTelemetry rather than deepening dependency on the 2026 maintenance-mode path.
 
 ## Post-Release Infrastructure Track
 
 These items are intentionally scheduled after the current widget proof closeout so they are owned as infrastructure follow-up work rather than left as implied technical debt.
 
-- Aurora rollback retirement: after the observation window, snapshot and decommission the original unencrypted cluster plus any rollback-only resources.
 - Observability migration: replace or supersede the current X-Ray SDK path with OpenTelemetry, and only keep X-Ray if a supported, proven delivery path is required during the transition.
-- Public cutover hardening: rerun the hosted QuickBooks assistant browser flow and any other public-shell regression checks after the next successful Amplify release.
+- Archived export UX follow-up: if product later adds a workspace-shell trigger for archived snapshot exports, treat it as new user-facing scope and add browser proof rather than reopening the current API-only release acceptance.
+- Public cutover hardening: rerun the hosted QuickBooks assistant browser flow and other public-shell regression checks on future Amplify releases.
 - Public cutover hardening: treat boot-manifest and `WileyCoWeb` fingerprint verification as part of release validation so future public E2E failures can be distinguished from stale-browser deployments immediately.
 
 ### App Runner Replacement Review
@@ -254,7 +251,7 @@ These items are intentionally scheduled after the current widget proof closeout 
 
 ### Phase 1. Runtime Foundation
 
-Target: complete the already-provisioned runtime path.
+Target: completed for the current App Runner and encrypted Aurora runtime path.
 
 - Keep App Runner on the current repo revision.
 - Keep VPC connectivity, secrets, and API security group access intact.
@@ -268,11 +265,11 @@ Exit criteria:
 
 ### Phase 2. Widget-To-API Connection
 
-Target: immediately after runtime validation passes.
+Target: completed for the current public Amplify deployment.
 
 - Keep Amplify pointed at the App Runner URL or final API DNS.
-- Publish the corrected [amplify.yml](../amplify.yml) to the tracked GitHub branch, then run a successful Amplify release with the pinned-SDK build spec.
-- Verify the generated workspace config file is present in the public build.
+- Keep future Amplify releases on the tracked GitHub branch copy of the corrected pinned-SDK [amplify.yml](../amplify.yml).
+- Verify the generated workspace config file remains present in each public build.
 
 Exit criteria:
 
@@ -282,12 +279,13 @@ Exit criteria:
 
 ### Phase 3. Data And AI Validation
 
-Target: after widget-to-API connection works.
+Target: core validation is complete; keep this as recurring release-proof coverage.
 
 - Validate baseline save/load against Aurora.
 - Validate scenario save/list/apply against Aurora.
 - Validate QuickBooks import preview and commit against canonical tables.
 - Validate `/api/ai/chat` and recommendation history.
+- Validate the hosted QuickBooks preview and assistant browser flow on the public site.
 - Validate server-side exports if Council packet generation is in scope.
 
 Exit criteria:
@@ -329,7 +327,7 @@ Platform / AWS owner:
 - Keep App Runner on the current repo image and revision.
 - Keep VPC and security-group access to Aurora healthy.
 - Keep IAM role and secrets aligned with production settings.
-- Create API DNS.
+- Create API DNS if the final public hostname is still required.
 - Add monitoring and alarms.
 
 Application owner:
@@ -341,10 +339,10 @@ Application owner:
 
 Release owner:
 
-- Redeploy Amplify after the tracked GitHub branch contains the corrected pinned-SDK [amplify.yml](../amplify.yml).
-- Set `WILEY_WORKSPACE_API_BASE_ADDRESS` to the API URL.
-- Run end-to-end smoke tests before the Council meeting.
+- Keep Amplify releases flowing from the tracked GitHub branch copy of the corrected pinned-SDK [amplify.yml](../amplify.yml).
+- Keep `WILEY_WORKSPACE_API_BASE_ADDRESS` pointed at the API URL.
+- Run end-to-end smoke tests on each release before the Council meeting.
 
 ## Immediate Next Action
 
-The next server-side move should be to redeploy the current `WileyCoWeb.Api` revision to App Runner, then rerun the public validation sequence (`/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, `/api/workspace/reference-data/import`) before completing the Amplify cutover release.
+The next server-side moves are operational hardening only: add monitoring and alarms, keep the release note and rollback path current, decide whether final public API DNS is still needed, and preserve the hosted browser validation sequence (`/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, `/api/workspace/reference-data/import` plus the QuickBooks assistant/browser smoke) on future Amplify releases. Observability migration remains post-release infrastructure work.
