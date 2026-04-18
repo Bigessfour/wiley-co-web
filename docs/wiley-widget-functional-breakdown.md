@@ -60,6 +60,7 @@ This is a code-trace proof standard, not an executed test certification. The flo
 
 + Core workspace bootstrap, baseline persistence, rate snapshots, scenarios, workspace knowledge, QuickBooks preview and commit, Jarvis persistence and reset, and immediate export flows have strong proof in the current code and test inventory.
 + Client-contained routing, rate recomputation, customer filtering, browser persistence, and download flows are directly covered by passing browser or component tests.
++ Status update 2026-04-17: the lower-level proof and fallback/error-boundary coverage follow-up is now pushed to `main` in commit `a9aa48b`. Local validation on that pushed change set is green: `WileyCoWeb.ComponentTests` Release coverage is `68.48%`, and `WileyCoWeb.IntegrationTests` passes `58/58`.
 + The current AWS runtime shape for Aurora access, runtime secret injection, xAI proxying, and Amplify build-time secret delivery is verified for the deployed environment.
 + Hosted QuickBooks preview and assistant proof is now complete on the public Amplify site: job `43` deployed commit `8620cf72f569058a5c72619e9e341e25fb0b34f1`, and both hosted browser tests passed against `https://main.d2ellat1y3ljd9.amplifyapp.com` on 2026-04-16.
 + The shipped Customer Viewer now has browser proof for roster display, service filtering, and full create/edit/delete maintenance over `/api/utility-customers`, while keeping the shared customer summary/export state synchronized.
