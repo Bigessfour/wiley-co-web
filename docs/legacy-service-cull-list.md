@@ -96,8 +96,7 @@ Why this pass was safe:
 
 ## Remaining Candidates
 
-- Empty or already-stale leftovers:
-  - `src/WileyWidget.Services/PasswordBoxHelper.cs`
+- None currently verified. `PasswordBoxHelper.cs` was an empty file already excluded from compilation by `src/WileyWidget.Services/WileyWidget.Services.csproj`, so it has now been removed as dead residue.
 
 ## Notes
 
