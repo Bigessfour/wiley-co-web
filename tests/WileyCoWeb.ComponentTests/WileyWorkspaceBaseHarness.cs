@@ -9,6 +9,7 @@ public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 	public string BaselineStatus => BaselineSaveStatus;
 	public string SnapshotStatus => SnapshotSaveStatus;
 	public string WorkspaceStatus => WorkspaceLoadStatus;
+	public string ScenarioStatus => ScenarioPersistenceStatus;
 
 	// Panel routing surface
 	public string ActivePanel => ActivePanelKey;
@@ -25,6 +26,11 @@ public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 	public Task InvokeRefreshWorkspaceAsync()
 	{
 		return RefreshWorkspaceAsync();
+	}
+
+	public Task InvokeFirstRenderAsync()
+	{
+		return OnAfterRenderAsync(true);
 	}
 
 	public Task InvokeSaveRateSnapshotAsync()

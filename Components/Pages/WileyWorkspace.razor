@@ -13,6 +13,8 @@
 
 <PageTitle>Wiley Workspace | Wiley.co</PageTitle>
 
+<LoggingErrorBoundary BoundaryName="WileyWorkspace">
+    <ChildContent>
 <div class="wiley-workspace min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
     <div class="mx-auto flex max-w-[96rem] flex-col gap-4">
         <div id="workspace-overview-hero" class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 px-6 py-5 text-white shadow-lg">
@@ -323,6 +325,21 @@
         </div>
     </div>
 </div>
+    </ChildContent>
+    <ErrorContent>
+        <section id="workspace-error-boundary" class="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-6 text-slate-900 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-rose-700">Workspace Error</p>
+            <h2 class="mt-2 text-2xl font-semibold tracking-tight">The workspace hit an unexpected rendering error.</h2>
+            <p class="mt-2 max-w-2xl text-sm text-slate-700">
+                Review the browser console and structured client logs for the full stack trace, then reopen the workspace panel or return to the overview.
+            </p>
+            <div class="mt-4 flex flex-wrap gap-3">
+                <a class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/wiley-workspace">Reload workspace</a>
+                <a class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 no-underline" href="/">Return home</a>
+            </div>
+        </section>
+    </ErrorContent>
+</LoggingErrorBoundary>
 
 <style>
     .wiley-workspace .workspace-sidebar {

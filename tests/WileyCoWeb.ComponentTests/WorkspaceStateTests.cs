@@ -100,4 +100,32 @@ public sealed class WorkspaceStateTests
 		Assert.True(state.IsUsingStartupFallback);
 		Assert.Contains("local fallback data", state.StartupSourceStatus);
 	}
+
+	[Fact]
+	public void ApplyBootstrap_ClearsScenarioItemsAndProjectionRows_WhenIncomingPayloadIsEmpty()
+	{
+		var state = new WorkspaceState();
+		state.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O")));
+
+		state.ApplyBootstrap(new WorkspaceBootstrapData(
+			WorkspaceTestData.WaterUtility,
+			WorkspaceTestData.WaterFiscalYear,
+			string.Empty,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"))
+		{
+			ScenarioItems = [],
+			ProjectionRows = []
+		});
+
+		Assert.Empty(state.ScenarioItems);
+		Assert.Empty(state.ProjectionSeries);
+	}
 }

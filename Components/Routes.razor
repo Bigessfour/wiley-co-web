@@ -1,23 +1,44 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <LayoutView Layout="typeof(Layout.MainLayout)">
-            <PageTitle>Page Not Found | Wiley.co</PageTitle>
+﻿<LoggingErrorBoundary BoundaryName="Router">
+    <ChildContent>
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <LayoutView Layout="typeof(Layout.MainLayout)">
+                    <PageTitle>Page Not Found | Wiley.co</PageTitle>
 
-            <section class="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-6 text-slate-900 shadow-sm">
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700">Routing</p>
-                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Page not found</h2>
+                    <section class="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-6 text-slate-900 shadow-sm">
+                        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-700">Routing</p>
+                        <h2 class="mt-2 text-2xl font-semibold tracking-tight">Page not found</h2>
+                        <p class="mt-2 max-w-2xl text-sm text-slate-700">
+                            The requested route does not match a Wiley Widget page. Return to the launcher or reopen the workspace overview.
+                        </p>
+                        <div class="mt-4 flex flex-wrap gap-3">
+                            <a class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/">Return home</a>
+                            <a class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 no-underline" href="/wiley-workspace">Open workspace overview</a>
+                        </div>
+                    </section>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </ChildContent>
+    <ErrorContent>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <PageTitle>Application Error | Wiley.co</PageTitle>
+
+            <section id="router-error-boundary" class="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-6 text-slate-900 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-rose-700">Application Error</p>
+                <h2 class="mt-2 text-2xl font-semibold tracking-tight">The workspace router hit an unexpected error.</h2>
                 <p class="mt-2 max-w-2xl text-sm text-slate-700">
-                    The requested route does not match a Wiley Widget page. Return to the launcher or reopen the workspace overview.
+                    Review the browser console and structured client logs for the full exception details, then reload the workspace or return home.
                 </p>
                 <div class="mt-4 flex flex-wrap gap-3">
-                    <a class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/">Return home</a>
-                    <a class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 no-underline" href="/wiley-workspace">Open workspace overview</a>
+                    <a class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/wiley-workspace">Reload workspace</a>
+                    <a class="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 no-underline" href="/">Return home</a>
                 </div>
             </section>
         </LayoutView>
-    </NotFound>
-</Router>
+    </ErrorContent>
+</LoggingErrorBoundary>

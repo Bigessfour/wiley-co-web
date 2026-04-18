@@ -19,8 +19,8 @@ public sealed class WorkspaceBootstrapService(WorkspaceState workspaceState, Wor
         Console.WriteLine("[startup] WorkspaceBootstrapService.LoadAsync entered.");
         logger?.LogInformation("Workspace bootstrap started (enterprise={Enterprise}, fiscalYear={FiscalYear})", enterprise ?? "default", fiscalYear?.ToString() ?? "default");
 
-        const WorkspaceStartupSource startupSource = WorkspaceStartupSource.ApiSnapshot;
-        const string startupStatus = "Workspace started from the live workspace API snapshot.";
+        var startupSource = WorkspaceStartupSource.ApiSnapshot;
+        var startupStatus = "Workspace started from the live workspace API snapshot.";
 
         WorkspaceBootstrapData bootstrapData;
 
@@ -31,8 +31,10 @@ public sealed class WorkspaceBootstrapService(WorkspaceState workspaceState, Wor
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Workspace bootstrap failed because the live API snapshot was unavailable or invalid.");
-            throw new InvalidOperationException("Workspace bootstrap requires a live API snapshot from production data.", ex);
+            logger?.LogWarning(ex, "Workspace bootstrap is falling back because the live API snapshot was unavailable or invalid.");
+            bootstrapData = CreateLocalFallbackBootstrap(enterprise, fiscalYear);
+            startupSource = WorkspaceStartupSource.LocalBootstrapFallback;
+            startupStatus = "Workspace started from local fallback data because the workspace API was unavailable. Saved scenarios are temporarily unavailable.";
         }
 
         workspaceState.ApplyBootstrap(bootstrapData);
@@ -40,5 +42,28 @@ public sealed class WorkspaceBootstrapService(WorkspaceState workspaceState, Wor
         workspaceState.SetCurrentStateSource(startupSource, startupStatus);
         Console.WriteLine("[startup] WorkspaceBootstrapService.LoadAsync completed.");
         logger?.LogInformation("Workspace bootstrap completed from {Source} with status: {Status}", startupSource, startupStatus);
+    }
+
+    private WorkspaceBootstrapData CreateLocalFallbackBootstrap(string? enterprise, int? fiscalYear)
+    {
+        var currentState = workspaceState.ToBootstrapData();
+
+        return new WorkspaceBootstrapData(
+            string.IsNullOrWhiteSpace(enterprise) ? currentState.SelectedEnterprise : enterprise.Trim(),
+            fiscalYear is > 0 ? fiscalYear.Value : currentState.SelectedFiscalYear,
+            string.Empty,
+            currentState.CurrentRate,
+            currentState.TotalCosts,
+            currentState.ProjectedVolume,
+            DateTime.UtcNow.ToString("O"))
+        {
+            EnterpriseOptions = currentState.EnterpriseOptions ?? [],
+            FiscalYearOptions = currentState.FiscalYearOptions ?? [],
+            CustomerServiceOptions = currentState.CustomerServiceOptions ?? [],
+            CustomerCityLimitOptions = currentState.CustomerCityLimitOptions ?? [],
+            CustomerRows = currentState.CustomerRows ?? [],
+            ProjectionRows = currentState.ProjectionRows ?? [],
+            ScenarioItems = []
+        };
     }
 }

@@ -41,7 +41,7 @@ public sealed class WorkspaceBootstrapServiceTests
 	}
 
 	[Fact]
-	public async Task LoadAsync_Throws_WhenApiRequestFails_AndDoesNotUseFallbackData()
+	public async Task LoadAsync_FallsBack_WhenApiRequestFails()
 	{
 		var state = new WorkspaceState();
 		var apiHandler = new StubHttpMessageHandler(_ => throw new HttpRequestException("API unavailable"));
@@ -50,12 +50,13 @@ public sealed class WorkspaceBootstrapServiceTests
 			state,
 			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
 
-		var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
+		await service.LoadAsync();
 
-		Assert.Contains("live API snapshot", exception.Message, StringComparison.OrdinalIgnoreCase);
-		Assert.Equal(WorkspaceStartupSource.None, state.StartupSource);
-		Assert.Equal(WorkspaceStartupSource.None, state.CurrentStateSource);
-		Assert.Equal(string.Empty, state.SelectedEnterprise);
+		Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
+		Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.CurrentStateSource);
+		Assert.True(state.IsUsingStartupFallback);
+		Assert.Empty(state.ScenarioItems);
+		Assert.Contains("local fallback data", state.StartupSourceStatus, StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static HttpResponseMessage CreateJsonResponse<TValue>(TValue value)

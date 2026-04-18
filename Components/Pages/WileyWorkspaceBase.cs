@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -30,6 +31,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     [Inject]
     protected BrowserDownloadService BrowserDownloadService { get; set; } = default!;
+
+    [Inject]
+    protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
 
     private bool persistenceInitialized;
     private DateTimeOffset? lastWorkspaceSyncUtc;
@@ -255,6 +259,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            WorkspaceLogger.LogWarning(ex, "Workspace scenario save failed for {Enterprise} FY {FiscalYear} Scenario={ScenarioName}.", SelectedEnterprise, SelectedFiscalYear, ActiveScenarioName);
             ScenarioPersistenceStatus = $"Scenario save failed: {ex.Message}";
             _apiHealth = WorkspaceApiHealth.Degraded;
         }
@@ -295,6 +300,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            WorkspaceLogger.LogWarning(ex, "Workspace baseline save failed for {Enterprise} FY {FiscalYear}.", SelectedEnterprise, SelectedFiscalYear);
             BaselineSaveStatus = $"Baseline save failed: {ex.Message}";
             _apiHealth = WorkspaceApiHealth.Degraded;
         }
@@ -328,6 +334,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            WorkspaceLogger.LogWarning(ex, "Workspace scenario apply failed for {Enterprise} FY {FiscalYear} SnapshotId={SnapshotId}.", SelectedEnterprise, SelectedFiscalYear, SelectedScenarioSnapshotId);
             ScenarioPersistenceStatus = $"Scenario apply failed: {ex.Message}";
             _apiHealth = WorkspaceApiHealth.Degraded;
         }
@@ -358,6 +365,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            WorkspaceLogger.LogWarning(ex, "Workspace snapshot save failed for {Enterprise} FY {FiscalYear}.", SelectedEnterprise, SelectedFiscalYear);
             SnapshotSaveStatus = $"Snapshot save failed: {ex.Message}";
             _apiHealth = WorkspaceApiHealth.Degraded;
         }
@@ -407,6 +415,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected override void OnInitialized()
     {
         Console.WriteLine("[startup] WileyWorkspaceBase.OnInitialized entered.");
+        WorkspaceLogger.LogInformation("Wiley workspace component initialized for panel {Panel}.", Panel ?? "overview");
         WorkspaceState.Changed += HandleWorkspaceStateChanged;
     }
 
@@ -428,17 +437,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            WorkspaceLogger.LogWarning(ex, "Workspace persistence initialization failed during first render.");
             WorkspaceLoadStatus = $"Workspace persistence initialization failed: {ex.Message}";
         }
 
-        try
-        {
-            await RefreshScenarioCatalogAsync();
-        }
-        catch (Exception ex)
-        {
-            ScenarioPersistenceStatus = $"Saved scenario list could not be loaded: {ex.Message}";
-        }
+        await RefreshScenarioCatalogAsync();
 
         if (!WorkspaceLoadStatus.Contains("failed", StringComparison.OrdinalIgnoreCase))
         {
@@ -506,6 +509,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
+            WorkspaceLogger.LogWarning(ex, "Workspace reload failed for {Enterprise} FY {FiscalYear}.", enterprise, fiscalYear);
             WorkspaceLoadStatus = $"Workspace reload failed: {ex.Message}";
             _apiHealth = WorkspaceApiHealth.Degraded;
         }
@@ -518,6 +522,13 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     private async Task RefreshScenarioCatalogAsync(long? selectedScenarioId = null)
     {
+        if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
+        {
+            SetNoSavedScenariosState("Saved scenarios are unavailable until the workspace reconnects to live data.");
+            WorkspaceLogger.LogInformation("Saved scenario catalog refresh skipped because the workspace selection is not initialized (enterprise={Enterprise}, fiscalYear={FiscalYear}).", SelectedEnterprise, SelectedFiscalYear);
+            return;
+        }
+
         try
         {
             var scenarios = await WorkspaceSnapshotApiService.GetScenariosAsync(SelectedEnterprise, SelectedFiscalYear);
@@ -535,7 +546,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             if (SelectedScenarioSnapshotId.HasValue)
             {
                 var selectedScenario = SavedScenarios.FirstOrDefault(item => item.SnapshotId == SelectedScenarioSnapshotId.Value);
-                ScenarioDescription = selectedScenario?.Description ?? ScenarioDescription;
+                ScenarioDescription = selectedScenario?.Description ?? string.Empty;
+            }
+            else
+            {
+                ScenarioDescription = string.Empty;
             }
 
             if (SavedScenarios.Count == 0)
@@ -545,10 +560,18 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
         catch (Exception ex)
         {
-            ScenarioPersistenceStatus = $"Saved scenario list could not be loaded: {ex.Message}";
-            SavedScenarios = [];
-            SelectedScenarioSnapshotId = null;
+            WorkspaceLogger.LogWarning(ex, "Saved scenario catalog load failed for {Enterprise} FY {FiscalYear}. Falling back to no-scenarios mode.", SelectedEnterprise, SelectedFiscalYear);
+            SetNoSavedScenariosState($"Saved scenarios are currently unavailable for {SelectedEnterprise} FY {SelectedFiscalYear}. You can keep working locally and try again when the API reconnects.");
+            _apiHealth = WorkspaceApiHealth.Degraded;
         }
+    }
+
+    private void SetNoSavedScenariosState(string status)
+    {
+        SavedScenarios = [];
+        SelectedScenarioSnapshotId = null;
+        ScenarioDescription = string.Empty;
+        ScenarioPersistenceStatus = status;
     }
 
     private async Task ExportDocumentAsync(Func<WorkspaceExportDocument> exportFactory, string pendingStatus)

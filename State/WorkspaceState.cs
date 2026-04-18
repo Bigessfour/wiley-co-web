@@ -504,15 +504,22 @@ public sealed class WorkspaceState
 
     private bool SetScenarioItemsWithoutNotify(IReadOnlyList<WorkspaceScenarioItemData>? items)
     {
-        if (items is null || items.Count == 0)
+        var normalizedItems = items?.Select(item => new ScenarioItem(item.Id, item.Name, item.Cost)).ToList() ?? [];
+
+        if (scenarioItems.Count == normalizedItems.Count
+            && scenarioItems.Zip(normalizedItems, (existing, incoming) =>
+                existing.Id == incoming.Id
+                && string.Equals(existing.Name, incoming.Name, StringComparison.Ordinal)
+                && existing.Cost == incoming.Cost)
+            .All(static matches => matches))
         {
             return false;
         }
 
         scenarioItems.Clear();
-        foreach (var item in items)
+        foreach (var item in normalizedItems)
         {
-            scenarioItems.Add(new ScenarioItem(item.Id, item.Name, item.Cost));
+            scenarioItems.Add(item);
         }
 
         return true;
@@ -538,18 +545,15 @@ public sealed class WorkspaceState
 
     private bool SetProjectionRowsWithoutNotify(IReadOnlyList<ProjectionRow>? rows)
     {
-        if (rows is null || rows.Count == 0)
-        {
-            return false;
-        }
+        var normalizedRows = rows?.Select(row => new ProjectionRow(row.Year, row.Rate)).ToList() ?? [];
 
-        if (projectionRows.Count == rows.Count && projectionRows.SequenceEqual(rows))
+        if (projectionRows.SequenceEqual(normalizedRows))
         {
             return false;
         }
 
         projectionRows.Clear();
-        foreach (var row in rows)
+        foreach (var row in normalizedRows)
         {
             projectionRows.Add(new ProjectionRow(row.Year, row.Rate));
         }

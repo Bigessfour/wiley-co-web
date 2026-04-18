@@ -144,7 +144,7 @@ public sealed class WorkspaceServiceTests
     }
 
     [Fact]
-    public async Task WorkspaceBootstrapService_Throws_WhenApiSnapshotIsUnavailable()
+    public async Task WorkspaceBootstrapService_FallsBack_WhenApiSnapshotIsUnavailable()
     {
         var state = new WorkspaceState();
         var client = new HttpClient(new RoutedHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)))
@@ -155,17 +155,17 @@ public sealed class WorkspaceServiceTests
         var snapshotService = new WorkspaceSnapshotApiService(client);
         var service = new WorkspaceBootstrapService(state, snapshotService);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
+        await service.LoadAsync();
 
-        Assert.Contains("live API snapshot", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(string.Empty, state.SelectedEnterprise);
-        Assert.Equal(0, state.SelectedFiscalYear);
-        Assert.Equal(WorkspaceStartupSource.None, state.StartupSource);
-        Assert.Equal(WorkspaceStartupSource.None, state.CurrentStateSource);
+        Assert.Equal(string.Empty, state.ActiveScenarioName);
+        Assert.Empty(state.ScenarioItems);
+        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
+        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.CurrentStateSource);
+        Assert.Contains("local fallback data", state.StartupSourceStatus, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task WorkspaceBootstrapService_Throws_WhenLiveApiSnapshotIsUnavailable()
+    public async Task WorkspaceBootstrapService_FallsBack_WhenLiveApiSnapshotPayloadIsNull()
     {
         var state = new WorkspaceState();
         var client = new HttpClient(new RoutedHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -179,13 +179,13 @@ public sealed class WorkspaceServiceTests
         var snapshotService = new WorkspaceSnapshotApiService(client);
         var service = new WorkspaceBootstrapService(state, snapshotService);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.LoadAsync());
+        await service.LoadAsync();
 
-        Assert.Contains("live API snapshot", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(string.Empty, state.SelectedEnterprise);
-        Assert.Equal(0, state.SelectedFiscalYear);
-        Assert.Equal(WorkspaceStartupSource.None, state.StartupSource);
-        Assert.Equal(WorkspaceStartupSource.None, state.CurrentStateSource);
+        Assert.Equal(string.Empty, state.ActiveScenarioName);
+        Assert.Empty(state.ScenarioItems);
+        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
+        Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.CurrentStateSource);
+        Assert.Contains("local fallback data", state.StartupSourceStatus, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

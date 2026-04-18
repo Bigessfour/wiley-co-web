@@ -342,7 +342,9 @@
 			"type": "shell",
 			"options": {
 				"env": {
-					"DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER": "1"
+					"DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER": "1",
+					"DOTNET_WATCH_RESTART_ON_RUDE_EDIT": "1",
+					"DOTNET_WATCH_SUPPRESS_EMOJIS": "1"
 				}
 			},
 			"problemMatcher": {
@@ -372,6 +374,13 @@
 				"WileyCoWeb.Api"
 			],
 			"type": "shell",
+			"options": {
+				"env": {
+					"DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER": "1",
+					"DOTNET_WATCH_RESTART_ON_RUDE_EDIT": "1",
+					"DOTNET_WATCH_SUPPRESS_EMOJIS": "1"
+				}
+			},
 			"problemMatcher": {
 				"pattern": "$msCompile",
 				"background": {
@@ -389,12 +398,25 @@
 			"isBackground": true
 		},
 		{
-			"label": "👀 Watch & Debug",
+			"label": "watch: debug full stack",
 			"dependsOn": [
 				"watch: api",
-				"watch"
+				"watch: debug client"
 			],
 			"dependsOrder": "parallel",
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "always",
+				"focus": false,
+				"echo": true
+			}
+		},
+		{
+			"label": "👀 Watch & Debug",
+			"dependsOn": [
+				"watch: debug full stack"
+			],
+			"dependsOrder": "sequence",
 			"presentation": {
 				"panel": "dedicated",
 				"reveal": "always",

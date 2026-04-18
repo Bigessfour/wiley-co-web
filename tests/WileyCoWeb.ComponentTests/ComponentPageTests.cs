@@ -90,6 +90,25 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public async Task WileyWorkspace_ScenarioCatalogFailure_ShowsGracefulNoScenariosState()
+	{
+		using var context = CreateContext(CreateSnapshotClient(failScenarioCatalog: true));
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O")));
+
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+		await cut.InvokeAsync(() => cut.Instance.InvokeFirstRenderAsync());
+
+		Assert.Contains("Saved scenarios are currently unavailable", cut.Instance.ScenarioStatus);
+		Assert.Equal("Degraded", cut.Instance.ApiHealth);
+	}
+
+	[Fact]
 	public async Task WileyWorkspaceBaseHarness_SaveRateSnapshotAsync_UpdatesSnapshotStatus()
 	{
 		using var context = CreateContext();
@@ -414,17 +433,18 @@ public sealed class ComponentPageTests
 		});
 	}
 
-	private static TestContext CreateContext()
+	private static TestContext CreateContext(HttpClient? snapshotClient = null)
 	{
 		var context = new TestContext();
 
 		var workspaceState = new WorkspaceState();
 		var jsRuntime = new FakeJsRuntime();
 
+		context.Services.AddLogging();
 		context.Services.AddSingleton(workspaceState);
 		context.Services.AddSingleton<IJSRuntime>(jsRuntime);
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
-		var snapshotClient = CreateSnapshotClient();
+		snapshotClient ??= CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
 		context.Services.AddScoped(_ => snapshotService);
 		context.Services.AddScoped(_ => new UtilityCustomerApiService(snapshotClient));
@@ -440,7 +460,7 @@ public sealed class ComponentPageTests
 		return context;
 	}
 
-	private static HttpClient CreateSnapshotClient()
+	private static HttpClient CreateSnapshotClient(bool failScenarioCatalog = false)
 	{
 		var utilityCustomers = new List<UtilityCustomerRecord>
 		{
@@ -485,6 +505,33 @@ public sealed class ComponentPageTests
 		return new HttpClient(new RoutedHttpMessageHandler(async request =>
 		{
 			var requestPath = request.RequestUri?.AbsolutePath ?? string.Empty;
+
+			if (request.Method == HttpMethod.Get && requestPath.EndsWith("/api/workspace/scenarios", StringComparison.OrdinalIgnoreCase))
+			{
+				if (failScenarioCatalog)
+				{
+					return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+					{
+						Content = new StringContent("scenario catalog unavailable", Encoding.UTF8, "text/plain")
+					};
+				}
+
+				return CreateJsonResponse(HttpStatusCode.OK, new WorkspaceScenarioCollectionResponse(
+				[
+					new WorkspaceScenarioSummaryResponse(
+						7,
+						WorkspaceTestData.CouncilReviewScenario,
+						WorkspaceTestData.WaterUtility,
+						WorkspaceTestData.WaterFiscalYear,
+						"2026-04-05T12:00:00Z",
+						WorkspaceTestData.WaterCurrentRate,
+						WorkspaceTestData.WaterTotalCosts,
+						WorkspaceTestData.WaterProjectedVolume,
+						6200m,
+						1,
+						"Saved scenario for the workspace shell.")
+				]));
+			}
 
 			if (request.Method == HttpMethod.Get && requestPath.EndsWith("/api/utility-customers", StringComparison.OrdinalIgnoreCase))
 			{
