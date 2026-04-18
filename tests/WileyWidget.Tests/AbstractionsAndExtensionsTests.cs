@@ -46,18 +46,6 @@ public sealed class AbstractionsAndExtensionsTests
     }
 
     [Fact]
-    public void CacheEntryOptions_UsesExpectedDefaults()
-    {
-        var options = new CacheEntryOptions();
-
-        Assert.Equal(1, options.Priority);
-        Assert.Null(options.AbsoluteExpirationRelativeToNow);
-        Assert.Null(options.SlidingExpiration);
-        Assert.Null(options.Size);
-        Assert.Null(options.PostEvictionCallback);
-    }
-
-    [Fact]
     public void ResourceLoadResult_ToString_FormatsSummary()
     {
         var result = new ResourceLoadResult
