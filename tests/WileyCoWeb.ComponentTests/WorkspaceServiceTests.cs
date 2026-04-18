@@ -68,6 +68,21 @@ public sealed class WorkspaceServiceTests
     }
 
     [Fact]
+    public async Task BrowserDownloadService_InvokesBase64DownloadInterop_WithDocumentPayload()
+    {
+        var runtime = new FakeJsRuntime();
+        var service = new BrowserDownloadService(runtime);
+        var document = new WorkspaceExportDocument("workspace-proof.xlsx", "application/test", [0, 1, 2, 3]);
+
+        await service.DownloadAsync(document);
+
+        var call = Assert.Single(runtime.Calls, entry => entry.Identifier == "wileyDownloads.saveFileFromBase64");
+        Assert.Equal("workspace-proof.xlsx", call.Arguments[0]);
+        Assert.Equal("application/test", call.Arguments[1]);
+        Assert.Equal(Convert.ToBase64String(document.Content), call.Arguments[2]);
+    }
+
+    [Fact]
     public async Task WorkspaceBootstrapService_UsesApiSnapshot_WhenAvailable()
     {
         var state = new WorkspaceState();

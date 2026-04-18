@@ -53,16 +53,9 @@ jobs:
       - name: Run tests with coverage
         run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --settings coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }}
 
-      - name: Enforce coverage threshold
+      - name: Generate source coverage summary
         shell: pwsh
         run: |
-          $thresholds = @{
-            component = 68
-            integration = 11
-            widget = 32
-            e2e = 0
-          }
-
           $resultsDirectory = Join-Path "TestResults" "${{ matrix.name }}"
           $coverageReport = Get-ChildItem -Path $resultsDirectory -Recurse -Filter coverage.cobertura.xml |
             Sort-Object FullName |
@@ -74,9 +67,113 @@ jobs:
 
           [xml]$coverageXml = Get-Content -Path $coverageReport.FullName -Raw
           $coveragePercent = [math]::Round(([double]$coverageXml.DocumentElement.'line-rate' * 100), 2)
-          $threshold = $thresholds['${{ matrix.name }}']
 
-          Write-Host "${{ matrix.name }} line coverage: $coveragePercent% (threshold $threshold%)"
+          $sourceLineRows = foreach ($package in @($coverageXml.coverage.packages.package)) {
+            foreach ($class in @($package.classes.class)) {
+              $filename = [string]$class.filename
+              if ([string]::IsNullOrWhiteSpace($filename)) {
+                continue
+              }
+
+              if ($filename -like 'tests/*' -or $filename -like 'tests\*') {
+                continue
+              }
+
+              foreach ($line in @($class.lines.line)) {
+                [pscustomobject]@{
+                  File = $filename.Replace('\\', '/')
+                  LineNumber = [int]$line.number
+                  Hits = [int]$line.hits
+                }
+              }
+            }
+          }
+
+          $sourceCoverageCsv = Join-Path $resultsDirectory 'source-coverage-summary.csv'
+          $sourceCoverageMarkdown = Join-Path $resultsDirectory 'source-coverage-summary.md'
+
+          if (-not $sourceLineRows) {
+            @(
+              '# Source Coverage Summary',
+              '',
+              "No production source lines were instrumented for `${{ matrix.name }}`.",
+              '',
+              "Project line coverage: $coveragePercent%"
+            ) | Set-Content -Path $sourceCoverageMarkdown
+
+            [pscustomobject]@{
+              File = '(no production source files instrumented)'
+              LineRate = 0
+              LinesCovered = 0
+              LinesValid = 0
+            } | Export-Csv -Path $sourceCoverageCsv -NoTypeInformation
+          }
+          else {
+            $sourceCoverageSummary = $sourceLineRows |
+              Group-Object File, LineNumber |
+              ForEach-Object {
+                $sample = $_.Group[0]
+                [pscustomobject]@{
+                  File = $sample.File
+                  LineNumber = $sample.LineNumber
+                  Hits = ($_.Group | Measure-Object -Property Hits -Maximum).Maximum
+                }
+              } |
+              Group-Object File |
+              ForEach-Object {
+                $valid = $_.Count
+                $covered = (@($_.Group | Where-Object Hits -gt 0)).Count
+                [pscustomobject]@{
+                  File = $_.Name
+                  LineRate = [math]::Round(($covered / [double]$valid) * 100, 2)
+                  LinesCovered = $covered
+                  LinesValid = $valid
+                }
+              } |
+              Sort-Object LineRate, File
+
+            $sourceCoverageSummary | Export-Csv -Path $sourceCoverageCsv -NoTypeInformation
+
+            $topUncoveredRows = $sourceCoverageSummary |
+              Select-Object -First 25 |
+              ForEach-Object { "| $($_.File) | $($_.LineRate)% | $($_.LinesCovered) | $($_.LinesValid) |" }
+
+            @(
+              '# Source Coverage Summary',
+              '',
+              "Project line coverage: $coveragePercent%",
+              '',
+              '| File | Line Coverage | Covered Lines | Valid Lines |',
+              '| --- | ---: | ---: | ---: |'
+            ) + $topUncoveredRows | Set-Content -Path $sourceCoverageMarkdown
+          }
+
+          if ($env:GITHUB_STEP_SUMMARY) {
+            Get-Content -Path $sourceCoverageMarkdown | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Enforce coverage baseline
+        shell: pwsh
+        run: |
+          $resultsDirectory = Join-Path "TestResults" "${{ matrix.name }}"
+          $coverageReport = Get-ChildItem -Path $resultsDirectory -Recurse -Filter coverage.cobertura.xml |
+            Sort-Object FullName |
+            Select-Object -First 1
+
+          if (-not $coverageReport) {
+            throw "Coverage report was not generated for ${{ matrix.project }}."
+          }
+
+          $baselines = Get-Content '.github/coverage-baselines.json' -Raw | ConvertFrom-Json -AsHashtable
+          if (-not $baselines.ContainsKey('${{ matrix.name }}')) {
+            throw "No coverage baseline was configured for '${{ matrix.name }}'."
+          }
+
+          [xml]$coverageXml = Get-Content -Path $coverageReport.FullName -Raw
+          $coveragePercent = [math]::Round(([double]$coverageXml.DocumentElement.'line-rate' * 100), 2)
+          $threshold = [double]$baselines['${{ matrix.name }}']
+
+          Write-Host "${{ matrix.name }} line coverage: $coveragePercent% (baseline $threshold%)"
 
           if ($threshold -eq 0) {
             Write-Host "E2E coverage is reported separately because browser-only runs do not instrument app code in-process."
@@ -84,7 +181,7 @@ jobs:
           }
 
           if ($coveragePercent -lt $threshold) {
-            throw "Coverage gate failed for ${{ matrix.name }}: $coveragePercent% < $threshold%."
+            throw "Coverage gate failed for ${{ matrix.name }}: $coveragePercent% < $threshold% baseline."
           }
 
       - name: Upload coverage artifact
@@ -92,7 +189,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.name }}
-          path: TestResults/${{ matrix.name }}/**/coverage.cobertura.xml
+          path: |
+            TestResults/${{ matrix.name }}/**/coverage.cobertura.xml
+            TestResults/${{ matrix.name }}/source-coverage-summary.csv
+            TestResults/${{ matrix.name }}/source-coverage-summary.md
           if-no-files-found: warn
 
   build-and-publish:

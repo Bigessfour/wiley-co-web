@@ -31,7 +31,7 @@
     </div>
 
     <div class="space-y-3">
-        <SfGrid TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420" OnActionComplete="OnScenarioGridActionComplete">
+        <SfGrid ID="scenario-grid" TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420" OnActionComplete="OnScenarioGridActionComplete">
             <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
             <GridColumns>
                 <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />

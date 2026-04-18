@@ -61,7 +61,7 @@
     }
 
     <div>
-        <SfGrid TValue="UtilityCustomerRecord" DataSource="@FilteredCustomers" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
+        <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@FilteredCustomers" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
             <GridPageSettings PageSize="10" PageCount="5" />
             <GridColumns>
                 <GridColumn Field=@nameof(UtilityCustomerRecord.AccountNumber) HeaderText="Account #" Width="125" />

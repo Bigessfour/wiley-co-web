@@ -85,6 +85,45 @@ public sealed class WileyWorkspaceE2ETests
 	}
 
 	[Fact]
+	public async Task Workspace_Persistence_RestoresEditedValues_AfterBrowserReload()
+	{
+		await RunWorkspaceTestAsync(async page =>
+		{
+			await OpenPanelAsync(page, "rates");
+			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
+			await currentRateInput.FillAsync("64.5");
+			await currentRateInput.PressAsync("Tab");
+
+			await OpenPanelAsync(page, "break-even");
+			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
+			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
+			await totalCostsInput.FillAsync("40250");
+			await projectedVolumeInput.FillAsync("650");
+			await projectedVolumeInput.PressAsync("Tab");
+
+			await page.WaitForFunctionAsync(@"() => {
+				const stored = globalThis.localStorage.getItem('wiley.workspace.state.v1') || '';
+				return stored.includes('40250') && stored.includes('650') && stored.includes('64.5');
+			}", null, new() { Timeout = 30000 });
+
+			await page.ReloadAsync(new PageReloadOptions
+			{
+				WaitUntil = WaitUntilState.DOMContentLoaded
+			});
+
+			await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+			await Expect(page.Locator("#workspace-load-status")).ToContainTextAsync("Workspace ready.", new() { Timeout = 30000 });
+			await Expect(page.Locator("#workspace-status-card")).ToContainTextAsync("browser storage", new() { Timeout = 30000 });
+
+			Assert.Equal("40250", NormalizeNumericValue(await totalCostsInput.InputValueAsync()));
+			Assert.Equal("650", NormalizeNumericValue(await projectedVolumeInput.InputValueAsync()));
+
+			await OpenPanelAsync(page, "rates");
+			Assert.Equal("64.5", NormalizeNumericValue(await currentRateInput.InputValueAsync()));
+		});
+	}
+
+	[Fact]
 	public async Task Workspace_SaveAndApplyScenario_RestoresSavedWorkspaceValues()
 	{
 		await RunWorkspaceTestAsync(async page =>

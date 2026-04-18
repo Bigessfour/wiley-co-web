@@ -53,7 +53,7 @@
 
     <div class="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
         <div id="break-even-gauge-card" class="rounded-2xl border border-slate-200 p-3">
-            <SfCircularGauge Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
+            <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
                 <CircularGaugeAxes>
                     <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
                         <CircularGaugeAxisLineStyle Width="8" Color="#e2e8f0" />
@@ -71,7 +71,7 @@
         </div>
 
         <div id="break-even-chart-card" class="h-64 rounded-2xl border border-slate-200 p-3">
-            <SfChart Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
+            <SfChart ID="break-even-rate-comparison-chart" Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
                 <ChartArea>
                     <ChartAreaBorder Width="0"></ChartAreaBorder>
                 </ChartArea>

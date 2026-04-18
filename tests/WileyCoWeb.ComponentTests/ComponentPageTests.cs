@@ -9,9 +9,19 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Syncfusion.Blazor;
+using Syncfusion.Blazor.Charts;
+using Syncfusion.Blazor.CircularGauge;
+using Syncfusion.Blazor.DropDowns;
+using Syncfusion.Blazor.Grids;
+using Syncfusion.Blazor.Inputs;
+using Syncfusion.Blazor.InteractiveChat;
+using Syncfusion.Blazor.Navigations;
+using Syncfusion.Blazor.Popups;
+using Syncfusion.Blazor.ProgressBar;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Components;
 using WileyCoWeb.Components.Layout;
+using WileyCoWeb.Components.Panels;
 using WileyCoWeb.Components.Pages;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -127,6 +137,267 @@ public sealed class ComponentPageTests
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
+	}
+
+	[Fact]
+	public void WileyWorkspace_SidebarDropdowns_BindToBootstrapOptionsAndSelection()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			enterpriseOptions: [WorkspaceTestData.WaterUtility, WorkspaceTestData.SanitationUtility],
+			fiscalYearOptions: [WorkspaceTestData.PriorFiscalYear, WorkspaceTestData.WaterFiscalYear]));
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		cut.WaitForAssertion(() =>
+		{
+			var enterpriseDropdown = cut.FindComponent<SfDropDownList<string, string>>().Instance;
+			var fiscalYearDropdown = cut.FindComponent<SfDropDownList<int, int>>().Instance;
+
+			Assert.Equal(workspaceState.SelectedEnterprise, enterpriseDropdown.Value);
+			Assert.Equal(workspaceState.EnterpriseOptions, enterpriseDropdown.DataSource?.ToArray());
+			Assert.Equal(workspaceState.SelectedFiscalYear, fiscalYearDropdown.Value);
+			Assert.Equal(workspaceState.FiscalYearOptions, fiscalYearDropdown.DataSource?.ToArray());
+		});
+
+		workspaceState.SetSelection(WorkspaceTestData.SanitationUtility, WorkspaceTestData.PriorFiscalYear);
+
+		cut.WaitForAssertion(() =>
+		{
+			var enterpriseDropdown = cut.FindComponent<SfDropDownList<string, string>>().Instance;
+			var fiscalYearDropdown = cut.FindComponent<SfDropDownList<int, int>>().Instance;
+
+			Assert.Equal(WorkspaceTestData.SanitationUtility, enterpriseDropdown.Value);
+			Assert.Equal(WorkspaceTestData.PriorFiscalYear, fiscalYearDropdown.Value);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_BreakEvenRoute_RendersSyncfusionGaugeChartAndNumericInputs()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "break-even"));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Equal(2, cut.FindComponents<SfNumericTextBox<decimal>>().Count);
+			Assert.Single(cut.FindComponents<SfCircularGauge>());
+			Assert.Single(cut.FindComponents<SfChart>());
+			Assert.Contains("break-even-rate-gauge", cut.Markup);
+			Assert.Contains("break-even-rate-comparison-chart", cut.Markup);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_BreakEvenPanel_RebindsGaugeAndComparisonInputs_WhenWorkspaceStateChanges()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.BaselineCurrentRate,
+			WorkspaceTestData.BaselineTotalCosts,
+			WorkspaceTestData.BaselineProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			scenarioItems: []));
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "break-even"));
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<BreakEvenPanel>().Instance;
+
+			Assert.Equal((double)workspaceState.CurrentRate, panel.GaugeCurrentRateValue, 3);
+			Assert.Equal((double)Math.Max(workspaceState.RecommendedRate, workspaceState.CurrentRate) * 1.5d, panel.GaugeMaximum, 3);
+			Assert.Equal(2, panel.RateComparison.Count);
+		});
+
+		workspaceState.SetTotalCosts(24000m);
+		workspaceState.SetProjectedVolume(400m);
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<BreakEvenPanel>().Instance;
+			var breakEvenPoint = Assert.Single(panel.RateComparison, point => point.Label == "Break-Even");
+
+			Assert.Equal(60d, breakEvenPoint.Value, 3);
+			Assert.Equal((double)Math.Max(workspaceState.RecommendedRate, workspaceState.CurrentRate) * 1.5d, panel.GaugeMaximum, 3);
+			Assert.Equal((double)workspaceState.CurrentRate, panel.GaugeCurrentRateValue, 3);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_RatesPanel_RebindsCurrentRateAndComparison_WhenCurrentRateChanges()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.BaselineCurrentRate,
+			WorkspaceTestData.BaselineTotalCosts,
+			WorkspaceTestData.BaselineProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			scenarioItems: []));
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "rates"));
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<RatesPanel>().Instance;
+			var currentRatePoint = Assert.Single(panel.RateComparison, point => point.Label == "Current");
+
+			Assert.Equal(workspaceState.CurrentRate, panel.CurrentRate);
+			Assert.Equal((double)workspaceState.CurrentRate, currentRatePoint.Value, 3);
+		});
+
+		workspaceState.SetCurrentRate(61.75m);
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<RatesPanel>().Instance;
+			var currentRatePoint = Assert.Single(panel.RateComparison, point => point.Label == "Current");
+
+			Assert.Equal(61.75m, panel.CurrentRate);
+			Assert.Equal(61.75d, currentRatePoint.Value, 3);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_ScenarioRoute_RendersSyncfusionGridAndKpiEditors()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "scenario"));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Equal(4, cut.FindComponents<SfNumericTextBox<decimal>>().Count);
+			Assert.Single(cut.FindComponents<SfGrid<ScenarioItem>>());
+			Assert.Contains("scenario-grid", cut.Markup);
+			Assert.Contains("Scenario Adjusted Rate", cut.Markup);
+			Assert.Contains("Scenario Cost Total", cut.Markup);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_TrendsPanel_RebindsProjectionSeries_WhenBootstrapChanges()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			projectionRows:
+			[
+				new ProjectionRow("FY26", 55.25m),
+				new ProjectionRow("FY27", 58.10m)
+			]));
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "trends"));
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<TrendsPanel>().Instance;
+
+			Assert.Equal(2, panel.ProjectionSeries.Count);
+			Assert.Contains(panel.ProjectionSeries, row => row.Year == "FY27" && row.Rate == 58.10m);
+		});
+
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			projectionRows:
+			[
+				new ProjectionRow("FY26", 55.25m),
+				new ProjectionRow("FY27", 58.10m),
+				new ProjectionRow("FY28", 63.40m)
+			]));
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<TrendsPanel>().Instance;
+
+			Assert.Equal(3, panel.ProjectionSeries.Count);
+			Assert.Contains(panel.ProjectionSeries, row => row.Year == "FY28" && row.Rate == 63.40m);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_ScenarioPlannerPanel_RebindsScenarioItemsAndDerivedKpis_WhenScenarioStateChanges()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		var reserveTransferId = Guid.NewGuid();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			scenarioItems:
+			[
+				new WorkspaceScenarioItemData(reserveTransferId, "Reserve transfer", 6200m)
+			]));
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "scenario"));
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<ScenarioPlannerPanel>().Instance;
+
+			Assert.Single(panel.ScenarioItems);
+			Assert.Equal(workspaceState.ScenarioCostTotal, panel.ScenarioCostTotal);
+			Assert.Equal(workspaceState.AdjustedRecommendedRate, panel.ScenarioAdjustedRate);
+		});
+
+		workspaceState.AddScenarioItem("Late capital", 5000m);
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<ScenarioPlannerPanel>().Instance;
+
+			Assert.Equal(2, panel.ScenarioItems.Count);
+			Assert.Contains(panel.ScenarioItems, item => item.Name == "Late capital" && item.Cost == 5000m);
+			Assert.Equal(workspaceState.ScenarioCostTotal, panel.ScenarioCostTotal);
+			Assert.Equal(workspaceState.AdjustedRecommendedRate, panel.ScenarioAdjustedRate);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_DecisionSupportRoute_RendersJarvisSyncfusionAssistSurface()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "decision-support"));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("decision-support-panel", cut.Markup);
+			Assert.Contains("jarvis-chat-surface", cut.Markup);
+			Assert.Contains("jarvis-question-input", cut.Markup);
+			Assert.Single(cut.FindComponents<SfAIAssistView>());
+			Assert.Single(cut.FindComponents<JarvisChatPanel>());
+		});
 	}
 
 	[Fact]
@@ -473,7 +744,15 @@ public sealed class ComponentPageTests
 		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
 			.Add(p => p.Panel, "quickbooks-import"));
 
-		Assert.Contains("QuickBooks Import", cut.Markup);
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("QuickBooks Import", cut.Markup);
+			Assert.Contains("quickbooks-import-panel", cut.Markup);
+			Assert.Contains("quickbooks-assistant-question", cut.Markup);
+			Assert.Single(cut.FindComponents<SfProgressBar>());
+			Assert.Single(cut.FindComponents<SfStepper>());
+			Assert.Single(cut.FindComponents<QuickBooksImportPanel>());
+		});
 	}
 
 	[Fact]
@@ -486,9 +765,36 @@ public sealed class ComponentPageTests
 
 		cut.WaitForAssertion(() =>
 		{
+			Assert.Contains("customer-search-input", cut.Markup);
+			Assert.Contains("customer-service-filter", cut.Markup);
+			Assert.Contains("customer-city-limits-filter", cut.Markup);
+			Assert.Contains("customer-directory-grid", cut.Markup);
 			Assert.Contains("Add customer", cut.Markup);
 			Assert.Contains("Directory status:", cut.Markup);
 			Assert.Contains("Account #", cut.Markup);
+			Assert.Single(cut.FindComponents<SfGrid<UtilityCustomerRecord>>());
+		});
+
+		cut.Find("#add-customer-button").Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("customer-editor-account-number", cut.Markup);
+			Assert.Contains("customer-editor-save-button", cut.Markup);
+			Assert.True(cut.FindComponents<SfDialog>().Count >= 1);
+		});
+
+		cut.Find("#customer-editor-cancel-button").Click();
+
+		cut.WaitForAssertion(() => Assert.DoesNotContain("customer-editor-save-button", cut.Markup));
+
+		var deleteButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "Delete", StringComparison.Ordinal));
+		deleteButton.Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("customer-delete-confirm-button", cut.Markup);
+			Assert.Contains("Delete Customer", cut.Markup);
 		});
 	}
 

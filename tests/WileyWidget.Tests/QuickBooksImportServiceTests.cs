@@ -111,6 +111,63 @@ public sealed class QuickBooksImportServiceTests
         Assert.Equal("101 · CASH IN BANK - UTILITY", preview.Rows[0].SplitAccount);
     }
 
+    [Fact]
+    public async Task CommitAsync_BlocksDuplicateHash_AndMarksSubsequentPreviewAsDuplicate()
+    {
+        var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
+        var service = new QuickBooksImportService(
+            _loggerFactory.CreateLogger<QuickBooksImportService>(),
+            contextFactory);
+
+        var fileBytes = Encoding.UTF8.GetBytes(CreateSparseTransactionListCsv());
+
+        var firstCommit = await service.CommitAsync(
+            fileBytes,
+            "transaction-list-by-date-all.csv",
+            "Water Utility",
+            2026);
+
+        var duplicatePreview = await service.PreviewAsync(
+            fileBytes,
+            "transaction-list-by-date-all.csv",
+            "Water Utility",
+            2026);
+
+        var duplicateCommit = await service.CommitAsync(
+            fileBytes,
+            "transaction-list-by-date-all.csv",
+            "Water Utility",
+            2026);
+
+        Assert.False(firstCommit.IsDuplicate);
+        Assert.Equal(2, firstCommit.ImportedRows);
+        Assert.True(duplicatePreview.IsDuplicate);
+        Assert.Equal(duplicatePreview.TotalRows, duplicatePreview.DuplicateRows);
+        Assert.All(duplicatePreview.Rows, row => Assert.True(row.IsDuplicate));
+        Assert.True(duplicateCommit.IsDuplicate);
+        Assert.Equal(0, duplicateCommit.ImportedRows);
+
+        await using var context = await contextFactory.CreateDbContextAsync();
+        Assert.Equal(1, await context.SourceFiles.CountAsync());
+        Assert.Equal(1, await context.ImportBatches.CountAsync());
+        Assert.Equal(2, await context.LedgerEntries.CountAsync());
+    }
+
+    [Fact]
+    public async Task PreviewAsync_WhenCsvContainsBadData_ThrowsReadableInvalidOperationException()
+    {
+        var service = CreateService();
+        var malformedCsv = "Type,Date,Amount\nDeposit,\"01/02/2026,362.90\n";
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.PreviewAsync(
+            Encoding.UTF8.GetBytes(malformedCsv),
+            "transaction-list-by-date-all.csv",
+            "Water Utility",
+            2026));
+
+        Assert.Contains("Unable to read the QuickBooks CSV export", exception.Message, StringComparison.Ordinal);
+    }
+
     private QuickBooksImportService CreateService()
     {
         return new QuickBooksImportService(

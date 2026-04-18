@@ -33,6 +33,8 @@ public sealed class WileyWorkspacePanelE2ETests
 
             // Break-even rate = TotalCosts / ProjectedVolume = 24000 / 400 = 60.00
             await Expect(page.Locator("#break-even-panel")).ToContainTextAsync("60", new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#break-even-rate-gauge")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#break-even-rate-comparison-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
         });
     }
 
@@ -64,6 +66,26 @@ public sealed class WileyWorkspacePanelE2ETests
             // The panel must render projection rows — at minimum the year labels should appear.
             await Expect(page.Locator("#trends-panel, [data-testid='trends-panel'], .trends-panel").First)
                 .ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#trends-projection-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+        });
+    }
+
+    [Fact]
+    public async Task Workspace_RatesPanel_RateComparisonChart_StaysVisibleAfterCurrentRateEdit()
+    {
+        await RunWorkspaceTestAsync(async page =>
+        {
+            await OpenPanelAsync(page, "rates");
+
+            var currentRateInput = page.Locator("#current-rate-input");
+            await Expect(currentRateInput).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#rates-comparison-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+
+            await currentRateInput.FillAsync("61.75");
+            await currentRateInput.PressAsync("Tab");
+
+            await Expect(page.Locator("#rates-panel")).ToContainTextAsync("61.75", new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#rates-comparison-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
         });
     }
 

@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text;
+using System.Net;
 using Microsoft.Extensions.Configuration;
 using WileyCoWeb.Contracts;
 using WileyWidget.Services;
@@ -221,20 +223,160 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Contains(messages!, message => message.Content == "Question from request history");
     }
 
-    private static WorkspaceAiAssistantService CreateService(TestUserContext userContext, RecordingConversationRepository repository)
+    [Fact]
+    public async Task AskAsync_WhenLiveKernelFails_UsesLegacyXaiResponse()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Legacy fallback answer with live workspace numbers.\"}]}]}", Encoding.UTF8, "application/json")
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
             {
-                ["XAI:Enabled"] = "false",
-                ["XAI:Endpoint"] = "https://api.x.ai/v1"
-            })
+                ["XAI:Enabled"] = "true",
+                ["XAI:Endpoint"] = "https://legacy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("Legacy fallback answer with live workspace numbers.", response.Answer, StringComparison.Ordinal);
+
+        var request = Assert.Single(httpFactory.Requests);
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("Bearer test-key", request.Authorization);
+        Assert.Contains("Current workspace context", request.Body, StringComparison.Ordinal);
+        Assert.Contains("How should we close the gap?", request.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenLegacyReturnsEmpty_UsesDeterministicFallback()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"output\":[]}", Encoding.UTF8, "application/json")
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XAI:Endpoint"] = "https://legacy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "What is the current status?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("fallback mode is active", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Runtime diagnostics", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(httpFactory.Requests);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenLegacyThrows_UsesDeterministicFallback()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => throw new HttpRequestException("legacy xai unavailable"));
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XAI:Endpoint"] = "https://legacy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "What is the current status?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("fallback mode is active", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Runtime diagnostics", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(httpFactory.Requests);
+    }
+
+    private static WorkspaceAiAssistantService CreateService(
+        TestUserContext userContext,
+        RecordingConversationRepository repository,
+        IReadOnlyDictionary<string, string?>? settings = null,
+        IHttpClientFactory? httpClientFactory = null,
+        IGrokApiKeyProvider? apiKeyProvider = null,
+        IWorkspaceKnowledgeService? knowledgeService = null)
+    {
+        var configurationValues = new Dictionary<string, string?>
+        {
+            ["XAI:Enabled"] = "false",
+            ["XAI:Endpoint"] = "https://api.x.ai/v1"
+        };
+
+        if (settings is not null)
+        {
+            foreach (var entry in settings)
+            {
+                configurationValues[entry.Key] = entry.Value;
+            }
+        }
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configurationValues)
             .Build();
 
         var logger = LoggerFactory.Create(builder => { }).CreateLogger<WorkspaceAiAssistantService>();
         var contextService = new TestWileyWidgetContextService();
-        var knowledgeService = new TestWorkspaceKnowledgeService();
-        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService, knowledgeService);
+        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService, knowledgeService ?? new TestWorkspaceKnowledgeService(), httpClientFactory, apiKeyProvider);
+    }
+
+    private static void SeedPersistedConversation(RecordingConversationRepository repository)
+    {
+        repository.StoredConversations["jarvis:user-123:water-utility:2026"] = new ConversationHistory
+        {
+            ConversationId = "jarvis:user-123:water-utility:2026",
+            MessagesJson = JsonSerializer.Serialize(new List<WorkspaceChatMessage>
+            {
+                new("user", "Earlier question"),
+                new("assistant", "Earlier answer")
+            }, JsonOptions),
+            MessageCount = 2,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
     }
 
     private sealed class TestWorkspaceKnowledgeService : IWorkspaceKnowledgeService
@@ -301,6 +443,70 @@ public sealed class WorkspaceAiAssistantServiceTests
         public string? UserId { get; }
         public string? DisplayName { get; }
         public string? Email { get; }
+    }
+
+    private sealed class TestGrokApiKeyProvider : IGrokApiKeyProvider
+    {
+        public TestGrokApiKeyProvider(string apiKey)
+        {
+            ApiKey = apiKey;
+        }
+
+        public string? MaskedApiKey => "test****key";
+        public string? ApiKey { get; }
+        public bool IsValidated => false;
+        public bool IsFromUserSecrets => false;
+        public Task<(bool Success, string Message)> ValidateAsync() => Task.FromResult((true, "ok"));
+        public string GetConfigurationSource() => "test-provider";
+    }
+
+    private sealed class TestHttpClientFactory : IHttpClientFactory
+    {
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> responder;
+
+        public TestHttpClientFactory(Func<HttpRequestMessage, HttpResponseMessage> responder)
+        {
+            this.responder = responder;
+        }
+
+        public List<RequestSnapshot> Requests { get; } = [];
+
+        public HttpClient CreateClient(string name)
+        {
+            _ = name;
+            return new HttpClient(new CallbackHttpMessageHandler(request =>
+            {
+                var body = request.Content is null
+                    ? string.Empty
+                    : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+                Requests.Add(new RequestSnapshot(
+                    request.Method,
+                    request.RequestUri?.ToString() ?? string.Empty,
+                    request.Headers.Authorization?.ToString(),
+                    body));
+
+                return responder(request);
+            }));
+        }
+    }
+
+    private sealed record RequestSnapshot(HttpMethod Method, string Url, string? Authorization, string Body);
+
+    private sealed class CallbackHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> responder;
+
+        public CallbackHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responder)
+        {
+            this.responder = responder;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(responder(request));
+        }
     }
 
     private sealed class RecordingConversationRepository : IConversationRepository
