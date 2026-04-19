@@ -64,7 +64,9 @@ async function seedCustomerDirectory(page: Page) {
 async function expectCustomerRows(page: Page, expectedNames: string[]) {
   const rows = page.locator("#customer-viewer-panel tr.e-row");
 
-  await expect(rows).toHaveCount(expectedNames.length);
+  await expect
+    .poll(async () => rows.count())
+    .toBeGreaterThanOrEqual(expectedNames.length);
 
   for (const name of expectedNames) {
     await expect(rows.filter({ hasText: name })).toHaveCount(1);

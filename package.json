@@ -1,16 +1,19 @@
 {
-  "name": "custom-azure-mcp-server",
+  "name": "wileyco-playwright-tooling",
   "version": "1.0.0",
   "type": "module",
-  "description": "Custom Azure MCP Server - Workaround for @azure/mcp dependency injection issues",
-  "main": "scripts/custom-azure-mcp-server.js",
+  "description": "WileyCo Playwright tooling and MCP helpers",
   "scripts": {
-    "start": "node scripts/custom-azure-mcp-server.js",
     "copilot:cli": "npx -y @github/copilot --experimental",
     "copilot:cli:update": "npm install -g @github/copilot@latest",
-    "playwright:install": "playwright install chromium",
+    "playwright:mcp": "npx --no-install playwright-mcp --isolated",
+    "playwright:mcp:test": "npx --no-install playwright run-test-mcp-server -c playwright.config.ts --headless",
+    "playwright:install": "playwright install chromium webkit",
     "playwright:test": "playwright test",
+    "playwright:test:ci": "playwright test --project=chromium --project=webkit",
+    "playwright:test:hosted": "node scripts/run-playwright-hosted.js",
     "playwright:test:ui": "playwright test --ui",
+    "playwright:test:update-snapshots": "playwright test --project=chromium --update-snapshots",
     "playwright:codegen": "playwright codegen http://localhost:5230/wiley-workspace",
     "playwright:report": "playwright show-report",
     "playwright:agents": "playwright-cli --help",
@@ -23,6 +26,7 @@
   "devDependencies": {
     "@modelcontextprotocol/server-filesystem": "^2026.1.14",
     "@playwright/cli": "^0.1.8",
+    "@playwright/mcp": "0.0.70",
     "@playwright/test": "^1.59.1",
     "prettier": "^3.8.3",
     "repomix": "^1.13.1"

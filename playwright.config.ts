@@ -16,7 +16,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI || useManagedWebServer ? 1 : undefined,
   reporter: [
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
@@ -31,7 +31,7 @@ export default defineConfig({
   webServer: useManagedWebServer
     ? {
         command:
-          "dotnet run --project WileyCoWeb.csproj --no-launch-profile --urls http://localhost:5230",
+          "dotnet run --project WileyCoWeb.csproj --launch-profile http --urls http://localhost:5230",
         url: defaultLocalBaseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,
@@ -45,6 +45,12 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "webkit",
+      use: {
+        ...devices["Desktop Safari"],
       },
     },
   ],

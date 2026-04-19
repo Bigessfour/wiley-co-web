@@ -23,9 +23,11 @@ test.describe("Core Panel Proof", () => {
     // 2. Change the current rate and tab out so the panel applies the edit.
     await enterNumericValue(page.locator("#current-rate-input"), "29.50");
 
-    await expect(page.locator("#rates-kpi-grid")).toContainText(
-      /Current Rate\s*\$29\.50/,
-    );
+    await expect
+      .poll(async () => page.locator("#rates-kpi-grid").innerText(), {
+        timeout: 10_000,
+      })
+      .toMatch(/Current Rate\s*\$29\.50/);
     await expect(page.locator("#rates-comparison-chart")).toBeVisible();
 
     // 3. Trigger the save flow and confirm the snapshot status updates.
