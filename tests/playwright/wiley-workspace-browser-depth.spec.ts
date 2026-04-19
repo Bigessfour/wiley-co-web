@@ -1,7 +1,83 @@
 import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
+import {
+  enterNumericValue,
+  gotoWorkspacePanel,
+  readCurrencyValueByLabel,
+} from "./support/workspace";
 
 test.describe("Wiley workspace browser depth", () => {
+  test.describe.configure({ mode: "serial" });
+
+  test("break-even recalculates cards when baseline inputs change", async ({
+    page,
+  }) => {
+    await gotoWorkspacePanel(page, "/wiley-workspace/break-even");
+
+    const kpiGrid = page.locator("#break-even-kpi-grid");
+    const breakEvenInputs = page.locator("#break-even-input-row input");
+
+    await enterNumericValue(breakEvenInputs.nth(0), "24000");
+    await enterNumericValue(breakEvenInputs.nth(1), "400");
+
+    await expect(kpiGrid).toContainText(/Total Costs\s*\$24,000/);
+    await expect(kpiGrid).toContainText(/Projected Volume\s*400/);
+    await expect(kpiGrid).toContainText(/Recommended Rate\s*\$60\.00/);
+  });
+
+  test("rates panel updates the current-rate KPI when the editor changes", async ({
+    page,
+  }) => {
+    await gotoWorkspacePanel(page, "/wiley-workspace/rates");
+
+    await enterNumericValue(page.locator("#current-rate-input"), "29.50");
+
+    await expect(page.locator("#rates-kpi-grid")).toContainText(
+      /Current Rate\s*\$29\.50/,
+    );
+    await expect(page.locator("#rates-comparison-chart")).toBeVisible();
+  });
+
+  test("scenario planner updates derived totals when a cost item is added", async ({
+    page,
+  }) => {
+    await gotoWorkspacePanel(page, "/wiley-workspace/scenario");
+
+    const panel = page.locator("#scenario-panel");
+    const grid = page.locator("#scenario-grid");
+    const dialog = page
+      .getByRole("dialog")
+      .filter({ has: page.locator('input[name="Name"]') })
+      .filter({ has: page.locator('input[name="Cost"]') });
+    const initialScenarioCostTotal = await readCurrencyValueByLabel(
+      panel,
+      "Scenario Cost Total",
+    );
+    const initialScenarioBreakEven = await readCurrencyValueByLabel(
+      panel,
+      "Scenario Break-Even",
+    );
+    const scenarioItemName = `Live test ${Date.now()}`;
+
+    await page.getByRole("button", { name: "Add" }).click();
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="Name"]').fill(scenarioItemName);
+    await enterNumericValue(dialog.locator('input[name="Cost"]'), "1234");
+    await dialog.getByRole("button", { name: "Save" }).click();
+
+    await expect(grid).toContainText(scenarioItemName);
+    await expect
+      .poll(() => readCurrencyValueByLabel(panel, "Scenario Cost Total"))
+      .toBe(initialScenarioCostTotal + 1234);
+    await expect
+      .poll(
+        async () =>
+          (await readCurrencyValueByLabel(panel, "Scenario Break-Even")) >
+          initialScenarioBreakEven,
+      )
+      .toBe(true);
+  });
+
   test("workspace shell resolves startup state and keeps the overview usable", async ({
     page,
   }) => {
