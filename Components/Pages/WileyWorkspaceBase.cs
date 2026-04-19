@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
@@ -31,6 +32,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     [Inject]
     protected BrowserDownloadService BrowserDownloadService { get; set; } = default!;
+
+    [Inject]
+    protected HttpClient HttpClient { get; set; } = default!;
 
     [Inject]
     protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
@@ -191,8 +195,46 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected void OpenPanel(string panelKey)
     {
+        var route = GetPanelRoute(panelKey);
+        var clickTelemetry = new WorkspaceNavigationClickRequest(
+            panelKey,
+            route,
+            ActivePanelKey,
+            SelectedEnterprise,
+            SelectedFiscalYear,
+            IsLoadingWorkspace,
+            IsSidebarOpen,
+            DateTimeOffset.UtcNow.ToString("O"));
+
+        WorkspaceLogger.LogInformation(
+            "Workspace navigation click: PanelKey={PanelKey} Route={Route} ActivePanel={ActivePanel} Enterprise={Enterprise} FiscalYear={FiscalYear} Loading={IsLoadingWorkspace} SidebarOpen={IsSidebarOpen}",
+            panelKey,
+            route,
+            ActivePanelKey,
+            SelectedEnterprise,
+            SelectedFiscalYear,
+            IsLoadingWorkspace,
+            IsSidebarOpen);
+
+        Console.WriteLine(
+            $"[NAV] Clicked {panelKey} -> {route} | Enterprise={SelectedEnterprise} | FY={SelectedFiscalYear} | Loading={IsLoadingWorkspace} | ActivePanel={ActivePanelKey}");
+
+        _ = TrackNavigationClickAsync(clickTelemetry);
+
         IsSidebarOpen = false;
-        NavigationManager.NavigateTo(GetPanelRoute(panelKey));
+        NavigationManager.NavigateTo(route);
+    }
+
+    private async Task TrackNavigationClickAsync(WorkspaceNavigationClickRequest request)
+    {
+        try
+        {
+            await HttpClient.PostAsJsonAsync("/api/workspace/navigation", request).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogDebug(ex, "Workspace navigation telemetry failed for {PanelKey}.", request.PanelKey);
+        }
     }
 
     protected void ToggleSidebar()

@@ -13,13 +13,13 @@ public sealed class WileyWorkspaceE2ETests
 		await RunWorkspaceTestAsync(async page =>
 		{
 			await Expect(page.GetByText("Utility Rate Study Workspace", new() { Exact = true })).ToBeVisibleAsync();
-			await Expect(page.Locator("a[href='/wiley-workspace/break-even']").First).ToContainTextAsync("Break-Even");
-			await Expect(page.Locator("a[href='/wiley-workspace/rates']").First).ToContainTextAsync("Rates");
-			await Expect(page.Locator("a[href='/wiley-workspace/scenario']").First).ToContainTextAsync("Scenario Planner");
-			await Expect(page.Locator("a[href='/wiley-workspace/customers']").First).ToContainTextAsync("Customer Viewer");
-			await Expect(page.Locator("a[href='/wiley-workspace/trends']").First).ToContainTextAsync("Trends");
-			await Expect(page.Locator("a[href='/wiley-workspace/quickbooks-import']").First).ToContainTextAsync("QuickBooks Import");
-			await Expect(page.Locator("a[href='/wiley-workspace/decision-support']").First).ToContainTextAsync("Decision Support");
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Break-Even" })).ToBeVisibleAsync();
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Rates" })).ToBeVisibleAsync();
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Scenario Planner" })).ToBeVisibleAsync();
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Customer Viewer" })).ToBeVisibleAsync();
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Trends" })).ToBeVisibleAsync();
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "QuickBooks Import" })).ToBeVisibleAsync();
+			await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Decision Support" })).ToBeVisibleAsync();
 		});
 	}
 
@@ -430,7 +430,20 @@ public sealed class WileyWorkspaceE2ETests
 
 	private static async Task OpenPanelAsync(IPage page, string panelKey)
 	{
-		await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
+		var buttonName = panelKey switch
+		{
+			"break-even" => "Break-Even",
+			"rates" => "Rates",
+			"scenario" => "Scenario Planner",
+			"customers" => "Customer Viewer",
+			"trends" => "Trends",
+			"quickbooks-import" => "QuickBooks Import",
+			"decision-support" => "Decision Support",
+			"data-dashboard" => "Data Dashboard",
+			_ => throw new ArgumentOutOfRangeException(nameof(panelKey), panelKey, "Unsupported workspace panel key.")
+		};
+
+		await page.GetByRole(AriaRole.Button, new() { Name = buttonName }).ClickAsync();
 	}
 
 	private static async Task UploadQuickBooksFileAsync(IPage page, string filePath)

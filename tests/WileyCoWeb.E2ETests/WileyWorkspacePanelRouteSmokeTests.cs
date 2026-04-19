@@ -71,4 +71,73 @@ public sealed class WileyWorkspacePanelRouteSmokeTests
             throw new Xunit.Sdk.XunitException($"{ex.Message}{Environment.NewLine}{diagnostics}");
         }
     }
+
+    [Fact]
+    public async Task Workspace_OverviewAndSidebarButtons_NavigateToExpectedPanels()
+    {
+        var baseUrl = Environment.GetEnvironmentVariable("WILEYCO_E2E_BASE_URL");
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return;
+        }
+
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        {
+            Headless = true
+        });
+
+        await using var context = await browser.NewContextAsync();
+        await context.AddInitScriptAsync("window.localStorage.clear(); window.sessionStorage.clear();");
+
+        var page = await context.NewPageAsync();
+        var consoleMessages = new List<string>();
+        page.Console += (_, message) => consoleMessages.Add($"{message.Type}: {message.Text}");
+
+        await page.GotoAsync($"{baseUrl.TrimEnd('/')}/wiley-workspace", new PageGotoOptions
+        {
+            WaitUntil = WaitUntilState.DOMContentLoaded
+        });
+
+        await Expect(page.Locator("#workspace-overview-dashboard")).ToBeVisibleAsync(new() { Timeout = PanelTimeoutMilliseconds });
+
+        var navigationCases = new[]
+        {
+            (OverviewButton: "Open Break-Even", SidebarButton: "Break-Even", PanelUrl: "/wiley-workspace/break-even", PanelSelector: "#break-even-panel"),
+            (OverviewButton: "Open Rates", SidebarButton: "Rates", PanelUrl: "/wiley-workspace/rates", PanelSelector: "#rates-panel"),
+            (OverviewButton: "Open Import", SidebarButton: "QuickBooks Import", PanelUrl: "/wiley-workspace/quickbooks-import", PanelSelector: "#quickbooks-import-panel"),
+            (OverviewButton: "Open Scenario Planner", SidebarButton: "Scenario Planner", PanelUrl: "/wiley-workspace/scenario", PanelSelector: "#scenario-panel"),
+            (OverviewButton: "Open Customer Viewer", SidebarButton: "Customer Viewer", PanelUrl: "/wiley-workspace/customers", PanelSelector: "#customer-viewer-panel"),
+            (OverviewButton: "Open Trends", SidebarButton: "Trends", PanelUrl: "/wiley-workspace/trends", PanelSelector: "#trends-panel"),
+            (OverviewButton: "Open Decision Support", SidebarButton: "Decision Support", PanelUrl: "/wiley-workspace/decision-support", PanelSelector: "#decision-support-panel"),
+            (OverviewButton: "Open Data Dashboard", SidebarButton: "Data Dashboard", PanelUrl: "/wiley-workspace/data-dashboard", PanelSelector: "#data-dashboard-panel")
+        };
+
+        foreach (var navigationCase in navigationCases)
+        {
+            await page.GotoAsync($"{baseUrl.TrimEnd('/')}/wiley-workspace", new PageGotoOptions
+            {
+                WaitUntil = WaitUntilState.DOMContentLoaded
+            });
+
+            await Expect(page.Locator("#workspace-overview-dashboard")).ToBeVisibleAsync(new() { Timeout = PanelTimeoutMilliseconds });
+
+            await page.GetByRole(AriaRole.Button, new() { Name = navigationCase.OverviewButton }).ClickAsync();
+            Assert.Contains(consoleMessages, message => message.Contains($"[NAV] Clicked {navigationCase.PanelUrl.Split('/').Last()}", StringComparison.OrdinalIgnoreCase));
+            await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex(navigationCase.PanelUrl.Replace("/", "\\/")));
+            await Expect(page.Locator(navigationCase.PanelSelector)).ToBeVisibleAsync(new() { Timeout = PanelTimeoutMilliseconds });
+
+            await page.GotoAsync($"{baseUrl.TrimEnd('/')}/wiley-workspace", new PageGotoOptions
+            {
+                WaitUntil = WaitUntilState.DOMContentLoaded
+            });
+
+            await Expect(page.Locator("#workspace-overview-dashboard")).ToBeVisibleAsync(new() { Timeout = PanelTimeoutMilliseconds });
+
+            await page.GetByRole(AriaRole.Button, new() { Name = navigationCase.SidebarButton }).ClickAsync();
+            Assert.Contains(consoleMessages, message => message.Contains($"[NAV] Clicked {navigationCase.PanelUrl.Split('/').Last()}", StringComparison.OrdinalIgnoreCase));
+            await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex(navigationCase.PanelUrl.Replace("/", "\\/")));
+            await Expect(page.Locator(navigationCase.PanelSelector)).ToBeVisibleAsync(new() { Timeout = PanelTimeoutMilliseconds });
+        }
+    }
 }

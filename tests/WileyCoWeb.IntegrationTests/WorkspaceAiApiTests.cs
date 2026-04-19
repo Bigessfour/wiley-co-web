@@ -114,4 +114,26 @@ public sealed class WorkspaceAiApiTests : IClassFixture<ApiApplicationFactory>
         Assert.NotEmpty(payload.Items);
         Assert.All(payload.Items, item => Assert.Equal("Alex Morgan", item.UserDisplayName));
     }
+
+    [Fact]
+    public async Task PostWorkspaceNavigation_ReturnsNoContent_ForTelemetryPayload()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/workspace/navigation",
+            new WorkspaceNavigationClickRequest(
+                "break-even",
+                "/wiley-workspace/break-even",
+                "overview",
+                "Water Utility",
+                2026,
+                false,
+                false,
+                DateTimeOffset.UtcNow.ToString("O")),
+            jsonOptions);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
 }

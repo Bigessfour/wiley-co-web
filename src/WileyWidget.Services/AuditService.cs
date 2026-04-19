@@ -26,7 +26,7 @@ namespace WileyWidget.Services
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             // Use workspace logs folder for centralized logging
-            var logsDirectory = LogPathResolver.GetLogsDirectory();
+            var logsDirectory = LogPathResolver.GetLogDirectory();
             _auditPath = Path.Combine(logsDirectory, "audit.log");
         }
 

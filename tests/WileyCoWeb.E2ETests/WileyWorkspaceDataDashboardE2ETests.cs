@@ -17,7 +17,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     {
         await RunWorkspaceTestAsync(static async page =>
         {
-            ILocator navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
+            ILocator navLink = page.GetByRole(AriaRole.Button, new() { Name = "Data Dashboard" });
             await Expect(navLink).ToBeVisibleAsync();
             await Expect(navLink).ToContainTextAsync("Data Dashboard");
         });
@@ -28,7 +28,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     {
         await RunWorkspaceTestAsync(static async page =>
         {
-            ILocator navLink = page.Locator("a.app-nav-link[href='/wiley-workspace/data-dashboard']");
+            ILocator navLink = page.GetByRole(AriaRole.Button, new() { Name = "Data Dashboard" });
             await navLink.ClickAsync();
 
             await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/wiley-workspace/data-dashboard"));
@@ -186,7 +186,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
     {
         await RunWorkspaceTestAsync(static async page =>
         {
-            ILocator openButton = page.Locator("#overview-data-dashboard a[href='/wiley-workspace/data-dashboard']").First;
+            ILocator openButton = page.Locator("#overview-data-dashboard").GetByRole(AriaRole.Button, new() { Name = "Open Data Dashboard" }).First;
             await openButton.ClickAsync();
 
             await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/wiley-workspace/data-dashboard"));

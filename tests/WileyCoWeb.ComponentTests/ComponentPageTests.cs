@@ -772,6 +772,60 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void WileyWorkspace_OverviewAndSidebarButtons_NavigateBetweenPanels()
+	{
+		using var context = CreateContext();
+		var navigationManager = context.Services.GetRequiredService<NavigationManager>();
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		cut.WaitForAssertion(() => Assert.Contains("workspace-overview-dashboard", cut.Markup));
+
+		var openBreakEvenButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "Open Break-Even", StringComparison.Ordinal));
+		openBreakEvenButton.Click();
+
+		cut.WaitForAssertion(() => Assert.EndsWith("/wiley-workspace/break-even", navigationManager.Uri));
+
+		var quickBooksSidebarButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "QuickBooks Import", StringComparison.Ordinal));
+		quickBooksSidebarButton.Click();
+
+		cut.WaitForAssertion(() => Assert.EndsWith("/wiley-workspace/quickbooks-import", navigationManager.Uri));
+	}
+
+	[Fact]
+	public void WileyWorkspace_OverviewAndSidebarButtons_PostNavigationTelemetry()
+	{
+		var capturedRequests = new List<WorkspaceNavigationClickRequest>();
+		var telemetryClient = new HttpClient(new RoutedHttpMessageHandler(async request =>
+		{
+			if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/navigation", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				var payload = await request.Content!.ReadFromJsonAsync<WorkspaceNavigationClickRequest>(JsonOptions);
+				Assert.NotNull(payload);
+				capturedRequests.Add(payload!);
+				return new HttpResponseMessage(HttpStatusCode.NoContent);
+			}
+
+			return new HttpResponseMessage(HttpStatusCode.NotFound);
+		}))
+		{
+			BaseAddress = new Uri("https://example.test/")
+		};
+
+		using var context = CreateContext(telemetryClient: telemetryClient);
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		cut.WaitForAssertion(() => Assert.Contains("workspace-overview-dashboard", cut.Markup));
+
+		var breakEvenButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "Open Break-Even", StringComparison.Ordinal));
+		breakEvenButton.Click();
+
+		cut.WaitForAssertion(() => Assert.Contains(capturedRequests, request => request.PanelKey == "break-even" && request.PanelRoute == "/wiley-workspace/break-even"));
+		Assert.Contains(capturedRequests, request => request.ActivePanelKey == "overview");
+		Assert.All(capturedRequests, request => Assert.False(string.IsNullOrWhiteSpace(request.ClickedAtUtc)));
+	}
+
+	[Fact]
 	public void WileyWorkspace_CustomersRoute_RendersLiveCustomerMaintenancePanel()
 	{
 		using var context = CreateContext();
@@ -935,7 +989,7 @@ public sealed class ComponentPageTests
 		});
 	}
 
-	private static TestContext CreateContext(HttpClient? snapshotClient = null, FakeJsRuntime? jsRuntime = null, Action<IServiceCollection>? configureServices = null)
+	private static TestContext CreateContext(HttpClient? snapshotClient = null, FakeJsRuntime? jsRuntime = null, Action<IServiceCollection>? configureServices = null, HttpClient? telemetryClient = null)
 	{
 		var context = new TestContext();
 
@@ -948,12 +1002,14 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
 		snapshotClient ??= CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
+		telemetryClient ??= CreateNavigationTelemetryClient();
 		context.Services.AddScoped(_ => snapshotService);
 		context.Services.AddScoped(_ => new UtilityCustomerApiService(snapshotClient));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));
+		context.Services.AddScoped(_ => telemetryClient);
 		context.Services.AddScoped(_ => new BrowserDownloadService(jsRuntime));
 		configureServices?.Invoke(context.Services);
 		context.Services.AddSyncfusionBlazor();
@@ -1375,6 +1431,22 @@ public sealed class ComponentPageTests
 			storage.Remove(arguments[0]?.ToString() ?? string.Empty);
 			return null;
 		}
+	}
+
+	private static HttpClient CreateNavigationTelemetryClient()
+	{
+		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		{
+			if (request.Method == HttpMethod.Post && request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/navigation", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+			}
+
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+		}))
+		{
+			BaseAddress = new Uri("https://example.test/")
+		};
 	}
 
 #pragma warning restore

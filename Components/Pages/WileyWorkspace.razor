@@ -85,8 +85,8 @@
                                     <DropDownListEvents TValue="int" TItem="int" ValueChange="HandleFiscalYearChanged" />
                                 </SfDropDownList>
                                 <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
-                                <SfTextBox Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
-                                <SfDropDownList TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
+                                <SfTextBox ID="scenario-description-input" Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
+                                <SfDropDownList ID="saved-scenarios-dropdown" TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
                                     <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
                                     <DropDownListEvents TValue="long?" TItem="WorkspaceScenarioSummaryResponse" ValueChange="HandleSavedScenarioChanged" />
                                 </SfDropDownList>
@@ -110,11 +110,11 @@
                         <div class="mt-2 grid gap-2">
                             @foreach (var panelNavItem in PanelNavItems)
                             {
-                                <a class="workspace-panel-link @(ActivePanelKey == panelNavItem.Key ? "is-active" : string.Empty)"
-                                   href="@GetPanelRoute(panelNavItem.Key)"
-                                   @onclick="CloseSidebar">
+                                <button type="button"
+                                        class="workspace-panel-link @(ActivePanelKey == panelNavItem.Key ? "is-active" : string.Empty)"
+                                        @onclick="() => OpenPanel(panelNavItem.Key)">
                                     @panelNavItem.Label
-                                </a>
+                                </button>
                             }
                         </div>
                     </div>
@@ -172,7 +172,7 @@
                                     <span>Projected volume @ProjectedVolumeDisplay</span>
                                 </div>
                             </div>
-                            <a class="workspace-card-link workspace-card-link-primary" href="@GetPanelRoute("break-even")" @onclick="CloseSidebar">Open Break-Even</a>
+                            <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("break-even")'>Open Break-Even</button>
                         </article>
 
                         <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
@@ -185,7 +185,7 @@
                                     <span>Target @BreakEvenRateDisplay</span>
                                 </div>
                             </div>
-                            <a class="workspace-card-link workspace-card-link-primary" href="@GetPanelRoute("rates")" @onclick="CloseSidebar">Open Rates</a>
+                            <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("rates")'>Open Rates</button>
                         </article>
 
                         <article id="overview-import" class="workspace-overview-card">
@@ -194,7 +194,7 @@
                                 <h3>Ingest and validate source records</h3>
                                 <p>Upload QuickBooks exports, inspect validation feedback, and stage records before commit.</p>
                             </div>
-                            <a class="workspace-card-link" href="@GetPanelRoute("quickbooks-import")" @onclick="CloseSidebar">Open Import</a>
+                            <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("quickbooks-import")'>Open Import</button>
                         </article>
 
                         <article id="overview-scenario" class="workspace-overview-card">
@@ -203,7 +203,7 @@
                                 <h3>Model what-if changes</h3>
                                 <p>Stress cost assumptions, compare adjusted break-even outcomes, and persist named scenarios.</p>
                             </div>
-                            <a class="workspace-card-link" href="@GetPanelRoute("scenario")" @onclick="CloseSidebar">Open Scenario Planner</a>
+                            <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("scenario")'>Open Scenario Planner</button>
                         </article>
 
                         <article id="overview-customers" class="workspace-overview-card">
@@ -212,7 +212,7 @@
                                 <h3>Review affected accounts</h3>
                                 <p>@FilteredCustomerCountDisplay customers currently match the active filters for export and operational review.</p>
                             </div>
-                            <a class="workspace-card-link" href="@GetPanelRoute("customers")" @onclick="CloseSidebar">Open Customer Viewer</a>
+                            <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("customers")'>Open Customer Viewer</button>
                         </article>
 
                         <article id="overview-trends" class="workspace-overview-card">
@@ -221,7 +221,7 @@
                                 <h3>Projected rate movement</h3>
                                 <p>Inspect the year-by-year rate line and understand how the active assumptions move over time.</p>
                             </div>
-                            <a class="workspace-card-link" href="@GetPanelRoute("trends")" @onclick="CloseSidebar">Open Trends</a>
+                            <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("trends")'>Open Trends</button>
                         </article>
 
                         <article id="overview-ai" class="workspace-overview-card">
@@ -230,7 +230,7 @@
                                 <h3>Jarvis guidance</h3>
                                 <p>Pull context-aware recommendations tied to the current enterprise, year, and scenario state.</p>
                             </div>
-                            <a class="workspace-card-link" href="@GetPanelRoute("decision-support")" @onclick="CloseSidebar">Open Decision Support</a>
+                            <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("decision-support")'>Open Decision Support</button>
                         </article>
 
                         <article id="overview-data-dashboard" class="workspace-overview-card workspace-overview-card-wide">
@@ -244,7 +244,7 @@
                                     <span>Scenario pressure @ScenarioCostTotalDisplay</span>
                                 </div>
                             </div>
-                            <a class="workspace-card-link workspace-card-link-primary" href="@GetPanelRoute("data-dashboard")" @onclick="CloseSidebar">Open Data Dashboard</a>
+                            <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("data-dashboard")'>Open Data Dashboard</button>
                         </article>
                     </section>
                 }
@@ -361,10 +361,12 @@
 
     .wiley-workspace .workspace-panel-link,
     .wiley-workspace .workspace-card-link {
+        appearance: none;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 0.4rem;
+        font: inherit;
         border-radius: 0.85rem;
         border: 1px solid rgba(148, 163, 184, 0.3);
         background: #ffffff;
@@ -374,6 +376,7 @@
         line-height: 1.2;
         padding: 0.75rem 1rem;
         text-decoration: none;
+        cursor: pointer;
         transition:
             background-color 120ms ease,
             border-color 120ms ease,

@@ -104,7 +104,7 @@ public partial class Program
 
     private static ILoggerFactory CreateStartupLoggerFactory()
     {
-        return LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: true));
+        return LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: false));
     }
 
     private static async Task<(SyncfusionLicenseResult SyncfusionResult, XaiSecretResolutionResult XaiResult)> ResolveSecretsAsync(WebApplicationBuilder builder)
@@ -627,6 +627,7 @@ public partial class Program
         MapWorkspaceSnapshotGetEndpoint(app);
         MapWorkspaceSnapshotPostEndpoint(app);
         MapWorkspaceKnowledgeEndpoint(app);
+        MapWorkspaceNavigationTelemetryEndpoint(app);
         MapWorkspaceBaselinePutEndpoint(app);
         MapWorkspaceScenarioListEndpoint(app);
         MapWorkspaceScenarioGetEndpoint(app);
@@ -733,6 +734,35 @@ public partial class Program
             cancellationToken);
 
         return Results.Ok(history);
+    }
+
+    private static void MapWorkspaceNavigationTelemetryEndpoint(WebApplication app)
+    {
+        app.MapPost("/api/workspace/navigation", MapWorkspaceNavigationTelemetryRequest);
+    }
+
+    private static async Task<IResult> MapWorkspaceNavigationTelemetryRequest(HttpRequest request, UserContext userContext, ILogger<Program> logger, CancellationToken cancellationToken)
+    {
+        var telemetry = await request.ReadFromJsonAsync<WorkspaceNavigationClickRequest>(cancellationToken: cancellationToken);
+        if (telemetry is null || string.IsNullOrWhiteSpace(telemetry.PanelKey) || string.IsNullOrWhiteSpace(telemetry.PanelRoute))
+        {
+            return Results.BadRequest("A workspace navigation telemetry payload is required.");
+        }
+
+        logger.LogInformation(
+            "Workspace navigation telemetry received: PanelKey={PanelKey} PanelRoute={PanelRoute} ActivePanelKey={ActivePanelKey} Enterprise={Enterprise} FiscalYear={FiscalYear} Loading={IsLoadingWorkspace} SidebarOpen={IsSidebarOpen} ClickedAtUtc={ClickedAtUtc} UserId={UserId} UserName={UserName}",
+            telemetry.PanelKey,
+            telemetry.PanelRoute,
+            telemetry.ActivePanelKey,
+            telemetry.SelectedEnterprise,
+            telemetry.SelectedFiscalYear,
+            telemetry.IsLoadingWorkspace,
+            telemetry.IsSidebarOpen,
+            telemetry.ClickedAtUtc,
+            userContext.UserId ?? "anonymous",
+            userContext.DisplayName ?? "anonymous");
+
+        return Results.NoContent();
     }
 
     private static void PopulateUserContext(HttpContext context, UserContext userContext)

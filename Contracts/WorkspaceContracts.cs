@@ -42,6 +42,16 @@ public sealed record WorkspaceBaselineUpdateResponse(
     string Message,
     WorkspaceBootstrapData Snapshot);
 
+public sealed record WorkspaceNavigationClickRequest(
+    string PanelKey,
+    string PanelRoute,
+    string ActivePanelKey,
+    string SelectedEnterprise,
+    int SelectedFiscalYear,
+    bool IsLoadingWorkspace,
+    bool IsSidebarOpen,
+    string ClickedAtUtc);
+
 public sealed record WorkspaceSnapshotArtifactRequest(List<string>? DocumentKinds, bool ReplaceExisting = false);
 
 public sealed record WorkspaceSnapshotArtifactSummary(

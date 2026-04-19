@@ -55,7 +55,7 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var trendsSection = page.Locator("a[href='/wiley-workspace/trends']").First;
+            var trendsSection = page.GetByRole(AriaRole.Button, new() { Name = "Trends" });
             await Expect(trendsSection).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
 
             // Navigate to the Trends panel.
@@ -416,7 +416,20 @@ public sealed class WileyWorkspacePanelE2ETests
 
     private static async Task OpenPanelAsync(IPage page, string panelKey)
     {
-        await page.Locator($"a[href='/wiley-workspace/{panelKey}']").First.ClickAsync();
+        var buttonName = panelKey switch
+        {
+            "break-even" => "Break-Even",
+            "rates" => "Rates",
+            "scenario" => "Scenario Planner",
+            "customers" => "Customer Viewer",
+            "trends" => "Trends",
+            "quickbooks-import" => "QuickBooks Import",
+            "decision-support" => "Decision Support",
+            "data-dashboard" => "Data Dashboard",
+            _ => throw new ArgumentOutOfRangeException(nameof(panelKey), panelKey, "Unsupported workspace panel key.")
+        };
+
+        await page.GetByRole(AriaRole.Button, new() { Name = buttonName }).ClickAsync();
     }
 
     private static ILocator FindCustomerGridRow(IPage page, string text)

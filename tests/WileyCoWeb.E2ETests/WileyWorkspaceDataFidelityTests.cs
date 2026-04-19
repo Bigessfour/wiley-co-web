@@ -23,7 +23,7 @@ public sealed class WileyWorkspaceDataFidelityTests
         {
             await ImportFixtureAsync(page, tempFile);
 
-            var breakEvenNav = page.Locator("a[href='/wiley-workspace/break-even']").First;
+            var breakEvenNav = page.GetByRole(AriaRole.Button, new() { Name = "Break-Even" });
             await breakEvenNav.ClickAsync();
 
             var panel = page.Locator("#break-even-panel");
@@ -48,7 +48,7 @@ public sealed class WileyWorkspaceDataFidelityTests
         {
             await ImportFixtureAsync(page, tempFile);
 
-            var trendsNav = page.Locator("a[href='/wiley-workspace/trends']").First;
+            var trendsNav = page.GetByRole(AriaRole.Button, new() { Name = "Trends" });
             await trendsNav.ClickAsync();
 
             var panel = page.Locator("#trends-panel, [data-testid='trends-panel'], .trends-panel").First;
@@ -89,7 +89,7 @@ public sealed class WileyWorkspaceDataFidelityTests
         {
             await ImportFixtureAsync(page, tempFile);
 
-            await page.Locator("a[href='/wiley-workspace/scenario']").First.ClickAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Scenario Planner" }).ClickAsync();
 
             var panel = page.Locator("#scenario-panel");
             await Expect(panel).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMilliseconds });
@@ -111,7 +111,7 @@ public sealed class WileyWorkspaceDataFidelityTests
     /// </summary>
     private static async Task ImportFixtureAsync(IPage page, string tempFile)
     {
-        var importNav = page.Locator("a[href='/wiley-workspace/quickbooks-import']").First;
+        var importNav = page.GetByRole(AriaRole.Button, new() { Name = "QuickBooks Import" });
         await importNav.ClickAsync();
 
         await UploadQuickBooksFileAsync(page, tempFile);
