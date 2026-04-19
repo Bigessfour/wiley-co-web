@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 from collections import defaultdict
 from pathlib import Path
-import hashlib
 
 from openpyxl import load_workbook
-
 
 ROOT = Path(__file__).resolve().parents[1] / "Import Data"
 
@@ -15,7 +14,11 @@ def file_hash(path: Path) -> str:
 
 
 def non_empty(values: tuple[object, ...]) -> list[str]:
-    return ["" if value is None else str(value) for value in values if value is not None and str(value).strip() != ""]
+    return [
+        "" if value is None else str(value)
+        for value in values
+        if value is not None and str(value).strip() != ""
+    ]
 
 
 def workbook_preview(path: Path) -> None:
@@ -26,21 +29,36 @@ def workbook_preview(path: Path) -> None:
         worksheet = workbook[sheet_name]
         header_row = None
         header_count = -1
-        for row_index, row in enumerate(worksheet.iter_rows(min_row=1, max_row=min(20, worksheet.max_row), values_only=True), start=1):
+        for row_index, row in enumerate(
+            worksheet.iter_rows(
+                min_row=1, max_row=min(20, worksheet.max_row), values_only=True
+            ),
+            start=1,
+        ):
             values = non_empty(row)
             if len(values) > header_count:
                 header_count = len(values)
                 header_row = (row_index, values)
         if header_row:
             row_index, values = header_row
-            print(f"  - {sheet_name}: rows={worksheet.max_row}, cols={worksheet.max_column}, header_row={row_index}, header={values[:22]}")
+            print(
+                f"  - {sheet_name}: rows={worksheet.max_row}, cols={worksheet.max_column}, header_row={row_index}, header={values[:22]}"
+            )
         else:
-            print(f"  - {sheet_name}: rows={worksheet.max_row}, cols={worksheet.max_column}, header_row=none")
+            print(
+                f"  - {sheet_name}: rows={worksheet.max_row}, cols={worksheet.max_column}, header_row=none"
+            )
     print()
 
 
 def main() -> None:
-    xlsx_files = sorted([path for path in ROOT.iterdir() if path.is_file() and path.suffix.lower() == ".xlsx"])
+    xlsx_files = sorted(
+        [
+            path
+            for path in ROOT.iterdir()
+            if path.is_file() and path.suffix.lower() == ".xlsx"
+        ]
+    )
     print(f"XLSX files: {len(xlsx_files)}")
     print()
 

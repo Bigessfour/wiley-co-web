@@ -33,6 +33,14 @@
     "cursor-global": false,
     "cursor-workspace": false
   },
+  "playwright.showTrace": true,
+  "playwright.pickLocatorCopyToClipboard": false,
+  "playwrightrunner.playwrightCommand": "npx playwright",
+  "playwrightrunner.playwrightConfigPath": "playwright.config.ts",
+  "playwrightrunner.playwrightRunProject": "chromium",
+  "playwrightrunner.playwrightDebugProject": "chromium",
+  "playwrightrunner.playwrightInspectProject": "chromium",
+  "playwrightrunner.codeLensSelector": "tests/playwright/**/*.spec.ts",
   "editor.formatOnSave": true,
   "files.exclude": {
     "**/bin": true,

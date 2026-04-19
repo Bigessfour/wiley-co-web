@@ -95,6 +95,12 @@ This file supplements the repository root copilot-instructions.md and is the alw
 - Prefer `rg` for content search and `rg --files` for fast file discovery.
 - Use PowerShell and avoid `grep`/`findstr` unless `rg` is unavailable.
 
+## Maintainability Gate
+
+- No newly added runtime code may ship with a CRAP score greater than 5.
+- Run `python .\Scripts\find_crap_code.py --threshold 5 --new-methods-only --fail-on-results --top 100` before handoff when a task adds or changes runtime code.
+- Use the dedicated VS Code task for this gate when you want a one-click workspace check.
+
 ## Recommended Next Steps When Needed
 
 - If the app is still using interactive server rendering, consider converting it to interactive WebAssembly so the Blazor WASM tooling is exercised fully.

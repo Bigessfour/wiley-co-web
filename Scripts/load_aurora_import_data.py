@@ -11,7 +11,6 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 IMPORT_DIR = ROOT / "Import Data"
 REGION = "us-east-2"
@@ -50,7 +49,9 @@ FILES = [
 ]
 
 
-def aws_data_api(command: str, *, sql: str | None = None, transaction_id: str | None = None) -> dict[str, Any]:
+def aws_data_api(
+    command: str, *, sql: str | None = None, transaction_id: str | None = None
+) -> dict[str, Any]:
     args = [
         "aws",
         "rds-data",
@@ -73,7 +74,9 @@ def aws_data_api(command: str, *, sql: str | None = None, transaction_id: str | 
 
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "AWS Data API call failed").strip())
+        raise RuntimeError(
+            (result.stderr or result.stdout or "AWS Data API call failed").strip()
+        )
 
     payload = result.stdout.strip()
     return json.loads(payload) if payload else {}
@@ -116,7 +119,13 @@ def parse_decimal(value: str | None) -> Decimal | None:
     if not text:
         return None
 
-    cleaned = text.replace(",", "").replace("$", "").replace("Ö", "").replace("(", "-").replace(")", "")
+    cleaned = (
+        text.replace(",", "")
+        .replace("$", "")
+        .replace("Ö", "")
+        .replace("(", "-")
+        .replace(")", "")
+    )
     cleaned = cleaned.replace("-SPLIT-", "")
     cleaned = cleaned.strip()
     if not cleaned or cleaned == "-":
@@ -148,7 +157,11 @@ def trim_row(row: list[str]) -> list[str]:
 def find_header_row(rows: list[list[str]]) -> tuple[int, dict[str, int]]:
     for index, row in enumerate(rows):
         headers = {value: col_index for col_index, value in enumerate(row) if value}
-        if "Type" in headers and "Date" in headers and ("Amount" in headers or "Balance" in headers):
+        if (
+            "Type" in headers
+            and "Date" in headers
+            and ("Amount" in headers or "Balance" in headers)
+        ):
             return index, headers
     raise RuntimeError("Could not identify a header row in the CSV file.")
 
@@ -171,7 +184,9 @@ def build_insert_sql(table: str, columns: list[str], rows: list[list[Any]]) -> s
     return f"insert into {table} ({column_sql}) values\n" + ",\n".join(values_sql) + ";"
 
 
-def split_batches(items: list[list[Any]], batch_size: int = 100) -> list[list[list[Any]]]:
+def split_batches(
+    items: list[list[Any]], batch_size: int = 100
+) -> list[list[list[Any]]]:
     return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
 
@@ -233,7 +248,9 @@ def insert_source_file(
     return int(decode_record_value(payload["records"][0][0]))
 
 
-def parse_transaction_file(path: Path, *, canonical_entity: str) -> tuple[int, int, list[list[Any]]]:
+def parse_transaction_file(
+    path: Path, *, canonical_entity: str
+) -> tuple[int, int, list[list[Any]]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = [trim_row(row) for row in csv.reader(handle)]
 
@@ -264,52 +281,97 @@ def parse_transaction_file(path: Path, *, canonical_entity: str) -> tuple[int, i
         split_account = get(row, "Split")
 
         if canonical_entity == "general-ledger-fy2026":
-            if not entry_type and not entry_date and not transaction_number and not name and not memo and amount is None:
+            if (
+                not entry_type
+                and not entry_date
+                and not transaction_number
+                and not name
+                and not memo
+                and amount is None
+            ):
                 section_label = first_non_empty(row)
                 if section_label:
-                    current_account_name = section_label if not section_label.lower().startswith("total") else current_account_name
-                    entries.append([
-                        row_number,
-                        None,
-                        "SECTION" if not section_label.lower().startswith("total") else "TOTAL",
-                        None,
-                        section_label,
-                        None,
-                        current_account_name,
-                        None,
-                        running_balance,
-                        None,
-                        canonical_entity,
-                    ])
+                    current_account_name = (
+                        section_label
+                        if not section_label.lower().startswith("total")
+                        else current_account_name
+                    )
+                    entries.append(
+                        [
+                            row_number,
+                            None,
+                            (
+                                "SECTION"
+                                if not section_label.lower().startswith("total")
+                                else "TOTAL"
+                            ),
+                            None,
+                            section_label,
+                            None,
+                            current_account_name,
+                            None,
+                            running_balance,
+                            None,
+                            canonical_entity,
+                        ]
+                    )
                 continue
 
             if not account_name:
                 account_name = current_account_name
 
-        if canonical_entity == "transaction-list-by-date-all" and not any((entry_type, entry_date, transaction_number, name, memo, account_name, split_account, amount, running_balance)):
+        if canonical_entity == "transaction-list-by-date-all" and not any(
+            (
+                entry_type,
+                entry_date,
+                transaction_number,
+                name,
+                memo,
+                account_name,
+                split_account,
+                amount,
+                running_balance,
+            )
+        ):
             continue
 
-        if canonical_entity == "general-ledger-fy2026" and not any((entry_type, entry_date, transaction_number, name, memo, account_name, split_account, amount, running_balance)):
+        if canonical_entity == "general-ledger-fy2026" and not any(
+            (
+                entry_type,
+                entry_date,
+                transaction_number,
+                name,
+                memo,
+                account_name,
+                split_account,
+                amount,
+                running_balance,
+            )
+        ):
             continue
 
-        entries.append([
-            row_number,
-            entry_date,
-            entry_type,
-            transaction_number,
-            name,
-            memo,
-            account_name,
-            split_account,
-            amount,
-            running_balance,
-            canonical_entity,
-        ])
+        entries.append(
+            [
+                row_number,
+                entry_date,
+                entry_type,
+                transaction_number,
+                name,
+                memo,
+                account_name,
+                split_account,
+                amount,
+                running_balance,
+                canonical_entity,
+            ]
+        )
 
     return len(rows), column_count, entries
 
 
-def load_rows(transaction_id: str, source_file_id: int, entries: list[list[Any]]) -> None:
+def load_rows(
+    transaction_id: str, source_file_id: int, entries: list[list[Any]]
+) -> None:
     columns = [
         "source_row_number",
         "entry_date",
@@ -327,9 +389,7 @@ def load_rows(transaction_id: str, source_file_id: int, entries: list[list[Any]]
 
     prepared = []
     for entry in entries:
-        row_number, entry_date, entry_type, transaction_number, name, memo, account_name, split_account, amount, running_balance, entry_scope = entry
-        prepared.append([
-            source_file_id,
+        (
             row_number,
             entry_date,
             entry_type,
@@ -340,9 +400,25 @@ def load_rows(transaction_id: str, source_file_id: int, entries: list[list[Any]]
             split_account,
             amount,
             running_balance,
-            None,
             entry_scope,
-        ])
+        ) = entry
+        prepared.append(
+            [
+                source_file_id,
+                row_number,
+                entry_date,
+                entry_type,
+                transaction_number,
+                name,
+                memo,
+                account_name,
+                split_account,
+                amount,
+                running_balance,
+                None,
+                entry_scope,
+            ]
+        )
 
     insert_columns = [
         "source_file_id",
@@ -372,8 +448,14 @@ def describe_file(file: ImportFile) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Load the attached CSV exports into the Aurora database via the RDS Data API.")
-    parser.add_argument("--dry-run", action="store_true", help="Parse files and print counts without writing to Aurora.")
+    parser = argparse.ArgumentParser(
+        description="Load the attached CSV exports into the Aurora database via the RDS Data API."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse files and print counts without writing to Aurora.",
+    )
     args = parser.parse_args()
 
     if not IMPORT_DIR.exists():
@@ -401,7 +483,9 @@ def main() -> None:
             }
         )
         file_summaries.append(summary)
-        print(f"{file.path.name}: rows={summary['row_count']} data_rows={summary['data_row_count']} cols={summary['column_count']} headers={summary['headers']}")
+        print(
+            f"{file.path.name}: rows={summary['row_count']} data_rows={summary['data_row_count']} cols={summary['column_count']} headers={summary['headers']}"
+        )
 
     if args.dry_run:
         print("Dry run complete; no database changes made.")
@@ -414,14 +498,22 @@ def main() -> None:
         variant_ids: dict[str, int] = {}
         for file in FILES:
             if file.variant_code not in variant_ids:
-                variant_ids[file.variant_code] = ensure_variant(transaction_id, file.variant_code, f"{file.variant_code} source variant")
+                variant_ids[file.variant_code] = ensure_variant(
+                    transaction_id,
+                    file.variant_code,
+                    f"{file.variant_code} source variant",
+                )
 
         for file, summary in zip(FILES, file_summaries):
             existing = query_single_value(
-                "select id from source_files where file_hash = " + sql_literal(summary["hash"]) + " limit 1;"
+                "select id from source_files where file_hash = "
+                + sql_literal(summary["hash"])
+                + " limit 1;"
             )
             if existing is not None:
-                print(f"Skipping existing file {file.path.name} (source_file_id={existing})")
+                print(
+                    f"Skipping existing file {file.path.name} (source_file_id={existing})"
+                )
                 continue
 
             source_file_id = insert_source_file(
@@ -436,8 +528,12 @@ def main() -> None:
                 column_count=summary["column_count"],
             )
 
-            row_count, column_count, entries = parse_transaction_file(file.path, canonical_entity=file.canonical_entity)
-            print(f"Loading {file.path.name}: source_file_id={source_file_id}, parsed_rows={len(entries)}, source_rows={row_count}, columns={column_count}")
+            row_count, column_count, entries = parse_transaction_file(
+                file.path, canonical_entity=file.canonical_entity
+            )
+            print(
+                f"Loading {file.path.name}: source_file_id={source_file_id}, parsed_rows={len(entries)}, source_rows={row_count}, columns={column_count}"
+            )
             load_rows(transaction_id, source_file_id, entries)
 
         aws_data_api("commit-transaction", transaction_id=transaction_id)

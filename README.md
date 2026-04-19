@@ -116,7 +116,6 @@ Reference-data note:
 - Production App Runner does not bundle that folder by default. `WileyCoWeb.Api/appsettings.json` requires an explicit reference-data path in production.
 - Monthly analysis imports should use the QuickBooks Import panel and API commit flow, not the repo-local `Import Data/` folder.
 
-
 ## Workspace Knowledge Layer
 
 The server-side knowledge layer is the shared calculation surface for Decision Support and Jarvis.
@@ -138,11 +137,11 @@ AWS CLI validation on April 15, 2026 confirms the current production support pic
 - API Gateway `WileyJarvisApi` (`w544vrvb3i`) still serves only as the xAI proxy and is not the workspace API host.
 - The xAI proxy now follows the AWS HTTP proxy pattern for greedy resources: API Gateway exposes `/{proxy+}` and forwards that path to `https://api.x.ai/{proxy}`. This allows the API host to use xAI's documented `/v1/chat/completions` and `/v1/responses` paths through the same gateway.
 - AWS CLI provisioning created the thin API runtime path:
-	- ECR repository `wiley-widget-api`
-	- App Runner service `wiley-widget-api` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`
-	- App Runner VPC connector `wiley-widget-api-vpc-connector`
-	- API security group `sg-050b6a6ae154820d5` with Aurora ingress on `5432`
-	- Interface VPC endpoints for `execute-api` and `xray`
+  - ECR repository `wiley-widget-api`
+  - App Runner service `wiley-widget-api` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`
+  - App Runner VPC connector `wiley-widget-api-vpc-connector`
+  - API security group `sg-050b6a6ae154820d5` with Aurora ingress on `5432`
+  - Interface VPC endpoints for `execute-api` and `xray`
 - Amplify app-level and `main` branch environment variables now include `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com`, and the Amplify app build spec was resynced from [amplify.yml](amplify.yml).
 
 Production implication: the missing compute host is now provisioned, but final cutover is not complete until the App Runner service finishes healthy startup validation and Amplify performs a release using the staged API base address. Until that release happens, the public client can still reflect the previous routing behavior.
@@ -180,8 +179,12 @@ dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "Fully
 
 This workspace now carries a separate Node-based Playwright setup for the VS Code Playwright extension and agent workflows.
 
-- `playwright.config.ts` defines a Chromium project, HTML plus JSON reporters, retry-time tracing, and a managed local `dotnet run` web server whenever the effective base URL is the local default `http://localhost:5230`.
+- `playwright.config.ts` defines Chromium and WebKit projects, HTML plus JSON reporters, retry-time tracing, and a managed local `dotnet run` web server whenever the effective base URL is the local default `http://localhost:5230`.
+- `npm run playwright:test:hosted` runs the Node Playwright suite against the three verified live hosts: `https://main.d2ellat1y3ljd9.amplifyapp.com`, `https://wileywidget.townofwiley.gov`, and `https://www.wileywidget.townofwiley.gov`.
+- `npm run playwright:test:ci` runs the full local Node Playwright suite with `--project=chromium --project=webkit` so CI covers both engines.
+- `.vscode/tasks.json` exposes the same workflow as the `playwright: test hosted` task and writes per-host JSON artifacts under `TestResults/playwright-hosted`.
 - `tests/playwright/workspace-smoke.spec.ts` gives the official Playwright extension and the Playwright Test Runner extension a concrete spec to discover, run, debug, record against, and inspect.
+- `tests/playwright/support/workspace.ts` centralizes shell waits, panel navigation, numeric editing, and visual-snapshot prep so panel specs share the same lifecycle rules.
 - `.vscode/settings.json` configures both installed Playwright extensions to use `playwright.config.ts`, default to the local workspace URL, and surface traces and locator copying in the IDE.
 - `.vscode/mcp.json` registers the `playwright` MCP server with the standard `npx @playwright/mcp@latest` wiring so Copilot and other MCP-capable clients can drive a browser through Playwright tools.
 - `package.json` adds `playwright:*` scripts for browser install, test runs, UI mode, codegen, reports, and agent CLI helpers.
@@ -189,6 +192,8 @@ This workspace now carries a separate Node-based Playwright setup for the VS Cod
 Use the Node-based setup for VS Code testing UI and agent automation. Keep the existing .NET Playwright xUnit suite for the current hosted-site regression coverage.
 
 If you want the Node Playwright setup to target a non-local site instead, set `WILEYCO_E2E_BASE_URL` to that host before running Playwright. The config skips the managed `dotnet run` server whenever the effective base URL is not the local default.
+
+Do not use the bare Amplify default app domain `https://d2ellat1y3ljd9.amplifyapp.com` as a hosted regression target. The current Amplify app serves the production branch from `https://main.d2ellat1y3ljd9.amplifyapp.com`, while the bare default domain returns `404` even at `/`. If you want the bare default domain to land on production, that redirect needs to be configured in Amplify hosting or by making the custom domain canonical there; it is not controlled by the repo build spec.
 
 ## Observability (AWS X-Ray + CloudWatch Logs)
 

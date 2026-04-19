@@ -67,6 +67,9 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+playwright-report/
+test-results/
+.playwright/
 pids
 *.pid
 *.seed

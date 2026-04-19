@@ -609,7 +609,9 @@ class AIManifestGenerator:
                     continue
 
                 rel_path = self._norm(file_path)
-                if self._is_builtin_excluded_path(rel_path) or rel_path.endswith(".secret"):
+                if self._is_builtin_excluded_path(rel_path) or rel_path.endswith(
+                    ".secret"
+                ):
                     continue
 
                 if self._should_include_file(file_path):
@@ -633,7 +635,9 @@ class AIManifestGenerator:
                     continue
 
                 rel_path = self._norm(file_path)
-                if self._is_builtin_excluded_path(rel_path) or rel_path.endswith(".secret"):
+                if self._is_builtin_excluded_path(rel_path) or rel_path.endswith(
+                    ".secret"
+                ):
                     continue
 
                 if self._should_include_file(file_path):

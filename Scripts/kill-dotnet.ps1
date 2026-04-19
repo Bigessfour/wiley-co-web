@@ -139,6 +139,24 @@ class DotNetProcessManager {
     }
 }
 
+function Write-ProcessLogEntry {
+    param(
+        [string]$LogFile,
+        [string]$Entry
+    )
+
+    if ([string]::IsNullOrWhiteSpace($LogFile)) {
+        return
+    }
+
+    $logDirectory = Split-Path -Parent $LogFile
+    if (-not [string]::IsNullOrWhiteSpace($logDirectory) -and -not (Test-Path $logDirectory)) {
+        New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    }
+
+    Add-Content -Path $LogFile -Value $Entry
+}
+
 function Invoke-ProcessCleanup {
     param(
         [string]$ProcessName = "dotnet",
@@ -168,8 +186,7 @@ function Invoke-ProcessCleanup {
         if ($LogFile) {
             $entry = "$(Get-Date -Format o) - DryRun listing: $($candidates.Count) processes matching Project='$Project' Pattern='$Pattern'`n"
             $candidates | ForEach-Object { $entry += "PID:$($_.ProcessId) CMD:$($_.CommandLine)`n" }
-            New-Item -ItemType Directory -Path (Split-Path $LogFile) -ErrorAction SilentlyContinue | Out-Null
-            Add-Content -Path $LogFile -Value $entry
+            Write-ProcessLogEntry -LogFile $LogFile -Entry $entry
             Write-Information "Log written to $LogFile"
         }
         return
@@ -182,11 +199,11 @@ function Invoke-ProcessCleanup {
     $remaining = $manager.GetOrphanedProcesses($Project, $Pattern)
     if ($remaining.Count -eq 0) {
         Write-Information "✅ All matching processes cleaned up"
-        if ($LogFile) { Add-Content -Path $LogFile -Value "$(Get-Date -Format o) - Killed PIDs: $($pids -join ',')`n" }
+        if ($LogFile) { Write-ProcessLogEntry -LogFile $LogFile -Entry "$(Get-Date -Format o) - Killed PIDs: $($pids -join ',')`n" }
     }
     else {
         Write-Warning "⚠️  $($remaining.Count) matching processes still remain"
-        if ($LogFile) { Add-Content -Path $LogFile -Value "$(Get-Date -Format o) - Remaining PIDs after kill attempt: $($remaining | ForEach-Object { $_.ProcessId } -join ',')`n" }
+        if ($LogFile) { Write-ProcessLogEntry -LogFile $LogFile -Entry "$(Get-Date -Format o) - Remaining PIDs after kill attempt: $($remaining | ForEach-Object { $_.ProcessId } -join ',')`n" }
     }
 }
 

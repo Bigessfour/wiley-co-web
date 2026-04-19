@@ -54,3 +54,9 @@ This file is the repository-level canonical policy for AI agents working in this
 - Treat ripgrep (rg) as the default search tool for content search and file discovery.
 - Prefer rg for content search and rg --files for fast file discovery.
 - Use PowerShell and avoid grep/findstr unless rg is unavailable.
+
+## Maintainability Gate
+
+- No newly added runtime code may ship with a CRAP score greater than 5.
+- Validate this rule with `python .\Scripts\find_crap_code.py --threshold 5 --new-methods-only --fail-on-results --top 100` before handoff when the task adds or changes runtime code.
+- Treat the gate as applying to active runtime code only, using the scanner's built-in scope rules for `Components`, `Services`, `WileyCoWeb.Api`, `State`, and root-level C# files.

@@ -435,7 +435,7 @@
 				"${workspaceFolder}/Scripts/kill-dotnet.ps1",
 				"-Force",
 				"-Pattern",
-				"WileyCoWeb(\\.Api)?\\.csproj"
+				"'WileyCoWeb(\\.Api)?\\.csproj'"
 			],
 			"type": "shell",
 			"presentation": {
@@ -820,24 +820,6 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "test: mcp",
-			"dependsOn": [
-				"build: fast"
-			],
-			"type": "shell",
-			"command": "dotnet",
-			"args": [
-				"test",
-				"--no-build",
-				"tests/syncfusion-winforms-mcp/tools/WileyWidgetMcpServer/WileyWidgetMcpServer.csproj"
-			],
-			"isBackground": false,
-			"problemMatcher": [
-				"$msCompile"
-			],
-			"group": "test"
-		},
-		{
 			"label": "run integration tests",
 			"dependsOn": [
 				"maintenance: Kill Test Processes"
@@ -862,43 +844,6 @@
 				"panel": "dedicated"
 			},
 			"problemMatcher": []
-		},
-		{
-			"label": "test: mcp-tests",
-			"dependsOn": [
-				"build: fast"
-			],
-			"type": "shell",
-			"command": "dotnet",
-			"args": [
-				"test",
-				"--no-build",
-				"tests/syncfusion-winforms-mcp/tools/WileyWidgetMcpServer.Tests/WileyWidgetMcpServer.Tests.csproj"
-			],
-			"isBackground": false,
-			"problemMatcher": [
-				"$msCompile"
-			],
-			"group": "test"
-		},
-		{
-			"label": "mcp: batch-validate-forms",
-			"type": "shell",
-			"command": "dotnet",
-			"args": [
-				"run",
-				"--project",
-				"tests/syncfusion-winforms-mcp/tools/WileyWidgetMcpServer/WileyWidgetMcpServer.csproj",
-				"--no-build",
-				"--",
-				"--run-script",
-				"tmp/mcp/BatchValidateForms.csx"
-			],
-			"isBackground": false,
-			"problemMatcher": [
-				"$msCompile"
-			],
-			"group": "test"
 		},
 		{
 			"label": "🔌 Setup MSSQL MCP (Windows Auth)",
@@ -2148,6 +2093,124 @@
 			"args": [],
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "playwright: install browsers",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"playwright:install"
+			],
+			"problemMatcher": [],
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "playwright: test",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"playwright:test"
+			],
+			"problemMatcher": [],
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "playwright: test hosted",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"playwright:test:hosted"
+			],
+			"problemMatcher": [],
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "playwright: test ui",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"playwright:test:ui"
+			],
+			"problemMatcher": [],
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "playwright: agent skills",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"playwright:agents:install-skills"
+			],
+			"problemMatcher": [],
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "🔍 Enforce New Code CRAP <= 5",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				".\\Scripts\\find_crap_code.py",
+				"--threshold",
+				"5",
+				"--new-methods-only",
+				"--fail-on-results",
+				"--top",
+				"100"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "temp: playwright browser-depth recalculation",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				".\\node_modules\\@playwright\\test\\cli.js",
+				"test",
+				"tests/playwright/wiley-workspace-browser-depth.spec.ts",
+				"--project=chromium",
+				"--grep",
+				"break-even recalculates cards|rates panel updates the current-rate KPI|scenario planner updates derived totals"
+			],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
 		}
 	],
 	"inputs": [
