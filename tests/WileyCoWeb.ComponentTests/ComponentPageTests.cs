@@ -814,6 +814,127 @@ public sealed class ComponentPageTests
 		});
 	}
 
+	[Fact]
+	public void WileyWorkspace_CustomersRoute_CreatesCustomer_AndRefreshesDirectory()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "customers"));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("customer-directory-grid", cut.Markup);
+			Assert.Contains("Add customer", cut.Markup);
+		});
+
+		cut.Find("#add-customer-button").Click();
+
+		cut.WaitForAssertion(() => Assert.Contains("customer-editor-save-button", cut.Markup));
+
+		cut.Find("#customer-editor-account-number").Change("3001");
+		cut.Find("#customer-editor-first-name").Change("Maya");
+		cut.Find("#customer-editor-last-name").Change("Lopez");
+		cut.Find("#customer-editor-service-address").Change("88 River Rd");
+		cut.Find("#customer-editor-service-city").Change("Wiley");
+		cut.Find("#customer-editor-service-state").Change("CO");
+		cut.Find("#customer-editor-service-zip-code").Change("81092");
+
+		cut.Find("#customer-editor-save-button").Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("Saved 3001 and created the live utility-customer directory.", cut.Markup);
+			Assert.DoesNotContain("customer-editor-save-button", cut.Markup);
+			Assert.Contains("3001", cut.Markup);
+		});
+	}
+
+	[Fact]
+	public void DataDashboardPanel_RendersAllSections_WhenOptionalDataIsPresent()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<DataDashboardPanel>(parameters => parameters
+			.Add(panel => panel.CurrentRate, 60m)
+			.Add(panel => panel.TotalCosts, 900m)
+			.Add(panel => panel.ProjectedVolume, 20m)
+			.Add(panel => panel.RecommendedRate, 55m)
+			.Add(panel => panel.AdjustedRecommendedRate, 62m)
+			.Add(panel => panel.ScenarioCostTotal, 24000m)
+			.Add(panel => panel.ScenarioItems, new List<ScenarioItem>
+			{
+				new("Reserve transfer", 6200m),
+				new("Vehicle replacement", 18000m)
+			})
+			.Add(panel => panel.ProjectionSeries, new List<ProjectionRow>
+			{
+				new("FY26", 58.10m),
+				new("FY27", 61.25m)
+			})
+			.Add(panel => panel.Customers, new List<CustomerRow>
+			{
+				new("North Plant", "Water", "Yes"),
+				new("South Lift", "Sewer", "No"),
+				new("East Hub", "Water", "Yes")
+			})
+			.Add(panel => panel.RateComparison, new List<RateComparisonPoint>
+			{
+				new("Current", 60d),
+				new("Break-Even", 55d)
+			})
+			.Add(panel => panel.SelectedEnterprise, WorkspaceTestData.WaterUtility)
+			.Add(panel => panel.SelectedFiscalYear, WorkspaceTestData.WaterFiscalYear));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("data-dashboard-panel", cut.Markup);
+			Assert.Contains("rate-comparison-section", cut.Markup);
+			Assert.Contains("waterfall-section", cut.Markup);
+			Assert.Contains("rate-trend-section", cut.Markup);
+			Assert.Contains("customer-donuts-section", cut.Markup);
+			Assert.Contains("kpi-net-position", cut.Markup);
+			Assert.Contains("kpi-coverage-ratio", cut.Markup);
+			Assert.Contains("kpi-rate-adequacy", cut.Markup);
+			Assert.Contains("kpi-scenario-pressure", cut.Markup);
+			Assert.Equal(2, cut.FindComponents<SfCircularGauge>().Count);
+			Assert.Equal(3, cut.FindComponents<SfChart>().Count);
+			Assert.Equal(2, cut.FindComponents<SfAccumulationChart>().Count);
+		});
+	}
+
+	[Fact]
+	public void DataDashboardPanel_RendersKpisAndGauges_WhenOptionalDataIsMissing()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<DataDashboardPanel>(parameters => parameters
+			.Add(panel => panel.CurrentRate, 40m)
+			.Add(panel => panel.TotalCosts, 1200m)
+			.Add(panel => panel.ProjectedVolume, 10m)
+			.Add(panel => panel.RecommendedRate, 80m)
+			.Add(panel => panel.AdjustedRecommendedRate, 75m)
+			.Add(panel => panel.ScenarioCostTotal, 0m)
+			.Add(panel => panel.ScenarioItems, [])
+			.Add(panel => panel.ProjectionSeries, [])
+			.Add(panel => panel.Customers, [])
+			.Add(panel => panel.RateComparison, [])
+			.Add(panel => panel.SelectedEnterprise, WorkspaceTestData.TrashUtility)
+			.Add(panel => panel.SelectedFiscalYear, WorkspaceTestData.PriorFiscalYear));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("data-dashboard-panel", cut.Markup);
+			Assert.DoesNotContain("rate-comparison-section", cut.Markup);
+			Assert.DoesNotContain("waterfall-section", cut.Markup);
+			Assert.DoesNotContain("rate-trend-section", cut.Markup);
+			Assert.DoesNotContain("customer-donuts-section", cut.Markup);
+			Assert.Equal(2, cut.FindComponents<SfCircularGauge>().Count);
+			Assert.Empty(cut.FindComponents<SfChart>());
+			Assert.Empty(cut.FindComponents<SfAccumulationChart>());
+		});
+	}
+
 	private static TestContext CreateContext(HttpClient? snapshotClient = null, FakeJsRuntime? jsRuntime = null, Action<IServiceCollection>? configureServices = null)
 	{
 		var context = new TestContext();
