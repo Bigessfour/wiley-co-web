@@ -20,6 +20,7 @@
     <PackageReference Include="bunit.generators" />
     <PackageReference Include="Syncfusion.Blazor.Core" />
     <PackageReference Include="Syncfusion.Blazor.InteractiveChat" />
+    <PackageReference Include="Moq" />
   </ItemGroup>
 
   <ItemGroup>

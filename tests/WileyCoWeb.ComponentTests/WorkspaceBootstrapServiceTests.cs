@@ -25,7 +25,8 @@ public sealed class WorkspaceBootstrapServiceTests
 
 		var service = new WorkspaceBootstrapService(
 			state,
-			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
+			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }),
+			new WorkspaceLocalBootstrapService(new HttpClient(fallbackHandler) { BaseAddress = new Uri("https://client.local/") }));
 
 		await service.LoadAsync(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear);
 
@@ -41,6 +42,39 @@ public sealed class WorkspaceBootstrapServiceTests
 	}
 
 	[Fact]
+	public async Task LoadAsync_UsesLocalBootstrapAsset_WhenApiRequestFails()
+	{
+		var state = new WorkspaceState();
+		var apiHandler = new StubHttpMessageHandler(_ => throw new HttpRequestException("API unavailable"));
+		var localBootstrapHandler = new StubHttpMessageHandler(request =>
+		{
+			Assert.EndsWith("/data/workspace-bootstrap.json", request.RequestUri?.AbsolutePath, StringComparison.OrdinalIgnoreCase);
+			return CreateJsonResponse(WorkspaceTestData.CreateWaterUtilityBootstrap(
+				WorkspaceTestData.BasePlanningScenario,
+				WorkspaceTestData.WaterCurrentRate,
+				WorkspaceTestData.WaterTotalCosts,
+				WorkspaceTestData.WaterProjectedVolume,
+				DateTime.UtcNow.ToString("O")));
+		});
+
+		var service = new WorkspaceBootstrapService(
+			state,
+			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }),
+			new WorkspaceLocalBootstrapService(new HttpClient(localBootstrapHandler) { BaseAddress = new Uri("https://client.local/") }));
+
+		await service.LoadAsync();
+
+		Assert.Equal(WorkspaceStartupSource.LocalBootstrapFallback, state.StartupSource);
+		Assert.Equal(WorkspaceTestData.WaterUtility, state.SelectedEnterprise);
+		Assert.Equal(WorkspaceTestData.WaterFiscalYear, state.SelectedFiscalYear);
+		Assert.Equal(WorkspaceTestData.BasePlanningScenario, state.ActiveScenarioName);
+		Assert.NotEmpty(state.ScenarioItems);
+		Assert.True(state.IsUsingStartupFallback);
+		Assert.Contains("local fallback data", state.StartupSourceStatus, StringComparison.OrdinalIgnoreCase);
+		Assert.Equal(1, localBootstrapHandler.CallCount);
+	}
+
+	[Fact]
 	public async Task LoadAsync_FallsBack_WhenApiRequestFails()
 	{
 		var state = new WorkspaceState();
@@ -48,7 +82,8 @@ public sealed class WorkspaceBootstrapServiceTests
 
 		var service = new WorkspaceBootstrapService(
 			state,
-			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }));
+			new WorkspaceSnapshotApiService(new HttpClient(apiHandler) { BaseAddress = new Uri("https://workspace.local/") }),
+			new WorkspaceLocalBootstrapService(new HttpClient(new StubHttpMessageHandler(_ => throw new HttpRequestException("local bootstrap unavailable"))) { BaseAddress = new Uri("https://client.local/") }));
 
 		await service.LoadAsync();
 

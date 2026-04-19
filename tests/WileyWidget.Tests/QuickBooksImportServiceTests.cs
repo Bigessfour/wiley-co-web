@@ -115,9 +115,13 @@ public sealed class QuickBooksImportServiceTests
     public async Task CommitAsync_BlocksDuplicateHash_AndMarksSubsequentPreviewAsDuplicate()
     {
         var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
+        var csvParser = new QuickBooksCsvParser();
+        var excelParser = new QuickBooksExcelParser();
         var service = new QuickBooksImportService(
             _loggerFactory.CreateLogger<QuickBooksImportService>(),
-            contextFactory);
+            contextFactory,
+            csvParser,
+            excelParser);
 
         var fileBytes = Encoding.UTF8.GetBytes(CreateSparseTransactionListCsv());
 
@@ -170,9 +174,13 @@ public sealed class QuickBooksImportServiceTests
 
     private QuickBooksImportService CreateService()
     {
+        var csvParser = new QuickBooksCsvParser();
+        var excelParser = new QuickBooksExcelParser();
         return new QuickBooksImportService(
             _loggerFactory.CreateLogger<QuickBooksImportService>(),
-            CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}"));
+            CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}"),
+            csvParser,
+            excelParser);
     }
 
     private static IDbContextFactory<AppDbContext> CreateContextFactory(string databaseName)

@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
@@ -7,63 +7,135 @@ namespace WileyCoWeb.Services;
 
 public sealed class WorkspaceAiApiService(HttpClient httpClient, ILogger<WorkspaceAiApiService>? logger = null)
 {
-	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-	{
-		PropertyNameCaseInsensitive = true
-	};
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
-	public async Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
-	{
-		logger?.LogInformation("Requesting workspace AI response for {Enterprise} FY {FiscalYear} (question length {QuestionLength}).", request.SelectedEnterprise, request.SelectedFiscalYear, request.Question?.Length ?? 0);
-		var response = await httpClient.PostAsJsonAsync("api/ai/chat", request, JsonOptions, cancellationToken).ConfigureAwait(false);
-		var payload = await response.Content.ReadFromJsonAsync<WorkspaceChatResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+    public Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
+        => ExecuteAskAsync(request, cancellationToken);
 
-		if (!response.IsSuccessStatusCode)
-		{
-			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-			logger?.LogWarning("Workspace AI request failed with status {StatusCode}", (int)response.StatusCode);
-			throw new InvalidOperationException(string.IsNullOrWhiteSpace(responseBody)
-				? $"Workspace AI request failed with status {(int)response.StatusCode}."
-				: responseBody);
-		}
+    public async Task ResetConversationAsync(WorkspaceConversationResetRequest request, CancellationToken cancellationToken = default)
+    {
+        logger?.LogInformation("Resetting workspace AI conversation for {Enterprise} FY {FiscalYear}.", request.SelectedEnterprise, request.SelectedFiscalYear);
 
-		logger?.LogInformation("Workspace AI response received (usedFallback={UsedFallback}, conversationId={ConversationId}, turnCount={TurnCount}).", payload?.UsedFallback ?? false, payload?.ConversationId ?? "N/A", payload?.ConversationMessageCount ?? 0);
-		return payload ?? throw new InvalidOperationException("The workspace AI response was empty.");
-	}
+        await httpClient.SendJsonAsync(
+            HttpMethod.Post,
+            "api/ai/chat/reset",
+            request,
+            JsonOptions,
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("workspace AI conversation reset", statusCode, responseBody)),
+            cancellationToken).ConfigureAwait(false);
+    }
 
-	public async Task ResetConversationAsync(WorkspaceConversationResetRequest request, CancellationToken cancellationToken = default)
-	{
-		logger?.LogInformation("Resetting workspace AI conversation for {Enterprise} FY {FiscalYear}.", request.SelectedEnterprise, request.SelectedFiscalYear);
-		var response = await httpClient.PostAsJsonAsync("api/ai/chat/reset", request, JsonOptions, cancellationToken).ConfigureAwait(false);
+    private async Task<WorkspaceChatResponse> ExecuteAskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken)
+    {
+        LogAskRequest(request);
 
-		if (!response.IsSuccessStatusCode)
-		{
-			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-			logger?.LogWarning("Workspace AI conversation reset failed with status {StatusCode}", (int)response.StatusCode);
-			throw new InvalidOperationException(string.IsNullOrWhiteSpace(responseBody)
-				? $"Workspace AI conversation reset failed with status {(int)response.StatusCode}."
-				: responseBody);
-		}
-	}
+        var payload = await SendAskRequestAsync(request, cancellationToken).ConfigureAwait(false);
 
-	public async Task<WorkspaceRecommendationHistoryResponse> GetRecommendationHistoryAsync(WorkspaceRecommendationHistoryRequest request, CancellationToken cancellationToken = default)
-	{
-		ArgumentNullException.ThrowIfNull(request);
-		logger?.LogInformation("Loading recommendation history for {Enterprise} FY {FiscalYear} (limit {Limit}).", request.SelectedEnterprise, request.SelectedFiscalYear, request.Limit);
+        LogAskResponse(payload);
+        return payload ?? throw new InvalidOperationException("The workspace AI response was empty.");
+    }
 
-		var endpoint = $"api/ai/recommendations?enterprise={Uri.EscapeDataString(request.SelectedEnterprise)}&fiscalYear={request.SelectedFiscalYear}&limit={request.Limit}";
-		var response = await httpClient.GetAsync(endpoint, cancellationToken).ConfigureAwait(false);
-		var payload = await response.Content.ReadFromJsonAsync<WorkspaceRecommendationHistoryResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+    private void LogAskRequest(WorkspaceChatRequest request)
+    {
+        logger?.LogInformation(
+            "Requesting workspace AI response for {Enterprise} FY {FiscalYear} (question length {QuestionLength}).",
+            request.SelectedEnterprise,
+            request.SelectedFiscalYear,
+            GetQuestionLength(request));
+    }
 
-		if (!response.IsSuccessStatusCode)
-		{
-			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-			logger?.LogWarning("Workspace recommendation history request failed with status {StatusCode}", (int)response.StatusCode);
-			throw new InvalidOperationException(string.IsNullOrWhiteSpace(responseBody)
-				? $"Workspace recommendation history request failed with status {(int)response.StatusCode}."
-				: responseBody);
-		}
+    private void LogAskResponse(WorkspaceChatResponse? payload)
+    {
+        logger?.LogInformation(
+            "Workspace AI response received (usedFallback={UsedFallback}, conversationId={ConversationId}, turnCount={TurnCount}).",
+            GetUsedFallback(payload),
+            GetConversationId(payload),
+            GetConversationMessageCount(payload));
+    }
 
-		return payload ?? new WorkspaceRecommendationHistoryResponse([]);
-	}
+    private static bool GetUsedFallback(WorkspaceChatResponse? payload)
+        => payload?.UsedFallback ?? false;
+
+    private static int GetQuestionLength(WorkspaceChatRequest request)
+        => request.Question?.Length ?? 0;
+
+    private static string GetConversationId(WorkspaceChatResponse? payload)
+        => payload?.ConversationId ?? "N/A";
+
+    private static int GetConversationMessageCount(WorkspaceChatResponse? payload)
+        => payload?.ConversationMessageCount ?? 0;
+
+    private Task<WorkspaceChatResponse?> SendAskRequestAsync(WorkspaceChatRequest request, CancellationToken cancellationToken)
+    {
+        return httpClient.SendJsonAsync<WorkspaceChatResponse>(
+            HttpMethod.Post,
+            "api/ai/chat",
+            request,
+            JsonOptions,
+            "The workspace AI response was not valid JSON.",
+            CreateFailureException("workspace AI request"),
+            cancellationToken);
+    }
+
+    public async Task<WorkspaceRecommendationHistoryResponse> GetRecommendationHistoryAsync(WorkspaceRecommendationHistoryRequest request, CancellationToken cancellationToken = default)
+        => await ExecuteGetRecommendationHistoryAsync(request, cancellationToken).ConfigureAwait(false);
+
+    private async Task<WorkspaceRecommendationHistoryResponse> ExecuteGetRecommendationHistoryAsync(WorkspaceRecommendationHistoryRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        LogRecommendationHistoryRequest(request);
+
+        var payload = await LoadRecommendationHistoryAsync(request, cancellationToken).ConfigureAwait(false);
+
+        LogRecommendationHistoryResponse(request);
+        return payload ?? new WorkspaceRecommendationHistoryResponse([]);
+    }
+
+    private void LogRecommendationHistoryRequest(WorkspaceRecommendationHistoryRequest request)
+    {
+        logger?.LogInformation(
+            "Loading recommendation history for {Enterprise} FY {FiscalYear} (limit {Limit}).",
+            request.SelectedEnterprise,
+            request.SelectedFiscalYear,
+            request.Limit);
+    }
+
+    private void LogRecommendationHistoryResponse(WorkspaceRecommendationHistoryRequest request)
+    {
+        logger?.LogInformation(
+            "Workspace recommendation history loaded for {Enterprise} FY {FiscalYear}.",
+            request.SelectedEnterprise,
+            request.SelectedFiscalYear);
+    }
+
+    private Task<WorkspaceRecommendationHistoryResponse?> LoadRecommendationHistoryAsync(
+        WorkspaceRecommendationHistoryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var endpoint = BuildRecommendationHistoryEndpoint(request);
+        return httpClient.GetJsonAsync<WorkspaceRecommendationHistoryResponse>(
+            endpoint,
+            JsonOptions,
+            $"The workspace recommendation history response from {endpoint} was not valid JSON.",
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("workspace recommendation history request", statusCode, responseBody)),
+            cancellationToken);
+    }
+
+    private static string BuildRecommendationHistoryEndpoint(WorkspaceRecommendationHistoryRequest request)
+        => $"api/ai/recommendations?enterprise={Uri.EscapeDataString(request.SelectedEnterprise)}&fiscalYear={request.SelectedFiscalYear}&limit={request.Limit}";
+
+    private static string BuildFailureMessage(string operationName, HttpStatusCode statusCode, string? responseBody)
+    {
+        var detail = HttpProblemDetailsParser.ExtractMessage(responseBody);
+        return string.IsNullOrWhiteSpace(detail)
+            ? $"{operationName} failed with status {(int)statusCode}."
+            : $"{operationName} failed with status {(int)statusCode}: {detail}";
+    }
+
+    private static Func<HttpStatusCode, string?, Exception> CreateFailureException(string operationName)
+        => (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage(operationName, statusCode, responseBody));
 }

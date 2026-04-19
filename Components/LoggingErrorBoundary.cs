@@ -28,21 +28,34 @@ public sealed class LoggingErrorBoundary : ErrorBoundary, IDisposable
 
     protected override async Task OnErrorAsync(Exception exception)
     {
-        var boundaryName = string.IsNullOrWhiteSpace(BoundaryName) ? nameof(LoggingErrorBoundary) : BoundaryName.Trim();
+        var boundaryName = ResolveBoundaryName();
         var uri = NavigationManager.Uri;
 
-        using (Logger.BeginScope(new Dictionary<string, object?>
-        {
-            ["BoundaryName"] = boundaryName,
-            ["Uri"] = uri
-        }))
+        using (CreateLoggingScope(boundaryName, uri))
         {
             Logger.LogError(exception, "Unhandled UI exception in {BoundaryName} at {Uri}", boundaryName, uri);
         }
 
+        await TryLogBrowserConsoleErrorAsync(exception, boundaryName, uri).ConfigureAwait(false);
+    }
+
+    private string ResolveBoundaryName()
+        => string.IsNullOrWhiteSpace(BoundaryName) ? nameof(LoggingErrorBoundary) : BoundaryName.Trim();
+
+    private IDisposable CreateLoggingScope(string boundaryName, string uri)
+    {
+        return Logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["BoundaryName"] = boundaryName,
+            ["Uri"] = uri
+        })!;
+    }
+
+    private async Task TryLogBrowserConsoleErrorAsync(Exception exception, string boundaryName, string uri)
+    {
         try
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"[{boundaryName}] Unhandled UI exception at {uri}", exception.ToString());
+            await JSRuntime.InvokeVoidAsync("console.error", $"[{boundaryName}] Unhandled UI exception at {uri}", exception.ToString()).ConfigureAwait(false);
         }
         catch (Exception jsException) when (jsException is JSException or InvalidOperationException)
         {

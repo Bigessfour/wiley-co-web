@@ -22,14 +22,12 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
-            var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
+            var breakEvenInputs = page.Locator("#break-even-input-row input");
+            var totalCostsInput = breakEvenInputs.Nth(0);
+            var projectedVolumeInput = breakEvenInputs.Nth(1);
 
-            await totalCostsInput.FillAsync("24000");
-            await projectedVolumeInput.FillAsync("400");
-
-            // Trigger recalculation — tab out or click elsewhere.
-            await projectedVolumeInput.PressAsync("Tab");
+            await E2ETestHelpers.EnterNumericValueAsync(totalCostsInput, "24000");
+            await E2ETestHelpers.EnterNumericValueAsync(projectedVolumeInput, "400");
 
             // Break-even rate = TotalCosts / ProjectedVolume = 24000 / 400 = 60.00
             await Expect(page.Locator("#break-even-panel")).ToContainTextAsync("60", new() { Timeout = ActionTimeoutMs });
@@ -77,12 +75,11 @@ public sealed class WileyWorkspacePanelE2ETests
         {
             await OpenPanelAsync(page, "rates");
 
-            var currentRateInput = page.Locator("#current-rate-input");
+            var currentRateInput = page.Locator("#current-rate-input input");
             await Expect(currentRateInput).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
             await Expect(page.Locator("#rates-comparison-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
 
-            await currentRateInput.FillAsync("61.75");
-            await currentRateInput.PressAsync("Tab");
+            await E2ETestHelpers.EnterNumericValueAsync(currentRateInput, "61.75");
 
             await Expect(page.Locator("#rates-panel")).ToContainTextAsync("61.75", new() { Timeout = ActionTimeoutMs });
             await Expect(page.Locator("#rates-comparison-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
@@ -223,8 +220,7 @@ public sealed class WileyWorkspacePanelE2ETests
     {
         await RunWorkspaceTestAsync(async page =>
         {
-            var decisionNav = page.GetByText("Decision Support", new() { Exact = true });
-            await decisionNav.ClickAsync();
+            await OpenPanelAsync(page, "decision-support");
 
             // Panel section must render; AI guidance or placeholder text should appear.
             var decisionPanel = page.Locator(
@@ -292,10 +288,10 @@ public sealed class WileyWorkspacePanelE2ETests
             // 1. Set a known rate and save a scenario.
             var scenarioName = $"E2E Trends {Guid.NewGuid():N}";
             await OpenPanelAsync(page, "rates");
-            var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
+            var currentRateInput = page.Locator("#current-rate-input input");
             var scenarioNameInput = page.Locator("#scenario-name-input");
 
-            await currentRateInput.FillAsync("58.00");
+            await E2ETestHelpers.EnterNumericValueAsync(currentRateInput, "58.00");
             await scenarioNameInput.FillAsync(scenarioName);
 
             await page.GetByRole(AriaRole.Button, new() { Name = "Save scenario" }).ClickAsync();
@@ -318,7 +314,7 @@ public sealed class WileyWorkspacePanelE2ETests
         await RunWorkspaceTestAsync(async page =>
         {
             // Locate the enterprise/fiscal-year switcher area.
-            var enterpriseSelector = page.Locator("#enterprise-select").First;
+            var enterpriseSelector = page.Locator("#workspace-enterprise-context-card [role='combobox']").First;
 
             if (!await enterpriseSelector.IsVisibleAsync())
             {
@@ -326,7 +322,7 @@ public sealed class WileyWorkspacePanelE2ETests
                 return;
             }
 
-            var initialValue = await enterpriseSelector.InputValueAsync();
+            var initialValue = await page.Locator("#enterprise-select").InputValueAsync();
 
             await enterpriseSelector.ClickAsync();
             var options = page.Locator("#enterprise-select_popup .e-list-item");

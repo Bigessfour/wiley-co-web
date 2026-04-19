@@ -33,93 +33,237 @@ public sealed class WorkspaceState
 
     public event Action? Changed
     {
-        add => changed += value;
-        remove => changed -= value;
+        add
+        {
+            changed += value;
+        }
+
+        remove
+        {
+            changed -= value;
+        }
     }
 
-    public IReadOnlyList<string> EnterpriseOptions => enterpriseOptions;
+    public IReadOnlyList<string> EnterpriseOptions
+    {
+        get
+        {
+            return enterpriseOptions;
+        }
+    }
 
-    public IReadOnlyList<int> FiscalYearOptions => fiscalYearOptions;
+    public IReadOnlyList<int> FiscalYearOptions
+    {
+        get
+        {
+            return fiscalYearOptions;
+        }
+    }
 
-    public WorkspaceStartupSource StartupSource => startupSource;
+    public WorkspaceStartupSource StartupSource
+    {
+        get
+        {
+            return startupSource;
+        }
+    }
 
-    public string StartupSourceStatus => startupSourceStatus;
+    public string StartupSourceStatus
+    {
+        get
+        {
+            return startupSourceStatus;
+        }
+    }
 
-    public bool IsUsingStartupFallback => startupSource == WorkspaceStartupSource.LocalBootstrapFallback;
+    public bool IsUsingStartupFallback
+    {
+        get
+        {
+            return startupSource == WorkspaceStartupSource.LocalBootstrapFallback;
+        }
+    }
 
-    public WorkspaceStartupSource CurrentStateSource => currentStateSource;
+    public WorkspaceStartupSource CurrentStateSource
+    {
+        get
+        {
+            return currentStateSource;
+        }
+    }
 
-    public string CurrentStateSourceStatus => currentStateSourceStatus;
+    public string CurrentStateSourceStatus
+    {
+        get
+        {
+            return currentStateSourceStatus;
+        }
+    }
 
-    public bool IsUsingBrowserRestoredState => currentStateSource == WorkspaceStartupSource.BrowserStorageRestore;
+    public bool IsUsingBrowserRestoredState
+    {
+        get
+        {
+            return currentStateSource == WorkspaceStartupSource.BrowserStorageRestore;
+        }
+    }
 
     public string SelectedEnterprise
     {
-        get => selectedEnterprise;
+        get
+        {
+            return selectedEnterprise;
+        }
         set => SetSelection(value, selectedFiscalYear);
     }
 
     public int SelectedFiscalYear
     {
-        get => selectedFiscalYear;
+        get
+        {
+            return selectedFiscalYear;
+        }
         set => SetSelection(selectedEnterprise, value);
     }
 
     public string ActiveScenarioName
     {
-        get => activeScenarioName;
+        get
+        {
+            return activeScenarioName;
+        }
         set => SetActiveScenarioName(value);
     }
 
     public decimal CurrentRate
     {
-        get => currentRate;
+        get
+        {
+            return currentRate;
+        }
         set => SetCurrentRate(value);
     }
 
     public decimal TotalCosts
     {
-        get => totalCosts;
+        get
+        {
+            return totalCosts;
+        }
         set => SetTotalCosts(value);
     }
 
     public decimal ProjectedVolume
     {
-        get => projectedVolume;
+        get
+        {
+            return projectedVolume;
+        }
         set => SetProjectedVolume(value);
     }
 
-    public decimal RecommendedRate => ProjectedVolume == 0 ? 0 : TotalCosts / ProjectedVolume;
+    public decimal RecommendedRate
+    {
+        get
+        {
+            return RateCalculator.CalculateRecommendedRate(TotalCosts, ProjectedVolume);
+        }
+    }
 
-    public decimal RateDelta => CurrentRate - RecommendedRate;
+    public decimal RateDelta
+    {
+        get
+        {
+            return RateCalculator.CalculateRateDelta(CurrentRate, RecommendedRate);
+        }
+    }
 
-    public decimal ScenarioCostTotal => scenarioItems.Sum(item => item.Cost);
+    public decimal ScenarioCostTotal
+    {
+        get
+        {
+            return scenarioItems.Sum(item => item.Cost);
+        }
+    }
 
-    public decimal AdjustedTotalCosts => TotalCosts + ScenarioCostTotal;
+    public decimal AdjustedTotalCosts
+    {
+        get
+        {
+            return RateCalculator.CalculateAdjustedTotalCosts(TotalCosts, ScenarioCostTotal);
+        }
+    }
 
-    public decimal AdjustedRecommendedRate => ProjectedVolume == 0 ? 0 : AdjustedTotalCosts / ProjectedVolume;
+    public decimal AdjustedRecommendedRate
+    {
+        get
+        {
+            return RateCalculator.CalculateAdjustedRecommendedRate(AdjustedTotalCosts, ProjectedVolume);
+        }
+    }
 
-    public decimal AdjustedRateDelta => CurrentRate - AdjustedRecommendedRate;
+    public decimal AdjustedRateDelta
+    {
+        get
+        {
+            return RateCalculator.CalculateAdjustedRateDelta(CurrentRate, AdjustedRecommendedRate);
+        }
+    }
 
-    public string ContextSummary => $"{SelectedEnterprise} FY {SelectedFiscalYear} | {ActiveScenarioName}";
+    public string ContextSummary
+    {
+        get
+        {
+            return $"{SelectedEnterprise} FY {SelectedFiscalYear} | {ActiveScenarioName}";
+        }
+    }
 
-    public IReadOnlyList<RateComparisonPoint> RateComparison =>
-    [
-        new RateComparisonPoint("Current", (double)CurrentRate),
-        new RateComparisonPoint("Break-Even", (double)AdjustedRecommendedRate)
-    ];
+    public IReadOnlyList<RateComparisonPoint> RateComparison
+    {
+        get
+        {
+            return RateCalculator.CreateRateComparison(CurrentRate, AdjustedRecommendedRate);
+        }
+    }
 
-    public IReadOnlyList<ScenarioItem> ScenarioItems => scenarioItems;
+    public IReadOnlyList<ScenarioItem> ScenarioItems
+    {
+        get
+        {
+            return scenarioItems;
+        }
+    }
 
-    public IReadOnlyList<CustomerRow> Customers => customerRows;
+    public IReadOnlyList<CustomerRow> Customers
+    {
+        get
+        {
+            return customerRows;
+        }
+    }
 
-    public IReadOnlyList<string> CustomerServiceOptions => customerServiceOptions;
+    public IReadOnlyList<string> CustomerServiceOptions
+    {
+        get
+        {
+            return customerServiceOptions;
+        }
+    }
 
-    public IReadOnlyList<string> CustomerCityLimitOptions => customerCityLimitOptions;
+    public IReadOnlyList<string> CustomerCityLimitOptions
+    {
+        get
+        {
+            return customerCityLimitOptions;
+        }
+    }
 
     public string CustomerSearchTerm
     {
-        get => customerSearchTerm;
+        get
+        {
+            return customerSearchTerm;
+        }
         set
         {
             var normalizedValue = string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
@@ -133,7 +277,10 @@ public sealed class WorkspaceState
 
     public string SelectedCustomerService
     {
-        get => selectedCustomerService;
+        get
+        {
+            return selectedCustomerService;
+        }
         set
         {
             var normalizedValue = string.IsNullOrWhiteSpace(value) ? AllServicesOption : value.Trim();
@@ -147,7 +294,10 @@ public sealed class WorkspaceState
 
     public string SelectedCustomerCityLimits
     {
-        get => selectedCustomerCityLimits;
+        get
+        {
+            return selectedCustomerCityLimits;
+        }
         set
         {
             var normalizedValue = string.IsNullOrWhiteSpace(value) ? AllCityLimitsOption : value.Trim();
@@ -159,44 +309,43 @@ public sealed class WorkspaceState
         }
     }
 
-    public IReadOnlyList<CustomerRow> FilteredCustomers =>
-    [
-        .. Customers.Where(customer =>
-            (string.IsNullOrWhiteSpace(customerSearchTerm) ||
-             customer.Name.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
-             customer.Service.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase) ||
-             customer.CityLimits.Contains(customerSearchTerm, StringComparison.OrdinalIgnoreCase)) &&
-            (string.Equals(selectedCustomerService, AllServicesOption, StringComparison.Ordinal) ||
-             string.Equals(customer.Service, selectedCustomerService, StringComparison.Ordinal)) &&
-            (string.Equals(selectedCustomerCityLimits, AllCityLimitsOption, StringComparison.Ordinal) ||
-             string.Equals(customer.CityLimits, selectedCustomerCityLimits, StringComparison.Ordinal)))
-    ];
+    public IReadOnlyList<CustomerRow> FilteredCustomers
+    {
+        get
+        {
+            return CustomerFilterService.FilterCustomers(
+                Customers,
+                customerSearchTerm,
+                selectedCustomerService,
+                selectedCustomerCityLimits);
+        }
+    }
 
-    public int FilteredCustomerCount => FilteredCustomers.Count;
+    public int FilteredCustomerCount
+    {
+        get
+        {
+            return FilteredCustomers.Count;
+        }
+    }
 
-    public IReadOnlyList<ProjectionRow> ProjectionSeries => projectionRows;
+    public IReadOnlyList<ProjectionRow> ProjectionSeries
+    {
+        get
+        {
+            return projectionRows;
+        }
+    }
 
     public void ApplyBootstrap(WorkspaceBootstrapData bootstrapData)
     {
         ArgumentNullException.ThrowIfNull(bootstrapData);
 
-        var hasChanged = false;
-
-        hasChanged |= SetSelectionWithoutNotify(bootstrapData.SelectedEnterprise, bootstrapData.SelectedFiscalYear);
-        hasChanged |= SetStringWithoutNotify(ref activeScenarioName, bootstrapData.ActiveScenarioName, WorkspaceDefaults.ActiveScenarioName);
-        hasChanged |= SetDecimalWithoutNotify(ref currentRate, bootstrapData.CurrentRate, WorkspaceDefaults.CurrentRate);
-        hasChanged |= SetDecimalWithoutNotify(ref totalCosts, bootstrapData.TotalCosts, WorkspaceDefaults.TotalCosts);
-        hasChanged |= SetDecimalWithoutNotify(ref projectedVolume, bootstrapData.ProjectedVolume, WorkspaceDefaults.ProjectedVolume);
-        hasChanged |= SetStringListWithoutNotify(enterpriseOptions, bootstrapData.EnterpriseOptions, WorkspaceDefaults.EnterpriseOptions);
-        hasChanged |= SetIntListWithoutNotify(fiscalYearOptions, bootstrapData.FiscalYearOptions, WorkspaceDefaults.FiscalYearOptions);
-        hasChanged |= SetStringListWithoutNotify(customerServiceOptions, bootstrapData.CustomerServiceOptions, WorkspaceDefaults.CustomerServiceOptions);
-        hasChanged |= SetStringListWithoutNotify(customerCityLimitOptions, bootstrapData.CustomerCityLimitOptions, WorkspaceDefaults.CustomerCityLimitOptions);
-        hasChanged |= SetScenarioItemsWithoutNotify(bootstrapData.ScenarioItems);
-        hasChanged |= SetCustomerRowsWithoutNotify(bootstrapData.CustomerRows);
-        hasChanged |= SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows);
-
-        if (!string.IsNullOrWhiteSpace(bootstrapData.LastUpdatedUtc))
-            lastUpdatedUtc = bootstrapData.LastUpdatedUtc;
+        var hasChanged = ApplyBootstrapSelection(bootstrapData)
+            | ApplyBootstrapScalars(bootstrapData)
+            | ApplyBootstrapOptions(bootstrapData)
+            | ApplyBootstrapCollections(bootstrapData)
+            | ApplyBootstrapLastUpdated(bootstrapData);
 
         if (hasChanged)
         {
@@ -204,183 +353,84 @@ public sealed class WorkspaceState
         }
     }
 
-    public WorkspaceBootstrapData ToBootstrapData() => new(
-        SelectedEnterprise,
-        SelectedFiscalYear,
-        ActiveScenarioName,
-        CurrentRate,
-        TotalCosts,
-        ProjectedVolume,
-        lastUpdatedUtc)
+    public WorkspaceBootstrapData ToBootstrapData()
     {
-        ScenarioItems = [.. scenarioItems.Select(item => new WorkspaceScenarioItemData(item.Id, item.Name, item.Cost))],
-        EnterpriseOptions = [.. enterpriseOptions],
-        FiscalYearOptions = [.. fiscalYearOptions],
-        CustomerServiceOptions = [.. customerServiceOptions],
-        CustomerCityLimitOptions = [.. customerCityLimitOptions],
-        CustomerRows = [.. customerRows],
-        ProjectionRows = [.. projectionRows]
-    };
+        return new WorkspaceBootstrapData(
+            SelectedEnterprise,
+            SelectedFiscalYear,
+            ActiveScenarioName,
+            CurrentRate,
+            TotalCosts,
+            ProjectedVolume,
+            lastUpdatedUtc)
+        {
+            ScenarioItems = [.. scenarioItems.Select(item => new WorkspaceScenarioItemData(item.Id, item.Name, item.Cost))],
+            EnterpriseOptions = [.. enterpriseOptions],
+            FiscalYearOptions = [.. fiscalYearOptions],
+            CustomerServiceOptions = [.. customerServiceOptions],
+            CustomerCityLimitOptions = [.. customerCityLimitOptions],
+            CustomerRows = [.. customerRows],
+            ProjectionRows = [.. projectionRows]
+        };
+    }
 
     public void SetSelection(string enterprise, int fiscalYear)
     {
-        var normalizedEnterprise = string.IsNullOrWhiteSpace(enterprise) ? selectedEnterprise : enterprise.Trim();
-        var normalizedFiscalYear = fiscalYear <= 0 ? selectedFiscalYear : fiscalYear;
-
-        if (string.Equals(selectedEnterprise, normalizedEnterprise, StringComparison.Ordinal) &&
-            selectedFiscalYear == normalizedFiscalYear)
-        {
-            return;
-        }
-
-        selectedEnterprise = normalizedEnterprise;
-        selectedFiscalYear = normalizedFiscalYear;
-        NotifyChanged();
+        if (SetSelectionCore(enterprise, fiscalYear)) NotifyChanged();
     }
 
     public void SetActiveScenarioName(string scenarioName)
     {
-        var normalizedScenarioName = string.IsNullOrWhiteSpace(scenarioName) ? activeScenarioName : scenarioName.Trim();
-        if (string.Equals(activeScenarioName, normalizedScenarioName, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        activeScenarioName = normalizedScenarioName;
-        NotifyChanged();
+        if (SetStringWithoutNotify(ref activeScenarioName, scenarioName, activeScenarioName)) NotifyChanged();
     }
 
     public void SetCurrentRate(decimal rate)
     {
-        if (currentRate == rate)
-        {
-            return;
-        }
-
-        currentRate = rate;
-        NotifyChanged();
+        if (SetDecimalWithoutNotify(ref currentRate, rate, currentRate)) NotifyChanged();
     }
 
     public void SetTotalCosts(decimal costs)
     {
-        if (totalCosts == costs)
-        {
-            return;
-        }
-
-        totalCosts = costs;
-        NotifyChanged();
+        if (SetDecimalWithoutNotify(ref totalCosts, costs, totalCosts)) NotifyChanged();
     }
 
     public void SetProjectedVolume(decimal volume)
     {
-        if (projectedVolume == volume)
-        {
-            return;
-        }
-
-        projectedVolume = volume;
-        NotifyChanged();
+        if (SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume)) NotifyChanged();
     }
 
     public void SetCustomerSearchTerm(string? searchTerm)
     {
-        var normalizedSearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? string.Empty : searchTerm.Trim();
-        if (string.Equals(customerSearchTerm, normalizedSearchTerm, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        customerSearchTerm = normalizedSearchTerm;
-        NotifyChanged();
+        if (SetStringWithoutNotify(ref customerSearchTerm, searchTerm, string.Empty)) NotifyChanged();
     }
 
     public void SetCustomerServiceFilter(string? service)
     {
-        var normalizedService = string.IsNullOrWhiteSpace(service) ? AllServicesOption : service.Trim();
-        if (string.Equals(selectedCustomerService, normalizedService, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        selectedCustomerService = normalizedService;
-        NotifyChanged();
+        if (SetStringWithoutNotify(ref selectedCustomerService, service, AllServicesOption)) NotifyChanged();
     }
 
     public void SetCustomerCityLimitsFilter(string? cityLimits)
     {
-        var normalizedCityLimits = string.IsNullOrWhiteSpace(cityLimits) ? AllCityLimitsOption : cityLimits.Trim();
-        if (string.Equals(selectedCustomerCityLimits, normalizedCityLimits, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        selectedCustomerCityLimits = normalizedCityLimits;
-        NotifyChanged();
+        if (SetStringWithoutNotify(ref selectedCustomerCityLimits, cityLimits, AllCityLimitsOption)) NotifyChanged();
     }
 
     public void ClearCustomerFilters()
     {
-        var hasChanged = false;
-
-        if (!string.IsNullOrEmpty(customerSearchTerm))
-        {
-            customerSearchTerm = string.Empty;
-            hasChanged = true;
-        }
-
-        if (!string.Equals(selectedCustomerService, AllServicesOption, StringComparison.Ordinal))
-        {
-            selectedCustomerService = AllServicesOption;
-            hasChanged = true;
-        }
-
-        if (!string.Equals(selectedCustomerCityLimits, AllCityLimitsOption, StringComparison.Ordinal))
-        {
-            selectedCustomerCityLimits = AllCityLimitsOption;
-            hasChanged = true;
-        }
-
-        if (hasChanged)
-        {
-            NotifyChanged();
-        }
+        if (TryClearCustomerFilters()) NotifyChanged();
     }
 
     public void ReplaceCustomerDirectory(IReadOnlyList<CustomerRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
 
-        var normalizedRows = rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.Name))
-            .Select(row => new CustomerRow(
-                row.Name.Trim(),
-                string.IsNullOrWhiteSpace(row.Service) ? "Unknown" : row.Service.Trim(),
-                string.IsNullOrWhiteSpace(row.CityLimits) ? "No" : row.CityLimits.Trim()))
-            .ToList();
-
-        var normalizedServiceOptions = normalizedRows
-            .Select(row => row.Service)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(service => service, StringComparer.Ordinal)
-            .ToList();
-        normalizedServiceOptions.Insert(0, AllServicesOption);
+        var normalizedRows = NormalizeCustomerDirectory(rows);
+        var normalizedServiceOptions = BuildCustomerServiceOptions(normalizedRows);
 
         var hasChanged = SetCustomerRowsWithoutNotify(normalizedRows);
         hasChanged |= SetStringListWithoutNotify(customerServiceOptions, normalizedServiceOptions, [AllServicesOption]);
         hasChanged |= SetStringListWithoutNotify(customerCityLimitOptions, [AllCityLimitsOption, "Yes", "No"], [AllCityLimitsOption, "Yes", "No"]);
 
-        if (!customerServiceOptions.Contains(selectedCustomerService, StringComparer.Ordinal))
-        {
-            selectedCustomerService = AllServicesOption;
-            hasChanged = true;
-        }
-
-        if (!customerCityLimitOptions.Contains(selectedCustomerCityLimits, StringComparer.Ordinal))
-        {
-            selectedCustomerCityLimits = AllCityLimitsOption;
-            hasChanged = true;
-        }
+        hasChanged |= EnsureCustomerFilterSelectionsAreValid();
 
         if (hasChanged)
         {
@@ -398,205 +448,173 @@ public sealed class WorkspaceState
     public void UpdateScenarioItem(Guid id, string name, decimal cost)
     {
         var scenarioItem = scenarioItems.FirstOrDefault(item => item.Id == id);
-        if (scenarioItem == null)
-        {
-            return;
-        }
-
-        var normalizedName = string.IsNullOrWhiteSpace(name) ? scenarioItem.Name : name.Trim();
-        var hasChanged = !string.Equals(scenarioItem.Name, normalizedName, StringComparison.Ordinal) || scenarioItem.Cost != cost;
-
-        scenarioItem.Name = normalizedName;
-        scenarioItem.Cost = cost;
-
-        if (hasChanged)
-        {
-            NotifyChanged();
-        }
+        if (scenarioItem != null && TryUpdateScenarioItem(scenarioItem, name, cost)) NotifyChanged();
     }
 
     public void RemoveScenarioItem(Guid id)
     {
         var scenarioItem = scenarioItems.FirstOrDefault(item => item.Id == id);
-        if (scenarioItem == null)
+        if (scenarioItem != null)
         {
-            return;
+            scenarioItems.Remove(scenarioItem);
+            NotifyChanged();
         }
-
-        scenarioItems.Remove(scenarioItem);
-        NotifyChanged();
     }
 
     public void Refresh() => NotifyChanged();
 
     public void SetStartupSource(WorkspaceStartupSource source, string status)
     {
-        var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "Workspace startup completed." : status.Trim();
-        if (startupSource == source && string.Equals(startupSourceStatus, normalizedStatus, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        startupSource = source;
-        startupSourceStatus = normalizedStatus;
-
-        if (currentStateSource == WorkspaceStartupSource.None)
-        {
-            currentStateSource = source;
-            currentStateSourceStatus = normalizedStatus;
-        }
-
-        NotifyChanged();
+        if (SetStartupSourceCore(source, status)) NotifyChanged();
     }
 
     public void SetCurrentStateSource(WorkspaceStartupSource source, string status)
     {
-        var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "Workspace state is ready." : status.Trim();
-        if (currentStateSource == source && string.Equals(currentStateSourceStatus, normalizedStatus, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        currentStateSource = source;
-        currentStateSourceStatus = normalizedStatus;
-        NotifyChanged();
+        if (SetCurrentStateSourceCore(source, status)) NotifyChanged();
     }
 
     private bool SetSelectionWithoutNotify(string? enterprise, int fiscalYear)
     {
-        var normalizedEnterprise = string.IsNullOrWhiteSpace(enterprise) ? selectedEnterprise : enterprise.Trim();
-        var normalizedFiscalYear = fiscalYear <= 0 ? selectedFiscalYear : fiscalYear;
-
-        if (string.Equals(selectedEnterprise, normalizedEnterprise, StringComparison.Ordinal) &&
-            selectedFiscalYear == normalizedFiscalYear)
-        {
-            return false;
-        }
-
-        selectedEnterprise = normalizedEnterprise;
-        selectedFiscalYear = normalizedFiscalYear;
-        return true;
+        return SetSelectionCore(enterprise, fiscalYear);
     }
 
     private static bool SetStringWithoutNotify(ref string field, string? value, string fallback)
-    {
-        var normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-        if (string.Equals(field, normalized, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        field = normalized;
-        return true;
-    }
+        => SetStringField(ref field, NormalizeStringValue(value, fallback));
 
     private static bool SetDecimalWithoutNotify(ref decimal field, decimal? value, decimal fallback)
-    {
-        var normalized = value ?? fallback;
-        if (field == normalized)
-        {
-            return false;
-        }
-
-        field = normalized;
-        return true;
-    }
+        => SetDecimalField(ref field, value ?? fallback);
 
     private bool SetScenarioItemsWithoutNotify(IReadOnlyList<WorkspaceScenarioItemData>? items)
     {
-        var normalizedItems = items?.Select(item => new ScenarioItem(item.Id, item.Name, item.Cost)).ToList() ?? [];
-
-        if (scenarioItems.Count == normalizedItems.Count
-            && scenarioItems.Zip(normalizedItems, (existing, incoming) =>
-                existing.Id == incoming.Id
-                && string.Equals(existing.Name, incoming.Name, StringComparison.Ordinal)
-                && existing.Cost == incoming.Cost)
-            .All(static matches => matches))
-        {
-            return false;
-        }
-
+        var normalizedItems = NormalizeScenarioItems(items);
+        var hasChanged = !scenarioItems.Select(item => (item.Id, item.Name, item.Cost)).SequenceEqual(normalizedItems.Select(item => (item.Id, item.Name, item.Cost)));
         scenarioItems.Clear();
-        foreach (var item in normalizedItems)
-        {
-            scenarioItems.Add(item);
-        }
-
-        return true;
+        scenarioItems.AddRange(normalizedItems);
+        return hasChanged;
     }
 
     private bool SetCustomerRowsWithoutNotify(IReadOnlyList<CustomerRow>? rows)
-    {
-        var normalizedRows = rows?.Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits)).ToList() ?? [];
-
-        if (customerRows.SequenceEqual(normalizedRows))
-        {
-            return false;
-        }
-
-        customerRows.Clear();
-        foreach (var row in normalizedRows)
-        {
-            customerRows.Add(new CustomerRow(row.Name, row.Service, row.CityLimits));
-        }
-
-        return true;
-    }
+        => SetRowsWithoutNotify(customerRows, NormalizeCustomerRows(rows));
 
     private bool SetProjectionRowsWithoutNotify(IReadOnlyList<ProjectionRow>? rows)
-    {
-        var normalizedRows = rows?.Select(row => new ProjectionRow(row.Year, row.Rate)).ToList() ?? [];
+        => SetRowsWithoutNotify(projectionRows, NormalizeProjectionRows(rows));
 
-        if (projectionRows.SequenceEqual(normalizedRows))
-        {
-            return false;
-        }
+    private static List<CustomerRow> NormalizeCustomerRows(IReadOnlyList<CustomerRow>? rows) => rows?.Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits)).ToList() ?? [];
 
-        projectionRows.Clear();
-        foreach (var row in normalizedRows)
-        {
-            projectionRows.Add(new ProjectionRow(row.Year, row.Rate));
-        }
+    private static List<ProjectionRow> NormalizeProjectionRows(IReadOnlyList<ProjectionRow>? rows) => rows?.Select(row => new ProjectionRow(row.Year, row.Rate)).ToList() ?? [];
 
-        return true;
-    }
+    private static IReadOnlyList<string> NormalizeStringList(IReadOnlyList<string>? source, IReadOnlyList<string> fallback) => (source is { Count: > 0 } ? source : fallback).Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).Distinct(StringComparer.Ordinal).ToList();
+
+    private static IReadOnlyList<int> NormalizeIntList(IReadOnlyList<int>? source, IReadOnlyList<int> fallback) => (source is { Count: > 0 } ? source : fallback).Where(item => item > 0).Distinct().OrderBy(item => item).ToList();
 
     private static bool SetStringListWithoutNotify(List<string> target, IReadOnlyList<string>? source, IReadOnlyList<string> fallback)
-    {
-        var normalized = (source is { Count: > 0 } ? source : fallback)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Select(item => item.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
-        if (target.SequenceEqual(normalized, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        target.Clear();
-        target.AddRange(normalized);
-        return true;
-    }
+        => SetRowsWithoutNotify(target, NormalizeStringList(source, fallback));
 
     private static bool SetIntListWithoutNotify(List<int> target, IReadOnlyList<int>? source, IReadOnlyList<int> fallback)
+        => SetRowsWithoutNotify(target, NormalizeIntList(source, fallback));
+
+    private static bool SetRowsWithoutNotify<T>(List<T> target, IReadOnlyList<T> normalizedRows) { var hasChanged = !target.SequenceEqual(normalizedRows); target.Clear(); target.AddRange(normalizedRows); return hasChanged; }
+
+    private static string NormalizeStringValue(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static bool SetStringField(ref string field, string value)
     {
-        var normalized = (source is { Count: > 0 } ? source : fallback)
-            .Where(item => item > 0)
-            .Distinct()
-            .OrderBy(item => item);
-
-        if (target.SequenceEqual(normalized))
-        {
-            return false;
-        }
-
-        target.Clear();
-        target.AddRange(normalized);
-        return true;
+        var hasChanged = !string.Equals(field, value, StringComparison.Ordinal);
+        field = value;
+        return hasChanged;
     }
 
+    private static bool SetDecimalField(ref decimal field, decimal value)
+    {
+        var hasChanged = field != value;
+        field = value;
+        return hasChanged;
+    }
+
+    private static bool SetIntField(ref int field, int value)
+    {
+        var hasChanged = field != value;
+        field = value;
+        return hasChanged;
+    }
+
+    private static bool SetEnumField<TEnum>(ref TEnum field, TEnum value)
+        where TEnum : struct, Enum
+    {
+        var hasChanged = !EqualityComparer<TEnum>.Default.Equals(field, value);
+        field = value;
+        return hasChanged;
+    }
+
+    private bool SetSelectionCore(string? enterprise, int fiscalYear) => SetStringField(ref selectedEnterprise, NormalizeSelectionEnterprise(enterprise)) | SetIntField(ref selectedFiscalYear, NormalizeSelectionFiscalYear(fiscalYear));
+
+    private bool TryClearCustomerFilters()
+        => ClearCustomerSearchTerm()
+            | ClearCustomerServiceFilter()
+            | ClearCustomerCityLimitsFilter();
+
+    private static bool TryUpdateScenarioItem(ScenarioItem scenarioItem, string name, decimal cost) { var normalizedName = NormalizeStringValue(name, scenarioItem.Name); var hasChanged = !string.Equals(scenarioItem.Name, normalizedName, StringComparison.Ordinal) || scenarioItem.Cost != cost; scenarioItem.Name = normalizedName; scenarioItem.Cost = cost; return hasChanged; }
+
+    private bool SetStartupSourceCore(WorkspaceStartupSource source, string status) { var normalizedStatus = NormalizeStartupSourceStatus(status); var hasChanged = SetEnumField(ref startupSource, source) | SetStringField(ref startupSourceStatus, normalizedStatus); InitializeCurrentStateSource(source, normalizedStatus); return hasChanged; }
+
+    private bool SetCurrentStateSourceCore(WorkspaceStartupSource source, string status) => SetEnumField(ref currentStateSource, source) | SetStringField(ref currentStateSourceStatus, NormalizeStartupSourceStatus(status));
+
+    private static List<ScenarioItem> NormalizeScenarioItems(IReadOnlyList<WorkspaceScenarioItemData>? items) => items?.Select(item => new ScenarioItem(item.Id, item.Name, item.Cost)).ToList() ?? [];
+
+    private bool ApplyBootstrapSelection(WorkspaceBootstrapData bootstrapData)
+        => SetSelectionWithoutNotify(bootstrapData.SelectedEnterprise, bootstrapData.SelectedFiscalYear);
+
+    private bool ApplyBootstrapScalars(WorkspaceBootstrapData bootstrapData)
+        => SetStringWithoutNotify(ref activeScenarioName, bootstrapData.ActiveScenarioName, WorkspaceDefaults.ActiveScenarioName)
+            | SetDecimalWithoutNotify(ref currentRate, bootstrapData.CurrentRate, WorkspaceDefaults.CurrentRate)
+            | SetDecimalWithoutNotify(ref totalCosts, bootstrapData.TotalCosts, WorkspaceDefaults.TotalCosts)
+            | SetDecimalWithoutNotify(ref projectedVolume, bootstrapData.ProjectedVolume, WorkspaceDefaults.ProjectedVolume);
+
+    private bool ApplyBootstrapOptions(WorkspaceBootstrapData bootstrapData)
+        => SetStringListWithoutNotify(enterpriseOptions, bootstrapData.EnterpriseOptions, WorkspaceDefaults.EnterpriseOptions)
+            | SetIntListWithoutNotify(fiscalYearOptions, bootstrapData.FiscalYearOptions, WorkspaceDefaults.FiscalYearOptions)
+            | SetStringListWithoutNotify(customerServiceOptions, bootstrapData.CustomerServiceOptions, WorkspaceDefaults.CustomerServiceOptions)
+            | SetStringListWithoutNotify(customerCityLimitOptions, bootstrapData.CustomerCityLimitOptions, WorkspaceDefaults.CustomerCityLimitOptions);
+
+    private bool ApplyBootstrapCollections(WorkspaceBootstrapData bootstrapData)
+        => SetScenarioItemsWithoutNotify(bootstrapData.ScenarioItems)
+            | SetCustomerRowsWithoutNotify(bootstrapData.CustomerRows)
+            | SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows);
+
+    private bool ApplyBootstrapLastUpdated(WorkspaceBootstrapData bootstrapData)
+        => SetStringWithoutNotify(ref lastUpdatedUtc, bootstrapData.LastUpdatedUtc, lastUpdatedUtc);
+
+    private static List<CustomerRow> NormalizeCustomerDirectory(IReadOnlyList<CustomerRow> rows) => rows.Where(row => !string.IsNullOrWhiteSpace(row.Name)).Select(row => new CustomerRow(row.Name.Trim(), string.IsNullOrWhiteSpace(row.Service) ? "Unknown" : row.Service.Trim(), string.IsNullOrWhiteSpace(row.CityLimits) ? "No" : row.CityLimits.Trim())).ToList();
+
+    private static List<string> BuildCustomerServiceOptions(IReadOnlyList<CustomerRow> rows) => [AllServicesOption, .. rows.Select(row => row.Service).Distinct(StringComparer.Ordinal).OrderBy(service => service, StringComparer.Ordinal)];
+
+    private bool EnsureCustomerFilterSelectionsAreValid() => SetValidatedSelection(customerServiceOptions, selectedCustomerService, AllServicesOption, value => selectedCustomerService = value) | SetValidatedSelection(customerCityLimitOptions, selectedCustomerCityLimits, AllCityLimitsOption, value => selectedCustomerCityLimits = value);
+
+    private static bool SetValidatedSelection<T>(IReadOnlyCollection<T> options, T selectedValue, T fallbackValue, Action<T> assignValue) where T : notnull { var normalizedValue = options.Contains(selectedValue) ? selectedValue : fallbackValue; var hasChanged = !EqualityComparer<T>.Default.Equals(selectedValue, normalizedValue); assignValue(normalizedValue); return hasChanged; }
+
+    private string NormalizeSelectionEnterprise(string? enterprise)
+        => string.IsNullOrWhiteSpace(enterprise) ? selectedEnterprise : enterprise.Trim();
+
+    private int NormalizeSelectionFiscalYear(int fiscalYear)
+        => fiscalYear <= 0 ? selectedFiscalYear : fiscalYear;
+
+    private bool ClearCustomerSearchTerm()
+        => SetStringField(ref customerSearchTerm, string.Empty);
+
+    private bool ClearCustomerServiceFilter()
+        => SetStringField(ref selectedCustomerService, AllServicesOption);
+
+    private bool ClearCustomerCityLimitsFilter()
+        => SetStringField(ref selectedCustomerCityLimits, AllCityLimitsOption);
+
+    private static string NormalizeStartupSourceStatus(string status)
+        => string.IsNullOrWhiteSpace(status) ? "Workspace startup completed." : status.Trim();
+
+    private void InitializeCurrentStateSource(WorkspaceStartupSource source, string normalizedStatus) { var isUninitialized = currentStateSource == WorkspaceStartupSource.None; currentStateSource = isUninitialized ? source : currentStateSource; currentStateSourceStatus = isUninitialized ? normalizedStatus : currentStateSourceStatus; }
+
     private void NotifyChanged() => changed?.Invoke();
+
 }
 
 public sealed record RateComparisonPoint(string Label, double Value);

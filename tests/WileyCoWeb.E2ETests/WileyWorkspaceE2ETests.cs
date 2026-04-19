@@ -30,8 +30,8 @@ public sealed class WileyWorkspaceE2ETests
 		{
 			await OpenPanelAsync(page, "rates");
 
-			var currentRate = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
-			await currentRate.FillAsync("63.50");
+			var currentRate = page.Locator("#current-rate-input input");
+			await E2ETestHelpers.EnterNumericValueAsync(currentRate, "63.50");
 
 			await page.GetByRole(AriaRole.Button, new() { Name = "Save rate snapshot" }).ClickAsync();
 
@@ -62,15 +62,16 @@ public sealed class WileyWorkspaceE2ETests
 		await RunWorkspaceTestAsync(async page =>
 		{
 			await OpenPanelAsync(page, "rates");
-			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
-			await currentRateInput.FillAsync("71.25");
+			var currentRateInput = page.Locator("#current-rate-input input");
+			await E2ETestHelpers.EnterNumericValueAsync(currentRateInput, "71.25");
 
 			await OpenPanelAsync(page, "break-even");
-			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
-			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
+			var breakEvenInputs = page.Locator("#break-even-input-row input");
+			var totalCostsInput = breakEvenInputs.Nth(0);
+			var projectedVolumeInput = breakEvenInputs.Nth(1);
 
-			await totalCostsInput.FillAsync("49250");
-			await projectedVolumeInput.FillAsync("8400");
+			await E2ETestHelpers.EnterNumericValueAsync(totalCostsInput, "49250");
+			await E2ETestHelpers.EnterNumericValueAsync(projectedVolumeInput, "8400");
 
 			await page.GetByRole(AriaRole.Button, new() { Name = "Save workspace baseline" }).ClickAsync();
 
@@ -90,16 +91,15 @@ public sealed class WileyWorkspaceE2ETests
 		await RunWorkspaceTestAsync(async page =>
 		{
 			await OpenPanelAsync(page, "rates");
-			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
-			await currentRateInput.FillAsync("64.5");
-			await currentRateInput.PressAsync("Tab");
+			var currentRateInput = page.Locator("#current-rate-input input");
+			await E2ETestHelpers.EnterNumericValueAsync(currentRateInput, "64.5");
 
 			await OpenPanelAsync(page, "break-even");
-			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
-			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
-			await totalCostsInput.FillAsync("40250");
-			await projectedVolumeInput.FillAsync("650");
-			await projectedVolumeInput.PressAsync("Tab");
+			var breakEvenInputs = page.Locator("#break-even-input-row input");
+			var totalCostsInput = breakEvenInputs.Nth(0);
+			var projectedVolumeInput = breakEvenInputs.Nth(1);
+			await E2ETestHelpers.EnterNumericValueAsync(totalCostsInput, "40250");
+			await E2ETestHelpers.EnterNumericValueAsync(projectedVolumeInput, "650");
 
 			await page.WaitForFunctionAsync(@"() => {
 				const stored = globalThis.localStorage.getItem('wiley.workspace.state.v1') || '';
@@ -130,16 +130,17 @@ public sealed class WileyWorkspaceE2ETests
 		{
 			var scenarioName = $"E2E Scenario {Guid.NewGuid():N}";
 			await OpenPanelAsync(page, "rates");
-			var currentRateInput = page.Locator("#rates-panel").GetByPlaceholder("Current Rate");
-			await currentRateInput.FillAsync("88.25");
+			var currentRateInput = page.Locator("#current-rate-input input");
+			await E2ETestHelpers.EnterNumericValueAsync(currentRateInput, "88.25");
 
 			await OpenPanelAsync(page, "break-even");
-			var totalCostsInput = page.Locator("#break-even-panel").GetByPlaceholder("Total Costs");
-			var projectedVolumeInput = page.Locator("#break-even-panel").GetByPlaceholder("Projected Volume");
+			var breakEvenInputs = page.Locator("#break-even-input-row input");
+			var totalCostsInput = breakEvenInputs.Nth(0);
+			var projectedVolumeInput = breakEvenInputs.Nth(1);
 			var scenarioNameInput = page.Locator("#scenario-name-input");
 
-			await totalCostsInput.FillAsync("45000");
-			await projectedVolumeInput.FillAsync("7000");
+			await E2ETestHelpers.EnterNumericValueAsync(totalCostsInput, "45000");
+			await E2ETestHelpers.EnterNumericValueAsync(projectedVolumeInput, "7000");
 			await scenarioNameInput.FillAsync(scenarioName);
 
 			await page.GetByRole(AriaRole.Button, new() { Name = "Save scenario" }).ClickAsync();

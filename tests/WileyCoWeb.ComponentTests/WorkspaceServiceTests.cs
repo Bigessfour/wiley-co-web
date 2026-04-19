@@ -12,6 +12,15 @@ public sealed class WorkspaceServiceTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private static WorkspaceLocalBootstrapService CreateLocalBootstrapService(HttpMessageHandler? handler = null)
+    {
+        handler ??= new RoutedHttpMessageHandler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)));
+        return new WorkspaceLocalBootstrapService(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://client.test/")
+        });
+    }
+
     [Fact]
     public async Task WorkspacePersistenceService_LoadsPersistedState_AndSavesChanges()
     {
@@ -107,7 +116,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService, CreateLocalBootstrapService());
 
         await service.LoadAsync();
 
@@ -147,7 +156,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService, CreateLocalBootstrapService());
 
         await service.LoadAsync(WorkspaceTestData.WaterUtility, WorkspaceTestData.WaterFiscalYear);
 
@@ -168,7 +177,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService, CreateLocalBootstrapService());
 
         await service.LoadAsync();
 
@@ -192,7 +201,7 @@ public sealed class WorkspaceServiceTests
         };
 
         var snapshotService = new WorkspaceSnapshotApiService(client);
-        var service = new WorkspaceBootstrapService(state, snapshotService);
+        var service = new WorkspaceBootstrapService(state, snapshotService, CreateLocalBootstrapService());
 
         await service.LoadAsync();
 

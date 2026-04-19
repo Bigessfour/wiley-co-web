@@ -24,6 +24,7 @@ using WileyWidget.Services.Abstractions;
 using WileyWidget.Services.HealthChecks;
 using WileyWidget.Services.Logging;
 using BusinessActivityLogRepository = WileyWidget.Business.Interfaces.IActivityLogRepository;
+using WileyCoWeb.Api.Configuration;
 
 namespace WileyCoWeb.Api;
 
@@ -31,6 +32,23 @@ public partial class Program
 {
     private const string ScenarioRecordPrefix = "RecordType:Scenario";
     private const string RateSnapshotRecordPrefix = "RecordType:RateSnapshot";
+    private static readonly Func<WorkspaceBaselineUpdateRequest, string?>[] WorkspaceBaselineValidationRules = new Func<WorkspaceBaselineUpdateRequest, string?>[]
+    {
+        request => string.IsNullOrWhiteSpace(request.SelectedEnterprise) ? "A workspace enterprise is required." : null,
+        request => request.SelectedFiscalYear <= 0 ? "A valid fiscal year is required." : null,
+        request => request.ProjectedVolume <= 0 ? "Projected volume must be greater than zero." : null,
+        request => request.CurrentRate < 0 || request.TotalCosts < 0 ? "Workspace baseline values cannot be negative." : null
+    };
+    private static readonly Func<WorkspaceScenarioSaveRequest, string?>[] WorkspaceScenarioSaveValidationRules = new Func<WorkspaceScenarioSaveRequest, string?>[]
+    {
+        request => request.Snapshot == null ? "A workspace snapshot is required." : null,
+        request => string.IsNullOrWhiteSpace(request.ScenarioName) ? "A scenario name is required." : null,
+        request => request.Snapshot == null
+            ? null
+            : string.IsNullOrWhiteSpace(request.Snapshot.SelectedEnterprise) || request.Snapshot.SelectedFiscalYear <= 0
+                ? "Scenario persistence requires a valid enterprise and fiscal year."
+                : null
+    };
 
     protected Program()
     {
@@ -55,261 +73,14 @@ public partial class Program
                 builder.Environment.ApplicationName,
                 Environment.CurrentDirectory);
 
-            var xaiSecretResolution = await ConfigureXaiSecretAsync(builder.Configuration, builder.Environment).ConfigureAwait(false);
+            TracingBootstrapper.InitializeTracing(builder);
 
-            // AWS X-Ray: distributed tracing for all incoming requests.
-            // Credentials are resolved from the IAM execution role (Amplify / ECS task role) — no connection string needed.
-            AWSXRayRecorder.InitializeInstance(builder.Configuration);
-            Console.WriteLine("[API Startup] AWS X-Ray tracing initialized (service: WileyCoWeb.Api).");
+            var startupOptions = await PrepareStartupRuntimeOptionsAsync(builder, bootstrapLogger).ConfigureAwait(false);
 
-            // --- Syncfusion license resolution (track source for telemetry) ---
-            var syncfusionKeySource = "not-found";
-            string? syncfusionLicenseKey = null;
-
-            var sfFromConfigDirect = builder.Configuration["SYNCFUSION_LICENSE_KEY"];
-            if (!string.IsNullOrWhiteSpace(sfFromConfigDirect))
-            {
-                syncfusionLicenseKey = sfFromConfigDirect;
-                syncfusionKeySource = "config:SYNCFUSION_LICENSE_KEY";
-            }
-            else
-            {
-                var sfFromConfigNamed = builder.Configuration["SyncfusionLicenseKey"];
-                if (!string.IsNullOrWhiteSpace(sfFromConfigNamed))
-                {
-                    syncfusionLicenseKey = sfFromConfigNamed;
-                    syncfusionKeySource = "config:SyncfusionLicenseKey";
-                }
-                else
-                {
-                    var sfFromEnv = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
-                    if (!string.IsNullOrWhiteSpace(sfFromEnv))
-                    {
-                        syncfusionLicenseKey = sfFromEnv;
-                        syncfusionKeySource = "env:SYNCFUSION_LICENSE_KEY";
-                    }
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(syncfusionLicenseKey)
-                && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("IntegrationTest")))
-            {
-                syncfusionLicenseKey = await LoadSyncfusionLicenseKeyFromLocalSettingsAsync(builder.Environment).ConfigureAwait(false);
-                if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
-                    syncfusionKeySource = "local-settings-file";
-            }
-
-            if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
-            {
-                SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey.Trim());
-                Console.WriteLine($"[API Startup] Syncfusion license key registered (source: {syncfusionKeySource}, length: {syncfusionLicenseKey.Trim().Length}).");
-            }
-            else
-            {
-                Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). " +
-                    "Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
-            }
-
-            // Capture xAI key resolution state after ConfigureXaiSecretAsync has run
-            var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
-            var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
-            var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
-            var xaiKeyResolved = !string.IsNullOrWhiteSpace(
-                xaiEnvironmentApiKey
-                ?? xaiConfigDirectApiKey
-                ?? xaiConfigNamedApiKey);
-            var xaiKeySource = !string.IsNullOrWhiteSpace(xaiEnvironmentApiKey)
-                ? "env:XAI_API_KEY"
-                : !string.IsNullOrWhiteSpace(xaiSecretResolution.ResolvedKeySource)
-                    && !string.Equals(xaiSecretResolution.ResolvedKeySource, "not-found", StringComparison.OrdinalIgnoreCase)
-                    ? xaiSecretResolution.ResolvedKeySource
-                    : !string.IsNullOrWhiteSpace(xaiConfigDirectApiKey)
-                        ? "config:XAI_API_KEY"
-                        : !string.IsNullOrWhiteSpace(xaiConfigNamedApiKey)
-                            ? "config:XAI:ApiKey"
-                            : "not-found";
-
-            var configuredConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
-                ?? builder.Configuration["DATABASE_URL"]
-                ?? Environment.GetEnvironmentVariable("DATABASE_URL");
-
-            var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
-                || builder.Configuration.GetValue<bool>("Database:AllowDegradedStartup");
-            var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
-
-            await TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
-                configuredConnectionString,
-                allowDegradedStartup,
-                builder.Environment,
-                bootstrapLogger).ConfigureAwait(false);
-
-            if (!allowDegradedStartup)
-            {
-                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:EnableInMemoryFallback"] = "false"
-                });
-            }
-
-            if (string.IsNullOrWhiteSpace(configuredConnectionString))
-            {
-                const string missingConnectionStringMessage = "No database connection string was configured for the API host.";
-
-                if (allowDegradedStartup)
-                {
-                    if (builder.Environment.IsEnvironment("IntegrationTest"))
-                    {
-                        bootstrapLogger.LogInformation("Workspace API skipped degraded fallback activation because the IntegrationTest host supplies its own in-memory database without a connection string.");
-                    }
-                    else
-                    {
-                        AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
-                    }
-                }
-                else
-                {
-                    throw new InvalidOperationException($"{missingConnectionStringMessage} Configure ConnectionStrings:DefaultConnection or DATABASE_URL before starting the workspace API.");
-                }
-            }
-
-            ConfigureApiLogging(builder.Logging, !builder.Environment.IsEnvironment("IntegrationTest"));
-
-            var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
-
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy("OpenWorkspaceClient", policy =>
-                {
-                    // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
-                    policy.AllowAnyHeader()
-                        .AllowAnyMethod()
-                            .SetIsOriginAllowed(origin => IsAllowedWorkspaceClientOrigin(origin, allowedWorkspaceClientOrigins))
-                        .AllowCredentials();
-                });
-            });
-            builder.Services.AddHttpClient();
-            builder.Services.AddMemoryCache();
-
-            builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
-            builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
-            builder.Services.AddSingleton<BusinessActivityLogRepository, ActivityLogRepository>();
-            builder.Services.AddSingleton<IAccountsRepository, AccountsRepository>();
-            builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
-            builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
-            builder.Services.AddSingleton<IEnterpriseRepository, EnterpriseRepository>();
-            builder.Services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
-            builder.Services.AddSingleton<IMunicipalAccountRepository, MunicipalAccountRepository>();
-            builder.Services.AddSingleton<IVendorRepository, VendorRepository>();
-            builder.Services.AddSingleton<IScenarioSnapshotRepository, ScenarioSnapshotRepository>();
-            builder.Services.AddSingleton<IDataAnonymizerService, DataAnonymizerService>();
-            builder.Services.AddTransient<IAnalyticsRepository, AnalyticsRepository>();
-            builder.Services.AddTransient<IBudgetAnalyticsRepository, BudgetAnalyticsRepository>();
-            builder.Services.AddTransient<IAnalyticsService, AnalyticsService>();
-            builder.Services.AddTransient<IWorkspaceKnowledgeService, WorkspaceKnowledgeService>();
-            builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
-            builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
-            builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
-            builder.Services.AddSingleton<QuickBooksImportService>();
-            builder.Services.AddSingleton<QuickBooksImportAssistantService>();
-            builder.Services.AddSingleton<WorkspaceAiAssistantService>();
-            builder.Services.AddSingleton<UserContext>();
-            builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
-            builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
-            builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
-
-            // Deterministic license tracking via health check (covers the new registration logic in this file)
-            builder.Services.AddHealthChecks()
-                .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
+            ConfigureServices(builder, startupOptions.ConfiguredConnectionString, startupOptions.AllowedWorkspaceClientOrigins);
 
             var app = builder.Build();
-            var logger = app.Logger;
-
-            // Emit startup key-resolution event as a structured log entry.
-            // Amplify ships stdout to CloudWatch Logs automatically; query with CloudWatch Logs Insights.
-            LogStartupKeyResolution(
-                logger,
-                syncfusionKeySource,
-                syncfusionLicenseKey,
-                xaiKeySource,
-                xaiKeyResolved,
-                xaiSecretResolution,
-                builder.Environment.EnvironmentName);
-
-            LogRuntimeBaseline(
-                logger,
-                builder,
-                configuredConnectionString,
-                allowDegradedStartup,
-                seedDevelopmentData,
-                allowedWorkspaceClientOrigins,
-                startupStopwatch.ElapsedMilliseconds);
-
-            if (AppDbStartupState.IsDegradedMode)
-            {
-                if (seedDevelopmentData)
-                {
-                    await SeedDevelopmentDataAsync(app.Services);
-                    logger.LogWarning("Workspace API is running in degraded mode with explicitly seeded development data.");
-                }
-                else
-                {
-                    logger.LogWarning("Workspace API is running in degraded mode without seeded sample data. Configure a real database or disable degraded startup.");
-                }
-            }
-
-            logger.LogInformation("Workspace API host initialized in {ElapsedMs}ms.", startupStopwatch.ElapsedMilliseconds);
-
-            app.Use(async (context, next) =>
-            {
-                var stopwatch = Stopwatch.StartNew();
-                logger.LogInformation("API request started: {Method} {Path}{QueryString}", context.Request.Method, context.Request.Path, context.Request.QueryString);
-
-                try
-                {
-                    await next().ConfigureAwait(false);
-                    logger.LogInformation(
-                        "API request completed: {Method} {Path}{QueryString} -> {StatusCode} in {ElapsedMs}ms",
-                        context.Request.Method,
-                        context.Request.Path,
-                        context.Request.QueryString,
-                        context.Response.StatusCode,
-                        stopwatch.ElapsedMilliseconds);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(
-                        ex,
-                        "API request failed: {Method} {Path}{QueryString} after {ElapsedMs}ms",
-                        context.Request.Method,
-                        context.Request.Path,
-                        context.Request.QueryString,
-                        stopwatch.ElapsedMilliseconds);
-                    throw;
-                }
-            });
-
-            app.Use(async (context, next) =>
-            {
-                var userContext = context.RequestServices.GetRequiredService<UserContext>();
-                PopulateUserContext(context, userContext);
-
-                try
-                {
-                    await next().ConfigureAwait(false);
-                }
-                finally
-                {
-                    userContext.SetCurrentUser(null, null, null);
-                }
-            });
-
-            app.UseXRay("WileyCoWeb.Api");
-            app.UseCors("OpenWorkspaceClient");
-            MapWorkspaceSnapshotEndpoints(app);
-            app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
-
-            await app.RunAsync();
+            await RunStartupHostAsync(app, builder, startupOptions, startupStopwatch).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -333,99 +104,270 @@ public partial class Program
 
     private static ILoggerFactory CreateStartupLoggerFactory()
     {
-        return LoggerFactory.Create(logging => ConfigureApiLogging(logging, includeWorkspaceFileLogger: true));
+        return LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: true));
     }
 
-    private static void ConfigureApiLogging(ILoggingBuilder logging, bool includeWorkspaceFileLogger)
+    private static async Task<(SyncfusionLicenseResult SyncfusionResult, XaiSecretResolutionResult XaiResult)> ResolveSecretsAsync(WebApplicationBuilder builder)
     {
-        logging.ClearProviders();
-        logging.SetMinimumLevel(LogLevel.Debug);
-        logging.AddSimpleConsole(options =>
-        {
-            options.TimestampFormat = "HH:mm:ss.fff ";
-            options.SingleLine = true;
-            options.IncludeScopes = false;
-        });
-        logging.AddFilter("Microsoft", LogLevel.Information);
-        logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
-        logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
-        logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Information);
-        logging.AddFilter("Microsoft.AspNetCore.Server.Kestrel", LogLevel.Information);
-        logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Information);
-        logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information);
-        logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Connection", LogLevel.Information);
-        logging.AddFilter("Microsoft.EntityFrameworkCore.Migrations", LogLevel.Information);
-        logging.AddFilter("WileyWidget", LogLevel.Debug);
-        logging.AddFilter("WileyWidget.Data", LogLevel.Debug);
-        logging.AddFilter("WileyWidget.Services", LogLevel.Debug);
-        logging.AddFilter("WileyWidget.Business", LogLevel.Debug);
-
-        if (includeWorkspaceFileLogger)
-        {
-            logging.AddProvider(new WorkspaceFileLoggerProvider("wiley-widget.log"));
-        }
+        var secretResolver = new SecretResolver(builder.Configuration);
+        var xaiSecretResolution = await secretResolver.ResolveXaiSecretAsync().ConfigureAwait(false);
+        var syncfusionLicenseResult = await LicenseBootstrapper.RegisterSyncfusionLicenseAsync(builder).ConfigureAwait(false);
+        return (syncfusionLicenseResult, xaiSecretResolution);
     }
 
-    private static async Task TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
-        string? configuredConnectionString,
-        bool allowDegradedStartup,
-        IWebHostEnvironment environment,
-        ILogger logger,
-        CancellationToken cancellationToken = default)
+    private static async Task<StartupRuntimeOptions> PrepareStartupRuntimeOptionsAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
-        if (!allowDegradedStartup
-            || AppDbStartupState.IsDegradedMode
-            || string.IsNullOrWhiteSpace(configuredConnectionString)
-            || !environment.IsDevelopment())
+        var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder).ConfigureAwait(false);
+
+        var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+        var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
+        var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
+        var xaiKeyResolved = !string.IsNullOrWhiteSpace(
+            xaiEnvironmentApiKey
+            ?? xaiConfigDirectApiKey
+            ?? xaiConfigNamedApiKey);
+        var xaiKeySource = DetermineXaiKeySource(xaiEnvironmentApiKey, xaiSecretResolution, xaiConfigDirectApiKey, xaiConfigNamedApiKey);
+
+        var configuredConnectionString = GetConfiguredConnectionString(builder.Configuration);
+        var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
+            || builder.Configuration.GetValue<bool>("Database:AllowDegradedStartup");
+        var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
+
+        await StartupConfigurationService.TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
+            configuredConnectionString,
+            allowDegradedStartup,
+            builder.Environment,
+            bootstrapLogger).ConfigureAwait(false);
+
+        if (!allowDegradedStartup)
         {
-            return;
-        }
-
-        const string fallbackReason = "Configured development database was unreachable during startup.";
-
-        try
-        {
-            var probeConnectionString = BuildConnectivityProbeConnectionString(configuredConnectionString);
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(probeConnectionString)
-                .Options;
-
-            await using var context = new AppDbContext(options);
-            if (await context.Database.CanConnectAsync(cancellationToken).ConfigureAwait(false))
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                logger.LogInformation("Workspace API validated the configured development database before service registration.");
-                return;
+                ["Database:EnableInMemoryFallback"] = "false"
+            });
+        }
+
+        EnsureStartupConnectionString(builder, configuredConnectionString, allowDegradedStartup, bootstrapLogger);
+
+        var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
+
+        return new StartupRuntimeOptions(
+            syncfusionLicenseResult,
+            xaiSecretResolution,
+            xaiKeySource,
+            xaiKeyResolved,
+            configuredConnectionString,
+            allowDegradedStartup,
+            seedDevelopmentData,
+            allowedWorkspaceClientOrigins);
+    }
+
+    private static async Task RunStartupHostAsync(
+        WebApplication app,
+        WebApplicationBuilder builder,
+        StartupRuntimeOptions startupOptions,
+        Stopwatch startupStopwatch)
+    {
+        var logger = app.Logger;
+
+        // Emit startup key-resolution event as a structured log entry.
+        // Amplify ships stdout to CloudWatch Logs automatically; query with CloudWatch Logs Insights.
+        LogStartupKeyResolution(
+            logger,
+            startupOptions.SyncfusionLicenseResult.KeySource,
+            startupOptions.SyncfusionLicenseResult.LicenseKey,
+            startupOptions.XaiKeySource,
+            startupOptions.XaiKeyResolved,
+            startupOptions.XaiSecretResolution,
+            builder.Environment.EnvironmentName);
+
+        LogRuntimeBaseline(
+            logger,
+            builder,
+            startupOptions.ConfiguredConnectionString,
+            startupOptions.AllowDegradedStartup,
+            startupOptions.SeedDevelopmentData,
+            startupOptions.AllowedWorkspaceClientOrigins,
+            startupStopwatch.ElapsedMilliseconds);
+
+        if (AppDbStartupState.IsDegradedMode)
+        {
+            if (startupOptions.SeedDevelopmentData)
+            {
+                await SeedDevelopmentDataAsync(app.Services).ConfigureAwait(false);
+                logger.LogWarning("Workspace API is running in degraded mode with explicitly seeded development data.");
+            }
+            else
+            {
+                logger.LogWarning("Workspace API is running in degraded mode without seeded sample data. Configure a real database or disable degraded startup.");
             }
         }
-        catch (Exception ex)
+
+        logger.LogInformation("Workspace API host initialized in {ElapsedMs}ms.", startupStopwatch.ElapsedMilliseconds);
+
+        ConfigureMiddleware(app, logger);
+
+        await app.RunAsync().ConfigureAwait(false);
+    }
+
+    private static void EnsureStartupConnectionString(WebApplicationBuilder builder, string? configuredConnectionString, bool allowDegradedStartup, ILogger bootstrapLogger)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredConnectionString))
         {
-            AppDbStartupState.ActivateFallback(fallbackReason);
-            logger.LogWarning(ex, "Workspace API activated degraded mode because the configured development database could not be reached during startup.");
             return;
         }
 
-        AppDbStartupState.ActivateFallback(fallbackReason);
-        logger.LogWarning("Workspace API activated degraded mode because the configured development database could not be reached during startup.");
+        const string missingConnectionStringMessage = "No database connection string was configured for the API host.";
+
+        if (allowDegradedStartup)
+        {
+            if (builder.Environment.IsEnvironment("IntegrationTest"))
+            {
+                bootstrapLogger.LogInformation("Workspace API skipped degraded fallback activation because the IntegrationTest host supplies its own in-memory database without a connection string.");
+            }
+            else
+            {
+                AppDbStartupState.ActivateFallback(missingConnectionStringMessage);
+            }
+
+            return;
+        }
+
+        throw new InvalidOperationException($"{missingConnectionStringMessage} Configure ConnectionStrings:DefaultConnection or DATABASE_URL before starting the workspace API.");
     }
 
-    private static string BuildConnectivityProbeConnectionString(string configuredConnectionString)
+    private sealed record StartupRuntimeOptions(
+        SyncfusionLicenseResult SyncfusionLicenseResult,
+        XaiSecretResolutionResult XaiSecretResolution,
+        string XaiKeySource,
+        bool XaiKeyResolved,
+        string? ConfiguredConnectionString,
+        bool AllowDegradedStartup,
+        bool SeedDevelopmentData,
+        IReadOnlySet<string> AllowedWorkspaceClientOrigins);
+
+    private static string DetermineXaiKeySource(string? xaiEnvironmentApiKey, XaiSecretResolutionResult xaiSecretResolution, string? xaiConfigDirectApiKey, string? xaiConfigNamedApiKey)
     {
-        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(Environment.ExpandEnvironmentVariables(configuredConnectionString))
-        {
-            Pooling = false
-        };
+        return !string.IsNullOrWhiteSpace(xaiEnvironmentApiKey)
+            ? "env:XAI_API_KEY"
+            : !string.IsNullOrWhiteSpace(xaiSecretResolution.ResolvedKeySource)
+                && !string.Equals(xaiSecretResolution.ResolvedKeySource, "not-found", StringComparison.OrdinalIgnoreCase)
+                ? xaiSecretResolution.ResolvedKeySource
+                : !string.IsNullOrWhiteSpace(xaiConfigDirectApiKey)
+                    ? "config:XAI_API_KEY"
+                    : !string.IsNullOrWhiteSpace(xaiConfigNamedApiKey)
+                        ? "config:XAI:ApiKey"
+                        : "not-found";
+    }
 
-        if (connectionStringBuilder.Timeout <= 0 || connectionStringBuilder.Timeout > 5)
-        {
-            connectionStringBuilder.Timeout = 5;
-        }
+    private static string? GetConfiguredConnectionString(IConfiguration configuration)
+    {
+        return configuration.GetConnectionString("DefaultConnection")
+            ?? configuration["ConnectionStrings:DefaultConnection"]
+            ?? configuration["DATABASE_URL"]
+            ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+    }
 
-        if (connectionStringBuilder.CommandTimeout <= 0 || connectionStringBuilder.CommandTimeout > 5)
+    private static void ConfigureServices(WebApplicationBuilder builder, string? configuredConnectionString, IReadOnlySet<string> allowedWorkspaceClientOrigins)
+    {
+        builder.Services.AddCors(options =>
         {
-            connectionStringBuilder.CommandTimeout = 5;
-        }
+            options.AddPolicy("OpenWorkspaceClient", policy =>
+            {
+                // Restricted per Q evaluation and plan hardening (Amplify + local dev only; no AllowAnyOrigin in prod)
+                policy.AllowAnyHeader()
+                    .AllowAnyMethod()
+                        .SetIsOriginAllowed(origin => IsAllowedWorkspaceClientOrigin(origin, allowedWorkspaceClientOrigins))
+                    .AllowCredentials();
+            });
+        });
+        builder.Services.AddHttpClient();
+        builder.Services.AddMemoryCache();
 
-        return connectionStringBuilder.ConnectionString;
+        builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
+        builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
+        builder.Services.AddSingleton<BusinessActivityLogRepository, ActivityLogRepository>();
+        builder.Services.AddSingleton<IAccountsRepository, AccountsRepository>();
+        builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
+        builder.Services.AddSingleton<IBudgetRepository, BudgetRepository>();
+        builder.Services.AddSingleton<IEnterpriseRepository, EnterpriseRepository>();
+        builder.Services.AddSingleton<IDepartmentRepository, DepartmentRepository>();
+        builder.Services.AddSingleton<IMunicipalAccountRepository, MunicipalAccountRepository>();
+        builder.Services.AddSingleton<IVendorRepository, VendorRepository>();
+        builder.Services.AddSingleton<IScenarioSnapshotRepository, ScenarioSnapshotRepository>();
+        builder.Services.AddSingleton<IDataAnonymizerService, DataAnonymizerService>();
+        builder.Services.AddTransient<IAnalyticsRepository, AnalyticsRepository>();
+        builder.Services.AddTransient<IBudgetAnalyticsRepository, BudgetAnalyticsRepository>();
+        builder.Services.AddTransient<IAnalyticsService, AnalyticsService>();
+        builder.Services.AddTransient<IWorkspaceKnowledgeService, WorkspaceKnowledgeService>();
+        builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
+        builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
+        builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
+        builder.Services.AddSingleton<QuickBooksCsvParser>();
+        builder.Services.AddSingleton<QuickBooksExcelParser>();
+        builder.Services.AddSingleton<QuickBooksImportService>();
+        builder.Services.AddSingleton<QuickBooksImportAssistantService>();
+        builder.Services.AddSingleton<WorkspaceAiAssistantService>();
+        builder.Services.AddSingleton<UserContext>();
+        builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
+        builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
+        builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
+
+        // Deterministic license tracking via health check (covers the new registration logic in this file)
+        builder.Services.AddHealthChecks()
+            .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
+    }
+
+    private static void ConfigureMiddleware(WebApplication app, ILogger logger)
+    {
+        app.Use(async (context, next) =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            logger.LogInformation("API request started: {Method} {Path}{QueryString}", context.Request.Method, context.Request.Path, context.Request.QueryString);
+
+            try
+            {
+                await next().ConfigureAwait(false);
+                logger.LogInformation(
+                    "API request completed: {Method} {Path}{QueryString} -> {StatusCode} in {ElapsedMs}ms",
+                    context.Request.Method,
+                    context.Request.Path,
+                    context.Request.QueryString,
+                    context.Response.StatusCode,
+                    stopwatch.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "API request failed: {Method} {Path}{QueryString} after {ElapsedMs}ms",
+                    context.Request.Method,
+                    context.Request.Path,
+                    context.Request.QueryString,
+                    stopwatch.ElapsedMilliseconds);
+                throw;
+            }
+        });
+
+        app.Use(async (context, next) =>
+        {
+            var userContext = context.RequestServices.GetRequiredService<UserContext>();
+            PopulateUserContext(context, userContext);
+
+            try
+            {
+                await next().ConfigureAwait(false);
+            }
+            finally
+            {
+                userContext.SetCurrentUser(null, null, null);
+            }
+        });
+
+        app.UseXRay("WileyCoWeb.Api");
+        app.UseCors("OpenWorkspaceClient");
+        MapWorkspaceSnapshotEndpoints(app);
+        app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
     }
 
     private static void LogRuntimeBaseline(
@@ -570,182 +512,6 @@ public partial class Program
         return labels.Length < 3 ? null : string.Join('.', labels[^3..]);
     }
 
-    private static async Task<XaiSecretResolutionResult> ConfigureXaiSecretAsync(ConfigurationManager configuration, IWebHostEnvironment environment)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(environment);
-
-        var secretName = configuration["XAI:SecretName"]
-            ?? configuration["XAI_SECRET_NAME"]
-            ?? "Grok";
-        var regionName = configuration["WILEY_AWS_REGION"]
-            ?? configuration["AWS_REGION"]
-            ?? configuration["AWS_DEFAULT_REGION"]
-            ?? "us-east-2";
-
-        var environmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
-        var configDirectApiKey = configuration["XAI_API_KEY"];
-        var configNamedApiKey = configuration["XAI:ApiKey"];
-
-        if (!string.IsNullOrWhiteSpace(environmentApiKey))
-        {
-            return new XaiSecretResolutionResult(
-                ResolvedKeySource: "env:XAI_API_KEY",
-                EnvironmentKeyPresent: true,
-                ConfigDirectKeyPresent: !string.IsNullOrWhiteSpace(configDirectApiKey),
-                ConfigNamedKeyPresent: !string.IsNullOrWhiteSpace(configNamedApiKey),
-                SecretFetchAttempted: false,
-                SecretName: secretName,
-                RegionName: regionName,
-                SecretFetchStatus: "skipped_existing_environment_key",
-                SecretFetchErrorCode: null,
-                SecretFetchErrorMessage: null,
-                ConfigurationInjected: false);
-        }
-
-        if (!string.IsNullOrWhiteSpace(configDirectApiKey))
-        {
-            return new XaiSecretResolutionResult(
-                ResolvedKeySource: "config:XAI_API_KEY",
-                EnvironmentKeyPresent: false,
-                ConfigDirectKeyPresent: true,
-                ConfigNamedKeyPresent: !string.IsNullOrWhiteSpace(configNamedApiKey),
-                SecretFetchAttempted: false,
-                SecretName: secretName,
-                RegionName: regionName,
-                SecretFetchStatus: "skipped_existing_direct_config_key",
-                SecretFetchErrorCode: null,
-                SecretFetchErrorMessage: null,
-                ConfigurationInjected: false);
-        }
-
-        if (!string.IsNullOrWhiteSpace(configNamedApiKey))
-        {
-            return new XaiSecretResolutionResult(
-                ResolvedKeySource: "config:XAI:ApiKey",
-                EnvironmentKeyPresent: false,
-                ConfigDirectKeyPresent: false,
-                ConfigNamedKeyPresent: true,
-                SecretFetchAttempted: false,
-                SecretName: secretName,
-                RegionName: regionName,
-                SecretFetchStatus: "skipped_existing_named_config_key",
-                SecretFetchErrorCode: null,
-                SecretFetchErrorMessage: null,
-                ConfigurationInjected: false);
-        }
-
-        if (environment.IsEnvironment("IntegrationTest"))
-        {
-            return new XaiSecretResolutionResult(
-                ResolvedKeySource: "not-found",
-                EnvironmentKeyPresent: false,
-                ConfigDirectKeyPresent: false,
-                ConfigNamedKeyPresent: false,
-                SecretFetchAttempted: false,
-                SecretName: secretName,
-                RegionName: regionName,
-                SecretFetchStatus: "skipped_integration_test",
-                SecretFetchErrorCode: null,
-                SecretFetchErrorMessage: null,
-                ConfigurationInjected: false);
-        }
-
-        var secretLookup = await TryGetSecretAsync(secretName, regionName).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(secretLookup.SecretValue))
-        {
-            return new XaiSecretResolutionResult(
-                ResolvedKeySource: "not-found",
-                EnvironmentKeyPresent: false,
-                ConfigDirectKeyPresent: false,
-                ConfigNamedKeyPresent: false,
-                SecretFetchAttempted: true,
-                SecretName: secretName,
-                RegionName: regionName,
-                SecretFetchStatus: secretLookup.Status,
-                SecretFetchErrorCode: secretLookup.ErrorCode,
-                SecretFetchErrorMessage: secretLookup.ErrorMessage,
-                ConfigurationInjected: false);
-        }
-
-        var normalizedApiKey = TryExtractApiKey(secretLookup.SecretValue);
-        if (string.IsNullOrWhiteSpace(normalizedApiKey))
-        {
-            return new XaiSecretResolutionResult(
-                ResolvedKeySource: "not-found",
-                EnvironmentKeyPresent: false,
-                ConfigDirectKeyPresent: false,
-                ConfigNamedKeyPresent: false,
-                SecretFetchAttempted: true,
-                SecretName: secretName,
-                RegionName: regionName,
-                SecretFetchStatus: "secret_loaded_but_api_key_extraction_failed",
-                SecretFetchErrorCode: null,
-                SecretFetchErrorMessage: "The resolved secret did not contain a usable API key value.",
-                ConfigurationInjected: false);
-        }
-
-        configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["XAI_API_KEY"] = normalizedApiKey,
-            ["XAI:ApiKey"] = normalizedApiKey,
-            ["XAI:SecretName"] = secretName
-        });
-
-        return new XaiSecretResolutionResult(
-            ResolvedKeySource: $"secrets-manager:{secretName}",
-            EnvironmentKeyPresent: false,
-            ConfigDirectKeyPresent: false,
-            ConfigNamedKeyPresent: false,
-            SecretFetchAttempted: true,
-            SecretName: secretName,
-            RegionName: regionName,
-            SecretFetchStatus: "secret_loaded_and_injected",
-            SecretFetchErrorCode: null,
-            SecretFetchErrorMessage: null,
-            ConfigurationInjected: true);
-    }
-
-    private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(IWebHostEnvironment environment)
-    {
-        ArgumentNullException.ThrowIfNull(environment);
-
-        var candidatePaths = new[]
-        {
-            Path.Combine(environment.ContentRootPath, "appsettings.Syncfusion.local.json"),
-            Path.Combine(environment.ContentRootPath, "..", "appsettings.Syncfusion.local.json")
-        };
-
-        foreach (var candidatePath in candidatePaths)
-        {
-            if (!File.Exists(candidatePath))
-            {
-                continue;
-            }
-
-            try
-            {
-                var localSettingsJson = await File.ReadAllTextAsync(candidatePath).ConfigureAwait(false);
-                using var document = JsonDocument.Parse(localSettingsJson);
-
-                if (document.RootElement.TryGetProperty("SyncfusionLicenseKey", out var licenseKeyElement))
-                {
-                    var licenseKey = licenseKeyElement.GetString()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(licenseKey))
-                    {
-                        return licenseKey;
-                    }
-                }
-            }
-            catch
-            {
-                // Ignore local file issues and keep the existing warning path.
-            }
-        }
-
-        return null;
-    }
-
     private static void LogStartupKeyResolution(
         ILogger logger,
         string syncfusionKeySource,
@@ -755,22 +521,12 @@ public partial class Program
         XaiSecretResolutionResult xaiSecretResolution,
         string environmentName)
     {
-        // Only surface a safe truncated fingerprint — never the full value
-        static string KeyFingerprint(string? key) =>
-            string.IsNullOrWhiteSpace(key)
-                ? "(empty)"
-                : (key.Trim().Length > 8 ? key.Trim()[..8] + "..." : "(too-short)");
-
-        static string? TruncateForLog(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return null;
-            }
-
-            var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
-            return normalized.Length > 200 ? normalized[..200] : normalized;
-        }
+        var logData = BuildStartupKeyResolutionLogData(
+            syncfusionKeySource,
+            syncfusionLicenseKey,
+            xaiKeySource,
+            xaiKeyResolved,
+            xaiSecretResolution);
 
         logger.LogInformation(
             "WileyWidget.Startup.KeyResolution Environment={Environment} SyncfusionKeySource={SyncfusionKeySource} " +
@@ -782,6 +538,32 @@ public partial class Program
             "XaiSecretFetchErrorCode={XaiSecretFetchErrorCode} XaiSecretFetchErrorMessage={XaiSecretFetchErrorMessage} " +
             "XaiConfigurationInjected={XaiConfigurationInjected}",
             environmentName,
+            logData.SyncfusionKeySource,
+            logData.SyncfusionKeyPresent,
+            logData.SyncfusionKeyLength,
+            logData.SyncfusionKeyFingerprint,
+            logData.XaiKeySource,
+            logData.XaiKeyPresent,
+            logData.XaiEnvironmentKeyPresent,
+            logData.XaiConfigDirectKeyPresent,
+            logData.XaiConfigNamedKeyPresent,
+            logData.XaiSecretFetchAttempted,
+            logData.XaiSecretName,
+            logData.XaiAwsRegion,
+            logData.XaiSecretFetchStatus,
+            logData.XaiSecretFetchErrorCode,
+            logData.XaiSecretFetchErrorMessage,
+            logData.XaiConfigurationInjected);
+    }
+
+    private static StartupKeyResolutionLogData BuildStartupKeyResolutionLogData(
+        string syncfusionKeySource,
+        string? syncfusionLicenseKey,
+        string xaiKeySource,
+        bool xaiKeyResolved,
+        XaiSecretResolutionResult xaiSecretResolution)
+    {
+        return new StartupKeyResolutionLogData(
             syncfusionKeySource,
             !string.IsNullOrWhiteSpace(syncfusionLicenseKey),
             syncfusionLicenseKey?.Trim().Length ?? 0,
@@ -800,86 +582,45 @@ public partial class Program
             xaiSecretResolution.ConfigurationInjected);
     }
 
-
-
-    private static async Task<SecretLookupResult> TryGetSecretAsync(string secretName, string regionName)
+    private static string KeyFingerprint(string? key)
     {
-        if (string.IsNullOrWhiteSpace(secretName) || string.IsNullOrWhiteSpace(regionName))
+        if (string.IsNullOrWhiteSpace(key))
         {
-            return new SecretLookupResult("invalid_lookup_configuration", null, "invalid_lookup_configuration", "Secret name or AWS region was missing.");
+            return "(empty)";
         }
 
-        try
-        {
-            using var client = new AmazonSecretsManagerClient(RegionEndpoint.GetBySystemName(regionName));
-            var response = await client.GetSecretValueAsync(new GetSecretValueRequest
-            {
-                SecretId = secretName,
-                VersionStage = "AWSCURRENT"
-            }).ConfigureAwait(false);
-
-            return new SecretLookupResult("secret_loaded", response.SecretString);
-        }
-        catch (ResourceNotFoundException ex)
-        {
-            return new SecretLookupResult("resource_not_found", null, nameof(ResourceNotFoundException), ex.Message);
-        }
-        catch (InvalidRequestException ex)
-        {
-            return new SecretLookupResult("invalid_request", null, nameof(InvalidRequestException), ex.Message);
-        }
-        catch (InvalidParameterException ex)
-        {
-            return new SecretLookupResult("invalid_parameter", null, nameof(InvalidParameterException), ex.Message);
-        }
-        catch (AmazonSecretsManagerException ex)
-        {
-            return new SecretLookupResult("amazon_secrets_manager_exception", null, ex.ErrorCode ?? nameof(AmazonSecretsManagerException), ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return new SecretLookupResult("unexpected_secret_resolution_exception", null, ex.GetType().Name, ex.Message);
-        }
+        var trimmed = key.Trim();
+        return trimmed.Length > 8 ? trimmed[..8] + "..." : "(too-short)";
     }
 
-    private static string? TryExtractApiKey(string secretValue)
+    private static string? TruncateForLog(string? value)
     {
-        if (string.IsNullOrWhiteSpace(secretValue))
+        if (string.IsNullOrWhiteSpace(value))
         {
             return null;
         }
 
-        var trimmed = secretValue.Trim();
-        if (!trimmed.StartsWith('{'))
-        {
-            return trimmed;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(trimmed);
-            var root = document.RootElement;
-
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return trimmed;
-            }
-
-            foreach (var propertyName in new[] { "XAI_API_KEY", "ApiKey", "XaiApiKey", "GrokApiKey", "XAI:ApiKey" })
-            {
-                if (root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String)
-                {
-                    return value.GetString();
-                }
-            }
-
-            return trimmed;
-        }
-        catch (JsonException)
-        {
-            return trimmed;
-        }
+        var normalized = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return normalized.Length > 200 ? normalized[..200] : normalized;
     }
+
+    private sealed record StartupKeyResolutionLogData(
+        string SyncfusionKeySource,
+        bool SyncfusionKeyPresent,
+        int SyncfusionKeyLength,
+        string SyncfusionKeyFingerprint,
+        string XaiKeySource,
+        bool XaiKeyPresent,
+        bool XaiEnvironmentKeyPresent,
+        bool XaiConfigDirectKeyPresent,
+        bool XaiConfigNamedKeyPresent,
+        bool XaiSecretFetchAttempted,
+        string XaiSecretName,
+        string XaiAwsRegion,
+        string XaiSecretFetchStatus,
+        string? XaiSecretFetchErrorCode,
+        string? XaiSecretFetchErrorMessage,
+        bool XaiConfigurationInjected);
 
     private static void MapWorkspaceSnapshotEndpoints(WebApplication app)
     {
@@ -898,25 +639,6 @@ public partial class Program
         MapWorkspaceAiChatEndpoint(app);
         MapQuickBooksImportEndpoints(app);
     }
-
-    private sealed record XaiSecretResolutionResult(
-        string ResolvedKeySource,
-        bool EnvironmentKeyPresent,
-        bool ConfigDirectKeyPresent,
-        bool ConfigNamedKeyPresent,
-        bool SecretFetchAttempted,
-        string SecretName,
-        string RegionName,
-        string SecretFetchStatus,
-        string? SecretFetchErrorCode,
-        string? SecretFetchErrorMessage,
-        bool ConfigurationInjected);
-
-    private sealed record SecretLookupResult(
-        string Status,
-        string? SecretValue,
-        string? ErrorCode = null,
-        string? ErrorMessage = null);
 
     private static void MapWorkspaceAiChatEndpoint(WebApplication app)
     {
@@ -1016,28 +738,56 @@ public partial class Program
     private static void PopulateUserContext(HttpContext context, UserContext userContext)
     {
         var principal = context.User;
+        var headers = context.Request.Headers;
 
-        var userId = ResolveClaim(principal, "sub")
+        userContext.SetCurrentUser(
+            ResolveUserId(principal, headers),
+            ResolveUserDisplayName(principal, headers),
+            ResolveUserEmail(principal, headers));
+    }
+
+    private static string ResolveUserId(ClaimsPrincipal principal, IHeaderDictionary headers)
+    {
+        return ResolveClaim(principal, "sub")
             ?? ResolveClaim(principal, ClaimTypes.NameIdentifier)
-            ?? context.Request.Headers["X-Wiley-User-Id"].FirstOrDefault()
+            ?? ResolveHeaderValue(headers, "X-Wiley-User-Id")
             ?? "anonymous";
+    }
 
-        var displayName = ResolveClaim(principal, "name")
+    private static string ResolveUserDisplayName(ClaimsPrincipal principal, IHeaderDictionary headers)
+    {
+        var emailLocalPart = ResolveEmailLocalPart(ResolveClaim(principal, ClaimTypes.Email));
+
+        return ResolveClaim(principal, "name")
             ?? ResolveClaim(principal, "preferred_username")
             ?? ResolveClaim(principal, ClaimTypes.Name)
-            ?? ResolveClaim(principal, ClaimTypes.Email)?.Split('@', 2)[0]
-            ?? context.Request.Headers["X-Wiley-User-Name"].FirstOrDefault()
+            ?? emailLocalPart
+            ?? ResolveHeaderValue(headers, "X-Wiley-User-Name")
             ?? "Guest";
+    }
 
-        var email = ResolveClaim(principal, ClaimTypes.Email)
+    private static string? ResolveUserEmail(ClaimsPrincipal principal, IHeaderDictionary headers)
+    {
+        return ResolveClaim(principal, ClaimTypes.Email)
             ?? ResolveClaim(principal, "email")
-            ?? context.Request.Headers["X-Wiley-User-Email"].FirstOrDefault();
-
-        userContext.SetCurrentUser(userId, displayName, email);
+            ?? ResolveHeaderValue(headers, "X-Wiley-User-Email");
     }
 
     private static string? ResolveClaim(ClaimsPrincipal principal, string claimType)
         => principal.FindFirst(claimType)?.Value;
+
+    private static string? ResolveHeaderValue(IHeaderDictionary headers, string headerName)
+        => headers[headerName].FirstOrDefault();
+
+    private static string? ResolveEmailLocalPart(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        return email.Split('@', 2)[0];
+    }
 
 
 
@@ -1170,6 +920,12 @@ public partial class Program
     {
         var customers = app.MapGroup("/api/utility-customers");
 
+        MapUtilityCustomerReadEndpoints(customers);
+        MapUtilityCustomerWriteEndpoints(customers);
+    }
+
+    private static void MapUtilityCustomerReadEndpoints(RouteGroupBuilder customers)
+    {
         customers.MapGet(string.Empty, async (
             IDbContextFactory<AppDbContext> contextFactory,
             CancellationToken cancellationToken) =>
@@ -1200,79 +956,86 @@ public partial class Program
                 ? Results.NotFound()
                 : Results.Ok(ToUtilityCustomerRecord(customer));
         });
+    }
 
-        customers.MapPost(string.Empty, async (
-            UtilityCustomerUpsertRequest request,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+    private static void MapUtilityCustomerWriteEndpoints(RouteGroupBuilder customers)
+    {
+        customers.MapPost(string.Empty, MapUtilityCustomerCreateEndpoint);
+        customers.MapPut("/{id:int}", MapUtilityCustomerUpdateEndpoint);
+        customers.MapDelete("/{id:int}", MapUtilityCustomerDeleteEndpoint);
+    }
+
+    private static async Task<IResult> MapUtilityCustomerCreateEndpoint(
+        UtilityCustomerUpsertRequest request,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        if (await context.UtilityCustomers.AnyAsync(item => item.AccountNumber == request.AccountNumber, cancellationToken))
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            if (await context.UtilityCustomers.AnyAsync(item => item.AccountNumber == request.AccountNumber, cancellationToken))
-            {
-                return Results.Conflict($"A utility customer with account number '{request.AccountNumber}' already exists.");
-            }
+            return Results.Conflict($"A utility customer with account number '{request.AccountNumber}' already exists.");
+        }
 
-            var customer = new UtilityCustomer();
-            ApplyUtilityCustomerRequest(customer, request, isNew: true);
+        var customer = new UtilityCustomer();
+        ApplyUtilityCustomerRequest(customer, request, isNew: true);
 
-            var validationErrors = ValidateModel(customer);
-            if (validationErrors != null)
-            {
-                return Results.ValidationProblem(validationErrors);
-            }
-
-            context.UtilityCustomers.Add(customer);
-            await context.SaveChangesAsync(cancellationToken);
-
-            return Results.Created($"/api/utility-customers/{customer.Id}", ToUtilityCustomerRecord(customer));
-        });
-
-        customers.MapPut("/{id:int}", async (
-            int id,
-            UtilityCustomerUpsertRequest request,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        var validationErrors = ValidateModel(customer);
+        if (validationErrors != null)
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var customer = await context.UtilityCustomers.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-            if (customer == null)
-            {
-                return Results.NotFound();
-            }
+            return Results.ValidationProblem(validationErrors);
+        }
 
-            if (await context.UtilityCustomers.AnyAsync(item => item.Id != id && item.AccountNumber == request.AccountNumber, cancellationToken))
-            {
-                return Results.Conflict($"A utility customer with account number '{request.AccountNumber}' already exists.");
-            }
+        context.UtilityCustomers.Add(customer);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            ApplyUtilityCustomerRequest(customer, request, isNew: false);
+        return Results.Created($"/api/utility-customers/{customer.Id}", ToUtilityCustomerRecord(customer));
+    }
 
-            var validationErrors = ValidateModel(customer);
-            if (validationErrors != null)
-            {
-                return Results.ValidationProblem(validationErrors);
-            }
-
-            await context.SaveChangesAsync(cancellationToken);
-            return Results.Ok(ToUtilityCustomerRecord(customer));
-        });
-
-        customers.MapDelete("/{id:int}", async (
-            int id,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+    private static async Task<IResult> MapUtilityCustomerUpdateEndpoint(
+        int id,
+        UtilityCustomerUpsertRequest request,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var customer = await context.UtilityCustomers.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (customer == null)
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var customer = await context.UtilityCustomers.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-            if (customer == null)
-            {
-                return Results.NotFound();
-            }
+            return Results.NotFound();
+        }
 
-            context.UtilityCustomers.Remove(customer);
-            await context.SaveChangesAsync(cancellationToken);
-            return Results.NoContent();
-        });
+        if (await context.UtilityCustomers.AnyAsync(item => item.Id != id && item.AccountNumber == request.AccountNumber, cancellationToken))
+        {
+            return Results.Conflict($"A utility customer with account number '{request.AccountNumber}' already exists.");
+        }
+
+        ApplyUtilityCustomerRequest(customer, request, isNew: false);
+
+        var validationErrors = ValidateModel(customer);
+        if (validationErrors != null)
+        {
+            return Results.ValidationProblem(validationErrors);
+        }
+
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Results.Ok(ToUtilityCustomerRecord(customer));
+    }
+
+    private static async Task<IResult> MapUtilityCustomerDeleteEndpoint(
+        int id,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var customer = await context.UtilityCustomers.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (customer == null)
+        {
+            return Results.NotFound();
+        }
+
+        context.UtilityCustomers.Remove(customer);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Results.NoContent();
     }
 
     private static void MapWorkspaceKnowledgeEndpoint(WebApplication app)
@@ -1284,31 +1047,13 @@ public partial class Program
             IWorkspaceKnowledgeService knowledgeService,
             CancellationToken cancellationToken) =>
         {
-            if (request.Snapshot is null)
+            if (!TryValidateWorkspaceKnowledgeRequest(request, out var validationError))
             {
-                return Results.BadRequest("A workspace snapshot is required to calculate live knowledge.");
+                return validationError;
             }
 
-            if (string.IsNullOrWhiteSpace(request.Snapshot.SelectedEnterprise))
-            {
-                return Results.BadRequest("A workspace enterprise is required to calculate live knowledge.");
-            }
-
-            if (request.Snapshot.SelectedFiscalYear <= 0)
-            {
-                return Results.BadRequest("A valid fiscal year is required to calculate live knowledge.");
-            }
-
-            var snapshot = request.Snapshot;
-            var knowledgeInput = new WorkspaceKnowledgeInput(
-                snapshot.SelectedEnterprise,
-                snapshot.SelectedFiscalYear,
-                snapshot.CurrentRate ?? 0m,
-                snapshot.TotalCosts ?? 0m,
-                snapshot.ProjectedVolume ?? 0m,
-                snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
-                Math.Clamp(request.TopVarianceCount, 1, 20),
-                Math.Clamp(request.ForecastYears, 1, 10));
+            var snapshot = request.Snapshot!;
+            var knowledgeInput = CreateWorkspaceKnowledgeInput(request);
 
             try
             {
@@ -1328,6 +1073,47 @@ public partial class Program
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
         });
+    }
+
+    private static bool TryValidateWorkspaceKnowledgeRequest(
+        WorkspaceKnowledgeRequest request,
+        out IResult? validationError)
+    {
+        validationError = null;
+
+        if (request.Snapshot is null)
+        {
+            validationError = Results.BadRequest("A workspace snapshot is required to calculate live knowledge.");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Snapshot.SelectedEnterprise))
+        {
+            validationError = Results.BadRequest("A workspace enterprise is required to calculate live knowledge.");
+            return false;
+        }
+
+        if (request.Snapshot.SelectedFiscalYear <= 0)
+        {
+            validationError = Results.BadRequest("A valid fiscal year is required to calculate live knowledge.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static WorkspaceKnowledgeInput CreateWorkspaceKnowledgeInput(WorkspaceKnowledgeRequest request)
+    {
+        var snapshot = request.Snapshot!;
+        return new WorkspaceKnowledgeInput(
+            snapshot.SelectedEnterprise,
+            snapshot.SelectedFiscalYear,
+            snapshot.CurrentRate ?? 0m,
+            snapshot.TotalCosts ?? 0m,
+            snapshot.ProjectedVolume ?? 0m,
+            snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
+            Math.Clamp(request.TopVarianceCount, 1, 20),
+            Math.Clamp(request.ForecastYears, 1, 10));
     }
 
     private static UtilityCustomerRecord ToUtilityCustomerRecord(UtilityCustomer customer)
@@ -1461,300 +1247,532 @@ public partial class Program
 
     private static void MapWorkspaceSnapshotPostEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/snapshot", async (
-            WorkspaceBootstrapData request,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        app.MapPost("/api/workspace/snapshot", MapWorkspaceSnapshotSaveAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceSnapshotSaveAsync(
+        WorkspaceBootstrapData request,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateWorkspaceSnapshotSaveRequest(request, out var validationError))
         {
-            if (string.IsNullOrWhiteSpace(request.SelectedEnterprise))
-            {
-                return Results.BadRequest("An enterprise name is required to save a snapshot.");
-            }
+            return validationError!;
+        }
 
-            if (request.SelectedFiscalYear <= 0)
-            {
-                return Results.BadRequest("A valid fiscal year is required to save a snapshot.");
-            }
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var savedAt = DateTimeOffset.UtcNow;
+        var snapshot = CreateWorkspaceSnapshotSaveRecord(request, savedAt);
 
-            var savedAt = DateTimeOffset.UtcNow;
-            var snapshot = new BudgetSnapshot
-            {
-                SnapshotName = $"{request.SelectedEnterprise} FY{request.SelectedFiscalYear} rate snapshot",
-                SnapshotDate = DateOnly.FromDateTime(savedAt.UtcDateTime),
-                CreatedAt = savedAt,
-                Notes = $"{RateSnapshotRecordPrefix}; Enterprise: {request.SelectedEnterprise}; FY: {request.SelectedFiscalYear}; Current rate: {request.CurrentRate:0.##}; Total costs: {request.TotalCosts:0.##}; Projected volume: {request.ProjectedVolume:0.##}",
-                Payload = JsonSerializer.Serialize(request)
-            };
+        context.BudgetSnapshots.Add(snapshot);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            context.BudgetSnapshots.Add(snapshot);
-            await context.SaveChangesAsync(cancellationToken);
+        return Results.Created($"/api/workspace/snapshot/{snapshot.Id}", BuildWorkspaceSnapshotSaveResponse(snapshot));
+    }
 
-            return Results.Created($"/api/workspace/snapshot/{snapshot.Id}", new WorkspaceSnapshotSaveResponse(
-                snapshot.Id,
-                snapshot.SnapshotName,
-                snapshot.CreatedAt.ToString("O")));
-        });
+    private static bool TryValidateWorkspaceSnapshotSaveRequest(WorkspaceBootstrapData request, out IResult? validationError)
+    {
+        if (string.IsNullOrWhiteSpace(request.SelectedEnterprise))
+        {
+            validationError = Results.BadRequest("An enterprise name is required to save a snapshot.");
+            return false;
+        }
+
+        if (request.SelectedFiscalYear <= 0)
+        {
+            validationError = Results.BadRequest("A valid fiscal year is required to save a snapshot.");
+            return false;
+        }
+
+        validationError = null;
+        return true;
+    }
+
+    private static BudgetSnapshot CreateWorkspaceSnapshotSaveRecord(WorkspaceBootstrapData request, DateTimeOffset savedAt)
+    {
+        return new BudgetSnapshot
+        {
+            SnapshotName = $"{request.SelectedEnterprise} FY{request.SelectedFiscalYear} rate snapshot",
+            SnapshotDate = DateOnly.FromDateTime(savedAt.UtcDateTime),
+            CreatedAt = savedAt,
+            Notes = $"{RateSnapshotRecordPrefix}; Enterprise: {request.SelectedEnterprise}; FY: {request.SelectedFiscalYear}; Current rate: {request.CurrentRate:0.##}; Total costs: {request.TotalCosts:0.##}; Projected volume: {request.ProjectedVolume:0.##}",
+            Payload = JsonSerializer.Serialize(request)
+        };
+    }
+
+    private static WorkspaceSnapshotSaveResponse BuildWorkspaceSnapshotSaveResponse(BudgetSnapshot snapshot)
+    {
+        return new WorkspaceSnapshotSaveResponse(
+            snapshot.Id,
+            snapshot.SnapshotName,
+            snapshot.CreatedAt.ToString("O"));
     }
 
     private static void MapWorkspaceBaselinePutEndpoint(WebApplication app)
     {
-        app.MapPut("/api/workspace/baseline", async (
-            WorkspaceBaselineUpdateRequest request,
-            IDbContextFactory<AppDbContext> contextFactory,
-            WorkspaceSnapshotComposer composer,
-            CancellationToken cancellationToken) =>
+        app.MapPut("/api/workspace/baseline", MapWorkspaceBaselineUpdateAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceBaselineUpdateAsync(
+        WorkspaceBaselineUpdateRequest request,
+        IDbContextFactory<AppDbContext> contextFactory,
+        WorkspaceSnapshotComposer composer,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateWorkspaceBaselineUpdateRequest(request, out var validationError))
         {
-            if (string.IsNullOrWhiteSpace(request.SelectedEnterprise))
+            return validationError!;
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var enterprise = await LoadWorkspaceBaselineEnterpriseAsync(context, request.SelectedEnterprise, cancellationToken).ConfigureAwait(false);
+        if (enterprise == null)
+        {
+            return Results.NotFound($"Enterprise '{request.SelectedEnterprise}' was not found.");
+        }
+
+        ApplyWorkspaceBaselineUpdate(enterprise, request);
+
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        var snapshot = await composer.BuildAsync(request.SelectedEnterprise, request.SelectedFiscalYear, cancellationToken).ConfigureAwait(false);
+        return Results.Ok(BuildWorkspaceBaselineUpdateResponse(snapshot));
+    }
+
+    private static bool TryValidateWorkspaceBaselineUpdateRequest(WorkspaceBaselineUpdateRequest request, out IResult? validationError)
+    {
+        var validationMessage = TryGetWorkspaceBaselineValidationMessage(request);
+        if (validationMessage is not null)
+        {
+            validationError = Results.BadRequest(validationMessage);
+            return false;
+        }
+
+        validationError = null;
+        return true;
+    }
+
+    private static string? TryGetWorkspaceBaselineValidationMessage(WorkspaceBaselineUpdateRequest request)
+    {
+        foreach (var validationRule in WorkspaceBaselineValidationRules)
+        {
+            var validationMessage = validationRule(request);
+            if (validationMessage is not null)
             {
-                return Results.BadRequest("A workspace enterprise is required.");
+                return validationMessage;
             }
+        }
 
-            if (request.SelectedFiscalYear <= 0)
-            {
-                return Results.BadRequest("A valid fiscal year is required.");
-            }
+        return null;
+    }
 
-            if (request.ProjectedVolume <= 0)
-            {
-                return Results.BadRequest("Projected volume must be greater than zero.");
-            }
+    private static async Task<Enterprise?> LoadWorkspaceBaselineEnterpriseAsync(
+        AppDbContext context,
+        string selectedEnterprise,
+        CancellationToken cancellationToken)
+    {
+        return await context.Enterprises
+            .FirstOrDefaultAsync(item => !item.IsDeleted && item.Name == selectedEnterprise, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
-            if (request.CurrentRate < 0 || request.TotalCosts < 0)
-            {
-                return Results.BadRequest("Workspace baseline values cannot be negative.");
-            }
+    private static void ApplyWorkspaceBaselineUpdate(Enterprise enterprise, WorkspaceBaselineUpdateRequest request)
+    {
+        enterprise.CurrentRate = decimal.Round(request.CurrentRate, 2, MidpointRounding.AwayFromZero);
+        enterprise.MonthlyExpenses = decimal.Round(request.TotalCosts, 2, MidpointRounding.AwayFromZero);
+        enterprise.CitizenCount = Math.Max(1, decimal.ToInt32(decimal.Round(request.ProjectedVolume, 0, MidpointRounding.AwayFromZero)));
+        enterprise.LastModified = DateTime.UtcNow;
+    }
 
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var enterprise = await context.Enterprises
-                .FirstOrDefaultAsync(item => !item.IsDeleted && item.Name == request.SelectedEnterprise, cancellationToken);
-
-            if (enterprise == null)
-            {
-                return Results.NotFound($"Enterprise '{request.SelectedEnterprise}' was not found.");
-            }
-
-            enterprise.CurrentRate = decimal.Round(request.CurrentRate, 2, MidpointRounding.AwayFromZero);
-            enterprise.MonthlyExpenses = decimal.Round(request.TotalCosts, 2, MidpointRounding.AwayFromZero);
-            enterprise.CitizenCount = Math.Max(1, decimal.ToInt32(decimal.Round(request.ProjectedVolume, 0, MidpointRounding.AwayFromZero)));
-            enterprise.LastModified = DateTime.UtcNow;
-
-            await context.SaveChangesAsync(cancellationToken);
-
-            var snapshot = await composer.BuildAsync(request.SelectedEnterprise, request.SelectedFiscalYear, cancellationToken);
-            var savedAtUtc = DateTime.UtcNow.ToString("O");
-            var response = new WorkspaceBaselineUpdateResponse(
-                snapshot.SelectedEnterprise,
-                snapshot.SelectedFiscalYear,
-                savedAtUtc,
-                $"Saved baseline values for {snapshot.SelectedEnterprise} FY {snapshot.SelectedFiscalYear}.",
-                snapshot);
-
-            return Results.Ok(response);
-        });
+    private static WorkspaceBaselineUpdateResponse BuildWorkspaceBaselineUpdateResponse(WorkspaceBootstrapData snapshot)
+    {
+        var savedAtUtc = DateTime.UtcNow.ToString("O");
+        return new WorkspaceBaselineUpdateResponse(
+            snapshot.SelectedEnterprise,
+            snapshot.SelectedFiscalYear,
+            savedAtUtc,
+            $"Saved baseline values for {snapshot.SelectedEnterprise} FY {snapshot.SelectedFiscalYear}.",
+            snapshot);
     }
 
     private static void MapWorkspaceScenarioListEndpoint(WebApplication app)
     {
-        app.MapGet("/api/workspace/scenarios", async (
-            string? enterprise,
-            int? fiscalYear,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        app.MapGet("/api/workspace/scenarios", MapWorkspaceScenarioListAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceScenarioListAsync(
+        string? enterprise,
+        int? fiscalYear,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var snapshots = await LoadWorkspaceScenarioSnapshotsAsync(context, cancellationToken).ConfigureAwait(false);
+        var scenarios = await BuildWorkspaceScenarioSummariesAsync(snapshots, enterprise, fiscalYear).ConfigureAwait(false);
+
+        return Results.Ok(new WorkspaceScenarioCollectionResponse(scenarios));
+    }
+
+    private static async Task<List<BudgetSnapshot>> LoadWorkspaceScenarioSnapshotsAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        return await context.BudgetSnapshots
+            .AsNoTracking()
+            .Where(snapshot => snapshot.Notes != null && snapshot.Notes.Contains(ScenarioRecordPrefix))
+            .OrderByDescending(snapshot => snapshot.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static Task<List<WorkspaceScenarioSummaryResponse>> BuildWorkspaceScenarioSummariesAsync(
+        IEnumerable<BudgetSnapshot> snapshots,
+        string? enterprise,
+        int? fiscalYear)
+    {
+        var scenarios = new List<WorkspaceScenarioSummaryResponse>();
+        foreach (var snapshot in snapshots)
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-
-            var snapshots = await context.BudgetSnapshots
-                .AsNoTracking()
-                .Where(snapshot => snapshot.Notes != null && snapshot.Notes.Contains(ScenarioRecordPrefix))
-                .OrderByDescending(snapshot => snapshot.CreatedAt)
-                .ToListAsync(cancellationToken);
-
-            var scenarios = new List<WorkspaceScenarioSummaryResponse>();
-            foreach (var snapshot in snapshots)
+            if (TryBuildWorkspaceScenarioSummary(snapshot, enterprise, fiscalYear, out var scenario))
             {
-                var payload = TryDeserializeBootstrap(snapshot.Payload);
-                if (payload == null)
-                {
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(enterprise) &&
-                    !string.Equals(payload.SelectedEnterprise, enterprise, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                if (fiscalYear is > 0 && payload.SelectedFiscalYear != fiscalYear.Value)
-                {
-                    continue;
-                }
-
-                scenarios.Add(BuildScenarioSummary(snapshot, payload));
+                scenarios.Add(scenario);
             }
+        }
 
-            return Results.Ok(new WorkspaceScenarioCollectionResponse(scenarios));
-        });
+        return Task.FromResult(scenarios);
+    }
+
+    private static bool TryBuildWorkspaceScenarioSummary(
+        BudgetSnapshot snapshot,
+        string? enterprise,
+        int? fiscalYear,
+        out WorkspaceScenarioSummaryResponse summary)
+    {
+        summary = default!;
+
+        var payload = TryDeserializeBootstrap(snapshot.Payload);
+        if (payload == null)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(enterprise)
+            && !string.Equals(payload.SelectedEnterprise, enterprise, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (fiscalYear is > 0 && payload.SelectedFiscalYear != fiscalYear.Value)
+        {
+            return false;
+        }
+
+        summary = BuildScenarioSummary(snapshot, payload);
+        return true;
     }
 
     private static void MapWorkspaceScenarioGetEndpoint(WebApplication app)
     {
-        app.MapGet("/api/workspace/scenarios/{snapshotId:long}", async (
-            long snapshotId,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        app.MapGet("/api/workspace/scenarios/{snapshotId:long}", MapWorkspaceScenarioGetAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceScenarioGetAsync(
+        long snapshotId,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var snapshot = await LoadWorkspaceScenarioSnapshotAsync(context, snapshotId, cancellationToken).ConfigureAwait(false);
+        return BuildWorkspaceScenarioResponse(snapshot);
+    }
+
+    private static async Task<BudgetSnapshot?> LoadWorkspaceScenarioSnapshotAsync(
+        AppDbContext context,
+        long snapshotId,
+        CancellationToken cancellationToken)
+    {
+        return await context.BudgetSnapshots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static IResult BuildWorkspaceScenarioResponse(BudgetSnapshot? snapshot)
+    {
+        if (snapshot is null || !IsWorkspaceScenarioSnapshot(snapshot))
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            return Results.NotFound();
+        }
 
-            var snapshot = await context.BudgetSnapshots
-                .AsNoTracking()
-                .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken);
+        return BuildWorkspaceScenarioPayloadResponse(snapshot.Payload);
+    }
 
-            if (snapshot == null || snapshot.Notes?.Contains(ScenarioRecordPrefix, StringComparison.Ordinal) != true)
-            {
-                return Results.NotFound();
-            }
+    private static bool IsWorkspaceScenarioSnapshot(BudgetSnapshot snapshot)
+    {
+        return snapshot.Notes?.Contains(ScenarioRecordPrefix, StringComparison.Ordinal) == true;
+    }
 
-            var payload = TryDeserializeBootstrap(snapshot.Payload);
-            return payload == null ? Results.BadRequest("The selected scenario does not contain a valid workspace payload.") : Results.Ok(payload);
-        });
+    private static IResult BuildWorkspaceScenarioPayloadResponse(string? payload)
+    {
+        var bootstrap = TryDeserializeBootstrap(payload);
+        return bootstrap == null ? Results.BadRequest("The selected scenario does not contain a valid workspace payload.") : Results.Ok(bootstrap);
     }
 
     private static void MapWorkspaceScenarioPostEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/scenarios", async (
-            WorkspaceScenarioSaveRequest request,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        app.MapPost("/api/workspace/scenarios", MapWorkspaceScenarioSaveAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceScenarioSaveAsync(
+        WorkspaceScenarioSaveRequest request,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!TryValidateWorkspaceScenarioSaveRequest(request, out var validationError))
         {
-            if (request.Snapshot == null)
+            return validationError!;
+        }
+
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var savedAt = DateTimeOffset.UtcNow;
+        var normalizedScenarioName = request.ScenarioName.Trim();
+        var snapshot = CreateWorkspaceScenarioSaveRecord(request, normalizedScenarioName, savedAt);
+
+        context.BudgetSnapshots.Add(snapshot);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        var payload = TryDeserializeBootstrap(snapshot.Payload) ?? request.Snapshot!;
+        return Results.Created($"/api/workspace/scenarios/{snapshot.Id}", BuildScenarioSummary(snapshot, payload, request.Description));
+    }
+
+    private static bool TryValidateWorkspaceScenarioSaveRequest(WorkspaceScenarioSaveRequest request, out IResult? validationError)
+    {
+        var validationMessage = TryGetWorkspaceScenarioSaveValidationMessage(request);
+        if (validationMessage is not null)
+        {
+            validationError = Results.BadRequest(validationMessage);
+            return false;
+        }
+
+        validationError = null;
+        return true;
+    }
+
+    private static string? TryGetWorkspaceScenarioSaveValidationMessage(WorkspaceScenarioSaveRequest request)
+    {
+        foreach (var validationRule in WorkspaceScenarioSaveValidationRules)
+        {
+            var validationMessage = validationRule(request);
+            if (validationMessage is not null)
             {
-                return Results.BadRequest("A workspace snapshot is required.");
+                return validationMessage;
             }
+        }
 
-            if (string.IsNullOrWhiteSpace(request.ScenarioName))
-            {
-                return Results.BadRequest("A scenario name is required.");
-            }
+        return null;
+    }
 
-            if (string.IsNullOrWhiteSpace(request.Snapshot.SelectedEnterprise) || request.Snapshot.SelectedFiscalYear <= 0)
-            {
-                return Results.BadRequest("Scenario persistence requires a valid enterprise and fiscal year.");
-            }
-
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-
-            var savedAt = DateTimeOffset.UtcNow;
-            var normalizedScenarioName = request.ScenarioName.Trim();
-            var snapshot = new BudgetSnapshot
-            {
-                SnapshotName = $"{request.Snapshot.SelectedEnterprise} FY{request.Snapshot.SelectedFiscalYear} scenario {normalizedScenarioName}",
-                SnapshotDate = DateOnly.FromDateTime(savedAt.UtcDateTime),
-                CreatedAt = savedAt,
-                Notes = BuildScenarioNotes(request, normalizedScenarioName),
-                Payload = JsonSerializer.Serialize(request.Snapshot with { ActiveScenarioName = normalizedScenarioName, LastUpdatedUtc = savedAt.ToString("O") })
-            };
-
-            context.BudgetSnapshots.Add(snapshot);
-            await context.SaveChangesAsync(cancellationToken);
-
-            var payload = TryDeserializeBootstrap(snapshot.Payload) ?? request.Snapshot;
-            return Results.Created($"/api/workspace/scenarios/{snapshot.Id}", BuildScenarioSummary(snapshot, payload, request.Description));
-        });
+    private static BudgetSnapshot CreateWorkspaceScenarioSaveRecord(
+        WorkspaceScenarioSaveRequest request,
+        string normalizedScenarioName,
+        DateTimeOffset savedAt)
+    {
+        return new BudgetSnapshot
+        {
+            SnapshotName = $"{request.Snapshot!.SelectedEnterprise} FY{request.Snapshot.SelectedFiscalYear} scenario {normalizedScenarioName}",
+            SnapshotDate = DateOnly.FromDateTime(savedAt.UtcDateTime),
+            CreatedAt = savedAt,
+            Notes = BuildScenarioNotes(request, normalizedScenarioName),
+            Payload = JsonSerializer.Serialize(request.Snapshot with { ActiveScenarioName = normalizedScenarioName, LastUpdatedUtc = savedAt.ToString("O") })
+        };
     }
 
     private static void MapWorkspaceSnapshotExportsPostEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/snapshot/{snapshotId:long}/exports", async (
-            long snapshotId,
-            WorkspaceSnapshotArtifactRequest? request,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        app.MapPost("/api/workspace/snapshot/{snapshotId:long}/exports", MapWorkspaceSnapshotExportsPostAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceSnapshotExportsPostAsync(
+        long snapshotId,
+        WorkspaceSnapshotArtifactRequest? request,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var snapshot = await LoadWorkspaceSnapshotForExportAsync(context, snapshotId, cancellationToken).ConfigureAwait(false);
+        if (!TryValidateWorkspaceSnapshotExport(snapshot, out var validationError))
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            return validationError!;
+        }
 
-            var snapshot = await context.BudgetSnapshots
-                .Include(item => item.ExportArtifacts)
-                .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken);
+        return await SaveWorkspaceSnapshotExportArtifactsAsync(context, snapshot!, request, cancellationToken).ConfigureAwait(false);
+    }
 
-            if (snapshot == null)
-            {
-                return Results.NotFound();
-            }
+    private static bool TryValidateWorkspaceSnapshotExport(BudgetSnapshot? snapshot, out IResult? validationError)
+    {
+        if (snapshot is null)
+        {
+            validationError = Results.NotFound();
+            return false;
+        }
 
-            if (string.IsNullOrWhiteSpace(snapshot.Payload))
-            {
-                return Results.BadRequest("The selected snapshot does not contain a payload that can be used to generate exports.");
-            }
+        if (string.IsNullOrWhiteSpace(snapshot.Payload))
+        {
+            validationError = Results.BadRequest("The selected snapshot does not contain a payload that can be used to generate exports.");
+            return false;
+        }
 
-            var documents = WorkspaceSnapshotExportArchiveService.CreateDocuments(snapshot.Payload, request?.DocumentKinds);
-            var normalizedKinds = documents.Select(document => document.DocumentKind).ToHashSet(StringComparer.Ordinal);
+        validationError = null;
+        return true;
+    }
 
-            if (request?.ReplaceExisting == true)
-            {
-                var existingArtifacts = snapshot.ExportArtifacts
-                    .Where(artifact => normalizedKinds.Contains(artifact.DocumentKind))
-                    .ToList();
+    private static async Task<IResult> SaveWorkspaceSnapshotExportArtifactsAsync(
+        AppDbContext context,
+        BudgetSnapshot snapshot,
+        WorkspaceSnapshotArtifactRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var documents = CreateWorkspaceSnapshotExportDocuments(snapshot, request);
+        return await PersistWorkspaceSnapshotExportArtifactsAsync(context, snapshot, documents, request, cancellationToken).ConfigureAwait(false);
+    }
 
-                if (existingArtifacts.Count > 0)
-                {
-                    context.BudgetSnapshotArtifacts.RemoveRange(existingArtifacts);
-                }
-            }
+    private static IReadOnlyCollection<WorkspaceSnapshotExportArtifactDocument> CreateWorkspaceSnapshotExportDocuments(
+        BudgetSnapshot snapshot,
+        WorkspaceSnapshotArtifactRequest? request)
+    {
+        return WorkspaceSnapshotExportArchiveService.CreateDocuments(snapshot.Payload!, request?.DocumentKinds);
+    }
 
-            var createdAt = DateTimeOffset.UtcNow;
-            var artifacts = documents.Select(document => new BudgetSnapshotArtifact
-            {
-                BudgetSnapshotId = snapshot.Id,
-                DocumentKind = document.DocumentKind,
-                FileName = document.FileName,
-                ContentType = document.ContentType,
-                SizeBytes = document.Content.LongLength,
-                CreatedAt = createdAt,
-                Payload = document.Content
-            }).ToList();
+    private static async Task<IResult> PersistWorkspaceSnapshotExportArtifactsAsync(
+        AppDbContext context,
+        BudgetSnapshot snapshot,
+        IReadOnlyCollection<WorkspaceSnapshotExportArtifactDocument> documents,
+        WorkspaceSnapshotArtifactRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var normalizedKinds = documents.Select(document => document.DocumentKind).ToHashSet(StringComparer.Ordinal);
 
-            context.BudgetSnapshotArtifacts.AddRange(artifacts);
-            await context.SaveChangesAsync(cancellationToken);
+        if (request?.ReplaceExisting == true)
+        {
+            RemoveExistingWorkspaceSnapshotArtifacts(context, snapshot, normalizedKinds);
+        }
 
-            return Results.Ok(new WorkspaceSnapshotArtifactBatchResponse(
-                snapshot.Id,
-                snapshot.SnapshotName,
-                artifacts.Select(BuildArtifactSummary).ToList()));
-        });
+        var artifacts = CreateWorkspaceSnapshotArtifacts(snapshot, documents);
+        context.BudgetSnapshotArtifacts.AddRange(artifacts);
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return Results.Ok(BuildWorkspaceSnapshotArtifactBatchResponse(snapshot, artifacts));
+    }
+
+    private static async Task<BudgetSnapshot?> LoadWorkspaceSnapshotForExportAsync(
+        AppDbContext context,
+        long snapshotId,
+        CancellationToken cancellationToken)
+    {
+        return await context.BudgetSnapshots
+            .Include(item => item.ExportArtifacts)
+            .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static void RemoveExistingWorkspaceSnapshotArtifacts(
+        AppDbContext context,
+        BudgetSnapshot snapshot,
+        ISet<string> normalizedKinds)
+    {
+        var existingArtifacts = snapshot.ExportArtifacts
+            .Where(artifact => normalizedKinds.Contains(artifact.DocumentKind))
+            .ToList();
+
+        if (existingArtifacts.Count > 0)
+        {
+            context.BudgetSnapshotArtifacts.RemoveRange(existingArtifacts);
+        }
+    }
+
+    private static List<BudgetSnapshotArtifact> CreateWorkspaceSnapshotArtifacts(
+        BudgetSnapshot snapshot,
+        IEnumerable<WorkspaceSnapshotExportArtifactDocument> documents)
+    {
+        var createdAt = DateTimeOffset.UtcNow;
+        return documents.Select(document => new BudgetSnapshotArtifact
+        {
+            BudgetSnapshotId = snapshot.Id,
+            DocumentKind = document.DocumentKind,
+            FileName = document.FileName,
+            ContentType = document.ContentType,
+            SizeBytes = document.Content.LongLength,
+            CreatedAt = createdAt,
+            Payload = document.Content
+        }).ToList();
+    }
+
+    private static WorkspaceSnapshotArtifactBatchResponse BuildWorkspaceSnapshotArtifactBatchResponse(
+        BudgetSnapshot snapshot,
+        IEnumerable<BudgetSnapshotArtifact> artifacts)
+    {
+        return new WorkspaceSnapshotArtifactBatchResponse(
+            snapshot.Id,
+            snapshot.SnapshotName,
+            artifacts.Select(BuildArtifactSummary).ToList());
     }
 
     private static void MapWorkspaceSnapshotExportsGetEndpoint(WebApplication app)
     {
-        app.MapGet("/api/workspace/snapshot/{snapshotId:long}/exports", async (
-            long snapshotId,
-            IDbContextFactory<AppDbContext> contextFactory,
-            CancellationToken cancellationToken) =>
+        app.MapGet("/api/workspace/snapshot/{snapshotId:long}/exports", MapWorkspaceSnapshotExportsGetAsync);
+    }
+
+    private static async Task<IResult> MapWorkspaceSnapshotExportsGetAsync(
+        long snapshotId,
+        IDbContextFactory<AppDbContext> contextFactory,
+        CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var snapshot = await LoadWorkspaceSnapshotExportSummaryAsync(context, snapshotId, cancellationToken).ConfigureAwait(false);
+        if (snapshot is null)
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            return Results.NotFound();
+        }
 
-            var snapshot = await context.BudgetSnapshots
-                .AsNoTracking()
-                .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken);
+        var response = await BuildWorkspaceSnapshotArtifactBatchResponseAsync(context, snapshot, cancellationToken).ConfigureAwait(false);
+        return Results.Ok(response);
+    }
 
-            if (snapshot == null)
-            {
-                return Results.NotFound();
-            }
+    private static async Task<BudgetSnapshot?> LoadWorkspaceSnapshotExportSummaryAsync(
+        AppDbContext context,
+        long snapshotId,
+        CancellationToken cancellationToken)
+    {
+        return await context.BudgetSnapshots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
-            var artifacts = await context.BudgetSnapshotArtifacts
-                .AsNoTracking()
-                .Where(item => item.BudgetSnapshotId == snapshotId)
-                .OrderByDescending(item => item.CreatedAt)
-                .ThenBy(item => item.Id)
-                .ToListAsync(cancellationToken);
+    private static async Task<WorkspaceSnapshotArtifactBatchResponse> BuildWorkspaceSnapshotArtifactBatchResponseAsync(
+        AppDbContext context,
+        BudgetSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var artifacts = await LoadWorkspaceSnapshotArtifactsAsync(context, snapshot.Id, cancellationToken).ConfigureAwait(false);
+        return BuildWorkspaceSnapshotArtifactBatchResponse(snapshot, artifacts);
+    }
 
-            return Results.Ok(new WorkspaceSnapshotArtifactBatchResponse(
-                snapshot.Id,
-                snapshot.SnapshotName,
-                artifacts.Select(BuildArtifactSummary).ToList()));
-        });
+    private static async Task<List<BudgetSnapshotArtifact>> LoadWorkspaceSnapshotArtifactsAsync(
+        AppDbContext context,
+        long snapshotId,
+        CancellationToken cancellationToken)
+    {
+        return await context.BudgetSnapshotArtifacts
+            .AsNoTracking()
+            .Where(item => item.BudgetSnapshotId == snapshotId)
+            .OrderByDescending(item => item.CreatedAt)
+            .ThenBy(item => item.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static void MapWorkspaceExportDownloadEndpoint(WebApplication app)
@@ -1816,12 +1834,8 @@ public partial class Program
 
     private static WorkspaceScenarioSummaryResponse BuildScenarioSummary(BudgetSnapshot snapshot, WorkspaceBootstrapData payload, string? descriptionOverride = null)
     {
-        var scenarioName = string.IsNullOrWhiteSpace(payload.ActiveScenarioName) ? snapshot.SnapshotName : payload.ActiveScenarioName;
-        var description = descriptionOverride;
-        if (string.IsNullOrWhiteSpace(description) && !string.IsNullOrWhiteSpace(snapshot.Notes))
-        {
-            description = ExtractDescription(snapshot.Notes);
-        }
+        var scenarioName = ResolveScenarioName(snapshot, payload);
+        var description = ResolveScenarioDescription(snapshot, descriptionOverride);
 
         return new WorkspaceScenarioSummaryResponse(
             snapshot.Id,
@@ -1832,9 +1846,38 @@ public partial class Program
             payload.CurrentRate,
             payload.TotalCosts,
             payload.ProjectedVolume,
-            payload.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
-            payload.ScenarioItems?.Count ?? 0,
+            GetScenarioItemTotalCost(payload),
+            GetScenarioItemCount(payload),
             description);
+    }
+
+    private static string ResolveScenarioName(BudgetSnapshot snapshot, WorkspaceBootstrapData payload)
+    {
+        return string.IsNullOrWhiteSpace(payload.ActiveScenarioName)
+            ? snapshot.SnapshotName
+            : payload.ActiveScenarioName;
+    }
+
+    private static string? ResolveScenarioDescription(BudgetSnapshot snapshot, string? descriptionOverride)
+    {
+        if (!string.IsNullOrWhiteSpace(descriptionOverride))
+        {
+            return descriptionOverride;
+        }
+
+        return string.IsNullOrWhiteSpace(snapshot.Notes)
+            ? null
+            : ExtractDescription(snapshot.Notes);
+    }
+
+    private static decimal GetScenarioItemTotalCost(WorkspaceBootstrapData payload)
+    {
+        return payload.ScenarioItems?.Sum(item => item.Cost) ?? 0m;
+    }
+
+    private static int GetScenarioItemCount(WorkspaceBootstrapData payload)
+    {
+        return payload.ScenarioItems?.Count ?? 0;
     }
 
     private static WorkspaceKnowledgeResponse ToWorkspaceKnowledgeResponse(WorkspaceKnowledgeResult knowledge)

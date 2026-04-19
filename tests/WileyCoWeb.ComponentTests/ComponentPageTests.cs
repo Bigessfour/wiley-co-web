@@ -439,6 +439,33 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public async Task WileyWorkspace_ScenarioCatalogRefresh_RetriesAfterSelectionBecomesValid()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+
+		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
+		await cut.InvokeAsync(() => cut.Instance.InvokeFirstRenderAsync());
+
+		Assert.Contains("Saved scenarios are unavailable until the workspace reconnects to live data.", cut.Instance.ScenarioStatus);
+		Assert.Equal(0, cut.Instance.SavedScenarioCount);
+
+		await cut.InvokeAsync(() => workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"))));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Equal(1, cut.Instance.SavedScenarioCount);
+			Assert.Contains("Loaded 1 saved scenario", cut.Instance.ScenarioStatus);
+			Assert.DoesNotContain("unavailable", cut.Instance.ScenarioStatus, StringComparison.OrdinalIgnoreCase);
+		});
+	}
+
+	[Fact]
 	public async Task WileyWorkspaceBaseHarness_SaveRateSnapshotAsync_UpdatesSnapshotStatus()
 	{
 		using var context = CreateContext();
@@ -811,9 +838,10 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
 		snapshotClient ??= CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
+		var localBootstrapService = new WorkspaceLocalBootstrapService(CreateLocalBootstrapClient());
 		context.Services.AddScoped(_ => snapshotService);
 		context.Services.AddScoped(_ => new UtilityCustomerApiService(snapshotClient));
-		context.Services.AddScoped(_ => new WorkspaceBootstrapService(workspaceState, snapshotService));
+		context.Services.AddScoped(_ => new WorkspaceBootstrapService(workspaceState, snapshotService, localBootstrapService));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
@@ -824,6 +852,27 @@ public sealed class ComponentPageTests
 		context.Renderer.SetRendererInfo(new RendererInfo("WebAssembly", true));
 
 		return context;
+	}
+
+	private static HttpClient CreateLocalBootstrapClient()
+	{
+		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		{
+			if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath.EndsWith("/data/workspace-bootstrap.json", StringComparison.OrdinalIgnoreCase) == true)
+			{
+				return Task.FromResult(CreateJsonResponse(HttpStatusCode.OK, WorkspaceTestData.CreateWaterUtilityBootstrap(
+					WorkspaceTestData.BasePlanningScenario,
+					WorkspaceTestData.WaterCurrentRate,
+					WorkspaceTestData.WaterTotalCosts,
+					WorkspaceTestData.WaterProjectedVolume,
+					DateTime.UtcNow.ToString("O"))));
+			}
+
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+		}))
+		{
+			BaseAddress = new Uri("https://client.test/")
+		};
 	}
 
 	private static HttpClient CreateSnapshotClient(bool failScenarioCatalog = false)

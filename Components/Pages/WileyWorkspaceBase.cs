@@ -36,7 +36,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
 
     private bool persistenceInitialized;
+    private bool isRefreshingScenarioCatalog;
     private DateTimeOffset? lastWorkspaceSyncUtc;
+    private string? lastScenarioCatalogSelectionKey;
     private WorkspaceApiHealth _apiHealth = WorkspaceApiHealth.Unknown;
 
     protected bool IsSavingSnapshot { get; set; }
@@ -461,6 +463,22 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     private void HandleWorkspaceStateChanged()
     {
+        if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
+        {
+            lastScenarioCatalogSelectionKey = null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SelectedEnterprise)
+            && SelectedFiscalYear > 0
+            && !IsLoadingWorkspace
+            && !IsSavingBaseline
+            && !IsApplyingScenario
+            && !isRefreshingScenarioCatalog
+            && !string.Equals($"{SelectedEnterprise.Trim().ToUpperInvariant()}::{SelectedFiscalYear}", lastScenarioCatalogSelectionKey, StringComparison.Ordinal))
+        {
+            _ = InvokeAsync(() => RefreshScenarioCatalogAsync(SelectedScenarioSnapshotId));
+        }
+
         if (persistenceInitialized
             && !IsLoadingWorkspace
             && WorkspaceLoadStatus.StartsWith("Workspace ready.", StringComparison.Ordinal))
@@ -524,10 +542,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     {
         if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
         {
+            lastScenarioCatalogSelectionKey = null;
             SetNoSavedScenariosState("Saved scenarios are unavailable until the workspace reconnects to live data.");
             WorkspaceLogger.LogInformation("Saved scenario catalog refresh skipped because the workspace selection is not initialized (enterprise={Enterprise}, fiscalYear={FiscalYear}).", SelectedEnterprise, SelectedFiscalYear);
             return;
         }
+
+        isRefreshingScenarioCatalog = true;
+        var selectionKey = $"{SelectedEnterprise.Trim().ToUpperInvariant()}::{SelectedFiscalYear}";
 
         try
         {
@@ -547,6 +569,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             {
                 var selectedScenario = SavedScenarios.FirstOrDefault(item => item.SnapshotId == SelectedScenarioSnapshotId.Value);
                 ScenarioDescription = selectedScenario?.Description ?? string.Empty;
+
+                if (selectedScenario is not null)
+                {
+                    ScenarioPersistenceStatus = $"Selected saved scenario '{selectedScenario.ScenarioName}'.";
+                }
             }
             else
             {
@@ -557,12 +584,25 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             {
                 ScenarioPersistenceStatus = $"No saved scenarios found for {SelectedEnterprise} FY {SelectedFiscalYear}.";
             }
+            else if (!SelectedScenarioSnapshotId.HasValue)
+            {
+                ScenarioPersistenceStatus = SavedScenarios.Count == 1
+                    ? $"Loaded 1 saved scenario for {SelectedEnterprise} FY {SelectedFiscalYear}."
+                    : $"Loaded {SavedScenarios.Count} saved scenarios for {SelectedEnterprise} FY {SelectedFiscalYear}.";
+            }
+
+            lastScenarioCatalogSelectionKey = selectionKey;
         }
         catch (Exception ex)
         {
+            lastScenarioCatalogSelectionKey = selectionKey;
             WorkspaceLogger.LogWarning(ex, "Saved scenario catalog load failed for {Enterprise} FY {FiscalYear}. Falling back to no-scenarios mode.", SelectedEnterprise, SelectedFiscalYear);
             SetNoSavedScenariosState($"Saved scenarios are currently unavailable for {SelectedEnterprise} FY {SelectedFiscalYear}. You can keep working locally and try again when the API reconnects.");
             _apiHealth = WorkspaceApiHealth.Degraded;
+        }
+        finally
+        {
+            isRefreshingScenarioCatalog = false;
         }
     }
 

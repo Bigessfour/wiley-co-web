@@ -27,114 +27,6 @@ public partial class CustomerViewerPanel : ComponentBase
     private bool isDeleteDialogOpen;
     private bool isEditingExistingCustomer;
 
-    private static IReadOnlyList<EnumOption<CustomerType>> CustomerTypeOptions { get; } =
-    [
-        new(CustomerType.Residential, "Residential"),
-        new(CustomerType.Commercial, "Commercial"),
-        new(CustomerType.Industrial, "Industrial"),
-        new(CustomerType.Agricultural, "Agricultural"),
-        new(CustomerType.Institutional, "Institutional"),
-        new(CustomerType.Government, "Government"),
-        new(CustomerType.MultiFamily, "Multi-Family")
-    ];
-
-    private static IReadOnlyList<EnumOption<ServiceLocation>> ServiceLocationOptions { get; } =
-    [
-        new(ServiceLocation.InsideCityLimits, "Inside City Limits"),
-        new(ServiceLocation.OutsideCityLimits, "Outside City Limits")
-    ];
-
-    private static IReadOnlyList<EnumOption<CustomerStatus>> CustomerStatusOptions { get; } =
-    [
-        new(CustomerStatus.Active, "Active"),
-        new(CustomerStatus.Inactive, "Inactive"),
-        new(CustomerStatus.Suspended, "Suspended"),
-        new(CustomerStatus.Closed, "Closed")
-    ];
-
-    private string SearchTermProxy
-    {
-        get => WorkspaceState.CustomerSearchTerm;
-        set
-        {
-            if (WorkspaceState.CustomerSearchTerm == value)
-            {
-                return;
-            }
-
-            WorkspaceState.SetCustomerSearchTerm(value);
-        }
-    }
-
-    private string SelectedCustomerServiceProxy
-    {
-        get => WorkspaceState.SelectedCustomerService;
-        set
-        {
-            if (WorkspaceState.SelectedCustomerService == value)
-            {
-                return;
-            }
-
-            WorkspaceState.SetCustomerServiceFilter(value);
-        }
-    }
-
-    private string SelectedCustomerCityLimitsProxy
-    {
-        get => WorkspaceState.SelectedCustomerCityLimits;
-        set
-        {
-            if (WorkspaceState.SelectedCustomerCityLimits == value)
-            {
-                return;
-            }
-
-            WorkspaceState.SetCustomerCityLimitsFilter(value);
-        }
-    }
-
-    private IReadOnlyList<string> CustomerServiceOptions => WorkspaceState.CustomerServiceOptions;
-
-    private IReadOnlyList<string> CustomerCityLimitOptions => WorkspaceState.CustomerCityLimitOptions;
-
-    private IReadOnlyList<UtilityCustomerRecord> FilteredCustomers =>
-    [
-        .. allCustomers.Where(customer =>
-            (string.IsNullOrWhiteSpace(WorkspaceState.CustomerSearchTerm)
-             || customer.DisplayName.Contains(WorkspaceState.CustomerSearchTerm, StringComparison.OrdinalIgnoreCase)
-             || customer.AccountNumber.Contains(WorkspaceState.CustomerSearchTerm, StringComparison.OrdinalIgnoreCase)
-             || customer.ServiceCity.Contains(WorkspaceState.CustomerSearchTerm, StringComparison.OrdinalIgnoreCase)
-             || customer.CustomerType.Contains(WorkspaceState.CustomerSearchTerm, StringComparison.OrdinalIgnoreCase)
-             || customer.ServiceLocation.Contains(WorkspaceState.CustomerSearchTerm, StringComparison.OrdinalIgnoreCase))
-            && (string.IsNullOrWhiteSpace(WorkspaceState.SelectedCustomerService)
-                || string.Equals(WorkspaceState.SelectedCustomerService, "All Services", StringComparison.Ordinal)
-                || string.Equals(customer.CustomerType, WorkspaceState.SelectedCustomerService, StringComparison.Ordinal))
-            && (string.IsNullOrWhiteSpace(WorkspaceState.SelectedCustomerCityLimits)
-                || string.Equals(WorkspaceState.SelectedCustomerCityLimits, "All", StringComparison.Ordinal)
-                || string.Equals(ToCityLimitsFlag(customer), WorkspaceState.SelectedCustomerCityLimits, StringComparison.Ordinal)))
-    ];
-
-    private string SelectedCustomerServiceDisplay => string.IsNullOrWhiteSpace(WorkspaceState.SelectedCustomerService) ? "All Services" : WorkspaceState.SelectedCustomerService;
-    private string SelectedCustomerCityLimitsDisplay => string.IsNullOrWhiteSpace(WorkspaceState.SelectedCustomerCityLimits) ? "All" : WorkspaceState.SelectedCustomerCityLimits;
-    private string ActiveCustomerCountDisplay => allCustomers.Count(customer => string.Equals(customer.Status, "Active", StringComparison.OrdinalIgnoreCase)).ToString(CultureInfo.InvariantCulture);
-    private string LiveFilteredCustomerCountDisplay => FilteredCustomers.Count.ToString(CultureInfo.InvariantCulture);
-    private string CustomerDirectoryStatus => customerDirectoryStatus;
-    private bool IsBusy => isLoadingCustomers || isSavingCustomer || isDeletingCustomer;
-    private bool HasApiFeedback => !string.IsNullOrWhiteSpace(CustomerApiError);
-    private string CustomerApiError => customerApiError ?? string.Empty;
-    private IReadOnlyList<string> ValidationSummaryItems =>
-    [
-        .. customerValidationErrors.Values.SelectMany(messages => messages).Distinct(StringComparer.Ordinal)
-    ];
-    private bool IsEditorDialogOpen => isEditorDialogOpen;
-    private bool IsDeleteDialogOpen => isDeleteDialogOpen;
-    private UtilityCustomerRecord? PendingDeleteCustomer => pendingDeleteCustomer;
-    private EditContext? EditorEditContext => editorEditContext;
-    private UtilityCustomerEditorModel EditorModel => editorModel;
-    private string EditorDialogTitle => isEditingExistingCustomer ? "Edit Utility Customer" : "Add Utility Customer";
-    private string EditorSaveButtonText => isEditingExistingCustomer ? "Save changes" : "Create customer";
-
     protected override async Task OnInitializedAsync()
     {
         await LoadCustomersAsync();
@@ -167,6 +59,8 @@ public partial class CustomerViewerPanel : ComponentBase
         editorModel = UtilityCustomerEditorModel.FromRecord(customer);
         editorEditContext = new EditContext(editorModel);
         isEditorDialogOpen = true;
+        isDeleteDialogOpen = false;
+        pendingDeleteCustomer = null;
     }
 
     private void CloseEditorDialog()
@@ -180,13 +74,6 @@ public partial class CustomerViewerPanel : ComponentBase
         editorEditContext = null;
     }
 
-    private void BeginDeleteCustomer(UtilityCustomerRecord customer)
-    {
-        ResetApiFeedback();
-        pendingDeleteCustomer = customer;
-        isDeleteDialogOpen = true;
-    }
-
     private void CloseDeleteDialog()
     {
         if (isDeletingCustomer)
@@ -198,52 +85,80 @@ public partial class CustomerViewerPanel : ComponentBase
         pendingDeleteCustomer = null;
     }
 
+    private void BeginDeleteCustomer(UtilityCustomerRecord customer)
+    {
+        ResetApiFeedback();
+        pendingDeleteCustomer = customer;
+        isDeleteDialogOpen = true;
+    }
+
     private async Task SaveCustomerAsync()
     {
-        if (isSavingCustomer || editorEditContext is null)
+        if (!TryPrepareCustomerSave(out var saveContext))
         {
             return;
         }
 
+        await ExecuteCustomerOperationAsync(
+            BeginSavingCustomer,
+            () => SaveCustomerCoreAsync(saveContext),
+            HandleSaveCustomerFailure,
+            EndSavingCustomer);
+    }
+
+    private bool TryPrepareCustomerSave(out CustomerSaveContext saveContext)
+    {
+        saveContext = default!;
+
+        if (!CanSaveCustomer())
+        {
+            return false;
+        }
+
+        saveContext = BuildCustomerSaveContext();
+        return true;
+    }
+
+    private bool CanSaveCustomer()
+    {
+        var editContext = editorEditContext;
+        if (isSavingCustomer || editContext is null)
+        {
+            return false;
+        }
+
+        return ValidateCustomerSaveContext(editContext);
+    }
+
+    private bool ValidateCustomerSaveContext(EditContext editContext)
+    {
         ResetApiFeedback();
-        if (!editorEditContext.Validate())
+        if (!editContext.Validate())
         {
             customerApiError = "Fix the validation issues before saving this customer.";
-            return;
+            return false;
         }
 
-        isSavingCustomer = true;
+        return true;
+    }
 
-        try
-        {
-            var request = editorModel.ToRequest();
-            var actionLabel = isEditingExistingCustomer ? "updated" : "created";
+    private CustomerSaveContext BuildCustomerSaveContext()
+    {
+        return new CustomerSaveContext(
+            editorModel.ToRequest(),
+            ResolveCustomerSaveId(),
+            editorModel.AccountNumber,
+            ResolveCustomerSaveActionLabel());
+    }
 
-            if (isEditingExistingCustomer && editorModel.Id > 0)
-            {
-                await UtilityCustomerApiService.UpdateCustomerAsync(editorModel.Id, request);
-            }
-            else
-            {
-                await UtilityCustomerApiService.CreateCustomerAsync(request);
-            }
+    private int? ResolveCustomerSaveId()
+    {
+        return isEditingExistingCustomer && editorModel.Id > 0 ? editorModel.Id : null;
+    }
 
-            isEditorDialogOpen = false;
-            editorEditContext = null;
-            await LoadCustomersAsync($"Saved {editorModel.AccountNumber} and {actionLabel} the live utility-customer directory.");
-        }
-        catch (UtilityCustomerApiException ex)
-        {
-            ApplyApiFeedback(ex.Message, ex.ValidationErrors);
-        }
-        catch (Exception ex)
-        {
-            customerApiError = $"Unable to save the customer: {ex.Message}";
-        }
-        finally
-        {
-            isSavingCustomer = false;
-        }
+    private string ResolveCustomerSaveActionLabel()
+    {
+        return isEditingExistingCustomer ? "updated" : "created";
     }
 
     private async Task DeleteCustomerAsync()
@@ -254,55 +169,136 @@ public partial class CustomerViewerPanel : ComponentBase
         }
 
         ResetApiFeedback();
-        isDeletingCustomer = true;
 
-        try
-        {
-            var deletedCustomerName = pendingDeleteCustomer.DisplayName;
-            await UtilityCustomerApiService.DeleteCustomerAsync(pendingDeleteCustomer.Id);
-            isDeleteDialogOpen = false;
-            pendingDeleteCustomer = null;
-            await LoadCustomersAsync($"Deleted {deletedCustomerName} from the live utility-customer directory.");
-        }
-        catch (UtilityCustomerApiException ex)
-        {
-            ApplyApiFeedback(ex.Message, ex.ValidationErrors);
-        }
-        catch (Exception ex)
-        {
-            customerApiError = $"Unable to delete the customer: {ex.Message}";
-        }
-        finally
-        {
-            isDeletingCustomer = false;
-        }
+        var customer = pendingDeleteCustomer;
+        await ExecuteCustomerOperationAsync(
+            BeginDeletingCustomer,
+            () => DeleteCustomerCoreAsync(customer),
+            HandleDeleteCustomerFailure,
+            EndDeletingCustomer);
     }
 
     private async Task LoadCustomersAsync(string? successMessage = null)
     {
         ResetApiFeedback();
-        isLoadingCustomers = true;
-        customerDirectoryStatus = "Loading live utility-customer directory...";
+
+        await ExecuteCustomerOperationAsync(
+            BeginLoadingCustomers,
+            () => LoadCustomersCoreAsync(successMessage),
+            HandleLoadCustomersFailure,
+            EndLoadingCustomers);
+    }
+
+    private async Task ExecuteCustomerOperationAsync(Action begin, Func<Task> operation, Action<Exception> handleFailure, Action complete)
+    {
+        begin();
         StateHasChanged();
 
         try
         {
-            var customers = await UtilityCustomerApiService.GetCustomersAsync();
-            allCustomers.Clear();
-            allCustomers.AddRange(customers.OrderBy(customer => customer.DisplayName, StringComparer.OrdinalIgnoreCase).ThenBy(customer => customer.AccountNumber, StringComparer.OrdinalIgnoreCase));
-            WorkspaceState.ReplaceCustomerDirectory([.. allCustomers.Select(ToCustomerRow)]);
-            customerDirectoryStatus = successMessage ?? $"Loaded {allCustomers.Count} utility customers from the live API.";
+            await operation();
         }
         catch (Exception ex)
         {
-            customerApiError = $"Unable to load the live utility-customer directory: {ex.Message}";
-            customerDirectoryStatus = "The live customer directory could not be refreshed.";
+            handleFailure(ex);
         }
         finally
         {
-            isLoadingCustomers = false;
+            complete();
             StateHasChanged();
         }
+    }
+
+    private void BeginSavingCustomer()
+    {
+        isSavingCustomer = true;
+    }
+
+    private void HandleSaveCustomerFailure(Exception ex)
+    {
+        if (ex is UtilityCustomerApiException apiException)
+        {
+            ApplyApiFeedback(apiException.Message, apiException.ValidationErrors);
+            return;
+        }
+
+        customerApiError = $"Unable to save the customer: {ex.Message}";
+    }
+
+    private void EndSavingCustomer()
+    {
+        isSavingCustomer = false;
+    }
+
+    private async Task SaveCustomerCoreAsync(CustomerSaveContext saveContext)
+    {
+        if (saveContext.CustomerId.HasValue)
+        {
+            await UtilityCustomerApiService.UpdateCustomerAsync(saveContext.CustomerId.Value, saveContext.Request);
+        }
+        else
+        {
+            await UtilityCustomerApiService.CreateCustomerAsync(saveContext.Request);
+        }
+
+        isEditorDialogOpen = false;
+        editorEditContext = null;
+        await LoadCustomersAsync($"Saved {saveContext.AccountNumber} and {saveContext.ActionLabel} the live utility-customer directory.");
+    }
+
+    private void BeginDeletingCustomer()
+    {
+        isDeletingCustomer = true;
+    }
+
+    private void HandleDeleteCustomerFailure(Exception ex)
+    {
+        if (ex is UtilityCustomerApiException apiException)
+        {
+            ApplyApiFeedback(apiException.Message, apiException.ValidationErrors);
+            return;
+        }
+
+        customerApiError = $"Unable to delete the customer: {ex.Message}";
+    }
+
+    private void EndDeletingCustomer()
+    {
+        isDeletingCustomer = false;
+    }
+
+    private async Task DeleteCustomerCoreAsync(UtilityCustomerRecord customer)
+    {
+        await UtilityCustomerApiService.DeleteCustomerAsync(customer.Id);
+        isDeleteDialogOpen = false;
+        pendingDeleteCustomer = null;
+        await LoadCustomersAsync($"Deleted {customer.DisplayName} from the live utility-customer directory.");
+    }
+
+    private void BeginLoadingCustomers()
+    {
+        isLoadingCustomers = true;
+        customerDirectoryStatus = "Loading live utility-customer directory...";
+    }
+
+    private void HandleLoadCustomersFailure(Exception ex)
+    {
+        customerApiError = $"Unable to load the live utility-customer directory: {ex.Message}";
+        customerDirectoryStatus = "The live customer directory could not be refreshed.";
+    }
+
+    private void EndLoadingCustomers()
+    {
+        isLoadingCustomers = false;
+    }
+
+    private async Task LoadCustomersCoreAsync(string? successMessage)
+    {
+        var customers = await UtilityCustomerApiService.GetCustomersAsync();
+        allCustomers.Clear();
+        allCustomers.AddRange(customers.OrderBy(customer => customer.DisplayName, StringComparer.OrdinalIgnoreCase).ThenBy(customer => customer.AccountNumber, StringComparer.OrdinalIgnoreCase));
+        WorkspaceState.ReplaceCustomerDirectory([.. allCustomers.Select(ToCustomerRow)]);
+        customerDirectoryStatus = successMessage ?? $"Loaded {allCustomers.Count} utility customers from the live API.";
     }
 
     private void ResetApiFeedback()
@@ -320,160 +316,5 @@ public partial class CustomerViewerPanel : ComponentBase
         {
             customerValidationErrors[validationError.Key] = validationError.Value;
         }
-    }
-
-    private static CustomerRow ToCustomerRow(UtilityCustomerRecord customer)
-        => new(customer.DisplayName, customer.CustomerType, ToCityLimitsFlag(customer));
-
-    private static string ToCityLimitsFlag(UtilityCustomerRecord customer)
-        => ParseServiceLocation(customer.ServiceLocation) == ServiceLocation.InsideCityLimits ? "Yes" : "No";
-
-    private static CustomerType ParseCustomerType(string value)
-        => value.Trim() switch
-        {
-            "Residential" => CustomerType.Residential,
-            "Commercial" => CustomerType.Commercial,
-            "Industrial" => CustomerType.Industrial,
-            "Agricultural" => CustomerType.Agricultural,
-            "Institutional" => CustomerType.Institutional,
-            "Government" => CustomerType.Government,
-            "Multi-Family" => CustomerType.MultiFamily,
-            _ => CustomerType.Residential
-        };
-
-    private static ServiceLocation ParseServiceLocation(string value)
-        => value.Trim() switch
-        {
-            "Inside City Limits" => ServiceLocation.InsideCityLimits,
-            "Outside City Limits" => ServiceLocation.OutsideCityLimits,
-            _ => ServiceLocation.InsideCityLimits
-        };
-
-    private static CustomerStatus ParseCustomerStatus(string value)
-        => value.Trim() switch
-        {
-            "Inactive" => CustomerStatus.Inactive,
-            "Suspended" => CustomerStatus.Suspended,
-            "Closed" => CustomerStatus.Closed,
-            _ => CustomerStatus.Active
-        };
-
-    private sealed record EnumOption<TValue>(TValue Value, string Text);
-
-    private sealed class UtilityCustomerEditorModel
-    {
-        public int Id { get; set; }
-
-        [Required(ErrorMessage = "Account number is required")]
-        [StringLength(20, ErrorMessage = "Account number cannot exceed 20 characters")]
-        public string AccountNumber { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "First name is required")]
-        [StringLength(50, ErrorMessage = "First name cannot exceed 50 characters")]
-        public string FirstName { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Last name is required")]
-        [StringLength(50, ErrorMessage = "Last name cannot exceed 50 characters")]
-        public string LastName { get; set; } = string.Empty;
-
-        [StringLength(100, ErrorMessage = "Company name cannot exceed 100 characters")]
-        public string? CompanyName { get; set; }
-
-        public CustomerType CustomerType { get; set; } = CustomerType.Residential;
-
-        [Required(ErrorMessage = "Service address is required")]
-        [StringLength(200, ErrorMessage = "Service address cannot exceed 200 characters")]
-        public string ServiceAddress { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Service city is required")]
-        [StringLength(50, ErrorMessage = "Service city cannot exceed 50 characters")]
-        public string ServiceCity { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Service state is required")]
-        [StringLength(2, MinimumLength = 2, ErrorMessage = "Service state must be exactly 2 characters")]
-        public string ServiceState { get; set; } = "CO";
-
-        [Required(ErrorMessage = "Service ZIP code is required")]
-        [StringLength(10, ErrorMessage = "Service ZIP code cannot exceed 10 characters")]
-        public string ServiceZipCode { get; set; } = string.Empty;
-
-        public ServiceLocation ServiceLocation { get; set; } = ServiceLocation.InsideCityLimits;
-
-        public CustomerStatus Status { get; set; } = CustomerStatus.Active;
-
-        public decimal CurrentBalance { get; set; }
-
-        public DateTime? AccountOpenDate { get; set; } = DateTime.Today;
-
-        [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
-        public string? PhoneNumber { get; set; }
-
-        [EmailAddress(ErrorMessage = "Email address must be valid")]
-        [StringLength(100, ErrorMessage = "Email address cannot exceed 100 characters")]
-        public string? EmailAddress { get; set; }
-
-        [StringLength(20, ErrorMessage = "Meter number cannot exceed 20 characters")]
-        public string? MeterNumber { get; set; }
-
-        [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
-        public string? Notes { get; set; }
-
-        public UtilityCustomerUpsertRequest ToRequest()
-            => new(
-                AccountNumber.Trim(),
-                FirstName.Trim(),
-                LastName.Trim(),
-                NormalizeOptional(CompanyName),
-                CustomerType,
-                ServiceAddress.Trim(),
-                ServiceCity.Trim(),
-                ServiceState.Trim().ToUpperInvariant(),
-                ServiceZipCode.Trim(),
-                ServiceLocation,
-                Status,
-                CurrentBalance,
-                AccountOpenDate,
-                NormalizeOptional(PhoneNumber),
-                NormalizeOptional(EmailAddress),
-                NormalizeOptional(MeterNumber),
-                NormalizeOptional(Notes));
-
-        public static UtilityCustomerEditorModel CreateDefault()
-            => new()
-            {
-                AccountOpenDate = DateTime.Today,
-                ServiceState = "CO",
-                Status = CustomerStatus.Active,
-                CustomerType = CustomerType.Residential,
-                ServiceLocation = ServiceLocation.InsideCityLimits
-            };
-
-        public static UtilityCustomerEditorModel FromRecord(UtilityCustomerRecord customer)
-            => new()
-            {
-                Id = customer.Id,
-                AccountNumber = customer.AccountNumber,
-                FirstName = customer.FirstName,
-                LastName = customer.LastName,
-                CompanyName = customer.CompanyName,
-                CustomerType = ParseCustomerType(customer.CustomerType),
-                ServiceAddress = customer.ServiceAddress,
-                ServiceCity = customer.ServiceCity,
-                ServiceState = customer.ServiceState,
-                ServiceZipCode = customer.ServiceZipCode,
-                ServiceLocation = ParseServiceLocation(customer.ServiceLocation),
-                Status = ParseCustomerStatus(customer.Status),
-                CurrentBalance = customer.CurrentBalance,
-                AccountOpenDate = DateTime.TryParse(customer.AccountOpenDateUtc, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var openedAt)
-                    ? openedAt.Date
-                    : DateTime.Today,
-                PhoneNumber = customer.PhoneNumber,
-                EmailAddress = customer.EmailAddress,
-                MeterNumber = customer.MeterNumber,
-                Notes = customer.Notes
-            };
-
-        private static string? NormalizeOptional(string? value)
-            => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

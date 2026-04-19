@@ -7,13 +7,23 @@
   "scripts": {
     "start": "node scripts/custom-azure-mcp-server.js",
     "copilot:cli": "npx -y @github/copilot --experimental",
-    "copilot:cli:update": "npm install -g @github/copilot@latest"
+    "copilot:cli:update": "npm install -g @github/copilot@latest",
+    "playwright:install": "playwright install chromium",
+    "playwright:test": "playwright test",
+    "playwright:test:ui": "playwright test --ui",
+    "playwright:codegen": "playwright codegen http://localhost:5230/wiley-workspace",
+    "playwright:report": "playwright show-report",
+    "playwright:agents": "playwright-cli --help",
+    "playwright:agents:install-skills": "playwright-cli install --skills",
+    "playwright:agents:show": "playwright-cli show"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/server-filesystem": "^2026.1.14",
+    "@playwright/cli": "^0.1.8",
+    "@playwright/test": "^1.59.1",
     "prettier": "^3.8.3",
     "repomix": "^1.13.1"
   },

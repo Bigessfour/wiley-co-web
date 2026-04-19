@@ -1,19 +1,15 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
 
-public sealed class WorkspaceBootstrapService(WorkspaceState workspaceState, WorkspaceSnapshotApiService workspaceSnapshotApiService, ILogger<WorkspaceBootstrapService>? logger = null)
+public sealed class WorkspaceBootstrapService(
+    WorkspaceState workspaceState,
+    WorkspaceSnapshotApiService workspaceSnapshotApiService,
+    WorkspaceLocalBootstrapService workspaceLocalBootstrapService,
+    ILogger<WorkspaceBootstrapService>? logger = null)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true
-    };
-
     public async Task LoadAsync(string? enterprise = null, int? fiscalYear = null, CancellationToken cancellationToken = default)
     {
         Console.WriteLine("[startup] WorkspaceBootstrapService.LoadAsync entered.");
@@ -32,9 +28,20 @@ public sealed class WorkspaceBootstrapService(WorkspaceState workspaceState, Wor
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "Workspace bootstrap is falling back because the live API snapshot was unavailable or invalid.");
-            bootstrapData = CreateLocalFallbackBootstrap(enterprise, fiscalYear);
             startupSource = WorkspaceStartupSource.LocalBootstrapFallback;
-            startupStatus = "Workspace started from local fallback data because the workspace API was unavailable. Saved scenarios are temporarily unavailable.";
+
+            try
+            {
+                bootstrapData = await workspaceLocalBootstrapService.LoadAsync(cancellationToken).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("Workspace local bootstrap asset returned no payload.");
+                startupStatus = "Workspace started from local fallback data because the workspace API was unavailable. A local workspace bootstrap asset is active until the API reconnects.";
+            }
+            catch (Exception localFallbackEx)
+            {
+                logger?.LogWarning(localFallbackEx, "Workspace local bootstrap asset fallback was unavailable or invalid. Using generated fallback state.");
+                bootstrapData = CreateLocalFallbackBootstrap(enterprise, fiscalYear);
+                startupStatus = "Workspace started from local fallback data because the workspace API was unavailable. Saved scenarios are temporarily unavailable.";
+            }
         }
 
         workspaceState.ApplyBootstrap(bootstrapData);

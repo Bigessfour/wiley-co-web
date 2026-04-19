@@ -176,6 +176,20 @@ $env:WILEYCO_E2E_BASE_URL = 'https://main.d2ellat1y3ljd9.amplifyapp.com'
 dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "FullyQualifiedName~Visual_WorkspaceOverview_MatchesBaseline"
 ```
 
+## VS Code Playwright Setup
+
+This workspace now carries a separate Node-based Playwright setup for the VS Code Playwright extension and agent workflows.
+
+- `playwright.config.ts` defines a Chromium project, HTML plus JSON reporters, retry-time tracing, and a managed local `dotnet run` web server whenever the effective base URL is the local default `http://localhost:5230`.
+- `tests/playwright/workspace-smoke.spec.ts` gives the official Playwright extension and the Playwright Test Runner extension a concrete spec to discover, run, debug, record against, and inspect.
+- `.vscode/settings.json` configures both installed Playwright extensions to use `playwright.config.ts`, default to the local workspace URL, and surface traces and locator copying in the IDE.
+- `.vscode/mcp.json` registers the `playwright` MCP server with the standard `npx @playwright/mcp@latest` wiring so Copilot and other MCP-capable clients can drive a browser through Playwright tools.
+- `package.json` adds `playwright:*` scripts for browser install, test runs, UI mode, codegen, reports, and agent CLI helpers.
+
+Use the Node-based setup for VS Code testing UI and agent automation. Keep the existing .NET Playwright xUnit suite for the current hosted-site regression coverage.
+
+If you want the Node Playwright setup to target a non-local site instead, set `WILEYCO_E2E_BASE_URL` to that host before running Playwright. The config skips the managed `dotnet run` server whenever the effective base URL is not the local default.
+
 ## Observability (AWS X-Ray + CloudWatch Logs)
 
 The thin API host uses AWS-native observability tools.

@@ -79,21 +79,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected Task RefreshKnowledgeFromButtonAsync() => RefreshKnowledgeAsync(force: true);
 
     protected async Task OnPromptRequestedAsync(AssistViewPromptRequestedEventArgs args)
-    {
-        if (args is null)
-        {
-            return;
-        }
-
-        var question = string.IsNullOrWhiteSpace(args.Prompt) ? ChatQuestion : args.Prompt.Trim();
-        if (string.IsNullOrWhiteSpace(question))
-        {
-            args.Cancel = true;
-            return;
-        }
-
-        await SubmitPromptAsync(question, args);
-    }
+        => await SubmitPromptAsync(string.IsNullOrWhiteSpace(args?.Prompt) ? ChatQuestion : args.Prompt.Trim(), args);
 
     public Task AskChatAsync()
     {
@@ -102,33 +88,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
     public async Task ResetChatAsync()
     {
-        try
-        {
-            IsChatBusy = true;
-            await InvokeAsync(StateHasChanged);
-
-            await AiApi.ResetConversationAsync(new WorkspaceConversationResetRequest(
-                BuildChatContextSummary(),
-                WorkspaceState.SelectedEnterprise,
-                WorkspaceState.SelectedFiscalYear)).ConfigureAwait(false);
-
-            chatTranscript.Clear();
-            chatPrompts.Clear();
-            recommendationHistory.Clear();
-            ChatAnswer = "Jarvis thread reset for the current workspace context.";
-            CurrentConversationLabel = "Local session";
-            CurrentProfileSummary = "Jarvis will ask a few setup questions on first contact.";
-            ChatQuestion = string.Empty;
-        }
-        catch (Exception ex)
-        {
-            ChatAnswer = ex.Message;
-        }
-        finally
-        {
-            IsChatBusy = false;
-            await InvokeAsync(StateHasChanged);
-        }
+        await ExecuteChatOperationAsync(BeginChatReset, ResetChatCoreAsync, HandleChatResetFailure, EndChatReset);
     }
 
     public Task ClearChatAsync()
@@ -155,65 +115,11 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             return;
         }
 
-        try
-        {
-            IsChatBusy = true;
-            ChatQuestion = question;
-            await InvokeAsync(StateHasChanged);
-
-            AppendUserMessage(question);
-
-            var response = await AiApi.AskAsync(new WorkspaceChatRequest(
-                question,
-                BuildChatContextSummary(),
-                WorkspaceState.SelectedEnterprise,
-                WorkspaceState.SelectedFiscalYear)
-            {
-                ConversationHistory = BuildConversationHistory()
-            }).ConfigureAwait(false);
-
-            UpdateChatRuntimeStatus(response.UsedFallback);
-
-            AppendAssistantMessage(response.Answer);
-            chatPrompts.Add(new AssistViewPrompt
-            {
-                Prompt = question,
-                Response = response.Answer,
-                IsResponseHelpful = null
-            });
-            ChatAnswer = response.Answer;
-            CurrentUserLabel = string.IsNullOrWhiteSpace(response.UserDisplayName) ? CurrentUserLabel : response.UserDisplayName;
-            CurrentProfileSummary = string.IsNullOrWhiteSpace(response.UserProfileSummary) ? CurrentProfileSummary : response.UserProfileSummary;
-            CurrentConversationLabel = !string.IsNullOrWhiteSpace(response.ConversationId)
-                ? $"Conversation {response.ConversationId} ({response.ConversationMessageCount} messages)"
-                : CurrentConversationLabel;
-
-            await LoadRecommendationHistoryAsync().ConfigureAwait(false);
-
-            if (args is not null)
-            {
-                args.Response = response.Answer;
-            }
-
-            ChatQuestion = string.Empty;
-        }
-        catch (Exception ex)
-        {
-            IsChatFallbackActive = true;
-            ChatRuntimeStatusTitle = "AI runtime unavailable";
-            ChatRuntimeStatusDetail = $"Jarvis reached the panel, but the server did not return a usable AI response. {ex.Message}";
-            ChatAnswer = ex.Message;
-            AppendAssistantMessage(ex.Message);
-            if (args is not null)
-            {
-                args.Response = ex.Message;
-            }
-        }
-        finally
-        {
-            IsChatBusy = false;
-            await InvokeAsync(StateHasChanged);
-        }
+        await ExecuteChatOperationAsync(
+            () => BeginChatSubmission(question),
+            () => SubmitPromptCoreAsync(question, args),
+            ex => HandleChatSubmissionFailure(ex, args),
+            EndChatSubmission);
     }
 
     private string GetStatusText()
@@ -266,92 +172,30 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     private async Task RefreshKnowledgeAsync(bool force = false)
     {
         var fingerprint = BuildKnowledgeFingerprint();
-        if (!force && string.Equals(lastKnowledgeFingerprint, fingerprint, StringComparison.Ordinal))
+        if (TryHandleKnowledgeRefreshPreconditions(force, fingerprint, out var knowledgeApi))
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(WorkspaceState.SelectedEnterprise) || WorkspaceState.SelectedFiscalYear <= 0)
-        {
-            lastKnowledgeFingerprint = fingerprint;
-            workspaceKnowledge = null;
-            ApplyFallbackKnowledge("Select an enterprise and fiscal year to load live workspace guidance.");
-            return;
-        }
-
-        var knowledgeApi = ServiceProvider.GetService<WorkspaceKnowledgeApiService>();
-        if (knowledgeApi is null)
-        {
-            lastKnowledgeFingerprint = fingerprint;
-            workspaceKnowledge = null;
-            ApplyFallbackKnowledge("Live guidance unavailable: Workspace knowledge service is not registered for this host.");
-            return;
-        }
-
-        try
-        {
-            IsKnowledgeBusy = true;
-            KnowledgeStatus = "Refreshing live workspace guidance...";
-            await InvokeAsync(StateHasChanged);
-
-            var knowledge = await knowledgeApi.GetAsync(new WorkspaceKnowledgeRequest(WorkspaceState.ToBootstrapData())).ConfigureAwait(false);
-            workspaceKnowledge = knowledge;
-            lastKnowledgeFingerprint = fingerprint;
-            ApplyKnowledge(knowledge);
-        }
-        catch (Exception ex)
-        {
-            workspaceKnowledge = null;
-            lastKnowledgeFingerprint = fingerprint;
-            ApplyFallbackKnowledge($"Live guidance unavailable: {ex.Message}");
-        }
-        finally
-        {
-            IsKnowledgeBusy = false;
-            await InvokeAsync(StateHasChanged);
-        }
+        await ExecuteChatOperationAsync(
+            BeginKnowledgeRefresh,
+            () => RefreshKnowledgeCoreAsync(knowledgeApi!, fingerprint),
+            ex => HandleKnowledgeRefreshFailure(ex, fingerprint),
+            EndKnowledgeRefresh);
     }
 
     private string BuildKnowledgeFingerprint()
     {
-        var snapshot = WorkspaceState.ToBootstrapData();
-        var scenarioCostTotal = snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m;
-        var scenarioCount = snapshot.ScenarioItems?.Count ?? 0;
-
-        return string.Join("|",
-            snapshot.SelectedEnterprise,
-            snapshot.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture),
-            snapshot.CurrentRate?.ToString(CultureInfo.InvariantCulture) ?? "0",
-            snapshot.TotalCosts?.ToString(CultureInfo.InvariantCulture) ?? "0",
-            snapshot.ProjectedVolume?.ToString(CultureInfo.InvariantCulture) ?? "0",
-            scenarioCostTotal.ToString(CultureInfo.InvariantCulture),
-            scenarioCount.ToString(CultureInfo.InvariantCulture));
+        return string.Join("|", BuildKnowledgeFingerprintParts(WorkspaceState.ToBootstrapData()));
     }
 
     private void ApplyKnowledge(WorkspaceKnowledgeResponse knowledge)
     {
         StatusText = knowledge.OperationalStatus;
         PrimaryBrief = knowledge.ExecutiveSummary;
-        Insights = knowledge.Insights
-            .Select(item => new InsightCard(item.Label, item.Value, item.Description))
-            .ToArray();
-        RecommendedActions = knowledge.RecommendedActions
-            .Select(item => new RecommendationItem(
-                string.IsNullOrWhiteSpace(item.Priority) ? item.Title : $"{item.Title} ({item.Priority})",
-                item.Description))
-            .ToArray();
-
-        if (Insights.Count == 0)
-        {
-            Insights = BuildInsights();
-        }
-
-        if (RecommendedActions.Count == 0)
-        {
-            RecommendedActions = BuildRecommendations();
-        }
-
-        KnowledgeStatus = $"Live guidance refreshed {FormatGeneratedAt(knowledge.GeneratedAtUtc)}.";
+        ApplyKnowledgeInsights(knowledge);
+        ApplyKnowledgeRecommendations(knowledge);
+        UpdateKnowledgeStatus(knowledge.GeneratedAtUtc);
     }
 
     private void ApplyFallbackKnowledge(string status)
@@ -446,72 +290,408 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
     private IReadOnlyList<InsightCard> BuildInsights()
     {
-        var adjustedBreakEven = WorkspaceState.AdjustedRecommendedRate;
-        var rateGap = adjustedBreakEven - WorkspaceState.CurrentRate;
-        var customerCount = WorkspaceState.FilteredCustomerCount;
-        var firstProjection = WorkspaceState.ProjectionSeries.FirstOrDefault()?.Rate ?? WorkspaceState.CurrentRate;
-        var lastProjection = WorkspaceState.ProjectionSeries.LastOrDefault()?.Rate ?? WorkspaceState.CurrentRate;
-        var projectionDelta = lastProjection - firstProjection;
-
-        return
-        [
-            new InsightCard(
-                "Rate gap",
-                rateGap.ToString("C2"),
-                rateGap > 0 ? "Positive values indicate the rate is below the adjusted break-even target." : "Negative values indicate coverage above the adjusted break-even target."),
-            new InsightCard(
-                "Scenario pressure",
-                WorkspaceState.ScenarioCostTotal.ToString("C0"),
-                "Combined impact of all active scenario items on the current workspace."),
-            new InsightCard(
-                "Customer scope",
-                customerCount.ToString(),
-                "Filtered customer records currently contributing to the viewer and service mix review."),
-            new InsightCard(
-                "Projection drift",
-                projectionDelta.ToString("C2"),
-                "Difference between the first and last projected rates in the trend series.")
+        return [
+            CreateRateGapInsight(),
+            CreateScenarioPressureInsight(),
+            CreateCustomerScopeInsight(),
+            CreateProjectionDriftInsight()
         ];
     }
 
     private List<RecommendationItem> BuildRecommendations()
     {
         var recommendations = new List<RecommendationItem>();
+        AddRateGapRecommendation(recommendations);
+        AddScenarioRecommendation(recommendations);
+        AddCustomerMixRecommendation(recommendations);
+        return recommendations;
+    }
+
+    private static IEnumerable<string> BuildKnowledgeFingerprintParts(WorkspaceBootstrapData snapshot)
+    {
+        return [
+            snapshot.SelectedEnterprise ?? string.Empty,
+            GetFingerprintSelectedFiscalYear(snapshot),
+            GetFingerprintCurrentRate(snapshot),
+            GetFingerprintTotalCosts(snapshot),
+            GetFingerprintProjectedVolume(snapshot),
+            GetFingerprintScenarioCostTotal(snapshot),
+            GetFingerprintScenarioCount(snapshot)
+        ];
+    }
+
+    private void ApplyKnowledgeInsights(WorkspaceKnowledgeResponse knowledge)
+    {
+        Insights = knowledge.Insights
+            .Select(item => new InsightCard(item.Label, item.Value, item.Description))
+            .ToArray();
+
+        if (Insights.Count == 0)
+        {
+            Insights = BuildInsights();
+        }
+    }
+
+    private void ApplyKnowledgeRecommendations(WorkspaceKnowledgeResponse knowledge)
+    {
+        RecommendedActions = knowledge.RecommendedActions
+            .Select(item => new RecommendationItem(
+                string.IsNullOrWhiteSpace(item.Priority) ? item.Title : $"{item.Title} ({item.Priority})",
+                item.Description))
+            .ToArray();
+
+        if (RecommendedActions.Count == 0)
+        {
+            RecommendedActions = BuildRecommendations();
+        }
+    }
+
+    private void UpdateKnowledgeStatus(string generatedAtUtc)
+    {
+        KnowledgeStatus = $"Live guidance refreshed {FormatGeneratedAt(generatedAtUtc)}.";
+    }
+
+    private InsightCard CreateRateGapInsight()
+    {
         var adjustedBreakEven = WorkspaceState.AdjustedRecommendedRate;
         var rateGap = adjustedBreakEven - WorkspaceState.CurrentRate;
+
+        return new InsightCard(
+            "Rate gap",
+            rateGap.ToString("C2"),
+            rateGap > 0 ? "Positive values indicate the rate is below the adjusted break-even target." : "Negative values indicate coverage above the adjusted break-even target.");
+    }
+
+    private InsightCard CreateScenarioPressureInsight()
+    {
+        return new InsightCard(
+            "Scenario pressure",
+            WorkspaceState.ScenarioCostTotal.ToString("C0"),
+            "Combined impact of all active scenario items on the current workspace.");
+    }
+
+    private InsightCard CreateCustomerScopeInsight()
+    {
+        return new InsightCard(
+            "Customer scope",
+            WorkspaceState.FilteredCustomerCount.ToString(),
+            "Filtered customer records currently contributing to the viewer and service mix review.");
+    }
+
+    private InsightCard CreateProjectionDriftInsight() => new(
+        "Projection drift",
+        GetProjectionDrift().ToString("C2"),
+        "Difference between the first and last projected rates in the trend series.");
+
+    private void AddRateGapRecommendation(List<RecommendationItem> recommendations)
+    {
+        var rateGap = WorkspaceState.AdjustedRecommendedRate - WorkspaceState.CurrentRate;
 
         if (rateGap > 0)
         {
             recommendations.Add(new RecommendationItem(
                 "Close the modeled rate gap",
                 $"Increase the working rate by {rateGap:C2} or offset the same amount through cost reductions before finalizing the scenario."));
-        }
-        else
-        {
-            recommendations.Add(new RecommendationItem(
-                "Preserve current coverage",
-                "The current rate meets or exceeds the adjusted break-even target. Validate reserve and customer-impact policy before locking it in."));
+            return;
         }
 
+        recommendations.Add(new RecommendationItem(
+            "Preserve current coverage",
+            "The current rate meets or exceeds the adjusted break-even target. Validate reserve and customer-impact policy before locking it in."));
+    }
+
+    private void AddScenarioRecommendation(List<RecommendationItem> recommendations)
+    {
         if (WorkspaceState.ScenarioItems.Count == 0)
         {
             recommendations.Add(new RecommendationItem(
                 "Add at least one scenario stressor",
                 "Capture a capital, labor, or reserve adjustment so the recommendation reflects non-base operating pressure."));
-        }
-        else
-        {
-            recommendations.Add(new RecommendationItem(
-                "Persist the active scenario",
-                "Save the current scenario state to Aurora so the adjusted recommendation is auditable and reproducible."));
+            return;
         }
 
         recommendations.Add(new RecommendationItem(
+            "Persist the active scenario",
+            "Save the current scenario state to Aurora so the adjusted recommendation is auditable and reproducible."));
+    }
+
+    private static void AddCustomerMixRecommendation(List<RecommendationItem> recommendations)
+    {
+        recommendations.Add(new RecommendationItem(
             "Review filtered customer mix",
             "Validate that customer filters reflect the service population you expect before using the workspace outputs in a production rate packet."));
-
-        return recommendations;
     }
+
+    private void BeginChatSubmission(string question)
+    {
+        IsChatBusy = true;
+        ChatQuestion = question;
+    }
+
+    private async Task SubmitPromptCoreAsync(string question, AssistViewPromptRequestedEventArgs? args)
+    {
+        AppendUserMessage(question);
+
+        var response = await AiApi.AskAsync(BuildChatRequest(question)).ConfigureAwait(false);
+        UpdateChatRuntimeStatus(response.UsedFallback);
+
+        ApplyPromptResponse(question, response, args);
+        await LoadRecommendationHistoryAsync().ConfigureAwait(false);
+    }
+
+    private WorkspaceChatRequest BuildChatRequest(string question)
+    {
+        return new WorkspaceChatRequest(
+            question,
+            BuildChatContextSummary(),
+            WorkspaceState.SelectedEnterprise,
+            WorkspaceState.SelectedFiscalYear)
+        {
+            ConversationHistory = BuildConversationHistory()
+        };
+    }
+
+    private void ApplyPromptResponse(string question, WorkspaceChatResponse response, AssistViewPromptRequestedEventArgs? args)
+    {
+        AppendPromptTranscript(question, response);
+        ApplyPromptAnswer(response);
+        ApplyPromptProfile(response);
+        ApplyPromptConversation(response);
+        ApplyPromptResponseArgument(response, args);
+        ChatQuestion = string.Empty;
+    }
+
+    private void HandleChatSubmissionFailure(Exception ex, AssistViewPromptRequestedEventArgs? args)
+    {
+        IsChatFallbackActive = true;
+        ChatRuntimeStatusTitle = "AI runtime unavailable";
+        ChatRuntimeStatusDetail = $"Jarvis reached the panel, but the server did not return a usable AI response. {ex.Message}";
+        ChatAnswer = ex.Message;
+        AppendAssistantMessage(ex.Message);
+
+        if (args is not null)
+        {
+            args.Response = ex.Message;
+        }
+    }
+
+    private void EndChatSubmission()
+    {
+        IsChatBusy = false;
+    }
+
+    private void BeginKnowledgeRefresh()
+    {
+        IsKnowledgeBusy = true;
+        KnowledgeStatus = "Refreshing live workspace guidance...";
+    }
+
+    private async Task RefreshKnowledgeCoreAsync(WorkspaceKnowledgeApiService knowledgeApi, string fingerprint)
+    {
+        var knowledge = await knowledgeApi.GetAsync(new WorkspaceKnowledgeRequest(WorkspaceState.ToBootstrapData())).ConfigureAwait(false);
+        workspaceKnowledge = knowledge;
+        lastKnowledgeFingerprint = fingerprint;
+        ApplyKnowledge(knowledge);
+    }
+
+    private void ApplyKnowledgeFallback(string status, string fingerprint)
+    {
+        workspaceKnowledge = null;
+        lastKnowledgeFingerprint = fingerprint;
+        ApplyFallbackKnowledge(status);
+    }
+
+    private void HandleKnowledgeRefreshFailure(Exception ex, string fingerprint)
+    {
+        ApplyKnowledgeFallback($"Live guidance unavailable: {ex.Message}", fingerprint);
+    }
+
+    private void EndKnowledgeRefresh()
+    {
+        IsKnowledgeBusy = false;
+    }
+
+    private bool ShouldSkipKnowledgeRefresh(bool force, string fingerprint)
+    {
+        return !force && string.Equals(lastKnowledgeFingerprint, fingerprint, StringComparison.Ordinal);
+    }
+
+    private bool TryHandleKnowledgeRefreshPreconditions(bool force, string fingerprint, out WorkspaceKnowledgeApiService? knowledgeApi)
+    {
+        knowledgeApi = null;
+
+        if (ShouldSkipKnowledgeRefresh(force, fingerprint))
+        {
+            return true;
+        }
+
+        if (TryApplyKnowledgeFallbackForMissingSelection(fingerprint))
+        {
+            return true;
+        }
+
+        return TryHandleMissingKnowledgeApiService(fingerprint, out knowledgeApi);
+    }
+
+    private bool TryHandleMissingKnowledgeApiService(string fingerprint, out WorkspaceKnowledgeApiService? knowledgeApi)
+    {
+        if (TryGetKnowledgeApiService(out knowledgeApi))
+        {
+            return false;
+        }
+
+        ApplyKnowledgeFallback("Live guidance unavailable: Workspace knowledge service is not registered for this host.", fingerprint);
+        return true;
+    }
+
+    private bool TryApplyKnowledgeFallbackForMissingSelection(string fingerprint)
+    {
+        if (!string.IsNullOrWhiteSpace(WorkspaceState.SelectedEnterprise) && WorkspaceState.SelectedFiscalYear > 0)
+        {
+            return false;
+        }
+
+        ApplyKnowledgeFallback("Select an enterprise and fiscal year to load live workspace guidance.", fingerprint);
+        return true;
+    }
+
+    private bool TryGetKnowledgeApiService(out WorkspaceKnowledgeApiService? knowledgeApi)
+    {
+        knowledgeApi = ServiceProvider.GetService<WorkspaceKnowledgeApiService>();
+        return knowledgeApi is not null;
+    }
+
+    private void AppendPromptTranscript(string question, WorkspaceChatResponse response)
+    {
+        AppendAssistantMessage(response.Answer);
+        chatPrompts.Add(new AssistViewPrompt
+        {
+            Prompt = question,
+            Response = response.Answer,
+            IsResponseHelpful = null
+        });
+    }
+
+    private void ApplyPromptAnswer(WorkspaceChatResponse response)
+    {
+        ChatAnswer = response.Answer;
+    }
+
+    private void ApplyPromptProfile(WorkspaceChatResponse response)
+    {
+        CurrentUserLabel = string.IsNullOrWhiteSpace(response.UserDisplayName) ? CurrentUserLabel : response.UserDisplayName;
+        CurrentProfileSummary = string.IsNullOrWhiteSpace(response.UserProfileSummary) ? CurrentProfileSummary : response.UserProfileSummary;
+    }
+
+    private void ApplyPromptConversation(WorkspaceChatResponse response)
+    {
+        CurrentConversationLabel = !string.IsNullOrWhiteSpace(response.ConversationId)
+            ? $"Conversation {response.ConversationId} ({response.ConversationMessageCount} messages)"
+            : CurrentConversationLabel;
+    }
+
+    private void ApplyPromptResponseArgument(WorkspaceChatResponse response, AssistViewPromptRequestedEventArgs? args)
+    {
+        if (args is not null)
+        {
+            args.Response = response.Answer;
+        }
+    }
+
+    private decimal GetFirstProjectionRateValue()
+    {
+        return WorkspaceState.ProjectionSeries.FirstOrDefault()?.Rate ?? WorkspaceState.CurrentRate;
+    }
+
+    private decimal GetLastProjectionRateValue()
+    {
+        return WorkspaceState.ProjectionSeries.LastOrDefault()?.Rate ?? WorkspaceState.CurrentRate;
+    }
+
+    private async Task ExecuteChatOperationAsync(Action begin, Func<Task> operation, Action<Exception> handleFailure, Action complete)
+    {
+        begin();
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await operation().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            handleFailure(ex);
+        }
+        finally
+        {
+            complete();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void BeginChatReset()
+    {
+        IsChatBusy = true;
+    }
+
+    private async Task ResetChatCoreAsync()
+    {
+        await AiApi.ResetConversationAsync(new WorkspaceConversationResetRequest(
+            BuildChatContextSummary(),
+            WorkspaceState.SelectedEnterprise,
+            WorkspaceState.SelectedFiscalYear)).ConfigureAwait(false);
+
+        chatTranscript.Clear();
+        chatPrompts.Clear();
+        recommendationHistory.Clear();
+        ChatAnswer = "Jarvis thread reset for the current workspace context.";
+        CurrentConversationLabel = "Local session";
+        CurrentProfileSummary = "Jarvis will ask a few setup questions on first contact.";
+        ChatQuestion = string.Empty;
+    }
+
+    private void HandleChatResetFailure(Exception ex)
+    {
+        ChatAnswer = ex.Message;
+    }
+
+    private void EndChatReset()
+    {
+        IsChatBusy = false;
+    }
+
+    private static string GetFingerprintSelectedFiscalYear(WorkspaceBootstrapData snapshot)
+    {
+        return snapshot.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string GetFingerprintCurrentRate(WorkspaceBootstrapData snapshot)
+    {
+        return snapshot.CurrentRate?.ToString(CultureInfo.InvariantCulture) ?? "0";
+    }
+
+    private static string GetFingerprintTotalCosts(WorkspaceBootstrapData snapshot)
+    {
+        return snapshot.TotalCosts?.ToString(CultureInfo.InvariantCulture) ?? "0";
+    }
+
+    private static string GetFingerprintProjectedVolume(WorkspaceBootstrapData snapshot)
+    {
+        return snapshot.ProjectedVolume?.ToString(CultureInfo.InvariantCulture) ?? "0";
+    }
+
+    private static string GetFingerprintScenarioCostTotal(WorkspaceBootstrapData snapshot)
+    {
+        var scenarioCostTotal = snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m;
+        return scenarioCostTotal.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string GetFingerprintScenarioCount(WorkspaceBootstrapData snapshot)
+    {
+        var scenarioCount = snapshot.ScenarioItems?.Count ?? 0;
+        return scenarioCount.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private decimal GetProjectionDrift() => GetLastProjectionRateValue() - GetFirstProjectionRateValue();
 
     public void Dispose()
     {

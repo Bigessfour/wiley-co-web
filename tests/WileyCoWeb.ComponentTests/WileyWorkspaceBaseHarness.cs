@@ -8,6 +8,7 @@ public sealed class WileyWorkspaceBaseHarness : WileyWorkspaceBase
 {
 	public string BaselineStatus => BaselineSaveStatus;
 	public string SnapshotStatus => SnapshotSaveStatus;
+	public int SavedScenarioCount => SavedScenarios.Count;
 	public string WorkspaceStatus => WorkspaceLoadStatus;
 	public string ScenarioStatus => ScenarioPersistenceStatus;
 

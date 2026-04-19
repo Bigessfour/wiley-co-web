@@ -74,6 +74,8 @@
   <ItemGroup>
     <Compile Include="QuickBooksImportService.cs" />
     <Compile Include="QuickBooksImportAssistantService.cs" />
+    <Compile Include="QuickBooksCsvParser.cs" />
+    <Compile Include="QuickBooksExcelParser.cs" />
     <Compile Include="..\..\Contracts\QuickBooksImportContracts.cs" Link="Contracts\QuickBooksImportContracts.cs" />
     <Compile Include="..\..\Contracts\WorkspaceChatContracts.cs" Link="Contracts\WorkspaceChatContracts.cs" />
   </ItemGroup>
