@@ -4,7 +4,7 @@
 @using Syncfusion.Blazor.Inputs
 @using WileyCoWeb.State
 
-<div id="rates-panel" class="space-y-4">
+<div id="rates-panel" aria-busy="@IsSavingSnapshot" class="space-y-4">
     <div id="rates-kpi-grid" class="grid gap-4 md:grid-cols-2">
         <SfCard>
             <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
@@ -18,10 +18,12 @@
 
     <div id="rates-input-chart-grid" class="grid gap-4 md:grid-cols-2">
         <div class="space-y-2">
-            <SfNumericTextBox ID="current-rate-input" TValue="decimal" Value="@CurrentRate" ValueChange="OnCurrentRateChanged" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Width="100%" Format="C2" />
+            <SfNumericTextBox ID="current-rate-input" TValue="decimal" Value="@CurrentRate" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Auto" ShowSpinButton="false" Min="0m" Step="0.01m" Width="100%" Format="C2">
+                <NumericTextBoxEvents TValue="decimal" ValueChange="OnCurrentRateChanged" />
+            </SfNumericTextBox>
             <p class="text-xs text-slate-500">Validated numeric rate editing updates the workspace instantly and keeps the rate panel aligned with the break-even calculation.</p>
         </div>
-        <div id="rates-panel-chart-section">
+        <div id="rates-panel-chart-section" role="img" aria-label="Rate comparison chart showing current rate versus break-even rate">
         <SfChart ID="rates-comparison-chart" Title="Rate Comparison" AccessibilityDescription="Rate comparison chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="220px">
             <ChartArea>
                 <ChartAreaBorder Width="0"></ChartAreaBorder>
@@ -45,7 +47,7 @@
         <SfButton CssClass="e-primary" IsPrimary="true" OnClick="OnSaveRateSnapshot" Disabled="@IsSavingSnapshot">
             @(IsSavingSnapshot ? "Saving..." : "Save rate snapshot")
         </SfButton>
-        <p id="snapshot-save-status" class="text-xs text-slate-500">@SnapshotSaveStatus</p>
+        <p id="snapshot-save-status" role="status" aria-live="polite" class="text-xs text-slate-500">@SnapshotSaveStatus</p>
     </div>
 </div>
 

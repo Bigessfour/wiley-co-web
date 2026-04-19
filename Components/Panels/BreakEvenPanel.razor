@@ -28,27 +28,32 @@
     <div id="break-even-input-row" class="grid gap-4 md:grid-cols-2">
         <SfNumericTextBox TValue="decimal"
                           Value="@TotalCosts"
-                          ValueChange="OnTotalCostsChanged"
                           Placeholder="Total Costs"
                           FloatLabelType="FloatLabelType.Auto"
                           ShowSpinButton="false"
+                          Min="0"
                           Width="100%"
-                          Format="C0" />
+                          Format="C0">
+            <NumericTextBoxEvents TValue="decimal" ValueChange="OnTotalCostsChanged" />
+        </SfNumericTextBox>
         <SfNumericTextBox TValue="decimal"
                           Value="@ProjectedVolume"
-                          ValueChange="OnProjectedVolumeChanged"
                           Placeholder="Projected Volume"
                           FloatLabelType="FloatLabelType.Auto"
                           ShowSpinButton="false"
+                          Min="0"
+                          Step="1"
                           Width="100%"
-                          Format="N0" />
+                          Format="N0">
+            <NumericTextBoxEvents TValue="decimal" ValueChange="OnProjectedVolumeChanged" />
+        </SfNumericTextBox>
     </div>
 
     <div id="break-even-actions" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="OnSaveWorkspaceBaseline">
             @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
         </SfButton>
-        <p id="baseline-save-status" class="text-xs text-slate-500">@BaselineSaveStatus</p>
+        <p id="baseline-save-status" role="status" aria-live="polite" class="text-xs text-slate-500">@BaselineSaveStatus</p>
     </div>
 
     <div class="grid gap-4 xl:grid-cols-[1fr_1.4fr]">

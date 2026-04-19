@@ -3,8 +3,8 @@
 @using Syncfusion.Blazor.Inputs
 @using WileyCoWeb.State
 
-<div id="scenario-panel" class="space-y-4">
-    <div class="grid gap-4 md:grid-cols-2">
+<div id="scenario-panel" class="space-y-4" aria-live="polite">
+    <div class="grid gap-4 md:grid-cols-2" role="group" aria-label="Scenario summary metrics">
         <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" Placeholder="Scenario Adjusted Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
         <SfNumericTextBox TValue="decimal" Value="@ScenarioCostTotal" Enabled="false" Placeholder="Scenario Cost Total" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C0" />
         <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedDelta" Enabled="false" Placeholder="Scenario Delta" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
@@ -31,7 +31,8 @@
     </div>
 
     <div class="space-y-3">
-        <SfGrid ID="scenario-grid" TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420" OnActionComplete="OnScenarioGridActionComplete">
+        <SfGrid ID="scenario-grid" TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420">
+            <GridEvents TValue="ScenarioItem" OnActionComplete="OnScenarioGridActionComplete" />
             <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
             <GridColumns>
                 <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
@@ -39,7 +40,7 @@
                 <GridColumn Field=@nameof(ScenarioItem.Cost) HeaderText="Cost" Format="C0" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
             </GridColumns>
         </SfGrid>
-        <p class="text-xs text-slate-500">Scenario edits update the workspace draft immediately. Use Save scenario in the sidebar to persist the current scenario to Aurora.</p>
+        <p id="scenario-edit-status" role="status" aria-live="polite" class="text-xs text-slate-500">Scenario edits update the workspace draft immediately. Use Save scenario in the sidebar to persist the current scenario to Aurora.</p>
     </div>
 </div>
 

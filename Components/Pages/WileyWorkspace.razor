@@ -78,12 +78,17 @@
                         <CardHeader Title="Enterprise Context" SubTitle="Select the active service and fiscal year" />
                         <CardContent>
                             <div class="space-y-4">
-                                <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" ValueChange="HandleEnterpriseChanged" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-                                <SfDropDownList ID="fiscal-year-select" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" ValueChange="HandleFiscalYearChanged" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" />
+                                <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%">
+                                    <DropDownListEvents TValue="string" TItem="string" ValueChange="HandleEnterpriseChanged" />
+                                </SfDropDownList>
+                                <SfDropDownList ID="fiscal-year-select" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%">
+                                    <DropDownListEvents TValue="int" TItem="int" ValueChange="HandleFiscalYearChanged" />
+                                </SfDropDownList>
                                 <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
                                 <SfTextBox Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
-                                <SfDropDownList TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" ValueChange="HandleSavedScenarioChanged" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
+                                <SfDropDownList TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
                                     <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
+                                    <DropDownListEvents TValue="long?" TItem="WorkspaceScenarioSummaryResponse" ValueChange="HandleSavedScenarioChanged" />
                                 </SfDropDownList>
                             </div>
                         </CardContent>

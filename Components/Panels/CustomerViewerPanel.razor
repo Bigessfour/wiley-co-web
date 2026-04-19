@@ -7,7 +7,7 @@
 @using Syncfusion.Blazor.Popups
 @using WileyCoWeb.Contracts
 
-<div id="customer-viewer-panel" class="space-y-4">
+<div id="customer-viewer-panel" aria-busy="@IsBusy()" class="space-y-4">
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SfCard>
             <CardHeader Title="Visible Customers" SubTitle="@GetLiveFilteredCustomerCountDisplay()" />
@@ -34,7 +34,7 @@
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-        <div id="customer-directory-status" class="text-sm text-slate-600">
+        <div id="customer-directory-status" role="status" aria-live="polite" class="text-sm text-slate-600">
             <span class="font-semibold text-slate-700">Directory status:</span> @GetCustomerDirectoryStatus()
         </div>
         <div class="flex flex-wrap gap-2">
@@ -46,7 +46,7 @@
 
     @if (HasApiFeedback())
     {
-        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert" aria-live="polite">
             <div class="font-semibold">@GetCustomerApiError()</div>
             @if (GetValidationSummaryItems().Count > 0)
             {
@@ -60,7 +60,7 @@
         </div>
     }
 
-    <div>
+    <div aria-busy="@IsBusy()">
         <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
             <GridPageSettings PageSize="10" PageCount="5" />
             <GridColumns>
@@ -90,7 +90,7 @@
 
     @if (IsEditorDialogOpen())
     {
-        <SfDialog Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="false" AllowDragging="true" Visible="true">
+        <SfDialog Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true">
             <DialogTemplates>
                 <Header>@GetEditorDialogTitle()</Header>
                 <Content>
@@ -199,7 +199,7 @@
 
     @if (IsDeleteDialogOpen() && GetPendingDeleteCustomer() is not null)
     {
-        <SfDialog Width="28rem" IsModal="true" ShowCloseIcon="false" AllowDragging="false" Visible="true">
+        <SfDialog Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true">
             <DialogTemplates>
                 <Header>Delete Customer</Header>
                 <Content>

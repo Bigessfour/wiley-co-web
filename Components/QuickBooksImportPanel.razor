@@ -19,7 +19,7 @@
 <SfCard CssClass="h-full">
     <CardHeader Title="QuickBooks Import" SubTitle="Clerk-facing CSV/XLSX intake with preview, duplicate checks, and commit confirmation." />
     <CardContent>
-        <div id="quickbooks-import-drop-area" class="space-y-4">
+        <div id="quickbooks-import-drop-area" aria-busy="@IsBusy" class="space-y-4">
             <SfProgressBar Type="ProgressType.Linear"
                            Value="@ImportProgress"
                            Maximum="100"
@@ -71,12 +71,12 @@
                         </SfCard>
                     </div>
 
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite">
                         <div id="quickbooks-import-status-headline" class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">@StatusHeadline</div>
                         <div id="quickbooks-import-status-message" class="mt-1 whitespace-pre-line">@StatusMessage</div>
                     </div>
 
-                    <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="grid gap-3 sm:grid-cols-3" aria-busy="@IsBusy">
                         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAnalyze)" OnClick="LoadPreviewAsync">Analyze file</SfButton>
                         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanCommit || IsBusy)" OnClick="OpenCommitDialogAsync">Commit import</SfButton>
                         <SfButton Disabled="@IsBusy" OnClick="ClearSelectionAsync">Reset panel</SfButton>
@@ -96,7 +96,7 @@
                                     <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskAssistant)" OnClick="AskAssistantAsync">Ask assistant</SfButton>
                                     <SfButton Disabled="@IsAskingAssistant" OnClick="ClearAssistantAsync">Clear answer</SfButton>
                                 </div>
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite" aria-busy="@IsAskingAssistant">
                                     <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Context</p>
                                     <p id="quickbooks-assistant-context-summary" class="mt-1 text-slate-900">@AssistantContextSummary</p>
                                     <p id="quickbooks-assistant-answer" class="mt-3 whitespace-pre-line">@AssistantAnswer</p>

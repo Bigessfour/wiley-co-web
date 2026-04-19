@@ -40,7 +40,7 @@
 
     @* ─── CIRCULAR GAUGES ────────────────────────────────────────────────────── *@
     <div class="grid gap-4 md:grid-cols-2">
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" role="img" aria-label="Coverage ratio gauge showing revenue divided by costs">
             <p class="mb-1 text-sm font-semibold text-slate-700">Coverage Ratio</p>
             <p class="mb-2 text-xs text-slate-500">Revenue ÷ Costs · Target ≥ 1.25×</p>
             <SfCircularGauge ID="coverage-ratio-gauge"
@@ -67,7 +67,7 @@
                 </CircularGaugeAxes>
             </SfCircularGauge>
         </div>
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" role="img" aria-label="Rate adequacy gauge showing current rate versus break-even rate">
             <p class="mb-1 text-sm font-semibold text-slate-700">Rate Adequacy</p>
             <p class="mb-2 text-xs text-slate-500">Current ÷ Break-Even · Target ≥ 100%</p>
             <SfCircularGauge ID="rate-adequacy-gauge"
@@ -102,6 +102,7 @@
         <div id="rate-comparison-section" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="mb-3 text-sm font-semibold text-slate-700">Rate Comparison</p>
             <SfChart ID="budget-variance-chart"
+                     AccessibilityDescription="Bar chart showing the rate comparison values used in the executive dashboard."
                      Width="100%"
                      Height="300px"
                      Background="transparent">
@@ -138,6 +139,7 @@
         <div id="waterfall-section" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="mb-3 text-sm font-semibold text-slate-700">Scenario Cost Waterfall</p>
             <SfChart ID="scenario-waterfall-chart"
+                     AccessibilityDescription="Waterfall chart showing how scenario costs build toward the final rate impact."
                      Width="100%"
                      Height="300px"
                      Background="transparent">
@@ -176,6 +178,7 @@
         <div id="rate-trend-section" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="mb-3 text-sm font-semibold text-slate-700">Rate Trend &amp; Projection</p>
             <SfChart ID="rate-trend-chart"
+                     AccessibilityDescription="Line chart showing the historical and projected rate trend."
                      Width="100%"
                      Height="300px"
                      Background="transparent">
@@ -213,7 +216,7 @@
     @if (CustomersByService.Count > 0 || CustomersByCityLimits.Count > 0)
     {
         <div id="customer-donuts-section" class="grid gap-4 md:grid-cols-2">
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" role="img" aria-label="Customers by service type donut chart">
                 <p class="mb-3 text-sm font-semibold text-slate-700">Customers by Service Type</p>
                 <SfAccumulationChart ID="customer-service-chart"
                                      EnableAnimation="true"
@@ -239,7 +242,7 @@
                     </AccumulationChartSeriesCollection>
                 </SfAccumulationChart>
             </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" role="img" aria-label="Customers by city limits donut chart">
                 <p class="mb-3 text-sm font-semibold text-slate-700">Customers by City Limits</p>
                 <SfAccumulationChart ID="customer-citylimits-chart"
                                      EnableAnimation="true"

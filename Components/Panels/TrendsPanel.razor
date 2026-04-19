@@ -2,8 +2,8 @@
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 
-<div id="trends-panel" class="space-y-4">
-    <div id="trends-chart-region">
+<div id="trends-panel" class="space-y-4" aria-label="Historical and projected rates trend panel">
+    <div id="trends-chart-region" role="img" aria-label="Projected rate trend chart">
     <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="560px">
         <ChartArea>
             <ChartAreaBorder Width="0"></ChartAreaBorder>
