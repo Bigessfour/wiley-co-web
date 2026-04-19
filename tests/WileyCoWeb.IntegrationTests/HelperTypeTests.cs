@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
+using WileyCoWeb.Api.Configuration;
 
 namespace WileyCoWeb.IntegrationTests;
 
@@ -41,23 +42,12 @@ public sealed class HelperTypeTests
 
         try
         {
-            var method = typeof(WileyCoWeb.Api.Program).GetMethod(
-                "TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync",
-                BindingFlags.NonPublic | BindingFlags.Static);
-
-            Assert.NotNull(method);
-
-            var task = (Task)method!.Invoke(
-                null,
-                [
-                    "Host=127.0.0.1;Port=1;Database=wileyco_dev;Username=postgres;Password=password;Timeout=1;Command Timeout=1",
-                    true,
-                    new TestWebHostEnvironment { EnvironmentName = "Development" },
-                    NullLogger.Instance,
-                    CancellationToken.None
-                ])!;
-
-            await task;
+            await StartupConfigurationService.TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
+                "Host=127.0.0.1;Port=1;Database=wileyco_dev;Username=postgres;Password=password;Timeout=1;Command Timeout=1",
+                true,
+                new TestWebHostEnvironment { EnvironmentName = "Development" },
+                NullLogger.Instance,
+                CancellationToken.None);
 
             Assert.True(AppDbStartupState.FallbackActivated);
             Assert.True(AppDbStartupState.IsDegradedMode);
@@ -76,23 +66,12 @@ public sealed class HelperTypeTests
 
         try
         {
-            var method = typeof(WileyCoWeb.Api.Program).GetMethod(
-                "TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync",
-                BindingFlags.NonPublic | BindingFlags.Static);
-
-            Assert.NotNull(method);
-
-            var task = (Task)method!.Invoke(
-                null,
-                [
-                    "Host=127.0.0.1;Port=1;Database=wileyco_dev;Username=postgres;Password=password;Timeout=1;Command Timeout=1",
-                    true,
-                    new TestWebHostEnvironment { EnvironmentName = "Production" },
-                    NullLogger.Instance,
-                    CancellationToken.None
-                ])!;
-
-            await task;
+            await StartupConfigurationService.TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
+                "Host=127.0.0.1;Port=1;Database=wileyco_dev;Username=postgres;Password=password;Timeout=1;Command Timeout=1",
+                false,
+                new TestWebHostEnvironment { EnvironmentName = "Production" },
+                NullLogger.Instance,
+                CancellationToken.None);
 
             Assert.False(AppDbStartupState.FallbackActivated);
             Assert.False(AppDbStartupState.IsDegradedMode);

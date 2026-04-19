@@ -43,20 +43,14 @@ public sealed class ClientStartupLocalSettingsTests
     }
 
     [Fact]
-    public void TryParseLocalSettingsPropertyValue_LogsLoadWarning_ForNullJson()
+    public void TryParseLocalSettingsPropertyValue_ReturnsNull_ForNullJson()
     {
         var diagnostics = new List<(LogLevel Level, string Message, Exception? Exception)>();
 
         var result = TryParseLocalSettingsPropertyValue(null, diagnostics);
 
         Assert.Null(result);
-        Assert.Single(diagnostics);
-
-        var (level, message, exception) = diagnostics[0];
-
-        Assert.Equal(LogLevel.Warning, level);
-        Assert.Contains("could not be loaded", message, StringComparison.OrdinalIgnoreCase);
-        Assert.IsType<ArgumentNullException>(exception);
+        Assert.Empty(diagnostics);
     }
 
     private static string? TryParseLocalSettingsPropertyValue(

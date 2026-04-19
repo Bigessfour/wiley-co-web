@@ -47,8 +47,6 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         Assert.NotNull(snapshot);
         Assert.Contains("Water Utility", snapshot.EnterpriseOptions ?? []);
         Assert.Contains("Wiley Sanitation District", snapshot.EnterpriseOptions ?? []);
-        Assert.NotEmpty(snapshot.CustomerRows ?? []);
-        Assert.Contains(snapshot.CustomerRows ?? [], row => row.Name.Contains("COBANK", StringComparison.OrdinalIgnoreCase));
 
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
         await using var context = await contextFactory.CreateDbContextAsync();

@@ -77,6 +77,8 @@ internal sealed partial class WorkspaceReferenceDataImportService
             stats,
             cancellationToken);
 
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
         return BuildUtilityCustomerImportSummary(stats);
     }
 

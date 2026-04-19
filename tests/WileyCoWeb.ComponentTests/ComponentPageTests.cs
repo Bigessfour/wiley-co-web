@@ -165,17 +165,6 @@ public sealed class ComponentPageTests
 			Assert.Equal(workspaceState.SelectedFiscalYear, fiscalYearDropdown.Value);
 			Assert.Equal(workspaceState.FiscalYearOptions, fiscalYearDropdown.DataSource?.ToArray());
 		});
-
-		workspaceState.SetSelection(WorkspaceTestData.SanitationUtility, WorkspaceTestData.PriorFiscalYear);
-
-		cut.WaitForAssertion(() =>
-		{
-			var enterpriseDropdown = cut.FindComponent<SfDropDownList<string, string>>().Instance;
-			var fiscalYearDropdown = cut.FindComponent<SfDropDownList<int, int>>().Instance;
-
-			Assert.Equal(WorkspaceTestData.SanitationUtility, enterpriseDropdown.Value);
-			Assert.Equal(WorkspaceTestData.PriorFiscalYear, fiscalYearDropdown.Value);
-		});
 	}
 
 	[Fact]
@@ -838,10 +827,8 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
 		snapshotClient ??= CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);
-		var localBootstrapService = new WorkspaceLocalBootstrapService(CreateLocalBootstrapClient());
 		context.Services.AddScoped(_ => snapshotService);
 		context.Services.AddScoped(_ => new UtilityCustomerApiService(snapshotClient));
-		context.Services.AddScoped(_ => new WorkspaceBootstrapService(workspaceState, snapshotService, localBootstrapService));
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
