@@ -21,15 +21,26 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     await waitForWorkspaceShell(page);
 
-    const documentCenter = page.locator("#workspace-document-center");
+    const documentCenter = page.locator(
+      "#workspace-document-panel_body #workspace-document-center",
+    );
     const exportStatus = documentCenter.locator("div.rounded-xl.bg-slate-50");
     const enterpriseCard = page.locator("#workspace-enterprise-context-card");
     const comboboxes = enterpriseCard.getByRole("combobox");
+    const exportCustomersButton = documentCenter.getByRole("button", {
+      name: "Export customers to Excel",
+    });
+    const exportScenarioButton = documentCenter.getByRole("button", {
+      name: "Export scenario to Excel",
+    });
+    const exportPdfButton = documentCenter.getByRole("button", {
+      name: "Download PDF rate packet",
+    });
 
     await expect(documentCenter).toBeVisible();
-    await expect(page.locator("#export-customers-excel-button")).toBeEnabled();
-    await expect(page.locator("#export-scenario-excel-button")).toBeEnabled();
-    await expect(page.locator("#export-workspace-pdf-button")).toBeEnabled();
+    await expect(exportCustomersButton).toBeEnabled();
+    await expect(exportScenarioButton).toBeEnabled();
+    await expect(exportPdfButton).toBeEnabled();
 
     await expect(enterpriseCard).toBeVisible();
     await expect(comboboxes).toHaveCount(3);
@@ -45,20 +56,44 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       page.getByRole("button", { name: "Apply saved scenario" }),
     ).toBeDisabled();
 
-    await page.locator("#export-customers-excel-button").click();
+    await exportCustomersButton.click();
     await expect(exportStatus).toContainText(
       /Downloaded .*\.xlsx|Export failed:/,
     );
 
-    await page.locator("#export-scenario-excel-button").click();
+    await exportScenarioButton.click();
     await expect(exportStatus).toContainText(
       /Downloaded .*\.xlsx|Export failed:/,
     );
 
-    await page.locator("#export-workspace-pdf-button").click();
+    await exportPdfButton.click();
     await expect(exportStatus).toContainText(
       /Downloaded .*\.pdf|Export failed:/,
     );
+  });
+
+  test("workspace shell keeps the dashboard controls usable below the media-query breakpoint", async ({
+    page,
+  }) => {
+    await page.goto("/wiley-workspace");
+
+    await waitForWorkspaceShell(page);
+    await page.setViewportSize({ width: 1279, height: 900 });
+
+    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+
+    await expect(page.locator("#workspace-dashboard")).toBeVisible();
+    await expect(
+      page.locator("#workspace-document-panel_body #workspace-document-center"),
+    ).toBeVisible();
+    await expect(sidebarToggle).toBeVisible();
+    await expect(page.locator("#workspace-jarvis-launcher")).toBeVisible();
+
+    await sidebarToggle.click();
+    await expect(sidebarToggle).toContainText("Open navigation");
+
+    await page.locator("#workspace-jarvis-launcher").click();
+    await expect(page.locator("#workspace-jarvis-dock")).toBeVisible();
   });
 
   test("customer editor dialog renders Syncfusion form controls", async ({
@@ -169,9 +204,14 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
   test("data dashboard and trends render Syncfusion charts and gauges", async ({
     page,
   }) => {
-    await page.goto("/wiley-workspace/data-dashboard");
+    await page.goto("/wiley-workspace");
 
     await waitForWorkspaceShell(page);
+
+    await page
+      .locator("#workspace-navigation-card")
+      .getByRole("button", { name: "Data Dashboard" })
+      .click();
 
     await expect(page.locator("#data-dashboard-panel")).toBeVisible();
     await expect(page.locator("#kpi-net-position")).toBeVisible();
@@ -181,6 +221,13 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await expect(page.locator("#coverage-ratio-gauge")).toBeVisible();
     await expect(page.locator("#rate-adequacy-gauge")).toBeVisible();
     await expect(page.locator("#budget-variance-chart")).toBeVisible();
+
+    const customerDonutsSection = page.locator("#customer-donuts-section");
+    if (await customerDonutsSection.count()) {
+      await expect(customerDonutsSection).toBeVisible();
+      await expect(page.locator("#customer-service-chart")).toBeVisible();
+      await expect(page.locator("#customer-citylimits-chart")).toBeVisible();
+    }
 
     await page.goto("/wiley-workspace/trends");
 
@@ -233,7 +280,13 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       "Visual snapshots are baselined for chromium only.",
     );
 
-    await gotoWorkspacePanel(page, "/wiley-workspace/data-dashboard");
+    await gotoWorkspacePanel(page, "/wiley-workspace");
+
+    await page
+      .locator("#workspace-navigation-card")
+      .getByRole("button", { name: "Data Dashboard" })
+      .click();
+
     await prepareForVisualSnapshot(page);
 
     await expect(page.locator("#data-dashboard-panel")).toHaveScreenshot(

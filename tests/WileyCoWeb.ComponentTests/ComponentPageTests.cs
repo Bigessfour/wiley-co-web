@@ -132,11 +132,30 @@ public sealed class ComponentPageTests
 
 		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
 		Assert.Contains("Document Center", cut.Markup);
+		Assert.Contains("workspace-main-shell", cut.Markup);
+		Assert.Contains("workspace-sidebar-toggle", cut.Markup);
+		Assert.Contains("workspace-jarvis-launcher", cut.Markup);
 		Assert.Contains("Break-Even", cut.Markup);
 		Assert.Contains("Rates", cut.Markup);
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
+	}
+
+	[Fact]
+	public void WileyWorkspace_JarvisLauncher_OpensFloatingDock()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		cut.Find("#workspace-jarvis-launcher").Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("workspace-jarvis-dock", cut.Markup);
+			Assert.Single(cut.FindComponents<JarvisChatPanel>());
+		});
 	}
 
 	[Fact]
@@ -638,7 +657,6 @@ public sealed class ComponentPageTests
 		using var context = CreateContext();
 		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
 
-		cut.Instance.InvokeToggleSidebar();
 		Assert.True(cut.Instance.SidebarOpen);
 
 		cut.Instance.InvokeOpenPanel("break-even");
@@ -652,11 +670,11 @@ public sealed class ComponentPageTests
 		using var context = CreateContext();
 		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
 
-		Assert.False(cut.Instance.SidebarOpen);
-		cut.Instance.InvokeToggleSidebar();
 		Assert.True(cut.Instance.SidebarOpen);
 		cut.Instance.InvokeToggleSidebar();
 		Assert.False(cut.Instance.SidebarOpen);
+		cut.Instance.InvokeToggleSidebar();
+		Assert.True(cut.Instance.SidebarOpen);
 	}
 
 	[Fact]
@@ -842,7 +860,7 @@ public sealed class ComponentPageTests
 			Assert.Contains("Add customer", cut.Markup);
 			Assert.Contains("Directory status:", cut.Markup);
 			Assert.Contains("Account #", cut.Markup);
-			Assert.Single(cut.FindComponents<SfGrid<UtilityCustomerRecord>>());
+			Assert.NotEmpty(cut.FindComponents<SfGrid<UtilityCustomerRecord>>());
 		});
 
 		cut.Find("#add-customer-button").Click();

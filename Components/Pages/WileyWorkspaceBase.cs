@@ -51,7 +51,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsApplyingScenario { get; set; }
     protected bool IsLoadingWorkspace { get; set; }
     protected bool IsExportingDocuments { get; set; }
-    protected bool IsSidebarOpen { get; set; }
+    protected bool IsSidebarOpen { get; set; } = true;
+    protected bool IsJarvisOpen { get; set; }
 
     protected string SnapshotSaveStatus { get; set; } = "Ready to save rate snapshot";
     protected string BaselineSaveStatus { get; set; } = "Baseline changes are local until you save them.";
@@ -222,6 +223,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         _ = TrackNavigationClickAsync(clickTelemetry);
 
         IsSidebarOpen = false;
+        IsJarvisOpen = false;
         NavigationManager.NavigateTo(route);
     }
 
@@ -240,6 +242,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected void ToggleSidebar()
     {
         IsSidebarOpen = !IsSidebarOpen;
+    }
+
+    protected void ToggleJarvis()
+    {
+        IsJarvisOpen = !IsJarvisOpen;
     }
 
     protected void ClearCustomerFilters() => WorkspaceState.ClearCustomerFilters();
