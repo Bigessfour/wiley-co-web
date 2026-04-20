@@ -140,6 +140,62 @@ public sealed class JarvisChatPanelTests : TestContext
 		});
 	}
 
+	[Fact]
+	public void JarvisChatPanel_DoesNotRequestRecommendationHistoryBeforeWorkspaceBootstrap()
+	{
+		var state = new WorkspaceState();
+		var handler = new RecordingHttpMessageHandler();
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(new WorkspaceAiApiService(new HttpClient(handler)
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		}));
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<JarvisChatPanel>();
+
+		cut.WaitForAssertion(() => Assert.Contains("Recommendation history will load after an enterprise and fiscal year are available.", cut.Markup));
+		Assert.DoesNotContain(handler.Paths, path => path.EndsWith("/api/ai/recommendations", StringComparison.OrdinalIgnoreCase));
+	}
+
+	[Fact]
+	public void JarvisChatPanel_LoadsRecommendationHistoryAfterWorkspaceBootstrap()
+	{
+		var state = new WorkspaceState();
+		var handler = new RecordingHttpMessageHandler();
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(new WorkspaceAiApiService(new HttpClient(handler)
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		}));
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<JarvisChatPanel>();
+
+		state.ApplyBootstrap(new WorkspaceBootstrapData(
+			"Water Utility",
+			2026,
+			"Council Review",
+			45m,
+			30000m,
+			120m,
+			DateTime.UtcNow.ToString("O")));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains(handler.Paths, path => path.EndsWith("/api/ai/recommendations", StringComparison.OrdinalIgnoreCase));
+			Assert.Contains("No saved recommendations yet for this workspace scope.", cut.Markup);
+		});
+	}
+
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
 	{
 		PropertyNameCaseInsensitive = true

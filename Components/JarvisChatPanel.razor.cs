@@ -24,6 +24,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
     private Action? workspaceChangedHandler;
     private string? lastKnowledgeFingerprint;
+    private string? lastRecommendationHistoryScope;
     private WorkspaceKnowledgeResponse? workspaceKnowledge;
 
     [Inject]
@@ -73,7 +74,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             return;
         }
 
-        await LoadRecommendationHistoryAsync().ConfigureAwait(false); // Persists via EfConversationRepository + UserContextPlugin (history now auditable)
+        await LoadRecommendationHistoryAsync(force: true).ConfigureAwait(false); // Persists via EfConversationRepository + UserContextPlugin (history now auditable)
         await RefreshKnowledgeAsync(force: true).ConfigureAwait(false);
         await InvokeAsync(StateHasChanged);
     }
@@ -192,6 +193,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     private async Task HandleWorkspaceChangedAsync()
     {
         await RefreshKnowledgeAsync().ConfigureAwait(false);
+        await LoadRecommendationHistoryAsync().ConfigureAwait(false);
         await InvokeAsync(StateHasChanged);
     }
 
@@ -255,8 +257,13 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         return [.. chatTranscript.TakeLast(12)];
     }
 
-    private async Task LoadRecommendationHistoryAsync()
+    private async Task LoadRecommendationHistoryAsync(bool force = false)
     {
+        if (TryHandleRecommendationHistoryPreconditions(force, out var recommendationHistoryScope))
+        {
+            return;
+        }
+
         try
         {
             var history = await AiApi.GetRecommendationHistoryAsync(new WorkspaceRecommendationHistoryRequest(
@@ -272,11 +279,42 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             RecommendationHistoryStatus = recommendationHistory.Count == 0
                 ? "No saved recommendations yet for this workspace scope."
                 : $"Loaded {recommendationHistory.Count} saved recommendation{(recommendationHistory.Count == 1 ? string.Empty : "s")} for this workspace scope.";
+            lastRecommendationHistoryScope = recommendationHistoryScope;
         }
         catch (Exception ex)
         {
             RecommendationHistoryStatus = $"Recommendation history is unavailable right now: {ex.Message}";
         }
+    }
+
+    private bool TryHandleRecommendationHistoryPreconditions(bool force, out string recommendationHistoryScope)
+    {
+        recommendationHistoryScope = BuildRecommendationHistoryScope();
+
+        if (string.IsNullOrWhiteSpace(recommendationHistoryScope))
+        {
+            recommendationHistory.Clear();
+            RecommendationHistoryStatus = "Recommendation history will load after an enterprise and fiscal year are available.";
+            lastRecommendationHistoryScope = null;
+            return true;
+        }
+
+        if (!force && string.Equals(lastRecommendationHistoryScope, recommendationHistoryScope, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private string BuildRecommendationHistoryScope()
+    {
+        if (string.IsNullOrWhiteSpace(WorkspaceState.SelectedEnterprise) || WorkspaceState.SelectedFiscalYear <= 0)
+        {
+            return string.Empty;
+        }
+
+        return $"{WorkspaceState.SelectedEnterprise.Trim()}|{WorkspaceState.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture)}";
     }
 
     private void UpdateChatRuntimeStatus(bool usedFallback)
@@ -465,7 +503,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         UpdateChatRuntimeStatus(response.UsedFallback);
 
         ApplyPromptResponse(question, response, args);
-        await LoadRecommendationHistoryAsync().ConfigureAwait(false);
+        await LoadRecommendationHistoryAsync(force: true).ConfigureAwait(false);
     }
 
     private WorkspaceChatRequest BuildChatRequest(string question)
