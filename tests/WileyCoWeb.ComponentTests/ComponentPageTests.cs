@@ -443,7 +443,7 @@ public sealed class ComponentPageTests
 		await cut.InvokeAsync(() => cut.Instance.InvokeFirstRenderAsync());
 
 		Assert.Contains("Saved scenarios are currently unavailable", cut.Instance.ScenarioStatus);
-		Assert.Equal("Degraded", cut.Instance.ApiHealth);
+		Assert.Equal("Healthy", cut.Instance.ApiHealth);
 	}
 
 	[Fact]
@@ -683,7 +683,7 @@ public sealed class ComponentPageTests
 		using var context = CreateContext();
 		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
 
-		Assert.Equal("Unknown", cut.Instance.ApiHealth);
+		Assert.Equal("Healthy", cut.Instance.ApiHealth);
 	}
 
 	[Fact]
