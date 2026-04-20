@@ -6,6 +6,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using WileyCoWeb.Contracts;
 using WileyWidget.Services.Abstractions;
 using WileyWidget.Services.Plugins;
@@ -14,6 +15,7 @@ namespace WileyWidget.Services;
 
 public sealed class WorkspaceAiAssistantService
 {
+    private const string DefaultSemanticKernelModel = "grok-4.20-0309-reasoning";
     private const string SystemPrompt = "You are Jarvis, the centerpiece municipal finance AI for rural utility communities. Excel at natural-language conversation: answer 'why is this a certain way?', 'what do we need to do to address this financial issue?' with auditor-impressing, transparent rationales grounded in real ledger data, QuickBooks imports, break-even models, operational methods (reserve building, infrastructure phasing, efficiency gains), GASB/AWWA rural benchmarks, and 5/10-yr trends. Help city councils with limited financial background feel confident in AI suggestions by explaining fluency concepts simply while showing rigorous methodology. Always tie to workspace context, AIContextStore, and UserContextPlugin. Use get_workspace_knowledge_summary, explain_financial_issue, suggest_operational_actions, and generate_rate_rationale for live financial depth. Keep responses practical, human, non-creepy, and actionable for quality council decisions.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -32,6 +34,7 @@ public sealed class WorkspaceAiAssistantService
     private readonly IWorkspaceKnowledgeService workspaceKnowledgeService;
     private readonly Lazy<KernelContext?> kernelContext;
     private readonly bool legacyXaiEnabled;
+    private readonly string semanticKernelModel;
     private readonly Uri chatCompletionEndpoint;
     private readonly Uri legacyXaiEndpoint;
     private readonly string legacyXaiModel;
@@ -63,15 +66,31 @@ public sealed class WorkspaceAiAssistantService
         this.httpClientFactory = httpClientFactory;
         this.apiKeyProvider = apiKeyProvider;
         legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
-        chatCompletionEndpoint = NormalizeChatCompletionEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:ChatEndpoint", "XAI:Endpoint"));
+        chatCompletionEndpoint = ResolveSemanticKernelChatEndpoint(configuration);
         legacyXaiEndpoint = NormalizeResponsesEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:Endpoint"));
-        // Per xAI docs (docs.x.ai/developers/models): prefer the grok-4-1-fast-reasoning family for function calling and reasoning.
+        // Per xAI docs (docs.x.ai/developers/models): prefer a reasoning-capable, function-capable Grok model for the live SK path.
+        semanticKernelModel = ResolveSemanticKernelModel(configuration);
         legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
         legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
         legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
         legacyXaiTimeoutSeconds = GetConfiguredInt(15, "XaiTimeoutSeconds", "XAI:TimeoutSeconds");
         kernelContext = new Lazy<KernelContext?>(InitializeKernelContext);
     }
+
+    public static OpenAIPromptExecutionSettings CreateSemanticKernelExecutionSettings()
+        => new()
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+        };
+
+    public static string ResolveSemanticKernelModel(IConfiguration configuration)
+        => GetConfiguredString(configuration, "XaiModel", "XAI:Model", "Grok:Model") ?? DefaultSemanticKernelModel;
+
+    public static Uri ResolveSemanticKernelChatEndpoint(IConfiguration configuration)
+        => NormalizeChatCompletionEndpoint(GetConfiguredString(configuration, "XaiApiEndpoint", "XaiBaseUrl", "XAI:ChatEndpoint", "XAI:Endpoint"));
+
+    internal static string GetDefaultSemanticKernelModel()
+        => DefaultSemanticKernelModel;
 
     public async Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
     {
@@ -86,6 +105,26 @@ public sealed class WorkspaceAiAssistantService
         var conversationHistory = await LoadConversationHistoryAsync(conversationId, request.ConversationHistory, cancellationToken).ConfigureAwait(false);
         var isFirstConversation = conversationHistory.Count == 0;
         var contextSummary = BuildContextSummary(request);
+
+        if (isFirstConversation)
+        {
+            var onboardingAnswer = BuildOnboardingAnswer(activeUser, request);
+            conversationHistory = AppendTurn(conversationHistory, question, onboardingAnswer);
+            _ = PersistOnboardingConversationAsync(conversationId, activeUser, request, question, onboardingAnswer, conversationHistory);
+
+            var onboardingResponse = new WorkspaceChatResponse(question, onboardingAnswer, true, contextSummary)
+            {
+                UserDisplayName = activeUser.DisplayName,
+                UserProfileSummary = BuildOnboardingProfileSummary(activeUser),
+                ConversationId = conversationId,
+                ConversationMessageCount = conversationHistory.Count,
+                IsFirstConversation = true,
+                CanResetConversation = true
+            };
+
+            logger.LogInformation("Workspace AI returned onboarding fallback for first conversation {ConversationId}", conversationId);
+            return onboardingResponse;
+        }
 
         var assistant = kernelContext.Value;
         string? fallbackDiagnosticCode = null;
@@ -202,27 +241,6 @@ public sealed class WorkspaceAiAssistantService
             }
         }
 
-        if (isFirstConversation)
-        {
-            var onboardingAnswer = BuildOnboardingAnswer(activeUser, request);
-            conversationHistory = AppendTurn(conversationHistory, question, onboardingAnswer);
-            await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-            await SaveRecommendationAsync(conversationId, activeUser, request, question, onboardingAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
-
-            var onboardingResponse = new WorkspaceChatResponse(question, onboardingAnswer, true, contextSummary)
-            {
-                UserDisplayName = activeUser.DisplayName,
-                UserProfileSummary = BuildOnboardingProfileSummary(activeUser),
-                ConversationId = conversationId,
-                ConversationMessageCount = conversationHistory.Count,
-                IsFirstConversation = true,
-                CanResetConversation = true
-            };
-
-            logger.LogInformation("Workspace AI returned onboarding fallback for first conversation {ConversationId}", conversationId);
-            return onboardingResponse;
-        }
-
         var legacyResult = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(legacyResult.Answer))
         {
@@ -323,10 +341,7 @@ public sealed class WorkspaceAiAssistantService
 
         chatHistory.AddUserMessage(BuildUserPrompt(question, request, conversationHistory));
 
-        var executionSettings = new OpenAIPromptExecutionSettings
-        {
-            ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
-        };
+        var executionSettings = CreateSemanticKernelExecutionSettings();
 
         var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, cancellationToken).ConfigureAwait(false);
         var answer = response.Content?.Trim();
@@ -370,8 +385,7 @@ public sealed class WorkspaceAiAssistantService
                 return null;
             }
 
-            // Per xAI docs (docs.x.ai/developers/models): 'grok-4' for Grok 4.20 (2M context, function calling, reasoning). Key from AWS Secrets Manager "Grok" secret (configured in Program.cs + amplify.yml).
-            var model = GetConfiguredString("Grok:Model", "XAI:Model", "XaiModel") ?? "grok-4";
+            var model = semanticKernelModel;
             var kernelBuilder = Kernel.CreateBuilder();
             kernelBuilder.AddOpenAIChatCompletion(
                 modelId: model,
@@ -587,6 +601,9 @@ public sealed class WorkspaceAiAssistantService
         => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback;
 
     private string? GetConfiguredString(params string[] keys)
+        => GetConfiguredString(configuration, keys);
+
+    private static string? GetConfiguredString(IConfiguration configuration, params string[] keys)
     {
         foreach (var key in keys)
         {
@@ -793,6 +810,28 @@ public sealed class WorkspaceAiAssistantService
         };
 
         await conversationRepository.SaveRecommendationAsync(recommendation, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task PersistOnboardingConversationAsync(
+        string conversationId,
+        ResolvedUserContext user,
+        WorkspaceChatRequest request,
+        string question,
+        string onboardingAnswer,
+        IReadOnlyList<WorkspaceChatMessage> conversationHistory)
+    {
+        try
+        {
+            await SaveConversationHistoryAsync(conversationId, user, request, conversationHistory, CancellationToken.None).ConfigureAwait(false);
+            await SaveRecommendationAsync(conversationId, user, request, question, onboardingAnswer, usedFallback: true, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Workspace AI onboarding persistence failed for conversation {ConversationId}",
+                conversationId);
+        }
     }
 
     private async Task<IReadOnlyList<WorkspaceChatMessage>> ReadPersistedConversationAsync(string conversationId, CancellationToken cancellationToken)

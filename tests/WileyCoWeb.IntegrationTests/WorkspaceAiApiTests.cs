@@ -106,10 +106,7 @@ public sealed class WorkspaceAiApiTests : IClassFixture<ApiApplicationFactory>
             2026), jsonOptions);
         chatResponse.EnsureSuccessStatusCode();
 
-        var historyResponse = await client.GetAsync("/api/ai/recommendations?enterprise=Water%20Utility&fiscalYear=2026&limit=5");
-        historyResponse.EnsureSuccessStatusCode();
-
-        var payload = await historyResponse.Content.ReadFromJsonAsync<WorkspaceRecommendationHistoryResponse>(jsonOptions);
+        var payload = await WaitForHistoryPayloadAsync(client);
         Assert.NotNull(payload);
         Assert.NotEmpty(payload.Items);
         Assert.All(payload.Items, item => Assert.Equal("Alex Morgan", item.UserDisplayName));
@@ -135,5 +132,29 @@ public sealed class WorkspaceAiApiTests : IClassFixture<ApiApplicationFactory>
             jsonOptions);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    private static async Task<WorkspaceRecommendationHistoryResponse?> WaitForHistoryPayloadAsync(HttpClient client, int timeoutMilliseconds = 2000, int pollMilliseconds = 50)
+    {
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var response = await client.GetAsync("/api/ai/recommendations?enterprise=Water%20Utility&fiscalYear=2026&limit=5");
+            if (response.IsSuccessStatusCode)
+            {
+                var payload = await response.Content.ReadFromJsonAsync<WorkspaceRecommendationHistoryResponse>(jsonOptions);
+                if (payload?.Items.Count > 0)
+                {
+                    return payload;
+                }
+            }
+
+            await Task.Delay(pollMilliseconds);
+        }
+
+        var finalResponse = await client.GetAsync("/api/ai/recommendations?enterprise=Water%20Utility&fiscalYear=2026&limit=5");
+        return await finalResponse.Content.ReadFromJsonAsync<WorkspaceRecommendationHistoryResponse>(jsonOptions);
     }
 }

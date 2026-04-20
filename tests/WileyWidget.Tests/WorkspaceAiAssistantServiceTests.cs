@@ -37,6 +37,30 @@ public sealed class WorkspaceAiAssistantServiceTests
     };
 
     [Fact]
+    public void SemanticKernelConnector_UsesDocumentedXaiDefaultsAndAutoFunctionChoice()
+    {
+        var defaultConfiguration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+
+        Assert.Equal("grok-4.20-0309-reasoning", WorkspaceAiAssistantService.ResolveSemanticKernelModel(defaultConfiguration));
+        Assert.Equal(new Uri("https://api.x.ai/v1"), WorkspaceAiAssistantService.ResolveSemanticKernelChatEndpoint(defaultConfiguration));
+
+        var configuredConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["XaiModel"] = "grok-4.20-0309-reasoning",
+            ["XAI:ChatEndpoint"] = "https://proxy.example/v1"
+        }).Build();
+
+        Assert.Equal("grok-4.20-0309-reasoning", WorkspaceAiAssistantService.ResolveSemanticKernelModel(configuredConfiguration));
+        Assert.Equal(new Uri("https://proxy.example/v1"), WorkspaceAiAssistantService.ResolveSemanticKernelChatEndpoint(configuredConfiguration));
+
+        var executionSettings = WorkspaceAiAssistantService.CreateSemanticKernelExecutionSettings();
+        var functionChoiceBehavior = executionSettings.FunctionChoiceBehavior;
+
+        Assert.NotNull(functionChoiceBehavior);
+        Assert.Contains("Auto", functionChoiceBehavior!.GetType().Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AskAsync_FirstConversation_UsesOnboardingAndScopesConversationByUserAndEnterprise()
     {
         var repository = new RecordingConversationRepository();
@@ -56,6 +80,7 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Equal("Alex Morgan", response.UserDisplayName);
         Assert.Contains("preferred name", response.Answer, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Onboarding pending for Alex Morgan", response.UserProfileSummary);
+        await WaitForConditionAsync(() => repository.SavedConversations.Count == 1 && repository.SavedRecommendations.Count == 1);
         Assert.Single(repository.SavedConversations);
         Assert.Single(repository.SavedRecommendations);
         Assert.Equal(2, repository.SavedConversations[0].MessageCount);
@@ -73,6 +98,8 @@ public sealed class WorkspaceAiAssistantServiceTests
             "Current workspace context",
             "Water Utility",
             2026));
+
+        await WaitForConditionAsync(() => repository.SavedConversations.Count == 1 && repository.SavedRecommendations.Count == 1);
 
         var secondResponse = await service.AskAsync(new WorkspaceChatRequest(
             "What did I just ask you?",
@@ -414,6 +441,23 @@ public sealed class WorkspaceAiAssistantServiceTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    private static async Task WaitForConditionAsync(Func<bool> condition, int timeoutMilliseconds = 2000, int pollMilliseconds = 25)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(pollMilliseconds);
+        }
+
+        Assert.True(condition(), "Condition was not satisfied before timeout.");
     }
 
     private sealed class TestWorkspaceKnowledgeService : IWorkspaceKnowledgeService

@@ -766,27 +766,56 @@ public partial class Program
         return Results.Ok(guidance);
     }
 
-    private static async Task<IResult> MapWorkspaceAiChatMessageEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, CancellationToken cancellationToken)
+    private static async Task<IResult> MapWorkspaceAiChatMessageEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, ILogger<Program> logger, CancellationToken cancellationToken)
     {
         var chatRequest = await request.ReadFromJsonAsync<WorkspaceChatRequest>(cancellationToken: cancellationToken);
         if (chatRequest is null || string.IsNullOrWhiteSpace(chatRequest.Question))
         {
+            logger.LogWarning("Rejected Jarvis chat request because the payload was missing a question or could not be parsed.");
             return Results.BadRequest("A question is required for workspace chat.");
         }
 
+        logger.LogInformation(
+            "Jarvis chat request received: Enterprise={Enterprise} FiscalYear={FiscalYear} QuestionLength={QuestionLength} ConversationHistoryCount={ConversationHistoryCount}",
+            chatRequest.SelectedEnterprise,
+            chatRequest.SelectedFiscalYear,
+            chatRequest.Question.Length,
+            chatRequest.ConversationHistory?.Count ?? 0);
+
         var chatResponse = await assistantService.AskAsync(chatRequest, cancellationToken);
+
+        logger.LogInformation(
+            "Jarvis chat request completed: Enterprise={Enterprise} FiscalYear={FiscalYear} UsedFallback={UsedFallback} ConversationId={ConversationId} MessageCount={ConversationMessageCount}",
+            chatRequest.SelectedEnterprise,
+            chatRequest.SelectedFiscalYear,
+            chatResponse.UsedFallback,
+            chatResponse.ConversationId,
+            chatResponse.ConversationMessageCount);
+
         return Results.Ok(chatResponse);
     }
 
-    private static async Task<IResult> MapWorkspaceAiChatResetEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, CancellationToken cancellationToken)
+    private static async Task<IResult> MapWorkspaceAiChatResetEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, ILogger<Program> logger, CancellationToken cancellationToken)
     {
         var resetRequest = await request.ReadFromJsonAsync<WorkspaceConversationResetRequest>(cancellationToken: cancellationToken);
         if (resetRequest is null)
         {
+            logger.LogWarning("Rejected Jarvis chat reset request because the payload was missing.");
             return Results.BadRequest("Workspace context is required to reset the Jarvis conversation.");
         }
 
+        logger.LogInformation(
+            "Jarvis chat reset request received: Enterprise={Enterprise} FiscalYear={FiscalYear}",
+            resetRequest.SelectedEnterprise,
+            resetRequest.SelectedFiscalYear);
+
         await assistantService.ResetConversationAsync(resetRequest, cancellationToken);
+
+        logger.LogInformation(
+            "Jarvis chat reset request completed: Enterprise={Enterprise} FiscalYear={FiscalYear}",
+            resetRequest.SelectedEnterprise,
+            resetRequest.SelectedFiscalYear);
+
         return Results.NoContent();
     }
 

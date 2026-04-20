@@ -15,7 +15,7 @@ public sealed class WorkspaceFileLoggerProvider : ILoggerProvider
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
-        var logsDirectory = LogPathResolver.GetLogDirectory();
+        var logsDirectory = LogPathResolver.GetLogsDirectory();
         _logFilePath = Path.Combine(logsDirectory, fileName);
     }
 
