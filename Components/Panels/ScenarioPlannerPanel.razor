@@ -42,6 +42,17 @@
             <SfGrid ID="scenario-grid" TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420">
                 <GridEvents TValue="ScenarioItem" OnActionComplete="OnScenarioGridActionComplete" />
                 <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
+                <GridTemplates>
+                    <EmptyRecordTemplate>
+                        <div class="flex min-h-[16rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+                            <div>
+                                <div class="text-sm font-semibold text-slate-900">No scenarios yet</div>
+                                <div class="mt-2 text-sm text-slate-600">Add your first what-if item to see how it changes break-even and rate pressure.</div>
+                            </div>
+                            <div class="text-xs text-slate-500">Use the Add toolbar button above to create the first scenario row.</div>
+                        </div>
+                    </EmptyRecordTemplate>
+                </GridTemplates>
                 <GridColumns>
                     <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
                     <GridColumn Field=@nameof(ScenarioItem.Name) HeaderText="Scenario Item" Width="180" />

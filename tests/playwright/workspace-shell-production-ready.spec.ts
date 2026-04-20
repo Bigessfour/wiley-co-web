@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { waitForWorkspaceShell } from "./support/workspace";
 
+const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v1";
+
 test.describe("Workspace Shell", () => {
   test("Workspace shell and navigation stay usable on a fresh load", async ({
     page,
@@ -116,10 +118,104 @@ test.describe("Workspace Shell", () => {
     await waitForWorkspaceShell(page);
     await page.setViewportSize({ width: 1279, height: 900 });
 
+    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+
     await expect(page.locator("#workspace-dashboard")).toBeVisible();
     await expect(page.locator("#workspace-document-center")).toBeVisible();
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
     await expect(page.locator("#workspace-status-card")).toBeVisible();
-    await expect(page.locator("#workspace-sidebar-toggle")).toBeVisible();
+    await expect(sidebarToggle).toBeVisible();
+
+    await sidebarToggle.click();
+    await expect(page.locator(".app-shell")).not.toHaveClass(
+      /app-shell-nav-collapsed/,
+    );
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
+    await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
+
+    await page.getByRole("link", { name: "Rates" }).click();
+    await expect(page.locator(".app-shell")).not.toHaveClass(
+      /app-shell-nav-collapsed/,
+    );
+    await expect(page.locator("#rates-panel")).toBeVisible();
+  });
+
+  test("Collapsing the left rail stays inert below the desktop breakpoint across key panel routes", async ({
+    page,
+  }) => {
+    const routeChecks = [
+      {
+        route: "/wiley-workspace/break-even",
+        visibleSelector: "#break-even-summary-panel",
+      },
+      { route: "/wiley-workspace/rates", visibleSelector: "#rates-panel" },
+      {
+        route: "/wiley-workspace/scenario",
+        visibleSelector: "#scenario-panel",
+      },
+      {
+        route: "/wiley-workspace/customers",
+        visibleSelector: "#customer-viewer-panel",
+      },
+      {
+        route: "/wiley-workspace/data-dashboard",
+        visibleSelector: "#data-dashboard-panel",
+      },
+    ];
+
+    await page.setViewportSize({ width: 1279, height: 900 });
+
+    for (const routeCheck of routeChecks) {
+      await page.goto(routeCheck.route);
+      await waitForWorkspaceShell(page);
+
+      await page.evaluate(
+        (storageKey) => localStorage.removeItem(storageKey),
+        leftNavStorageKey,
+      );
+      await page.reload();
+      await waitForWorkspaceShell(page);
+
+      await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();
+      await page.locator("#workspace-sidebar-toggle").click();
+      await expect(page.locator(".app-shell")).not.toHaveClass(
+        /app-shell-nav-collapsed/,
+      );
+      await expect(
+        page.getByRole("navigation", { name: "Primary" }),
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
+    }
+  });
+
+  test("Collapsing the left rail stays inert on mobile widths", async ({
+    page,
+  }) => {
+    await page.goto("/wiley-workspace");
+    await waitForWorkspaceShell(page);
+    await page.setViewportSize({ width: 900, height: 900 });
+
+    const appMain = page.locator(".app-main");
+    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+
+    const beforeWidth = await appMain.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+
+    await sidebarToggle.click();
+    await expect(page.locator("#app-sidebar-edge-toggle")).toBeHidden();
+
+    const afterWidth = await appMain.evaluate(
+      (element) => element.getBoundingClientRect().width,
+    );
+
+    expect(Math.abs(afterWidth - beforeWidth)).toBeLessThan(5);
+    await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }),
+    ).toBeVisible();
   });
 });

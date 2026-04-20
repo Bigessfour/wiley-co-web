@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -14,6 +15,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     [Parameter]
     public string? Panel { get; set; }
+
+    [CascadingParameter]
+    protected WorkspaceLayoutContext? LayoutContext { get; set; }
 
     [Inject]
     protected WorkspaceState WorkspaceState { get; set; } = default!;
@@ -167,6 +171,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         WorkspaceApiHealth.Degraded => "Degraded",
         _ => "Unknown"
     };
+    protected bool IsLeftNavRailCollapsed => LayoutContext?.IsLeftNavCollapsed ?? false;
+    protected string NavigationRailToggleText => IsLeftNavRailCollapsed ? "Expand navigation" : "Collapse navigation";
 
     protected IReadOnlyList<WorkspacePanelNavItem> PanelNavItems { get; } =
     [
@@ -247,6 +253,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected void ToggleJarvis()
     {
         IsJarvisOpen = !IsJarvisOpen;
+    }
+
+    protected Task ToggleLeftNavRailAsync()
+    {
+        return LayoutContext?.ToggleLeftNavAsync() ?? Task.CompletedTask;
     }
 
     protected void ClearCustomerFilters() => WorkspaceState.ClearCustomerFilters();
@@ -497,6 +508,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         if (!WorkspaceLoadStatus.Contains("failed", StringComparison.OrdinalIgnoreCase))
         {
             WorkspaceLoadStatus = BuildWorkspaceReadyStatus();
+            _apiHealth = WorkspaceApiHealth.Healthy;
         }
 
         lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
