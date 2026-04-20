@@ -20,6 +20,7 @@ public sealed class WorkspaceAiAssistantService
         PropertyNameCaseInsensitive = true
     };
     private static readonly Uri directResponsesEndpoint = NormalizeResponsesEndpoint("https://api.x.ai/v1");
+    private static readonly Uri directChatCompletionEndpoint = NormalizeChatCompletionEndpoint("https://api.x.ai/v1");
 
     private readonly ILogger<WorkspaceAiAssistantService> logger;
     private readonly IConfiguration configuration;
@@ -121,39 +122,10 @@ public sealed class WorkspaceAiAssistantService
         {
             try
             {
-                var chatHistory = new ChatHistory();
-                chatHistory.AddSystemMessage(BuildSystemPrompt(activeUser, request));
-
-                foreach (var message in conversationHistory)
+                var liveResponse = await ExecuteSemanticKernelAsync(assistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+                if (liveResponse is not null)
                 {
-                    if (IsAssistantMessage(message.Role))
-                    {
-                        chatHistory.AddAssistantMessage(message.Content);
-                    }
-                    else
-                    {
-                        chatHistory.AddUserMessage(message.Content);
-                    }
-                }
-
-                chatHistory.AddUserMessage(BuildUserPrompt(question, request, conversationHistory));
-
-                var executionSettings = new OpenAIPromptExecutionSettings
-                {
-                    ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
-                };
-
-                var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, cancellationToken).ConfigureAwait(false);
-                var answer = response.Content?.Trim();
-                if (!string.IsNullOrWhiteSpace(answer))
-                {
-                    conversationHistory = AppendTurn(conversationHistory, question, answer);
-                    await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-                    await SaveRecommendationAsync(conversationId, activeUser, request, question, answer, usedFallback: false, cancellationToken).ConfigureAwait(false);
-
-                    var chatResponse = new WorkspaceChatResponse(question, answer, false, contextSummary);
-                    logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
-                    return ApplyUserMetadata(chatResponse, activeUser, conversationId, conversationHistory.Count);
+                    return liveResponse;
                 }
             }
             catch (Exception ex)
@@ -170,6 +142,38 @@ public sealed class WorkspaceAiAssistantService
                     legacyXaiEndpoint);
             }
         }
+
+                if (string.Equals(fallbackDiagnosticCode, "transport_tls_failed", StringComparison.Ordinal) && !IsDirectXaiEndpoint(chatCompletionEndpoint))
+                {
+                    try
+                    {
+                        var directAssistant = CreateKernelContext(directChatCompletionEndpoint);
+                        if (directAssistant is not null)
+                        {
+                            var directResponse = await ExecuteSemanticKernelAsync(directAssistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+                            if (directResponse is not null)
+                            {
+                                logger.LogInformation(
+                                    "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy TLS failure.",
+                                    request.SelectedEnterprise,
+                                    request.SelectedFiscalYear);
+                                return directResponse;
+                            }
+                        }
+                    }
+                    catch (Exception directEx)
+                    {
+                        fallbackDiagnosticCode = TryClassifySemanticKernelFailure(directEx);
+                        fallbackDiagnosticMessage = $"{directEx.GetType().Name}: {directEx.Message}";
+                        logger.LogWarning(
+                            directEx,
+                            "Workspace AI direct xAI retry failed for {Enterprise} FY {FiscalYear} (model: {Model}, directChatEndpoint: {DirectChatEndpoint})",
+                            request.SelectedEnterprise,
+                            request.SelectedFiscalYear,
+                            legacyXaiModel,
+                            directChatCompletionEndpoint);
+                    }
+                }
 
         if (string.Equals(fallbackDiagnosticCode, "rate_limited", StringComparison.Ordinal))
         {
@@ -257,7 +261,61 @@ public sealed class WorkspaceAiAssistantService
         return new WorkspaceRecommendationHistoryResponse(items);
     }
 
+    private KernelContext? CreateKernelContext(Uri chatEndpoint)
+        => InitializeKernelContext(chatEndpoint);
+
+    private async Task<WorkspaceChatResponse?> ExecuteSemanticKernelAsync(
+        KernelContext assistant,
+        ResolvedUserContext activeUser,
+        WorkspaceChatRequest request,
+        string question,
+        IReadOnlyList<WorkspaceChatMessage> conversationHistory,
+        CancellationToken cancellationToken)
+    {
+        var conversationId = BuildConversationId(activeUser, request);
+
+        var chatHistory = new ChatHistory();
+        chatHistory.AddSystemMessage(BuildSystemPrompt(activeUser, request));
+
+        foreach (var message in conversationHistory)
+        {
+            if (IsAssistantMessage(message.Role))
+            {
+                chatHistory.AddAssistantMessage(message.Content);
+            }
+            else
+            {
+                chatHistory.AddUserMessage(message.Content);
+            }
+        }
+
+        chatHistory.AddUserMessage(BuildUserPrompt(question, request, conversationHistory));
+
+        var executionSettings = new OpenAIPromptExecutionSettings
+        {
+            ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
+        };
+
+        var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, cancellationToken).ConfigureAwait(false);
+        var answer = response.Content?.Trim();
+        if (string.IsNullOrWhiteSpace(answer))
+        {
+            return null;
+        }
+
+        var updatedConversationHistory = AppendTurn(conversationHistory, question, answer);
+        await SaveConversationHistoryAsync(conversationId, activeUser, request, updatedConversationHistory, cancellationToken).ConfigureAwait(false);
+        await SaveRecommendationAsync(conversationId, activeUser, request, question, answer, usedFallback: false, cancellationToken).ConfigureAwait(false);
+
+        var chatResponse = new WorkspaceChatResponse(question, answer, false, BuildContextSummary(request));
+        logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, updatedConversationHistory.Count);
+        return ApplyUserMetadata(chatResponse, activeUser, conversationId, updatedConversationHistory.Count);
+    }
+
     private KernelContext? InitializeKernelContext()
+        => InitializeKernelContext(chatCompletionEndpoint);
+
+    private KernelContext? InitializeKernelContext(Uri chatEndpoint)
     {
         var apiKeyResolution = ResolveApiKeyResolution();
 
@@ -273,7 +331,7 @@ public sealed class WorkspaceAiAssistantService
                     apiKeyResolution.ConfigDirectPresent,
                     apiKeyResolution.ConfigNamedPresent,
                     apiKeyResolution.SecretName,
-                    chatCompletionEndpoint,
+                    chatEndpoint,
                     legacyXaiEndpoint,
                     legacyXaiModel,
                     legacyXaiEnabled);
@@ -286,7 +344,7 @@ public sealed class WorkspaceAiAssistantService
             kernelBuilder.AddOpenAIChatCompletion(
                 modelId: model,
                 apiKey: apiKeyResolution.ApiKey,
-                endpoint: chatCompletionEndpoint);
+                endpoint: chatEndpoint);
 
             kernelBuilder.Plugins.AddFromType<Plugins.System.TimePlugin>();
             kernelBuilder.Plugins.AddFromType<Plugins.Development.CodebaseInsightPlugin>();
@@ -305,7 +363,7 @@ public sealed class WorkspaceAiAssistantService
                 "Workspace AI assistant initialized with Semantic Kernel (model: {Model}, apiKeySource: {ApiKeySource}, chatEndpoint: {ChatEndpoint}, legacyEndpoint: {LegacyEndpoint}, plugins: Time+Codebase+Anomaly+JarvisUserContext+WorkspaceKnowledge)",
                 model,
                 apiKeyResolution.ApiKeySource,
-                chatCompletionEndpoint,
+                chatEndpoint,
                 legacyXaiEndpoint);
 
             return new KernelContext(kernel, chatService);
@@ -317,7 +375,7 @@ public sealed class WorkspaceAiAssistantService
                 ex,
                 "Workspace AI assistant could not initialize Semantic Kernel (apiKeySource: {ApiKeySource}, chatEndpoint: {ChatEndpoint}, legacyEndpoint: {LegacyEndpoint}, model: {Model}, legacyXaiEnabled: {LegacyXaiEnabled})",
                 apiKeyResolution.ApiKeySource,
-                chatCompletionEndpoint,
+                chatEndpoint,
                 legacyXaiEndpoint,
                 legacyXaiModel,
                 legacyXaiEnabled);
