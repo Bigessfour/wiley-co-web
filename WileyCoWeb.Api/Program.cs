@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Diagnostics;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Net;
 using Amazon;
 using Amazon.SecretsManager;
@@ -115,9 +116,81 @@ public partial class Program
         return (syncfusionLicenseResult, xaiSecretResolution);
     }
 
+    private static async Task LoadPersistedAiConfigurationAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
+    {
+        try
+        {
+            using var context = new AppDbContextFactory(builder.Configuration).CreateDbContext();
+            var settings = await context.AppSettings
+                .AsNoTracking()
+                .OrderBy(entry => entry.Id)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+
+            if (settings is null)
+            {
+                bootstrapLogger.LogInformation("Workspace API did not find a persisted AppSettings row to promote into AI configuration.");
+                return;
+            }
+
+            var injectedConfiguration = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+            if (settings.EnableAI)
+            {
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Enabled", "true");
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "EnableAI", "true");
+            }
+
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:ApiKey", settings.XaiApiKey);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI_API_KEY", settings.XaiApiKey);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Endpoint", settings.XaiApiEndpoint);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:ChatEndpoint", settings.XaiApiEndpoint);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Model", settings.XaiModel);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "Grok:Model", settings.XaiModel);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:TimeoutSeconds", settings.XaiTimeout.ToString(CultureInfo.InvariantCulture));
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:MaxTokens", settings.XaiMaxTokens.ToString(CultureInfo.InvariantCulture));
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Temperature", settings.XaiTemperature.ToString(CultureInfo.InvariantCulture));
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiKey", settings.XaiApiKey);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiEndpoint", settings.XaiApiEndpoint);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiBaseUrl", settings.XaiApiEndpoint);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiModel", settings.XaiModel);
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiTimeoutSeconds", settings.XaiTimeout.ToString(CultureInfo.InvariantCulture));
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiMaxTokens", settings.XaiMaxTokens.ToString(CultureInfo.InvariantCulture));
+            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiTemperature", settings.XaiTemperature.ToString(CultureInfo.InvariantCulture));
+
+            if (injectedConfiguration.Count == 0)
+            {
+                bootstrapLogger.LogInformation("Workspace API found persisted AppSettings row {AppSettingsId} but no AI configuration values needed promotion.", settings.Id);
+                return;
+            }
+
+            builder.Configuration.AddInMemoryCollection(injectedConfiguration);
+            bootstrapLogger.LogInformation(
+                "Workspace API promoted persisted AI configuration from AppSettings row {AppSettingsId} into runtime configuration (KeysAdded={KeyCount}).",
+                settings.Id,
+                injectedConfiguration.Count);
+        }
+        catch (Exception ex)
+        {
+            bootstrapLogger.LogWarning(ex, "Workspace API could not promote persisted AppSettings AI configuration; continuing with environment and secret-based configuration.");
+        }
+    }
+
+    private static void AddRuntimeConfigurationValue(IDictionary<string, string?> target, IConfiguration configuration, string key, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !string.IsNullOrWhiteSpace(configuration[key]))
+        {
+            return;
+        }
+
+        target[key] = value;
+    }
+
     private static async Task<StartupRuntimeOptions> PrepareStartupRuntimeOptionsAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
         var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder).ConfigureAwait(false);
+
+        await LoadPersistedAiConfigurationAsync(builder, bootstrapLogger).ConfigureAwait(false);
 
         var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
         var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];

@@ -332,6 +332,43 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Single(httpFactory.Requests);
     }
 
+    [Fact]
+    public async Task AskAsync_HonorsXaiAliasConfiguration_WhenLegacyFallbackExecutes()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Alias fallback answer.\"}]}]}", Encoding.UTF8, "application/json")
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XaiApiKey"] = "alias-key",
+                ["XaiApiEndpoint"] = "https://alias.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory);
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.Contains("Alias fallback answer.", response.Answer, StringComparison.Ordinal);
+
+        var request = Assert.Single(httpFactory.Requests);
+        Assert.Equal("Bearer alias-key", request.Authorization);
+        Assert.Contains("https://alias.example/v1", request.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static WorkspaceAiAssistantService CreateService(
         TestUserContext userContext,
         RecordingConversationRepository repository,

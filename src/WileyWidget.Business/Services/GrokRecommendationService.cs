@@ -48,13 +48,11 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
         _apiKey = apiKeyProvider?.ApiKey
-            ?? configuration["XAI:ApiKey"]
-            ?? configuration["xAI:ApiKey"]
-            ?? configuration["XAI_API_KEY"];
+            ?? GetConfiguredString("XaiApiKey", "XAI:ApiKey", "xAI:ApiKey", "XAI_API_KEY");
 
-        _enabled = configuration.GetValue<bool>("XAI:Enabled", true);
-        _model = configuration["XAI:Model"] ?? "grok-4.1";
-        _endpoint = NormalizeChatCompletionsEndpoint(configuration["XAI:Endpoint"]);
+        _enabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
+        _model = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4.1";
+        _endpoint = NormalizeChatCompletionsEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:Endpoint", "XAI:ChatEndpoint"));
 
         if (_enabled && !string.IsNullOrWhiteSpace(_apiKey))
         {
@@ -201,6 +199,33 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
         var departmentCount = departmentExpenses.Count;
 
         return $"Based on monthly expenses totaling ${totalExpenses:N2} across {departmentCount} departments and a target profit margin of {targetProfitMargin}%, the recommended adjustments support full cost recovery and reserve stability. Water, Sewer, Trash, Apartments, Electric, and Gas are weighted with small operating differences to reflect typical municipal cost structures. This fallback result is deterministic and safe to use when Grok is unavailable.";
+    }
+
+    private string? GetConfiguredString(params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            var value = _configuration[key];
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private bool GetConfiguredBoolean(bool fallback, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (bool.TryParse(_configuration[key], out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return fallback;
     }
 
     private static string BuildSystemPrompt()

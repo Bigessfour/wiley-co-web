@@ -60,14 +60,14 @@ public sealed class WorkspaceAiAssistantService
         this.workspaceKnowledgeService = workspaceKnowledgeService ?? throw new ArgumentNullException(nameof(workspaceKnowledgeService));
         this.httpClientFactory = httpClientFactory;
         this.apiKeyProvider = apiKeyProvider;
-        legacyXaiEnabled = configuration.GetValue<bool>("XAI:Enabled", true);
-        chatCompletionEndpoint = NormalizeChatCompletionEndpoint(configuration["XAI:ChatEndpoint"] ?? configuration["XAI:Endpoint"]);
-        legacyXaiEndpoint = NormalizeResponsesEndpoint(configuration["XAI:Endpoint"]);
+        legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
+        chatCompletionEndpoint = NormalizeChatCompletionEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:ChatEndpoint", "XAI:Endpoint"));
+        legacyXaiEndpoint = NormalizeResponsesEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:Endpoint"));
         // Per xAI docs (docs.x.ai/developers/models): use 'grok-4' alias for Grok 4.20 (flagship with 2M context, function calling, low hallucination). Key via Bearer token from AWS Secrets Manager "Grok" (already configured).
-        legacyXaiModel = configuration["XAI:Model"] ?? configuration["Grok:Model"] ?? "grok-4";
-        legacyXaiTemperature = ParseDouble(configuration["XAI:Temperature"], 0.3d);
-        legacyXaiMaxTokens = ParseInt(configuration["XAI:MaxTokens"], 800);
-        legacyXaiTimeoutSeconds = ParseInt(configuration["XAI:TimeoutSeconds"], 15);
+        legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4";
+        legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
+        legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
+        legacyXaiTimeoutSeconds = GetConfiguredInt(15, "XaiTimeoutSeconds", "XAI:TimeoutSeconds");
         kernelContext = new Lazy<KernelContext?>(InitializeKernelContext);
     }
 
@@ -265,7 +265,7 @@ public sealed class WorkspaceAiAssistantService
             if (string.IsNullOrWhiteSpace(apiKeyResolution.ApiKey))
             {
                 UpdateAvailability(apiKeyResolution, isAvailable: false, "missing_api_key", "No usable XAI_API_KEY value was visible to the process.");
-                logger.LogWarning(
+                logger.LogError(
                     "Workspace AI assistant is running without a usable API key and will fall back to deterministic responses (ApiKeySource={ApiKeySource}, EnvironmentKeyPresent={EnvironmentKeyPresent}, ConfigDirectKeyPresent={ConfigDirectKeyPresent}, ConfigNamedKeyPresent={ConfigNamedKeyPresent}, SecretName={SecretName}, ChatEndpoint={ChatEndpoint}, LegacyEndpoint={LegacyEndpoint}, Model={Model}, LegacyXaiEnabled={LegacyXaiEnabled})",
                     apiKeyResolution.ApiKeySource,
                     apiKeyResolution.EnvironmentPresent,
@@ -280,7 +280,7 @@ public sealed class WorkspaceAiAssistantService
             }
 
             // Per xAI docs (docs.x.ai/developers/models): 'grok-4' for Grok 4.20 (2M context, function calling, reasoning). Key from AWS Secrets Manager "Grok" secret (configured in Program.cs + amplify.yml).
-            var model = configuration["Grok:Model"] ?? configuration["XAI:Model"] ?? "grok-4";
+            var model = GetConfiguredString("Grok:Model", "XAI:Model", "XaiModel") ?? "grok-4";
             var kernelBuilder = Kernel.CreateBuilder();
             kernelBuilder.AddOpenAIChatCompletion(
                 modelId: model,
@@ -388,7 +388,7 @@ public sealed class WorkspaceAiAssistantService
             if (!response.IsSuccessStatusCode)
             {
                 var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                logger.LogWarning(
+                logger.LogError(
                     "Workspace AI legacy xAI fallback returned {StatusCode} for conversation prompt: {Body}",
                     response.StatusCode,
                     responseBody);
@@ -412,7 +412,7 @@ public sealed class WorkspaceAiAssistantService
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Workspace AI legacy xAI fallback could not produce an answer.");
+            logger.LogError(ex, "Workspace AI legacy xAI fallback could not produce an answer.");
             return new LegacyAnswerResult(null, "legacy_request_exception", $"{ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -462,6 +462,59 @@ public sealed class WorkspaceAiAssistantService
 
     private static double ParseDouble(string? value, double fallback)
         => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback;
+
+    private string? GetConfiguredString(params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            var value = configuration[key];
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private bool GetConfiguredBoolean(bool fallback, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (bool.TryParse(configuration[key], out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return fallback;
+    }
+
+    private int GetConfiguredInt(int fallback, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (int.TryParse(configuration[key], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return fallback;
+    }
+
+    private double GetConfiguredDouble(double fallback, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (double.TryParse(configuration[key], NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return fallback;
+    }
 
     private sealed class LegacyXaiResponse
     {
@@ -714,7 +767,7 @@ public sealed class WorkspaceAiAssistantService
     {
         var environmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
         var providerApiKey = apiKeyProvider?.ApiKey;
-        var directConfigApiKey = configuration["XAI_API_KEY"];
+        var directConfigApiKey = configuration["XaiApiKey"] ?? configuration["XAI_API_KEY"];
         var namedConfigApiKey = configuration["XAI:ApiKey"] ?? configuration["xAI:ApiKey"];
         var secretName = configuration["XAI:SecretName"] ?? configuration["XAI_SECRET_NAME"];
 

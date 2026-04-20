@@ -3,151 +3,104 @@
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
 @using Syncfusion.Blazor.Inputs
-@using Syncfusion.Blazor.Layouts
 @using WileyCoWeb.State
 
 <div id="break-even-panel" class="space-y-4">
-    <SfDashboardLayout ID="break-even-dashboard"
-                       Columns="12"
-                       CellSpacing="@(new double[] { 16, 16 })"
-                       AllowDragging="true"
-                       AllowFloating="true"
-                       AllowResizing="true"
-                       EnablePersistence="true"
-                       MediaQuery="max-width:1024px">
-        <DashboardLayoutPanels>
-            <DashboardLayoutPanel Id="break-even-summary-panel" Column="0" Row="0" SizeX="12" SizeY="2">
-                <HeaderTemplate>
-                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
-                        Break-Even Summary
-                    </div>
-                </HeaderTemplate>
-                <ContentTemplate>
-                    <div id="break-even-kpi-grid" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <SfCard>
-                            <CardHeader Title="Total Costs" SubTitle="@TotalCostsDisplay" />
-                            <CardContent Content="Operating and capital inputs used in the current scenario." />
-                        </SfCard>
-                        <SfCard>
-                            <CardHeader Title="Projected Volume" SubTitle="@ProjectedVolumeDisplay" />
-                            <CardContent Content="Illustrative service volume for the selected enterprise." />
-                        </SfCard>
-                        <SfCard>
-                            <CardHeader Title="Rate Delta" SubTitle="@RateDeltaDisplay" />
-                            <CardContent Content="Gap between the current rate and the break-even rate." />
-                        </SfCard>
-                        <SfCard>
-                            <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
-                            <CardContent Content="Calculated break-even rate for the current scenario." />
-                        </SfCard>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
+    <section id="break-even-summary-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Summary</p>
+        <div id="break-even-kpi-grid" class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <SfCard>
+                <CardHeader Title="Total Costs" SubTitle="@TotalCostsDisplay" />
+                <CardContent Content="Operating and capital inputs used in the current scenario." />
+            </SfCard>
+            <SfCard>
+                <CardHeader Title="Projected Volume" SubTitle="@ProjectedVolumeDisplay" />
+                <CardContent Content="Illustrative service volume for the selected enterprise." />
+            </SfCard>
+            <SfCard>
+                <CardHeader Title="Rate Delta" SubTitle="@RateDeltaDisplay" />
+                <CardContent Content="Gap between the current rate and the break-even rate." />
+            </SfCard>
+            <SfCard>
+                <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
+                <CardContent Content="Calculated break-even rate for the current scenario." />
+            </SfCard>
+        </div>
+    </section>
 
-            <DashboardLayoutPanel Id="break-even-input-panel" Column="0" Row="2" SizeX="12" SizeY="2">
-                <HeaderTemplate>
-                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
-                        Break-Even Inputs
-                    </div>
-                </HeaderTemplate>
-                <ContentTemplate>
-                    <div id="break-even-input-row" class="grid gap-4 md:grid-cols-2">
-                        <SfNumericTextBox TValue="decimal"
-                                          Value="@TotalCosts"
-                                          Placeholder="Total Costs"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0"
-                                          Width="100%"
-                                          Format="C0">
-                            <NumericTextBoxEvents TValue="decimal" ValueChange="OnTotalCostsChanged" />
-                        </SfNumericTextBox>
-                        <SfNumericTextBox TValue="decimal"
-                                          Value="@ProjectedVolume"
-                                          Placeholder="Projected Volume"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0"
-                                          Step="1"
-                                          Width="100%"
-                                          Format="N0">
-                            <NumericTextBoxEvents TValue="decimal" ValueChange="OnProjectedVolumeChanged" />
-                        </SfNumericTextBox>
-                    </div>
+    <section id="break-even-input-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Inputs</p>
+        <div id="break-even-input-row" class="mt-3 grid gap-4 md:grid-cols-2">
+            <SfNumericTextBox TValue="decimal"
+                              Value="@TotalCosts"
+                              Placeholder="Total Costs"
+                              FloatLabelType="FloatLabelType.Auto"
+                              ShowSpinButton="false"
+                              Min="0"
+                              Width="100%"
+                              Format="C0">
+                <NumericTextBoxEvents TValue="decimal" ValueChange="OnTotalCostsChanged" />
+            </SfNumericTextBox>
+            <SfNumericTextBox TValue="decimal"
+                              Value="@ProjectedVolume"
+                              Placeholder="Projected Volume"
+                              FloatLabelType="FloatLabelType.Auto"
+                              ShowSpinButton="false"
+                              Min="0"
+                              Step="1"
+                              Width="100%"
+                              Format="N0">
+                <NumericTextBoxEvents TValue="decimal" ValueChange="OnProjectedVolumeChanged" />
+            </SfNumericTextBox>
+        </div>
 
-                    <div id="break-even-actions" class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="OnSaveWorkspaceBaseline">
-                            @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
-                        </SfButton>
-                        <p id="baseline-save-status" role="status" aria-live="polite" class="text-xs text-slate-500">@BaselineSaveStatus</p>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
+        <div id="break-even-actions" class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="OnSaveWorkspaceBaseline">
+                @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
+            </SfButton>
+            <p id="baseline-save-status" role="status" aria-live="polite" class="text-xs text-slate-500">@BaselineSaveStatus</p>
+        </div>
+    </section>
 
-            <DashboardLayoutPanel Id="break-even-visuals-panel" Column="0" Row="4" SizeX="12" SizeY="6">
-                <HeaderTemplate>
-                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
-                        Break-Even Visuals
-                    </div>
-                </HeaderTemplate>
-                <ContentTemplate>
-                    <div class="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
-                        <div id="break-even-gauge-card" class="rounded-2xl border border-slate-200 p-3">
-                            <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
-                                <CircularGaugeAxes>
-                                    <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
-                                        <CircularGaugeAxisLineStyle Width="8" Color="#e2e8f0" />
-                                        <CircularGaugeRanges>
-                                            <CircularGaugeRange Start="0" End="@Math.Max(0, GaugeMaximum * 0.55)" Color="#bae6fd" StartWidth="8" EndWidth="8" />
-                                            <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.55)" End="@Math.Max(0, GaugeMaximum * 0.85)" Color="#7dd3fc" StartWidth="8" EndWidth="8" />
-                                            <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.85)" End="@GaugeMaximum" Color="#0f172a" StartWidth="8" EndWidth="8" />
-                                        </CircularGaugeRanges>
-                                        <CircularGaugePointers>
-                                            <CircularGaugePointer Value="@GaugeCurrentRateValue" Radius="70%" Color="#0f172a" />
-                                        </CircularGaugePointers>
-                                    </CircularGaugeAxis>
-                                </CircularGaugeAxes>
-                            </SfCircularGauge>
-                        </div>
+    <section id="break-even-visuals-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Visuals</p>
+        <div class="mt-3 grid gap-4 xl:grid-cols-[1fr_1.4fr]">
+            <div id="break-even-gauge-card" class="rounded-2xl border border-slate-200 p-3">
+                <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
+                    <CircularGaugeAxes>
+                        <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
+                            <CircularGaugeAxisLineStyle Width="8" Color="#e2e8f0" />
+                            <CircularGaugeRanges>
+                                <CircularGaugeRange Start="0" End="@Math.Max(0, GaugeMaximum * 0.55)" Color="#bae6fd" StartWidth="8" EndWidth="8" />
+                                <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.55)" End="@Math.Max(0, GaugeMaximum * 0.85)" Color="#7dd3fc" StartWidth="8" EndWidth="8" />
+                                <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.85)" End="@GaugeMaximum" Color="#0f172a" StartWidth="8" EndWidth="8" />
+                            </CircularGaugeRanges>
+                            <CircularGaugePointers>
+                                <CircularGaugePointer Value="@GaugeCurrentRateValue" Radius="70%" Color="#0f172a" />
+                            </CircularGaugePointers>
+                        </CircularGaugeAxis>
+                    </CircularGaugeAxes>
+                </SfCircularGauge>
+            </div>
 
-                        <div id="break-even-chart-card" class="h-64 rounded-2xl border border-slate-200 p-3">
-                            <SfChart ID="break-even-rate-comparison-chart" Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
-                                <ChartArea>
-                                    <ChartAreaBorder Width="0"></ChartAreaBorder>
-                                </ChartArea>
-                                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-                                    <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-                                </ChartPrimaryXAxis>
-                                <ChartPrimaryYAxis LabelFormat="C2">
-                                    <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-                                </ChartPrimaryYAxis>
-                                <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-                                <ChartLegendSettings Visible="false"></ChartLegendSettings>
-                                <ChartSeriesCollection>
-                                    <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
-                                </ChartSeriesCollection>
-                            </SfChart>
-                        </div>
-                    </div>
-                </ContentTemplate>
-            </DashboardLayoutPanel>
-        </DashboardLayoutPanels>
-    </SfDashboardLayout>
+            <div id="break-even-chart-card" class="rounded-2xl border border-slate-200 p-3">
+                <SfChart ID="break-even-rate-comparison-chart" Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
+                    <ChartArea>
+                        <ChartAreaBorder Width="0"></ChartAreaBorder>
+                    </ChartArea>
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
+                        <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis LabelFormat="C2">
+                        <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                    </ChartPrimaryYAxis>
+                    <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
+                    <ChartLegendSettings Visible="false"></ChartLegendSettings>
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
+                    </ChartSeriesCollection>
+                </SfChart>
+            </div>
+        </div>
+    </section>
 </div>
-
-@code {
-    [Parameter] public decimal TotalCosts { get; set; }
-    [Parameter] public decimal ProjectedVolume { get; set; }
-    [Parameter] public string TotalCostsDisplay { get; set; } = string.Empty;
-    [Parameter] public string ProjectedVolumeDisplay { get; set; } = string.Empty;
-    [Parameter] public string RateDeltaDisplay { get; set; } = string.Empty;
-    [Parameter] public string BreakEvenRateDisplay { get; set; } = string.Empty;
-    [Parameter] public bool IsSavingBaseline { get; set; }
-    [Parameter] public string BaselineSaveStatus { get; set; } = string.Empty;
-    [Parameter] public double GaugeMaximum { get; set; }
-    [Parameter] public double GaugeCurrentRateValue { get; set; }
-    [Parameter] public IReadOnlyList<RateComparisonPoint> RateComparison { get; set; } = [];
-    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnTotalCostsChanged { get; set; }
-    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnProjectedVolumeChanged { get; set; }
-    [Parameter] public EventCallback OnSaveWorkspaceBaseline { get; set; }
-}
