@@ -42,7 +42,9 @@ public sealed class ComponentPageTests
 
 		Assert.Contains("Workspace Body", cut.Markup);
 		Assert.Contains("Syncfusion Finance Workspace", cut.Markup);
-		Assert.Contains("Workspace", cut.Markup);
+		Assert.Contains("e-appbar", cut.Markup);
+		Assert.Contains("e-sidebar", cut.Markup);
+		Assert.Contains("workspace-navigation-list", cut.Markup);
 		Assert.Contains("Reload", cut.Markup);
 	}
 
@@ -53,10 +55,12 @@ public sealed class ComponentPageTests
 
 		var cut = context.RenderComponent<NavMenu>();
 
-		Assert.Contains("Rate Study Console", cut.Markup);
-		Assert.Contains("Workspace", cut.Markup);
+		Assert.Contains("Workspace navigation", cut.Markup);
+		Assert.Contains("e-listview", cut.Markup);
+		Assert.Contains("Workspace Overview", cut.Markup);
+		Assert.Contains("Break-Even", cut.Markup);
 		Assert.Contains("Syncfusion 33.1.44", cut.Markup);
-		Assert.Equal("/", cut.Find(".app-brand-link").GetAttribute("href"));
+		Assert.Equal(9, cut.FindAll(".app-nav-link").Count);
 	}
 
 	[Fact]
@@ -133,7 +137,7 @@ public sealed class ComponentPageTests
 		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
 		Assert.Contains("Document Center", cut.Markup);
 		Assert.Contains("workspace-main-shell", cut.Markup);
-		Assert.Contains("workspace-sidebar-toggle", cut.Markup);
+		Assert.Contains("workspace-panel-toggle", cut.Markup);
 		Assert.Contains("workspace-jarvis-launcher", cut.Markup);
 		Assert.Contains("Break-Even", cut.Markup);
 		Assert.Contains("Rates", cut.Markup);

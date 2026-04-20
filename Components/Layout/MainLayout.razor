@@ -1,26 +1,135 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
 
-<div class="app-shell">
-    <aside class="app-sidebar">
-        <NavMenu />
-    </aside>
-
-    <main class="app-main">
-        <header class="app-header">
-            <div>
-                <p class="app-eyebrow">Wiley.co</p>
-                <h1 class="app-title">Syncfusion Finance Workspace</h1>
+<CascadingValue Value="_layoutContext">
+    <div class="app-shell @(IsLeftNavCollapsed ? "app-shell-nav-collapsed" : string.Empty)">
+        <SfAppBar ID="app-shell-appbar"
+                  CssClass="app-shell-appbar"
+                  ColorMode="AppBarColor.Primary"
+                  Mode="AppBarMode.Dense"
+                  IsSticky="true"
+                  Position="AppBarPosition.Top">
+            <button id="app-shell-nav-toggle"
+                    type="button"
+                    class="e-control e-btn e-lib e-inherit app-shell-nav-toggle"
+                    @onclick="ToggleLeftNavAsync">
+                <span class="e-btn-icon e-icons e-menu" aria-hidden="true"></span>
+                <span>@NavigationRailToggleText</span>
+            </button>
+            <div class="app-shell-brand" aria-label="Wiley.co workspace shell">
+                <span class="app-eyebrow">Wiley.co</span>
+                <span class="app-title">Syncfusion Finance Workspace</span>
             </div>
-        </header>
+            <AppBarSpacer />
+            <span class="app-shell-appbar-copy">Production workspace shell</span>
+        </SfAppBar>
 
-        <article class="app-content">
-            @Body
-        </article>
-    </main>
-</div>
+        <div class="app-shell-body">
+            <SfSidebar ID="app-shell-sidebar"
+                       EnableDock="true"
+                       DockSize="5rem"
+                       Width="19rem"
+                       Type="SidebarType.Push"
+                       Position="SidebarPosition.Left"
+                       Target=".e-main-content"
+                       ShowBackdrop="false"
+                       CloseOnDocumentClick="false"
+                       EnableGestures="true"
+                       MediaQuery="(min-width: 768px)"
+                       IsOpen="@(!IsLeftNavCollapsed)"
+                       IsOpenChanged="HandleLeftNavOpenChangedAsync">
+                <NavMenu />
+            </SfSidebar>
+
+            <section id="app-shell-content" class="e-main-content app-shell-content">
+                <main class="app-content">
+                    @Body
+                </main>
+            </section>
+        </div>
+    </div>
+</CascadingValue>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private const string LeftNavStorageKey = "wiley.workspace.left-nav-collapsed.v1";
+
+    private readonly WorkspaceLayoutContext _layoutContext = new();
+    private bool leftNavCollapsed;
+    private bool leftNavStateRestored;
+
+    protected bool IsLeftNavCollapsed => leftNavCollapsed;
+
+    private string NavigationRailToggleText => IsLeftNavCollapsed ? "Expand navigation rail" : "Collapse navigation rail";
+
+    protected override void OnInitialized()
+    {
+        _layoutContext.ToggleLeftNavAsync = ToggleLeftNavAsync;
+        SyncLayoutContext();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || leftNavStateRestored)
+        {
+            return;
+        }
+
+        leftNavStateRestored = true;
+
+        try
+        {
+            var storedValue = await JSRuntime.InvokeAsync<string?>("wileyWorkspaceStorage.getItem", LeftNavStorageKey);
+
+            if (bool.TryParse(storedValue, out var restoredCollapsedState) && restoredCollapsedState != leftNavCollapsed)
+            {
+                leftNavCollapsed = restoredCollapsedState;
+                SyncLayoutContext();
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private Task ToggleLeftNavAsync()
+    {
+        return SetLeftNavCollapsedAsync(!leftNavCollapsed);
+    }
+
+    private Task HandleLeftNavOpenChangedAsync(bool isOpen)
+    {
+        return SetLeftNavCollapsedAsync(!isOpen);
+    }
+
+    private async Task SetLeftNavCollapsedAsync(bool collapsed)
+    {
+        if (leftNavCollapsed == collapsed)
+        {
+            return;
+        }
+
+        leftNavCollapsed = collapsed;
+        SyncLayoutContext();
+        StateHasChanged();
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("wileyWorkspaceStorage.setItem", LeftNavStorageKey, leftNavCollapsed.ToString());
+        }
+        catch
+        {
+        }
+    }
+
+    private void SyncLayoutContext()
+    {
+        _layoutContext.IsLeftNavCollapsed = leftNavCollapsed;
+    }
+}

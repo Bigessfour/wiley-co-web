@@ -1,56 +1,42 @@
-﻿<div class="app-brand">
-    <p class="app-brand-kicker">Wiley Widget</p>
-    <a class="app-brand-link" href="/">Rate Study Console</a>
-    <p class="app-brand-copy">Production workspace shell for rate analysis, dashboards, and guided planning.</p>
-</div>
+﻿<div class="app-nav-shell">
+    <SfListView ID="workspace-navigation-list"
+                CssClass="app-nav-list"
+                ShowHeader="true"
+                HeaderTitle="Workspace navigation"
+                DataSource="@NavigationItems">
+        <Template Context="navItem">
+            <SfTooltip Content="@navItem.Tooltip"
+                       OpensOn="Hover"
+                       Position="Position.RightCenter"
+                       ShowTipPointer="true">
+                <NavLink class="app-nav-link" href="@navItem.Href" Match="@navItem.Match" aria-label="@navItem.Label">
+                    <span class="app-nav-link-index" aria-hidden="true">@navItem.Index</span>
+                    <span class="app-nav-link-label">@navItem.Label</span>
+                </NavLink>
+            </SfTooltip>
+        </Template>
+    </SfListView>
 
-<nav class="app-nav" aria-label="Primary">
-    <NavLink class="app-nav-link" href="/wiley-workspace" Match="NavLinkMatch.All">
-        <span aria-hidden="true">01</span>
-        <span>Workspace Overview</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/break-even">
-        <span aria-hidden="true">02</span>
-        <span>Break-Even</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/rates">
-        <span aria-hidden="true">03</span>
-        <span>Rates</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/quickbooks-import">
-        <span aria-hidden="true">04</span>
-        <span>QuickBooks Import</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/scenario">
-        <span aria-hidden="true">05</span>
-        <span>Scenario Planner</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/customers">
-        <span aria-hidden="true">06</span>
-        <span>Customer Viewer</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/trends">
-        <span aria-hidden="true">07</span>
-        <span>Trends</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/decision-support">
-        <span aria-hidden="true">08</span>
-        <span>Decision Support</span>
-    </NavLink>
-    <NavLink class="app-nav-link" href="/wiley-workspace/data-dashboard">
-        <span aria-hidden="true">09</span>
-        <span>Data Dashboard</span>
-    </NavLink>
-</nav>
-
-<div class="app-sidebar-footer">
-    <div class="app-sidebar-stat">
-        <span>UI stack</span>
-        <strong>Syncfusion 33.1.44</strong>
-    </div>
-    <div class="app-sidebar-stat">
-        <span>Host</span>
-        <strong>AWS Amplify</strong>
+    <div class="app-sidebar-footer">
+        <span class="e-badge e-badge-dark">Syncfusion 33.1.44</span>
+        <span class="e-badge e-badge-info">AWS Amplify</span>
     </div>
 </div>
+
+@code {
+    private static readonly IReadOnlyList<WorkspaceNavItem> NavigationItems =
+    [
+        new("01", "Workspace Overview", "/wiley-workspace", NavLinkMatch.All, "Open the workspace overview"),
+        new("02", "Break-Even", "/wiley-workspace/break-even", NavLinkMatch.Prefix, "Inspect rate balance and gauge inputs"),
+        new("03", "Rates", "/wiley-workspace/rates", NavLinkMatch.Prefix, "Adjust the live rate controls"),
+        new("04", "QuickBooks Import", "/wiley-workspace/quickbooks-import", NavLinkMatch.Prefix, "Stage and validate QuickBooks exports"),
+        new("05", "Scenario Planner", "/wiley-workspace/scenario", NavLinkMatch.Prefix, "Model what-if scenarios and saved snapshots"),
+        new("06", "Customer Viewer", "/wiley-workspace/customers", NavLinkMatch.Prefix, "Review customer impacts and exports"),
+        new("07", "Trends", "/wiley-workspace/trends", NavLinkMatch.Prefix, "Inspect projected rate movement"),
+        new("08", "Decision Support", "/wiley-workspace/decision-support", NavLinkMatch.Prefix, "Open Jarvis decision support"),
+        new("09", "Data Dashboard", "/wiley-workspace/data-dashboard", NavLinkMatch.Prefix, "Open the executive dashboard")
+    ];
+
+    private sealed record WorkspaceNavItem(string Index, string Label, string Href, NavLinkMatch Match, string Tooltip);
+}
 

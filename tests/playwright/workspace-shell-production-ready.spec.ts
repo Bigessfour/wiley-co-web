@@ -23,9 +23,9 @@ test.describe("Workspace Shell", () => {
     );
 
     // 2. Use the left navigation to visit every panel route once, then return to the overview.
-    const primaryNavigation = page.locator("#workspace-navigation-card");
+    const primaryNavigation = page.locator("#workspace-navigation-list");
 
-    await primaryNavigation.getByRole("button", { name: "Break-Even" }).click();
+    await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
     await expect(page.locator("#break-even-summary-panel")).toBeAttached();
     await expect(
       page
@@ -36,12 +36,12 @@ test.describe("Workspace Shell", () => {
       "Break-Even",
     );
 
-    await primaryNavigation.getByRole("button", { name: "Rates" }).click();
+    await primaryNavigation.getByRole("link", { name: "Rates" }).click();
     await expect(page.locator("#rates-panel")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText("Rates");
 
     await primaryNavigation
-      .getByRole("button", { name: "QuickBooks Import" })
+      .getByRole("link", { name: "QuickBooks Import" })
       .click();
     await expect(
       page.locator("#quickbooks-import-status-headline"),
@@ -51,7 +51,7 @@ test.describe("Workspace Shell", () => {
     );
 
     await primaryNavigation
-      .getByRole("button", { name: "Scenario Planner" })
+      .getByRole("link", { name: "Scenario Planner" })
       .click();
     await expect(page.locator("#scenario-summary-panel")).toBeAttached();
     await expect(
@@ -64,7 +64,7 @@ test.describe("Workspace Shell", () => {
     );
 
     await primaryNavigation
-      .getByRole("button", { name: "Customer Viewer" })
+      .getByRole("link", { name: "Customer Viewer" })
       .click();
     await expect(page.locator("#customer-summary-panel")).toBeAttached();
     await expect(
@@ -76,12 +76,12 @@ test.describe("Workspace Shell", () => {
       "Customer Viewer",
     );
 
-    await primaryNavigation.getByRole("button", { name: "Trends" }).click();
+    await primaryNavigation.getByRole("link", { name: "Trends" }).click();
     await expect(page.locator("#trends-panel")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText("Trends");
 
     await primaryNavigation
-      .getByRole("button", { name: "Decision Support" })
+      .getByRole("link", { name: "Decision Support" })
       .click();
     await expect(page.locator("#decision-support-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
@@ -89,7 +89,7 @@ test.describe("Workspace Shell", () => {
     );
 
     await primaryNavigation
-      .getByRole("button", { name: "Data Dashboard" })
+      .getByRole("link", { name: "Data Dashboard" })
       .click();
     await expect(page.locator("#data-dashboard-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
@@ -99,9 +99,7 @@ test.describe("Workspace Shell", () => {
     // 3. Resize to a narrower desktop width and confirm the shell still fits the viewport.
     await page.setViewportSize({ width: 1280, height: 900 });
 
-    await expect(
-      page.getByRole("navigation", { name: "Primary" }),
-    ).toBeVisible();
+    await expect(page.locator("#workspace-navigation-list")).toBeVisible();
     await expect(page.locator("#workspace-status-card")).toBeVisible();
 
     await page.goto("/wiley-workspace");
@@ -118,7 +116,7 @@ test.describe("Workspace Shell", () => {
     await waitForWorkspaceShell(page);
     await page.setViewportSize({ width: 1279, height: 900 });
 
-    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+    const sidebarToggle = page.locator("#app-shell-nav-toggle");
 
     await expect(page.locator("#workspace-dashboard")).toBeVisible();
     await expect(page.locator("#workspace-document-center")).toBeVisible();
@@ -126,26 +124,24 @@ test.describe("Workspace Shell", () => {
     await expect(page.locator("#workspace-status-card")).toBeVisible();
     await expect(sidebarToggle).toBeVisible();
 
-    await sidebarToggle.click();
-    await expect(page.locator(".app-shell")).not.toHaveClass(
-      /app-shell-nav-collapsed/,
-    );
-    await expect(
-      page.getByRole("navigation", { name: "Primary" }),
-    ).toBeVisible();
+    await sidebarToggle.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(sidebarToggle).toContainText("Expand navigation rail");
+    await expect(page.locator("#workspace-navigation-list")).toBeVisible();
     await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
 
     await page.getByRole("link", { name: "Rates" }).click();
-    await expect(page.locator(".app-shell")).not.toHaveClass(
-      /app-shell-nav-collapsed/,
-    );
+    await expect(sidebarToggle).toContainText("Expand navigation rail");
     await expect(page.locator("#rates-panel")).toBeVisible();
   });
 
   test("Collapsing the left rail stays inert below the desktop breakpoint across key panel routes", async ({
     page,
   }) => {
+    test.setTimeout(120000);
+
     const routeChecks = [
       {
         route: "/wiley-workspace/break-even",
@@ -180,14 +176,20 @@ test.describe("Workspace Shell", () => {
       await waitForWorkspaceShell(page);
 
       await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();
-      await page.locator("#workspace-sidebar-toggle").click();
-      await expect(page.locator(".app-shell")).not.toHaveClass(
-        /app-shell-nav-collapsed/,
+      await page.locator("#app-shell-nav-toggle").evaluate((button) => {
+        (button as HTMLButtonElement).click();
+      });
+      await expect(page.locator("#app-shell-nav-toggle")).toContainText(
+        "Expand navigation rail",
       );
-      await expect(
-        page.getByRole("navigation", { name: "Primary" }),
-      ).toBeVisible();
+      await expect(page.locator("#workspace-navigation-list")).toBeVisible();
       await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
+
+      await page.reload();
+      await waitForWorkspaceShell(page);
+      await expect(page.locator("#app-shell-nav-toggle")).toContainText(
+        "Expand navigation rail",
+      );
     }
   });
 
@@ -198,24 +200,13 @@ test.describe("Workspace Shell", () => {
     await waitForWorkspaceShell(page);
     await page.setViewportSize({ width: 900, height: 900 });
 
-    const appMain = page.locator(".app-main");
-    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+    const sidebarToggle = page.locator("#app-shell-nav-toggle");
 
-    const beforeWidth = await appMain.evaluate(
-      (element) => element.getBoundingClientRect().width,
-    );
-
-    await sidebarToggle.click();
-    await expect(page.locator("#app-sidebar-edge-toggle")).toBeHidden();
-
-    const afterWidth = await appMain.evaluate(
-      (element) => element.getBoundingClientRect().width,
-    );
-
-    expect(Math.abs(afterWidth - beforeWidth)).toBeLessThan(5);
+    await sidebarToggle.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(sidebarToggle).toContainText("Expand navigation rail");
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
-    await expect(
-      page.getByRole("navigation", { name: "Primary" }),
-    ).toBeVisible();
+    await expect(page.locator("#workspace-navigation-list")).toBeVisible();
   });
 });

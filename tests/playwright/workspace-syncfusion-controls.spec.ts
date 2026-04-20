@@ -78,15 +78,22 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await waitForWorkspaceShell(page);
     await page.setViewportSize({ width: 1279, height: 900 });
 
-    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+    const sidebarToggle = page.locator("#app-shell-nav-toggle");
+    const panelToggle = page.locator("#workspace-panel-toggle");
 
     await expect(page.locator("#workspace-dashboard")).toBeVisible();
     await expect(page.locator("#workspace-document-center")).toBeVisible();
     await expect(sidebarToggle).toBeVisible();
+    await expect(panelToggle).toBeVisible();
     await expect(page.locator("#workspace-jarvis-launcher")).toBeVisible();
 
-    await sidebarToggle.click();
-    await expect(sidebarToggle).toContainText("Open navigation");
+    await sidebarToggle.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(sidebarToggle).toContainText("Expand navigation rail");
+
+    await panelToggle.click();
+    await expect(panelToggle).toContainText("Open workspace panel");
 
     await page.locator("#workspace-jarvis-launcher").click();
     await expect(page.locator("#workspace-jarvis-dock")).toBeVisible();
@@ -100,7 +107,8 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await waitForWorkspaceShell(page);
     await page.setViewportSize({ width: 1279, height: 900 });
 
-    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+    const sidebarToggle = page.locator("#app-shell-nav-toggle");
+    const panelToggle = page.locator("#workspace-panel-toggle");
     const sidebarRail = page.locator("aside.workspace-sidebar");
     const sidebarShell = page.locator("#workspace-sidebar-shell");
     const jarvisLauncher = page.locator("#workspace-jarvis-launcher");
@@ -108,9 +116,14 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     await expect(sidebarShell).toBeVisible();
 
-    await sidebarToggle.click();
-    await expect(sidebarToggle).toContainText("Open navigation");
-    await expect(sidebarRail).toHaveClass(/lg:w-16/);
+    await sidebarToggle.evaluate((button) => {
+      (button as HTMLButtonElement).click();
+    });
+    await expect(sidebarToggle).toContainText("Expand navigation rail");
+
+    await panelToggle.click();
+    await expect(panelToggle).toContainText("Open workspace panel");
+    await expect(sidebarRail).toHaveClass(/hidden lg:block lg:w-16/);
     await expect(sidebarShell).toBeVisible();
 
     await jarvisLauncher.click();

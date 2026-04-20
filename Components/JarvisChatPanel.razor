@@ -73,6 +73,7 @@
                         <div class="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-2">
                             <div id="jarvis-chat-ui" class="relative h-[19rem] overflow-hidden rounded-xl border border-slate-200 bg-white sm:h-[24rem]" aria-busy="@IsChatBusy">
                                 <SfAIAssistView ID="jarvis-chat-surface"
+                                                @ref="JarvisAssistView"
                                                 Height="100%"
                                                 Width="100%"
                                                 @bind-Prompt="ChatQuestion"
@@ -102,6 +103,22 @@
                                                         <div class="mt-1 whitespace-pre-line text-slate-700">@context.Response</div>
                                                     </div>
                                                 </ResponseItemTemplate>
+                                                <FooterTemplate>
+                                                    <div class="flex flex-col gap-3 border-t border-slate-200 bg-white px-3 py-3">
+                                                        <SfTextBox ID="jarvis-question-input"
+                                                                   Placeholder="Ask about the workspace, codebase, or AI tools"
+                                                                   FloatLabelType="FloatLabelType.Auto"
+                                                                   Multiline="true"
+                                                                   Rows="3"
+                                                                   ShowClearButton="true"
+                                                                   Width="100%"
+                                                                   @bind-Value="ChatQuestion" />
+                                                        <div class="flex flex-wrap gap-3">
+                                                            <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskChat)" OnClick="SubmitFooterPromptAsync">Ask Jarvis</SfButton>
+                                                            <SfButton Disabled="@IsChatBusy" OnClick="ResetChatAsync">Reset Thread</SfButton>
+                                                        </div>
+                                                    </div>
+                                                </FooterTemplate>
                                             </AssistView>
                                         </AssistViews>
                                     </ChildContent>
@@ -172,20 +189,6 @@
                                         }
                                     </div>
                                 }
-                            </div>
-
-                            <SfTextBox ID="jarvis-question-input"
-                                       Placeholder="Ask about the workspace, codebase, or AI tools"
-                                       FloatLabelType="FloatLabelType.Auto"
-                                       Multiline="true"
-                                       Rows="4"
-                                       ShowClearButton="true"
-                                       Width="100%"
-                                       @bind-Value="ChatQuestion" />
-
-                            <div class="flex flex-wrap gap-3">
-                                <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskChat)" OnClick="AskChatAsync">Ask Jarvis</SfButton>
-                                <SfButton Disabled="@IsChatBusy" OnClick="ResetChatAsync">Reset Thread</SfButton>
                             </div>
 
                             <div id="jarvis-chat-answer" role="status" aria-live="polite" aria-busy="@IsChatBusy" class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">

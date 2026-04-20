@@ -10,6 +10,8 @@ namespace WileyCoWeb.Components;
 
 public partial class JarvisChatPanel : ComponentBase, IDisposable
 {
+    private SfAIAssistView? JarvisAssistView { get; set; }
+
     private readonly List<WorkspaceChatMessage> chatTranscript = [];
     private readonly List<AssistViewPrompt> chatPrompts = [];
     private readonly List<WorkspaceRecommendationHistoryItem> recommendationHistory = [];
@@ -76,14 +78,38 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         await InvokeAsync(StateHasChanged);
     }
 
-    protected Task RefreshKnowledgeFromButtonAsync() => RefreshKnowledgeAsync(force: true);
+    protected Task RefreshKnowledgeFromButtonAsync()
+    {
+        return RefreshKnowledgeAsync(force: true);
+    }
 
     protected async Task OnPromptRequestedAsync(AssistViewPromptRequestedEventArgs args)
-        => await SubmitPromptAsync(string.IsNullOrWhiteSpace(args?.Prompt) ? ChatQuestion : args.Prompt.Trim(), args);
+    {
+        await SubmitPromptAsync(string.IsNullOrWhiteSpace(args?.Prompt) ? ChatQuestion : args.Prompt.Trim(), args);
+    }
 
     public Task AskChatAsync()
     {
         return SubmitPromptAsync(ChatQuestion);
+    }
+
+    protected async Task SubmitFooterPromptAsync()
+    {
+        if (!CanAskChat)
+        {
+            return;
+        }
+
+        if (JarvisAssistView is null)
+        {
+            await SubmitPromptAsync(ChatQuestion);
+            return;
+        }
+
+        var prompt = ChatQuestion.Trim();
+        await JarvisAssistView.ExecutePromptAsync(prompt).ConfigureAwait(false);
+        ChatQuestion = string.Empty;
+        await InvokeAsync(StateHasChanged);
     }
 
     public async Task ResetChatAsync()
@@ -378,10 +404,13 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
             "Filtered customer records currently contributing to the viewer and service mix review.");
     }
 
-    private InsightCard CreateProjectionDriftInsight() => new(
+    private InsightCard CreateProjectionDriftInsight()
+    {
+        return new(
         "Projection drift",
         GetProjectionDrift().ToString("C2"),
         "Difference between the first and last projected rates in the trend series.");
+    }
 
     private void AddRateGapRecommendation(List<RecommendationItem> recommendations)
     {
@@ -691,7 +720,10 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         return scenarioCount.ToString(CultureInfo.InvariantCulture);
     }
 
-    private decimal GetProjectionDrift() => GetLastProjectionRateValue() - GetFirstProjectionRateValue();
+    private decimal GetProjectionDrift()
+    {
+        return GetLastProjectionRateValue() - GetFirstProjectionRateValue();
+    }
 
     public void Dispose()
     {

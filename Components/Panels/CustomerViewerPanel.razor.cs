@@ -27,9 +27,9 @@ public partial class CustomerViewerPanel : ComponentBase
     private bool isDeleteDialogOpen;
     private bool isEditingExistingCustomer;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        await LoadCustomersAsync();
+        return LoadCustomersAsync();
     }
 
     private async Task RefreshCustomerDirectoryAsync()

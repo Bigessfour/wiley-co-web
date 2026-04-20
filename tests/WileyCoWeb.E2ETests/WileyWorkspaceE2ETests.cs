@@ -432,18 +432,18 @@ public sealed class WileyWorkspaceE2ETests
 	{
 		var buttonName = panelKey switch
 		{
-			"break-even" => "Break-Even",
-			"rates" => "Rates",
-			"scenario" => "Scenario Planner",
-			"customers" => "Customer Viewer",
-			"trends" => "Trends",
-			"quickbooks-import" => "QuickBooks Import",
-			"decision-support" => "Decision Support",
-			"data-dashboard" => "Data Dashboard",
+			"break-even" => "Open Break-Even",
+			"rates" => "Open Rates",
+			"scenario" => "Open Scenario Planner",
+			"customers" => "Open Customer Viewer",
+			"trends" => "Open Trends",
+			"quickbooks-import" => "Open Import",
+			"decision-support" => "Open Decision Support",
+			"data-dashboard" => "Open Data Dashboard",
 			_ => throw new ArgumentOutOfRangeException(nameof(panelKey), panelKey, "Unsupported workspace panel key.")
 		};
 
-		await page.GetByRole(AriaRole.Button, new() { Name = buttonName }).ClickAsync();
+		await page.GetByRole(AriaRole.Button, new() { Name = buttonName, Exact = true }).ClickAsync();
 	}
 
 	private static async Task UploadQuickBooksFileAsync(IPage page, string filePath)

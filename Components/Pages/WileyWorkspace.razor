@@ -70,9 +70,11 @@
         <div class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Workspace controls</p>
-                <p class="mt-1 text-sm text-slate-600">Collapse the navigation rail to give charts, grids, and gauges more room.</p>
+                <p class="mt-1 text-sm text-slate-600">Collapse the workspace panel to give charts, grids, and gauges more room.</p>
             </div>
-            <SfButton id="workspace-sidebar-toggle" CssClass="e-outline" OnClick="ToggleSidebar">@(IsSidebarOpen ? "Collapse navigation" : "Open navigation")</SfButton>
+            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <SfButton id="workspace-panel-toggle" CssClass="e-outline" OnClick="ToggleSidebar">@(IsSidebarOpen ? "Collapse workspace panel" : "Open workspace panel")</SfButton>
+            </div>
         </div>
 
         <div class="flex flex-col gap-4 lg:flex-row">
