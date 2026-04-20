@@ -9,6 +9,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 
 RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish .
 RUN chown -R appuser:appuser /app

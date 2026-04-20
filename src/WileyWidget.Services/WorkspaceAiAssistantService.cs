@@ -19,6 +19,7 @@ public sealed class WorkspaceAiAssistantService
     {
         PropertyNameCaseInsensitive = true
     };
+    private static readonly Uri directResponsesEndpoint = NormalizeResponsesEndpoint("https://api.x.ai/v1");
 
     private readonly ILogger<WorkspaceAiAssistantService> logger;
     private readonly IConfiguration configuration;
@@ -63,8 +64,8 @@ public sealed class WorkspaceAiAssistantService
         legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
         chatCompletionEndpoint = NormalizeChatCompletionEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:ChatEndpoint", "XAI:Endpoint"));
         legacyXaiEndpoint = NormalizeResponsesEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:Endpoint"));
-        // Per xAI docs (docs.x.ai/developers/models): use 'grok-4' alias for Grok 4.20 (flagship with 2M context, function calling, low hallucination). Key via Bearer token from AWS Secrets Manager "Grok" (already configured).
-        legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4";
+        // Per xAI docs (docs.x.ai/developers/models): prefer the grok-4-1-fast-reasoning family for function calling and reasoning.
+        legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
         legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
         legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
         legacyXaiTimeoutSeconds = GetConfiguredInt(15, "XaiTimeoutSeconds", "XAI:TimeoutSeconds");
@@ -412,8 +413,40 @@ public sealed class WorkspaceAiAssistantService
         }
         catch (Exception ex)
         {
+            if (!IsDirectXaiEndpoint(legacyXaiEndpoint) && ShouldRetryDirectly(ex))
+            {
+                try
+                {
+                    using var directRequestMessage = new HttpRequestMessage(HttpMethod.Post, directResponsesEndpoint)
+                    {
+                        Content = JsonContent.Create(requestBody, options: JsonOptions)
+                    };
+                    directRequestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKeyResolution.ApiKey);
+
+                    var directResponse = await client.SendAsync(directRequestMessage, cancellationToken).ConfigureAwait(false);
+                    if (directResponse.IsSuccessStatusCode)
+                    {
+                        var directXaiResponse = await directResponse.Content.ReadFromJsonAsync<LegacyXaiResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+                        var directAnswer = directXaiResponse?.output?.FirstOrDefault()?.content?.FirstOrDefault()?.text?.Trim();
+                        if (!string.IsNullOrWhiteSpace(directAnswer))
+                        {
+                            logger.LogInformation("Workspace AI legacy xAI fallback succeeded directly against api.x.ai after proxy transport failure.");
+                            return new LegacyAnswerResult(directAnswer);
+                        }
+                    }
+
+                    logger.LogWarning(
+                        "Workspace AI direct xAI fallback retry did not return an answer (StatusCode={StatusCode}).",
+                        directResponse.StatusCode);
+                }
+                catch (Exception directEx)
+                {
+                    logger.LogWarning(directEx, "Workspace AI direct xAI fallback retry failed.");
+                }
+            }
+
             logger.LogError(ex, "Workspace AI legacy xAI fallback could not produce an answer.");
-            return new LegacyAnswerResult(null, "legacy_request_exception", $"{ex.GetType().Name}: {ex.Message}");
+            return new LegacyAnswerResult(null, "legacy_request_exception", DescribeException(ex));
         }
         finally
         {
@@ -829,6 +862,7 @@ public sealed class WorkspaceAiAssistantService
         {
             "missing_api_key" => "Runtime diagnostics: no usable XAI_API_KEY value was visible to the process, so Semantic Kernel chat did not initialize.",
             "rate_limited" => "Runtime diagnostics: xAI accepted the request but returned HTTP 429 Too Many Requests. Jarvis is connected, but the current xAI key or team tier is out of rate-limit headroom. Reduce request frequency, use xAI Console to review limits, or move to a higher tier.",
+            "transport_tls_failed" => $"Runtime diagnostics: the live xAI endpoint failed the TLS handshake and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "kernel_initialization_failed" => $"Runtime diagnostics: Semantic Kernel initialization failed before live chat became available ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "semantic_kernel_request_failed" => $"Runtime diagnostics: live Semantic Kernel execution failed and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "legacy_disabled" => "Runtime diagnostics: the legacy xAI fallback path is disabled, so Jarvis remained on deterministic guidance after live initialization failed.",
@@ -839,7 +873,7 @@ public sealed class WorkspaceAiAssistantService
 
     private static string TryClassifySemanticKernelFailure(Exception exception)
     {
-        var message = exception.Message;
+        var message = DescribeException(exception);
 
         if (message.Contains("429", StringComparison.OrdinalIgnoreCase)
             || message.Contains("too many requests", StringComparison.OrdinalIgnoreCase)
@@ -848,7 +882,50 @@ public sealed class WorkspaceAiAssistantService
             return "rate_limited";
         }
 
+        if (message.Contains("ssl connection could not be established", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("certificate", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("authenticationexception", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("handshake", StringComparison.OrdinalIgnoreCase))
+        {
+            return "transport_tls_failed";
+        }
+
         return "semantic_kernel_request_failed";
+    }
+
+    private static bool ShouldRetryDirectly(Exception exception)
+    {
+        var message = DescribeException(exception);
+        return message.Contains("ssl connection could not be established", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("certificate", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("authenticationexception", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("handshake", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDirectXaiEndpoint(Uri endpoint)
+        => string.Equals(endpoint.Host, "api.x.ai", StringComparison.OrdinalIgnoreCase);
+
+    private static string DescribeException(Exception exception)
+    {
+        var builder = new StringBuilder();
+        var current = exception;
+        var depth = 0;
+
+        while (current is not null && depth < 4)
+        {
+            if (depth > 0)
+            {
+                builder.Append(" | Inner: ");
+            }
+
+            builder.Append(current.GetType().Name);
+            builder.Append(": ");
+            builder.Append(current.Message);
+            current = current.InnerException;
+            depth++;
+        }
+
+        return builder.ToString();
     }
 
     private static string SanitizeDiagnosticMessage(string? value)
