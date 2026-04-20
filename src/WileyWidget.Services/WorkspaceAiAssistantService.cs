@@ -87,27 +87,6 @@ public sealed class WorkspaceAiAssistantService
         var isFirstConversation = conversationHistory.Count == 0;
         var contextSummary = BuildContextSummary(request);
 
-        if (isFirstConversation)
-        {
-            var onboardingAnswer = BuildOnboardingAnswer(activeUser, request);
-            conversationHistory = AppendTurn(conversationHistory, question, onboardingAnswer);
-            await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-            await SaveRecommendationAsync(conversationId, activeUser, request, question, onboardingAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
-
-            var onboardingResponse = new WorkspaceChatResponse(question, onboardingAnswer, true, contextSummary)
-            {
-                UserDisplayName = activeUser.DisplayName,
-                UserProfileSummary = BuildOnboardingProfileSummary(activeUser),
-                ConversationId = conversationId,
-                ConversationMessageCount = conversationHistory.Count,
-                IsFirstConversation = true,
-                CanResetConversation = true
-            };
-
-            logger.LogInformation("Workspace AI returned onboarding prompt for first conversation {ConversationId}", conversationId);
-            return onboardingResponse;
-        }
-
         var assistant = kernelContext.Value;
         string? fallbackDiagnosticCode = null;
         string? fallbackDiagnosticMessage = null;
@@ -189,6 +168,59 @@ public sealed class WorkspaceAiAssistantService
                 conversationHistory.Count,
                 fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
             return ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
+        }
+
+        if (string.Equals(fallbackDiagnosticCode, "transport_tls_failed", StringComparison.Ordinal) && !IsDirectXaiEndpoint(chatCompletionEndpoint))
+        {
+            try
+            {
+                var directAssistant = CreateKernelContext(directChatCompletionEndpoint);
+                if (directAssistant is not null)
+                {
+                    var directResponse = await ExecuteSemanticKernelAsync(directAssistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+                    if (directResponse is not null)
+                    {
+                        logger.LogInformation(
+                            "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy TLS failure.",
+                            request.SelectedEnterprise,
+                            request.SelectedFiscalYear);
+                        return directResponse;
+                    }
+                }
+            }
+            catch (Exception directEx)
+            {
+                fallbackDiagnosticCode = TryClassifySemanticKernelFailure(directEx);
+                fallbackDiagnosticMessage = $"{directEx.GetType().Name}: {directEx.Message}";
+                logger.LogWarning(
+                    directEx,
+                    "Workspace AI direct xAI retry failed for {Enterprise} FY {FiscalYear} (model: {Model}, directChatEndpoint: {DirectChatEndpoint})",
+                    request.SelectedEnterprise,
+                    request.SelectedFiscalYear,
+                    legacyXaiModel,
+                    directChatCompletionEndpoint);
+            }
+        }
+
+        if (isFirstConversation)
+        {
+            var onboardingAnswer = BuildOnboardingAnswer(activeUser, request);
+            conversationHistory = AppendTurn(conversationHistory, question, onboardingAnswer);
+            await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
+            await SaveRecommendationAsync(conversationId, activeUser, request, question, onboardingAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
+
+            var onboardingResponse = new WorkspaceChatResponse(question, onboardingAnswer, true, contextSummary)
+            {
+                UserDisplayName = activeUser.DisplayName,
+                UserProfileSummary = BuildOnboardingProfileSummary(activeUser),
+                ConversationId = conversationId,
+                ConversationMessageCount = conversationHistory.Count,
+                IsFirstConversation = true,
+                CanResetConversation = true
+            };
+
+            logger.LogInformation("Workspace AI returned onboarding fallback for first conversation {ConversationId}", conversationId);
+            return onboardingResponse;
         }
 
         var legacyResult = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);

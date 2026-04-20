@@ -18,10 +18,10 @@ namespace WileyCoWeb.ComponentTests;
 public sealed class JarvisChatPanelTests : TestContext
 {
 	[Fact]
-	public async Task AskJarvis_FirstConversationShowsOnboardingPrompt()
+	public async Task AskJarvis_FirstConversationUsesLiveAnswerBeforeOnboardingFallback()
 	{
 		var state = new WorkspaceState();
-		var handler = new RecordingHttpMessageHandler(firstResponseAnswer: "Hi Guest. I’ll keep this thread tied to Water FY 2026. Tell me your preferred name, your role or department, and what you want Jarvis to help with.", firstResponseProfileSummary: "Onboarding pending for Guest: preferred name, role or department, and Jarvis goals have not been captured yet.");
+		var handler = new RecordingHttpMessageHandler(firstResponseAnswer: "Live answer", firstResponseProfileSummary: "Preferences summary");
 
 		Services.AddSingleton(state);
 		Services.AddSingleton(new WorkspaceAiApiService(new HttpClient(handler)
@@ -38,10 +38,11 @@ public sealed class JarvisChatPanelTests : TestContext
 		await AskJarvisAsync(cut, "What should I know about the current workspace?");
 
 		Assert.Contains("jarvis-chat-ui", cut.Markup, StringComparison.OrdinalIgnoreCase);
-		Assert.Contains("preferred name", cut.Markup, StringComparison.OrdinalIgnoreCase);
+		Assert.Single(handler.ChatRequests);
+		Assert.Contains("Live answer", cut.Markup);
 		Assert.Contains("Profile summary", cut.Markup);
-		Assert.Contains("Onboarding pending", cut.Markup);
 		Assert.Contains("Conversation jarvis:alex-morgan:water-utility:2026", cut.Markup);
+		Assert.DoesNotContain("preferred name", cut.Markup, StringComparison.OrdinalIgnoreCase);
 	}
 
 	[Fact]
