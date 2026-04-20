@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { waitForWorkspaceShell } from "./support/workspace";
 
-const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v1";
+const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
 
 test.describe("Workspace Shell", () => {
   test("Workspace shell and navigation stay usable on a fresh load", async ({
@@ -127,7 +127,7 @@ test.describe("Workspace Shell", () => {
     await sidebarToggle.evaluate((button) => {
       (button as HTMLButtonElement).click();
     });
-    await expect(sidebarToggle).toContainText("Expand navigation rail");
+    await expect(sidebarToggle).toContainText("Collapse navigation rail");
     await expect(page.locator("#workspace-navigation-list")).toBeVisible();
     await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
@@ -180,7 +180,7 @@ test.describe("Workspace Shell", () => {
         (button as HTMLButtonElement).click();
       });
       await expect(page.locator("#app-shell-nav-toggle")).toContainText(
-        "Expand navigation rail",
+        "Collapse navigation rail",
       );
       await expect(page.locator("#workspace-navigation-list")).toBeVisible();
       await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
@@ -188,7 +188,7 @@ test.describe("Workspace Shell", () => {
       await page.reload();
       await waitForWorkspaceShell(page);
       await expect(page.locator("#app-shell-nav-toggle")).toContainText(
-        "Expand navigation rail",
+        "Collapse navigation rail",
       );
     }
   });
@@ -205,7 +205,7 @@ test.describe("Workspace Shell", () => {
     await sidebarToggle.evaluate((button) => {
       (button as HTMLButtonElement).click();
     });
-    await expect(sidebarToggle).toContainText("Expand navigation rail");
+    await expect(sidebarToggle).toContainText("Collapse navigation rail");
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
     await expect(page.locator("#workspace-navigation-list")).toBeVisible();
   });

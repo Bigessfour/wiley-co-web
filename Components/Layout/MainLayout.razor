@@ -57,10 +57,10 @@
 </div>
 
 @code {
-    private const string LeftNavStorageKey = "wiley.workspace.left-nav-collapsed.v1";
+    private const string LeftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
 
     private readonly WorkspaceLayoutContext _layoutContext = new();
-    private bool leftNavCollapsed;
+    private bool leftNavCollapsed = true;
     private bool leftNavStateRestored;
 
     protected bool IsLeftNavCollapsed => leftNavCollapsed;
