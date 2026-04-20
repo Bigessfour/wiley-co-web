@@ -104,3 +104,20 @@
         </div>
     </section>
 </div>
+
+@code {
+    [Parameter] public decimal TotalCosts { get; set; }
+    [Parameter] public decimal ProjectedVolume { get; set; }
+    [Parameter] public string TotalCostsDisplay { get; set; } = string.Empty;
+    [Parameter] public string ProjectedVolumeDisplay { get; set; } = string.Empty;
+    [Parameter] public string RateDeltaDisplay { get; set; } = string.Empty;
+    [Parameter] public string BreakEvenRateDisplay { get; set; } = string.Empty;
+    [Parameter] public bool IsSavingBaseline { get; set; }
+    [Parameter] public string BaselineSaveStatus { get; set; } = string.Empty;
+    [Parameter] public double GaugeMaximum { get; set; }
+    [Parameter] public double GaugeCurrentRateValue { get; set; }
+    [Parameter] public IReadOnlyList<RateComparisonPoint> RateComparison { get; set; } = [];
+    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnTotalCostsChanged { get; set; }
+    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnProjectedVolumeChanged { get; set; }
+    [Parameter] public EventCallback OnSaveWorkspaceBaseline { get; set; }
+}
