@@ -17,6 +17,11 @@
                        MediaQuery="max-width:1024px">
         <DashboardLayoutPanels>
             <DashboardLayoutPanel Id="break-even-summary-panel" Column="0" Row="0" SizeX="12" SizeY="2">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Break-Even Summary
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div id="break-even-kpi-grid" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <SfCard>
@@ -40,6 +45,11 @@
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="break-even-input-panel" Column="0" Row="2" SizeX="12" SizeY="2">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Break-Even Inputs
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div id="break-even-input-row" class="grid gap-4 md:grid-cols-2">
                         <SfNumericTextBox TValue="decimal"
@@ -75,6 +85,11 @@
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="break-even-visuals-panel" Column="0" Row="4" SizeX="12" SizeY="6">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Break-Even Visuals
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
                         <div id="break-even-gauge-card" class="rounded-2xl border border-slate-200 p-3">

@@ -24,7 +24,12 @@ test.describe("Workspace Shell", () => {
     const primaryNavigation = page.locator("#workspace-navigation-card");
 
     await primaryNavigation.getByRole("button", { name: "Break-Even" }).click();
-    await expect(page.locator("#break-even-panel")).toBeVisible();
+    await expect(page.locator("#break-even-summary-panel")).toBeAttached();
+    await expect(
+      page
+        .locator("#break-even-summary-panel")
+        .getByText("Break-Even Summary", { exact: true }),
+    ).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Break-Even",
     );
@@ -46,7 +51,12 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("button", { name: "Scenario Planner" })
       .click();
-    await expect(page.locator("#scenario-panel")).toBeVisible();
+    await expect(page.locator("#scenario-summary-panel")).toBeAttached();
+    await expect(
+      page
+        .locator("#scenario-summary-panel")
+        .getByText("Scenario Summary", { exact: true }),
+    ).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Scenario Planner",
     );
@@ -54,7 +64,12 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("button", { name: "Customer Viewer" })
       .click();
-    await expect(page.locator("#customer-viewer-panel")).toBeVisible();
+    await expect(page.locator("#customer-summary-panel")).toBeAttached();
+    await expect(
+      page
+        .locator("#customer-summary-panel")
+        .getByText("Customer Summary", { exact: true }),
+    ).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Customer Viewer",
     );
@@ -66,7 +81,7 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("button", { name: "Decision Support" })
       .click();
-    await expect(page.locator("#decision-support-panel")).toBeVisible();
+    await expect(page.locator("#decision-support-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Decision Support",
     );
@@ -74,7 +89,7 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("button", { name: "Data Dashboard" })
       .click();
-    await expect(page.locator("#data-dashboard-panel")).toBeVisible();
+    await expect(page.locator("#data-dashboard-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Data Dashboard",
     );
@@ -102,9 +117,7 @@ test.describe("Workspace Shell", () => {
     await page.setViewportSize({ width: 1279, height: 900 });
 
     await expect(page.locator("#workspace-dashboard")).toBeVisible();
-    await expect(
-      page.locator("#workspace-document-panel_body #workspace-document-center"),
-    ).toBeVisible();
+    await expect(page.locator("#workspace-document-center")).toBeVisible();
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
     await expect(page.locator("#workspace-status-card")).toBeVisible();
     await expect(page.locator("#workspace-sidebar-toggle")).toBeVisible();

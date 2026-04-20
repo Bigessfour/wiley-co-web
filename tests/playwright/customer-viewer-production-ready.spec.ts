@@ -1,12 +1,32 @@
 import { expect, test } from "@playwright/test";
-import { gotoWorkspacePanel } from "./support/workspace";
+import { waitForWorkspaceShell } from "./support/workspace";
 
 test.describe("Unique Interaction Proof", () => {
   test("Customer viewer handles search, filter reset, and degraded directory states", async ({
     page,
   }) => {
-    // 1. Open /wiley-workspace/customers from a blank session.
-    await gotoWorkspacePanel(page, "/wiley-workspace/customers");
+    await page.route("**/api/utility-customers**", async (route) => {
+      const method = route.request().method();
+
+      if (method === "GET") {
+        await route.fulfill({
+          status: 200,
+          json: [],
+        });
+
+        return;
+      }
+
+      await route.continue();
+    });
+
+    // 1. Open the workspace shell first, then enter the customer viewer through the overview navigation.
+    await page.goto("/wiley-workspace");
+    await waitForWorkspaceShell(page);
+    await page
+      .locator("#workspace-navigation-card")
+      .getByRole("button", { name: "Customer Viewer" })
+      .click();
 
     const panel = page.locator("#customer-viewer-panel");
     const directoryStatus = page.locator("#customer-directory-status");
@@ -21,8 +41,8 @@ test.describe("Unique Interaction Proof", () => {
     await expect(panel).toBeVisible();
     await expect(page.locator("#customer-directory-grid")).toBeVisible();
     await expect(directoryStatus).toBeVisible();
-    await expect(directoryStatus).not.toContainText(
-      "Loading live utility-customer directory...",
+    await expect(directoryStatus).toContainText(
+      /Loaded \d+ utility customers from the live API\.|The live customer directory could not be refreshed\./,
     );
     await expect(refreshButton).toBeEnabled();
     await expect(clearFiltersButton).toBeEnabled();

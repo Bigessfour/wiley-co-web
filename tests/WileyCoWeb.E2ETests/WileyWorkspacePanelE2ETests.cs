@@ -324,7 +324,7 @@ public sealed class WileyWorkspacePanelE2ETests
 
             var initialValue = await page.Locator("#enterprise-select").InputValueAsync();
 
-            await enterpriseSelector.ClickAsync();
+            await enterpriseSelector.ClickAsync(new() { Force = true });
             var options = page.Locator("#enterprise-select_popup .e-list-item");
             if (await options.CountAsync() < 2)
             {

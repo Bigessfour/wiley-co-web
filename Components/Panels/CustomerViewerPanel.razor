@@ -12,13 +12,16 @@
     <SfDashboardLayout ID="customer-viewer-dashboard"
                        Columns="12"
                        CellSpacing="@(new double[] { 16, 16 })"
-                       AllowDragging="true"
-                       AllowFloating="true"
                        AllowResizing="true"
                        EnablePersistence="true"
                        MediaQuery="max-width:1024px">
         <DashboardLayoutPanels>
             <DashboardLayoutPanel Id="customer-summary-panel" Column="0" Row="0" SizeX="12" SizeY="2">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Customer Summary
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <SfCard>
@@ -42,6 +45,11 @@
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="customer-filters-panel" Column="0" Row="2" SizeX="12" SizeY="2">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Customer Filters
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="grid gap-3 md:grid-cols-3">
                         <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
@@ -63,6 +71,11 @@
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="customer-grid-panel" Column="0" Row="4" SizeX="12" SizeY="8">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Customer Directory
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div aria-busy="@IsBusy()">
                         <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
@@ -109,32 +122,6 @@
             }
         </div>
     }
-
-    <div aria-busy="@IsBusy()">
-        <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
-            <GridPageSettings PageSize="10" PageCount="5" />
-            <GridColumns>
-                <GridColumn Field=@nameof(UtilityCustomerRecord.AccountNumber) HeaderText="Account #" Width="125" />
-                <GridColumn Field=@nameof(UtilityCustomerRecord.DisplayName) HeaderText="Customer" Width="190" />
-                <GridColumn Field=@nameof(UtilityCustomerRecord.CustomerType) HeaderText="Customer Type" Width="140" />
-                <GridColumn Field=@nameof(UtilityCustomerRecord.ServiceLocation) HeaderText="Location" Width="150" />
-                <GridColumn Field=@nameof(UtilityCustomerRecord.Status) HeaderText="Status" Width="110" />
-                <GridColumn Field=@nameof(UtilityCustomerRecord.CurrentBalance) HeaderText="Balance" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
-                <GridColumn Field=@nameof(UtilityCustomerRecord.PhoneNumber) HeaderText="Phone" Width="135" />
-                <GridColumn HeaderText="Actions" Width="180" AllowSorting="false" AllowFiltering="false">
-                    <Template Context="customerContext">
-                        @{
-                            var customer = (UtilityCustomerRecord)customerContext;
-                        }
-                        <div class="flex flex-wrap gap-2">
-                            <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
-                            <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
-                        </div>
-                    </Template>
-                </GridColumn>
-            </GridColumns>
-        </SfGrid>
-    </div>
 
     <p class="text-xs text-slate-500">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
 

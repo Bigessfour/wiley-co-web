@@ -15,6 +15,11 @@
                        MediaQuery="max-width:1024px">
         <DashboardLayoutPanels>
             <DashboardLayoutPanel Id="scenario-summary-panel" Column="0" Row="0" SizeX="12" SizeY="2">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Scenario Summary
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="grid gap-4 md:grid-cols-2" role="group" aria-label="Scenario summary metrics">
                         <SfNumericTextBox TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" Placeholder="Scenario Adjusted Rate" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" />
@@ -26,6 +31,11 @@
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="scenario-metrics-panel" Column="0" Row="2" SizeX="12" SizeY="2">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Scenario Metrics
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <SfCard>
@@ -49,6 +59,11 @@
             </DashboardLayoutPanel>
 
             <DashboardLayoutPanel Id="scenario-grid-panel" Column="0" Row="4" SizeX="12" SizeY="8">
+                <HeaderTemplate>
+                    <div class="e-panel-header px-3 py-2 text-sm font-semibold text-slate-700">
+                        Scenario Grid
+                    </div>
+                </HeaderTemplate>
                 <ContentTemplate>
                     <div class="space-y-3">
                         <SfGrid ID="scenario-grid" TValue="ScenarioItem" DataSource="@ScenarioItems" Toolbar="@ScenarioToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420">

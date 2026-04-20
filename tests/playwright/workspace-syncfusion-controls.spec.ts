@@ -21,9 +21,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     await waitForWorkspaceShell(page);
 
-    const documentCenter = page.locator(
-      "#workspace-document-panel_body #workspace-document-center",
-    );
+    const documentCenter = page.locator("#workspace-document-center");
     const exportStatus = documentCenter.locator("div.rounded-xl.bg-slate-50");
     const enterpriseCard = page.locator("#workspace-enterprise-context-card");
     const comboboxes = enterpriseCard.getByRole("combobox");
@@ -83,9 +81,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     const sidebarToggle = page.locator("#workspace-sidebar-toggle");
 
     await expect(page.locator("#workspace-dashboard")).toBeVisible();
-    await expect(
-      page.locator("#workspace-document-panel_body #workspace-document-center"),
-    ).toBeVisible();
+    await expect(page.locator("#workspace-document-center")).toBeVisible();
     await expect(sidebarToggle).toBeVisible();
     await expect(page.locator("#workspace-jarvis-launcher")).toBeVisible();
 
@@ -94,6 +90,114 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     await page.locator("#workspace-jarvis-launcher").click();
     await expect(page.locator("#workspace-jarvis-dock")).toBeVisible();
+  });
+
+  test("workspace shell collapses the sidebar and opens and closes the Jarvis dock", async ({
+    page,
+  }) => {
+    await page.goto("/wiley-workspace");
+
+    await waitForWorkspaceShell(page);
+    await page.setViewportSize({ width: 1279, height: 900 });
+
+    const sidebarToggle = page.locator("#workspace-sidebar-toggle");
+    const sidebarRail = page.locator("aside.workspace-sidebar");
+    const sidebarShell = page.locator("#workspace-sidebar-shell");
+    const jarvisLauncher = page.locator("#workspace-jarvis-launcher");
+    const jarvisDock = page.locator("#workspace-jarvis-dock");
+
+    await expect(sidebarShell).toBeVisible();
+
+    await sidebarToggle.click();
+    await expect(sidebarToggle).toContainText("Open navigation");
+    await expect(sidebarRail).toHaveClass(/lg:w-16/);
+    await expect(sidebarShell).toBeVisible();
+
+    await jarvisLauncher.click();
+    await expect(jarvisDock).toBeVisible();
+
+    await jarvisDock.getByRole("button", { name: "Close" }).click();
+    await expect(jarvisDock).toBeHidden();
+    await expect(jarvisLauncher).toBeVisible();
+  });
+
+  test("customer viewer dashboard persistence survives a reload", async ({
+    page,
+  }) => {
+    await page.route("**/api/utility-customers**", async (route) => {
+      const method = route.request().method();
+
+      if (method === "GET") {
+        await route.fulfill({
+          status: 200,
+          json: [],
+        });
+
+        return;
+      }
+
+      await route.continue();
+    });
+
+    await page.goto("/wiley-workspace");
+    await waitForWorkspaceShell(page);
+    await page
+      .locator("#workspace-navigation-card")
+      .getByRole("button", { name: "Customer Viewer" })
+      .click();
+
+    const panel = page.locator("#customer-viewer-panel");
+    const directoryStatus = page.locator("#customer-directory-status");
+    const dashboard = page.locator("#customer-viewer-dashboard");
+    const customerGrid = page.locator("#customer-directory-grid");
+
+    await expect(panel).toBeVisible();
+    await expect(directoryStatus).toBeVisible();
+    await expect(directoryStatus).toContainText(
+      /Loaded \d+ utility customers from the live API\.|The live customer directory could not be refreshed\./,
+    );
+    await expect(dashboard).toBeAttached();
+    await expect(customerGrid).toBeVisible();
+    await expect(
+      page
+        .locator("#customer-summary-panel")
+        .getByText("Customer Summary", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("#customer-filters-panel")
+        .getByText("Customer Filters", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("#customer-grid-panel")
+        .getByText("Customer Directory", { exact: true }),
+    ).toBeVisible();
+
+    const dashboardPersistenceKeysBefore = await page.evaluate(() =>
+      Object.keys(localStorage).filter((key) =>
+        key.includes("customer-viewer-dashboard"),
+      ),
+    );
+
+    expect(dashboardPersistenceKeysBefore.length).toBeGreaterThan(0);
+
+    await page.reload();
+
+    await expect(panel).toBeVisible();
+    await expect(directoryStatus).toBeVisible();
+    await expect(dashboard).toBeAttached();
+    await expect(customerGrid).toBeVisible();
+
+    const dashboardPersistenceKeysAfter = await page.evaluate(() =>
+      Object.keys(localStorage).filter((key) =>
+        key.includes("customer-viewer-dashboard"),
+      ),
+    );
+
+    expect(dashboardPersistenceKeysAfter).toEqual(
+      dashboardPersistenceKeysBefore,
+    );
   });
 
   test("customer editor dialog renders Syncfusion form controls", async ({

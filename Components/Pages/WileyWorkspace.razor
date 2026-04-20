@@ -5,7 +5,6 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
-@using Syncfusion.Blazor.Layouts
 @using WileyCoWeb.Components.Panels
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
@@ -155,220 +154,188 @@
                 </aside>
 
             <main id="workspace-main-content" class="min-w-0 flex-1">
-                <SfDashboardLayout ID="workspace-dashboard" Columns="12" CellSpacing="@(new double[] { 16, 16 })" MediaQuery="max-width:1280px" AllowResizing="true">
-                    <DashboardLayoutPanels>
-                        <DashboardLayoutPanel Id="workspace-document-panel" Column="0" Row="0" SizeX="12" SizeY="2">
-                            <ContentTemplate>
-                                <div class="workspace-main-shell flex min-h-[10rem] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-                                    <div id="workspace-document-center" class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Document Center</p>
-                                                <h2 class="mt-1 text-lg font-semibold text-slate-900">Syncfusion Excel & PDF Deliverables</h2>
-                                                <p class="mt-1 text-sm text-slate-600">Export the filtered customer set, the active scenario workbook, or a PDF rate packet from the current workspace state.</p>
-                                            </div>
-                                            <div class="flex flex-col gap-3 xl:min-w-[38rem]">
-                                                <div class="grid gap-3 md:grid-cols-3">
-                                                    <SfButton id="export-customers-excel-button" CssClass="e-primary" IsPrimary="true" Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers to Excel</SfButton>
-                                                    <SfButton id="export-scenario-excel-button" Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario to Excel</SfButton>
-                                                    <SfButton id="export-workspace-pdf-button" Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">Download PDF rate packet</SfButton>
-                                                </div>
-                                                <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                                                    <span class="font-semibold text-slate-700">Export status:</span> @DocumentExportStatus
-                                                </div>
-                                            </div>
+                <div id="workspace-dashboard" class="w-full flex-1 overflow-auto pr-1">
+                    <div class="workspace-main-shell flex min-h-[calc(100vh-18rem)] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                        <div id="workspace-breadcrumb" class="border-b border-slate-200 pb-3">
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@BreadcrumbSection</p>
+                            <div class="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                                <span>Workspace</span>
+                                <span>/</span>
+                                <span class="font-semibold text-slate-800">@ActivePanelLabel</span>
+                            </div>
+                        </div>
+
+                        @if (IsOverviewMode)
+                        {
+                            <section id="workspace-overview-dashboard" class="workspace-overview-grid flex-1" aria-label="Workspace overview panels">
+                                <article id="overview-break-even" class="workspace-overview-card workspace-overview-card-featured">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Break-Even</p>
+                                        <h3>Core rate position</h3>
+                                        <p>Current @CurrentRateDisplay, recommended @BreakEvenRateDisplay, and delta @RateDeltaDisplay with direct baseline controls.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Total costs @TotalCostsDisplay</span>
+                                            <span>Projected volume @ProjectedVolumeDisplay</span>
                                         </div>
                                     </div>
-                                </div>
-                            </ContentTemplate>
-                        </DashboardLayoutPanel>
+                                    <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("break-even")'>Open Break-Even</button>
+                                </article>
 
-                        <DashboardLayoutPanel Id="workspace-content-panel" Column="0" Row="2" SizeX="12" SizeY="10">
-                            <ContentTemplate>
-                                <div class="workspace-main-shell flex min-h-[calc(100vh-18rem)] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-                                    <div id="workspace-breadcrumb" class="border-b border-slate-200 pb-3">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@BreadcrumbSection</p>
-                                        <div class="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                                            <span>Workspace</span>
-                                            <span>/</span>
-                                            <span class="font-semibold text-slate-800">@ActivePanelLabel</span>
+                                <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Rates</p>
+                                        <h3>Editable rate controls</h3>
+                                        <p>Adjust the current rate, compare it against the recommendation, and save a point-in-time snapshot.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Current @CurrentRateDisplay</span>
+                                            <span>Target @BreakEvenRateDisplay</span>
                                         </div>
                                     </div>
+                                    <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("rates")'>Open Rates</button>
+                                </article>
 
-                                    @if (IsOverviewMode)
-                                    {
-                                        <section id="workspace-overview-dashboard" class="workspace-overview-grid flex-1" aria-label="Workspace overview panels">
-                                            <article id="overview-break-even" class="workspace-overview-card workspace-overview-card-featured">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Break-Even</p>
-                                                    <h3>Core rate position</h3>
-                                                    <p>Current @CurrentRateDisplay, recommended @BreakEvenRateDisplay, and delta @RateDeltaDisplay with direct baseline controls.</p>
-                                                    <div class="workspace-overview-card-metrics">
-                                                        <span>Total costs @TotalCostsDisplay</span>
-                                                        <span>Projected volume @ProjectedVolumeDisplay</span>
-                                                    </div>
-                                                </div>
-                                                <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("break-even")'>Open Break-Even</button>
-                                            </article>
+                                <article id="overview-import" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">QuickBooks Import</p>
+                                        <h3>Ingest and validate source records</h3>
+                                        <p>Upload QuickBooks exports, inspect validation feedback, and stage records before commit.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("quickbooks-import")'>Open Import</button>
+                                </article>
 
-                                            <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Rates</p>
-                                                    <h3>Editable rate controls</h3>
-                                                    <p>Adjust the current rate, compare it against the recommendation, and save a point-in-time snapshot.</p>
-                                                    <div class="workspace-overview-card-metrics">
-                                                        <span>Current @CurrentRateDisplay</span>
-                                                        <span>Target @BreakEvenRateDisplay</span>
-                                                    </div>
-                                                </div>
-                                                <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("rates")'>Open Rates</button>
-                                            </article>
+                                <article id="overview-scenario" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Scenario Planner</p>
+                                        <h3>Model what-if changes</h3>
+                                        <p>Stress cost assumptions, compare adjusted break-even outcomes, and persist named scenarios.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("scenario")'>Open Scenario Planner</button>
+                                </article>
 
-                                            <article id="overview-import" class="workspace-overview-card">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">QuickBooks Import</p>
-                                                    <h3>Ingest and validate source records</h3>
-                                                    <p>Upload QuickBooks exports, inspect validation feedback, and stage records before commit.</p>
-                                                </div>
-                                                <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("quickbooks-import")'>Open Import</button>
-                                            </article>
+                                <article id="overview-customers" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Customer Viewer</p>
+                                        <h3>Review affected accounts</h3>
+                                        <p>@FilteredCustomerCountDisplay customers currently match the active filters for export and operational review.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("customers")'>Open Customer Viewer</button>
+                                </article>
 
-                                            <article id="overview-scenario" class="workspace-overview-card">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Scenario Planner</p>
-                                                    <h3>Model what-if changes</h3>
-                                                    <p>Stress cost assumptions, compare adjusted break-even outcomes, and persist named scenarios.</p>
-                                                </div>
-                                                <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("scenario")'>Open Scenario Planner</button>
-                                            </article>
+                                <article id="overview-trends" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Trends</p>
+                                        <h3>Projected rate movement</h3>
+                                        <p>Inspect the year-by-year rate line and understand how the active assumptions move over time.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("trends")'>Open Trends</button>
+                                </article>
 
-                                            <article id="overview-customers" class="workspace-overview-card">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Customer Viewer</p>
-                                                    <h3>Review affected accounts</h3>
-                                                    <p>@FilteredCustomerCountDisplay customers currently match the active filters for export and operational review.</p>
-                                                </div>
-                                                <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("customers")'>Open Customer Viewer</button>
-                                            </article>
+                                <article id="overview-ai" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Decision Support</p>
+                                        <h3>Jarvis guidance</h3>
+                                        <p>Pull context-aware recommendations tied to the current enterprise, year, and scenario state.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("decision-support")'>Open Decision Support</button>
+                                </article>
 
-                                            <article id="overview-trends" class="workspace-overview-card">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Trends</p>
-                                                    <h3>Projected rate movement</h3>
-                                                    <p>Inspect the year-by-year rate line and understand how the active assumptions move over time.</p>
-                                                </div>
-                                                <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("trends")'>Open Trends</button>
-                                            </article>
-
-                                            <article id="overview-ai" class="workspace-overview-card">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Decision Support</p>
-                                                    <h3>Jarvis guidance</h3>
-                                                    <p>Pull context-aware recommendations tied to the current enterprise, year, and scenario state.</p>
-                                                </div>
-                                                <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("decision-support")'>Open Decision Support</button>
-                                            </article>
-
-                                            <article id="overview-data-dashboard" class="workspace-overview-card workspace-overview-card-wide">
-                                                <div class="workspace-overview-card-copy">
-                                                    <p class="workspace-overview-card-kicker">Data Dashboard</p>
-                                                    <h3>Executive visual summary</h3>
-                                                    <p>KPI gauges, scenario pressure, customer mix, and trend visuals in one consolidated dashboard.</p>
-                                                    <div class="workspace-overview-card-metrics">
-                                                        <span>Enterprise @SelectedEnterprise</span>
-                                                        <span>Fiscal year @SelectedFiscalYear</span>
-                                                        <span>Scenario pressure @ScenarioCostTotalDisplay</span>
-                                                    </div>
-                                                </div>
-                                                <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("data-dashboard")'>Open Data Dashboard</button>
-                                            </article>
-                                        </section>
-                                    }
-                                    else
-                                    {
-                                        <div class="flex-1 overflow-auto pr-1">
-                                            @switch (ActivePanelKey)
-                                            {
-                                                case "break-even":
-                                                    <BreakEvenPanel @key="ActivePanelKey"
-                                                                    TotalCosts="@TotalCosts"
-                                                                    ProjectedVolume="@ProjectedVolume"
-                                                                    TotalCostsDisplay="@TotalCostsDisplay"
-                                                                    ProjectedVolumeDisplay="@ProjectedVolumeDisplay"
-                                                                    RateDeltaDisplay="@RateDeltaDisplay"
-                                                                    BreakEvenRateDisplay="@BreakEvenRateDisplay"
-                                                                    IsSavingBaseline="@IsSavingBaseline"
-                                                                    BaselineSaveStatus="@BaselineSaveStatus"
-                                                                    GaugeMaximum="@GaugeMaximum"
-                                                                    GaugeCurrentRateValue="@GaugeCurrentRateValue"
-                                                                    RateComparison="@RateComparison"
-                                                                    OnTotalCostsChanged="HandleTotalCostsChanged"
-                                                                    OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
-                                                                    OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync" />
-                                                    break;
-                                                case "rates":
-                                                    <RatesPanel @key="ActivePanelKey"
-                                                                CurrentRate="@CurrentRate"
-                                                                CurrentRateDisplay="@CurrentRateDisplay"
-                                                                BreakEvenRateDisplay="@BreakEvenRateDisplay"
-                                                                IsSavingSnapshot="@IsSavingSnapshot"
-                                                                SnapshotSaveStatus="@SnapshotSaveStatus"
-                                                                RateComparison="@RateComparison"
-                                                                OnCurrentRateChanged="HandleCurrentRateChanged"
-                                                                OnSaveRateSnapshot="SaveRateSnapshotAsync" />
-                                                    break;
-                                                case "quickbooks-import":
-                                                    <QuickBooksImportPanelWrapper @key="ActivePanelKey" WorkspaceState="@WorkspaceState" />
-                                                    break;
-                                                case "scenario":
-                                                    <ScenarioPlannerPanel @key="ActivePanelKey"
-                                                                          ScenarioAdjustedRate="@ScenarioAdjustedRate"
-                                                                          ScenarioCostTotal="@ScenarioCostTotal"
-                                                                          ScenarioAdjustedDelta="@ScenarioAdjustedDelta"
-                                                                          CurrentRate="@CurrentRate"
-                                                                          BreakEvenRateDisplay="@BreakEvenRateDisplay"
-                                                                          ScenarioAdjustedRateDisplay="@ScenarioAdjustedRateDisplay"
-                                                                          ScenarioCostTotalDisplay="@ScenarioCostTotalDisplay"
-                                                                          ScenarioAdjustedDeltaDisplay="@ScenarioAdjustedDeltaDisplay"
-                                                                          ScenarioItems="@ScenarioItems"
-                                                                          ScenarioToolbarItems="@ScenarioToolbarItems"
-                                                                          OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
-                                                    break;
-                                                case "customers":
-                                                    <CustomerViewerPanel @key="ActivePanelKey" />
-                                                    break;
-                                                case "trends":
-                                                    <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
-                                                    break;
-                                                case "decision-support":
-                                                    <DecisionSupportPanel @key="ActivePanelKey" />
-                                                    break;
-                                                case "data-dashboard":
-                                                    <DataDashboardPanel @key="ActivePanelKey"
-                                                                        CurrentRate="@CurrentRate"
-                                                                        TotalCosts="@TotalCosts"
-                                                                        ProjectedVolume="@ProjectedVolume"
-                                                                        RecommendedRate="@RecommendedRate"
-                                                                        AdjustedRecommendedRate="@ScenarioAdjustedRate"
-                                                                        ScenarioCostTotal="@ScenarioCostTotal"
-                                                                        ScenarioItems="@ScenarioItems"
-                                                                        ProjectionSeries="@ProjectionSeries"
-                                                                        Customers="@Customers"
-                                                                        RateComparison="@RateComparison"
-                                                                        SelectedEnterprise="@SelectedEnterprise"
-                                                                        SelectedFiscalYear="@SelectedFiscalYear" />
-                                                    break;
-                                                default:
-                                                    NavigationManager.NavigateTo("/wiley-workspace", replace: true);
-                                                    break;
-                                            }
+                                <article id="overview-data-dashboard" class="workspace-overview-card workspace-overview-card-wide">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Data Dashboard</p>
+                                        <h3>Executive visual summary</h3>
+                                        <p>KPI gauges, scenario pressure, customer mix, and trend visuals in one consolidated dashboard.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Enterprise @SelectedEnterprise</span>
+                                            <span>Fiscal year @SelectedFiscalYear</span>
+                                            <span>Scenario pressure @ScenarioCostTotalDisplay</span>
                                         </div>
-                                    }
-                                </div>
-                            </ContentTemplate>
-                        </DashboardLayoutPanel>
-                    </DashboardLayoutPanels>
-                </SfDashboardLayout>
+                                    </div>
+                                    <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("data-dashboard")'>Open Data Dashboard</button>
+                                </article>
+                            </section>
+                        }
+                        else
+                        {
+                            <div class="flex-1 overflow-auto pr-1">
+                                @switch (ActivePanelKey)
+                                {
+                                    case "break-even":
+                                        <BreakEvenPanel @key="ActivePanelKey"
+                                                        TotalCosts="@TotalCosts"
+                                                        ProjectedVolume="@ProjectedVolume"
+                                                        TotalCostsDisplay="@TotalCostsDisplay"
+                                                        ProjectedVolumeDisplay="@ProjectedVolumeDisplay"
+                                                        RateDeltaDisplay="@RateDeltaDisplay"
+                                                        BreakEvenRateDisplay="@BreakEvenRateDisplay"
+                                                        IsSavingBaseline="@IsSavingBaseline"
+                                                        BaselineSaveStatus="@BaselineSaveStatus"
+                                                        GaugeMaximum="@GaugeMaximum"
+                                                        GaugeCurrentRateValue="@GaugeCurrentRateValue"
+                                                        RateComparison="@RateComparison"
+                                                        OnTotalCostsChanged="HandleTotalCostsChanged"
+                                                        OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
+                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync" />
+                                        break;
+                                    case "rates":
+                                        <RatesPanel @key="ActivePanelKey"
+                                                    CurrentRate="@CurrentRate"
+                                                    CurrentRateDisplay="@CurrentRateDisplay"
+                                                    BreakEvenRateDisplay="@BreakEvenRateDisplay"
+                                                    IsSavingSnapshot="@IsSavingSnapshot"
+                                                    SnapshotSaveStatus="@SnapshotSaveStatus"
+                                                    RateComparison="@RateComparison"
+                                                    OnCurrentRateChanged="HandleCurrentRateChanged"
+                                                    OnSaveRateSnapshot="SaveRateSnapshotAsync" />
+                                        break;
+                                    case "quickbooks-import":
+                                        <QuickBooksImportPanelWrapper @key="ActivePanelKey" WorkspaceState="@WorkspaceState" />
+                                        break;
+                                    case "scenario":
+                                        <ScenarioPlannerPanel @key="ActivePanelKey"
+                                                              ScenarioAdjustedRate="@ScenarioAdjustedRate"
+                                                              ScenarioCostTotal="@ScenarioCostTotal"
+                                                              ScenarioAdjustedDelta="@ScenarioAdjustedDelta"
+                                                              CurrentRate="@CurrentRate"
+                                                              BreakEvenRateDisplay="@BreakEvenRateDisplay"
+                                                              ScenarioAdjustedRateDisplay="@ScenarioAdjustedRateDisplay"
+                                                              ScenarioCostTotalDisplay="@ScenarioCostTotalDisplay"
+                                                              ScenarioAdjustedDeltaDisplay="@ScenarioAdjustedDeltaDisplay"
+                                                              ScenarioItems="@ScenarioItems"
+                                                              ScenarioToolbarItems="@ScenarioToolbarItems"
+                                                              OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
+                                        break;
+                                    case "customers":
+                                        <CustomerViewerPanel @key="ActivePanelKey" />
+                                        break;
+                                    case "trends":
+                                        <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
+                                        break;
+                                    case "decision-support":
+                                        <DecisionSupportPanel @key="ActivePanelKey" />
+                                        break;
+                                    case "data-dashboard":
+                                        <DataDashboardPanel @key="ActivePanelKey"
+                                                            CurrentRate="@CurrentRate"
+                                                            TotalCosts="@TotalCosts"
+                                                            ProjectedVolume="@ProjectedVolume"
+                                                            RecommendedRate="@RecommendedRate"
+                                                            AdjustedRecommendedRate="@ScenarioAdjustedRate"
+                                                            ScenarioCostTotal="@ScenarioCostTotal"
+                                                            ScenarioItems="@ScenarioItems"
+                                                            ProjectionSeries="@ProjectionSeries"
+                                                            Customers="@Customers"
+                                                            RateComparison="@RateComparison"
+                                                            SelectedEnterprise="@SelectedEnterprise"
+                                                            SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
+                                    default:
+                                        NavigationManager.NavigateTo("/wiley-workspace", replace: true);
+                                        break;
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
             </main>
         </div>
 
