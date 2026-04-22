@@ -96,10 +96,17 @@ internal sealed partial class WorkspaceReferenceDataImportService
     ];
 
     private static readonly IReadOnlyDictionary<string, EnterpriseBaselineSeed> DefaultEnterpriseBaselines =
-        new Dictionary<string, EnterpriseBaselineSeed>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Water Utility"] = new(31.25m, 98000m, 4500),
-            ["Wiley Sanitation District"] = new(21.50m, 72000m, 3200),
-            ["Sanitation Utility"] = new(21.50m, 72000m, 3200)
-        };
+        WorkspaceEnterpriseSeedCatalog.All
+                .SelectMany(seed => new[]
+                {
+                    new KeyValuePair<string, EnterpriseBaselineSeed>(
+                        seed.Name,
+                        new EnterpriseBaselineSeed(seed.CurrentRate, seed.MonthlyExpenses, seed.CustomerCount)),
+                    new KeyValuePair<string, EnterpriseBaselineSeed>(
+                        seed.DepartmentName,
+                        new EnterpriseBaselineSeed(seed.CurrentRate, seed.MonthlyExpenses, seed.CustomerCount))
+                })
+                .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToDictionary(item => item.Key, item => item.Value, StringComparer.OrdinalIgnoreCase);
 }

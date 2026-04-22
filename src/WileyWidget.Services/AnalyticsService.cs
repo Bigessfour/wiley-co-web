@@ -244,11 +244,15 @@ namespace WileyWidget.Services
         private static List<BudgetEntry> FilterEntriesByEntityName(IEnumerable<BudgetEntry> entries, string entityName)
         {
             var trimmed = entityName.Trim();
+            var aliases = WorkspaceEnterpriseCatalog.TryNormalizeEnterpriseName(trimmed, out var normalizedName)
+                ? WorkspaceEnterpriseCatalog.GetAliases(normalizedName).ToArray()
+                : [trimmed];
+
             return entries.Where(be =>
-                (!string.IsNullOrWhiteSpace(be.Fund?.Name) && string.Equals(be.Fund!.Name, trimmed, StringComparison.OrdinalIgnoreCase)) ||
-                (trimmed.Contains("Sanitation", StringComparison.OrdinalIgnoreCase) && (be.Fund?.Name?.Contains("Sewer", StringComparison.OrdinalIgnoreCase) == true || be.Fund?.Name?.Contains("Sanitation", StringComparison.OrdinalIgnoreCase) == true)) ||
-                (trimmed.Contains("Utility", StringComparison.OrdinalIgnoreCase) && (be.Fund?.Name?.Contains("Water", StringComparison.OrdinalIgnoreCase) == true || be.Fund?.Name?.Contains("Trash", StringComparison.OrdinalIgnoreCase) == true)) ||
-                (!string.IsNullOrWhiteSpace(be.MunicipalAccount?.Name) && be.MunicipalAccount!.Name!.IndexOf(trimmed, StringComparison.OrdinalIgnoreCase) >= 0)
+                aliases.Any(alias =>
+                    (!string.IsNullOrWhiteSpace(be.Fund?.Name) && be.Fund!.Name!.Contains(alias, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(be.MunicipalAccount?.Name) && be.MunicipalAccount!.Name!.Contains(alias, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(be.Department?.Name) && be.Department!.Name!.Contains(alias, StringComparison.OrdinalIgnoreCase)))
             ).ToList();
         }
 

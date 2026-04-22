@@ -108,6 +108,93 @@ public class SourceFile
     public ICollection<BudgetSnapshot> BudgetSnapshots { get; set; } = new List<BudgetSnapshot>();
 }
 
+[Table("quickbooks_routing_rules")]
+public class QuickBooksRoutingRule
+{
+    [Key]
+    [Column("id")]
+    public long Id { get; set; }
+
+    [Required]
+    [Column("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("description")]
+    public string? Description { get; set; }
+
+    [Column("priority")]
+    public int Priority { get; set; }
+
+    [Column("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    [Column("source_file_pattern")]
+    public string? SourceFilePattern { get; set; }
+
+    [Column("default_enterprise_pattern")]
+    public string? DefaultEnterprisePattern { get; set; }
+
+    [Column("account_pattern")]
+    public string? AccountPattern { get; set; }
+
+    [Column("memo_pattern")]
+    public string? MemoPattern { get; set; }
+
+    [Column("name_pattern")]
+    public string? NamePattern { get; set; }
+
+    [Column("split_account_pattern")]
+    public string? SplitAccountPattern { get; set; }
+
+    [Column("target_enterprise")]
+    public string? TargetEnterprise { get; set; }
+
+    [Column("allocation_profile_id")]
+    public long? AllocationProfileId { get; set; }
+
+    public QuickBooksAllocationProfile? AllocationProfile { get; set; }
+}
+
+[Table("quickbooks_allocation_profiles")]
+public class QuickBooksAllocationProfile
+{
+    [Key]
+    [Column("id")]
+    public long Id { get; set; }
+
+    [Required]
+    [Column("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("description")]
+    public string? Description { get; set; }
+
+    [Column("is_active")]
+    public bool IsActive { get; set; } = true;
+
+    public ICollection<QuickBooksAllocationTarget> Targets { get; set; } = new List<QuickBooksAllocationTarget>();
+}
+
+[Table("quickbooks_allocation_targets")]
+public class QuickBooksAllocationTarget
+{
+    [Key]
+    [Column("id")]
+    public long Id { get; set; }
+
+    [Column("allocation_profile_id")]
+    public long AllocationProfileId { get; set; }
+
+    public QuickBooksAllocationProfile AllocationProfile { get; set; } = null!;
+
+    [Required]
+    [Column("enterprise_name")]
+    public string EnterpriseName { get; set; } = string.Empty;
+
+    [Column("allocation_percent", TypeName = "numeric(18,2)")]
+    public decimal AllocationPercent { get; set; }
+}
+
 [Table("chart_of_accounts")]
 public class ChartOfAccount
 {
@@ -264,6 +351,30 @@ public class LedgerEntry
     [Required]
     [Column("entry_scope")]
     public string EntryScope { get; set; } = string.Empty;
+
+    [Column("original_entry_scope")]
+    public string? OriginalEntryScope { get; set; }
+
+    [Column("source_amount", TypeName = "numeric(18,2)")]
+    public decimal? SourceAmount { get; set; }
+
+    [Column("applied_routing_rule_id")]
+    public long? AppliedRoutingRuleId { get; set; }
+
+    [Column("applied_routing_rule_name")]
+    public string? AppliedRoutingRuleName { get; set; }
+
+    [Column("applied_allocation_profile_id")]
+    public long? AppliedAllocationProfileId { get; set; }
+
+    [Column("applied_allocation_profile_name")]
+    public string? AppliedAllocationProfileName { get; set; }
+
+    [Column("routing_allocation_percent", TypeName = "numeric(18,2)")]
+    public decimal? RoutingAllocationPercent { get; set; }
+
+    [Column("routing_reason")]
+    public string? RoutingReason { get; set; }
 
     public ICollection<LedgerEntryLine> Lines { get; set; } = new List<LedgerEntryLine>();
 }

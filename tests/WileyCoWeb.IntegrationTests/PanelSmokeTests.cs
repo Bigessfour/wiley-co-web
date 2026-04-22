@@ -138,7 +138,7 @@ public sealed class PanelSmokeTests : IClassFixture<ApiApplicationFactory>
             Assert.False(string.IsNullOrWhiteSpace(item.Name), "Scenario item must have a name.");
             Assert.True(item.Cost >= 0, "Scenario item cost must be non-negative.");
         });
-        Assert.Contains(payload.ScenarioItems, item => item.Name == "Utilities");
+        Assert.Contains(payload.ScenarioItems, item => item.Name == "Water Utility reserve target");
     }
 
     [Fact]

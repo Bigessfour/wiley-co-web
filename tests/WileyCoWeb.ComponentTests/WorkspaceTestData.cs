@@ -6,8 +6,9 @@ namespace WileyCoWeb.ComponentTests;
 internal static class WorkspaceTestData
 {
     public const string WaterUtility = "Water Utility";
-    public const string SanitationUtility = "Sanitation Utility";
+    public const string SanitationUtility = "Wiley Sanitation District";
     public const string TrashUtility = "Trash";
+    public const string Apartments = "Apartments";
     public const string ArchivedUtility = "Archived Utility";
     public const string CouncilReviewScenario = "Council Review Scenario";
     public const string CouncilReview = "Council Review";
@@ -54,7 +55,7 @@ internal static class WorkspaceTestData
             projectedVolume,
             lastUpdatedUtc ?? "2026-04-05T12:00:00Z")
         {
-            EnterpriseOptions = enterpriseOptions?.ToList() ?? [WaterUtility, SanitationUtility],
+            EnterpriseOptions = enterpriseOptions?.ToList() ?? [WaterUtility, SanitationUtility, TrashUtility, Apartments],
             FiscalYearOptions = fiscalYearOptions?.ToList() ?? [PriorFiscalYear, WaterFiscalYear],
             CustomerServiceOptions = ["All Services", "Water", "Sewer"],
             CustomerCityLimitOptions = ["All", "Yes", "No"],

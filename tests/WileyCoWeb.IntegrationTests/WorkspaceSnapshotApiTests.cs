@@ -39,13 +39,16 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         Assert.NotNull(payload.ProjectionRows);
         Assert.NotNull(payload.ScenarioItems);
         Assert.Contains("Water Utility", payload.EnterpriseOptions);
+        Assert.Contains("Wiley Sanitation District", payload.EnterpriseOptions);
+        Assert.Contains("Trash", payload.EnterpriseOptions);
+        Assert.Contains("Apartments", payload.EnterpriseOptions);
         Assert.DoesNotContain("Archived Utility", payload.EnterpriseOptions);
         Assert.Equal(new[] { 2025, 2026 }, payload.FiscalYearOptions.OrderBy(year => year));
         Assert.Equal("All Services", payload.CustomerServiceOptions.First());
         Assert.Equal(2, payload.CustomerRows.Count);
         Assert.Equal(4, payload.ProjectionRows.Count);
         Assert.NotEmpty(payload.ScenarioItems);
-        Assert.Contains(payload.ScenarioItems, item => item.Name == "Utilities");
+        Assert.Contains(payload.ScenarioItems, item => item.Name == "Water Utility reserve target");
     }
 
     [Fact]
@@ -61,7 +64,7 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
 
         Assert.NotNull(payload);
         Assert.Equal(2026, payload.SelectedFiscalYear);
-        Assert.Equal("Sanitation Utility", payload.SelectedEnterprise);
+        Assert.Equal("Water Utility", payload.SelectedEnterprise);
     }
 
     [Fact]

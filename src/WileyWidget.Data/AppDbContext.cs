@@ -74,6 +74,9 @@ namespace WileyWidget.Data
         public DbSet<ProfitLossMonthlyLine> ProfitLossMonthlyLines { get; set; } = null!;
         public DbSet<BudgetSnapshot> BudgetSnapshots { get; set; } = null!;
         public DbSet<BudgetSnapshotArtifact> BudgetSnapshotArtifacts { get; set; } = null!;
+        public DbSet<QuickBooksRoutingRule> QuickBooksRoutingRules { get; set; } = null!;
+        public DbSet<QuickBooksAllocationProfile> QuickBooksAllocationProfiles { get; set; } = null!;
+        public DbSet<QuickBooksAllocationTarget> QuickBooksAllocationTargets { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -499,6 +502,54 @@ namespace WileyWidget.Data
                 entity.Property(e => e.SplitAccount).HasMaxLength(200);
                 entity.Property(e => e.ClearedFlag).HasMaxLength(20);
                 entity.Property(e => e.EntryDate).HasColumnType("date");
+                entity.Property(e => e.OriginalEntryScope).HasMaxLength(100);
+                entity.Property(e => e.AppliedRoutingRuleName).HasMaxLength(200);
+                entity.Property(e => e.AppliedAllocationProfileName).HasMaxLength(200);
+                entity.Property(e => e.RoutingReason).HasMaxLength(500);
+                entity.HasIndex(e => e.AppliedRoutingRuleId);
+                entity.HasIndex(e => e.AppliedAllocationProfileId);
+            });
+
+            modelBuilder.Entity<QuickBooksRoutingRule>(entity =>
+            {
+                entity.ToTable("quickbooks_routing_rules");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.SourceFilePattern).HasMaxLength(200);
+                entity.Property(e => e.DefaultEnterprisePattern).HasMaxLength(200);
+                entity.Property(e => e.AccountPattern).HasMaxLength(200);
+                entity.Property(e => e.MemoPattern).HasMaxLength(200);
+                entity.Property(e => e.NamePattern).HasMaxLength(200);
+                entity.Property(e => e.SplitAccountPattern).HasMaxLength(200);
+                entity.Property(e => e.TargetEnterprise).HasMaxLength(100);
+                entity.HasIndex(e => e.Priority);
+                entity.HasIndex(e => e.IsActive);
+                entity.HasOne(e => e.AllocationProfile)
+                      .WithMany()
+                      .HasForeignKey(e => e.AllocationProfileId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<QuickBooksAllocationProfile>(entity =>
+            {
+                entity.ToTable("quickbooks_allocation_profiles");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.IsActive);
+            });
+
+            modelBuilder.Entity<QuickBooksAllocationTarget>(entity =>
+            {
+                entity.ToTable("quickbooks_allocation_targets");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.EnterpriseName).HasMaxLength(100).IsRequired();
+                entity.HasOne(e => e.AllocationProfile)
+                      .WithMany(e => e.Targets)
+                      .HasForeignKey(e => e.AllocationProfileId)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(e => e.AllocationProfileId);
             });
 
             modelBuilder.Entity<LedgerEntryLine>(entity =>

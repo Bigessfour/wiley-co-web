@@ -12,7 +12,12 @@ public sealed record QuickBooksImportPreviewRow(
 	decimal? Amount,
 	decimal? RunningBalance,
 	string? ClearedFlag,
-	bool IsDuplicate);
+	bool IsDuplicate,
+	string? RoutedEnterprise = null,
+	string? RoutingRuleName = null,
+	string? AllocationSummary = null,
+	decimal? SourceAmount = null,
+	string? RoutingReason = null);
 
 public sealed record QuickBooksImportPreviewResponse(
 	string FileName,

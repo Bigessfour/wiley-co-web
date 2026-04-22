@@ -35,10 +35,12 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         var payload = await response.Content.ReadFromJsonAsync<WorkspaceReferenceDataImportResponse>(jsonOptions);
 
         Assert.NotNull(payload);
-        Assert.True(payload.ImportedEnterpriseCount >= 2);
+        Assert.True(payload.ImportedEnterpriseCount >= 4);
         Assert.True(payload.ImportedUtilityCustomerCount > 0);
         Assert.Contains("Water Utility", payload.EnterpriseNames);
         Assert.Contains("Wiley Sanitation District", payload.EnterpriseNames);
+        Assert.Contains("Trash", payload.EnterpriseNames);
+        Assert.Contains("Apartments", payload.EnterpriseNames);
         Assert.Contains("Imported", payload.UtilityCustomerImportStatus, StringComparison.OrdinalIgnoreCase);
 
         var snapshotResponse = await client.GetAsync("/api/workspace/snapshot");
@@ -48,10 +50,19 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         Assert.NotNull(snapshot);
         Assert.Contains("Water Utility", snapshot.EnterpriseOptions ?? []);
         Assert.Contains("Wiley Sanitation District", snapshot.EnterpriseOptions ?? []);
+        Assert.Contains("Trash", snapshot.EnterpriseOptions ?? []);
+        Assert.Contains("Apartments", snapshot.EnterpriseOptions ?? []);
 
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
         await using var context = await contextFactory.CreateDbContextAsync();
-        Assert.Equal(2, await context.Enterprises.CountAsync(item => !item.IsDeleted));
+        var activeEnterpriseNames = await context.Enterprises
+            .Where(item => !item.IsDeleted)
+            .Select(item => item.Name)
+            .OrderBy(name => name)
+            .ToListAsync();
+        Assert.Equal(4, activeEnterpriseNames.Count);
+        Assert.Equal(4, await context.DepartmentCurrentCharges.CountAsync(item => item.IsActive));
+        Assert.Equal(4, await context.DepartmentGoals.CountAsync(item => item.IsActive));
         Assert.Equal(payload.ImportedUtilityCustomerCount, await context.UtilityCustomers.CountAsync());
     }
 
@@ -90,7 +101,7 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         Assert.NotNull(payload);
         Assert.True(payload.ImportedLedgerFileCount >= 2);
         Assert.True(payload.ImportedLedgerRowCount > 0);
-        Assert.True(payload.SeededEnterpriseBaselineCount >= 2);
+        Assert.True(payload.SeededEnterpriseBaselineCount >= 4);
 
         var snapshotResponse = await client.GetAsync("/api/workspace/snapshot?enterprise=Water%20Utility&fiscalYear=2026");
         snapshotResponse.EnsureSuccessStatusCode();

@@ -20,6 +20,7 @@ public sealed class QuickBooksImportService
 	private readonly IDbContextFactory<AppDbContext> contextFactory;
 	private readonly IQuickBooksFileParser csvParser;
 	private readonly IQuickBooksFileParser excelParser;
+	private readonly QuickBooksRoutingService routingService;
 
 	static QuickBooksImportService()
 	{
@@ -29,11 +30,13 @@ public sealed class QuickBooksImportService
 	public QuickBooksImportService(
 		ILogger<QuickBooksImportService> logger,
 		IDbContextFactory<AppDbContext> contextFactory,
+		QuickBooksRoutingService routingService,
 		QuickBooksCsvParser csvParser,
 		QuickBooksExcelParser excelParser)
 	{
 		this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+		this.routingService = routingService ?? throw new ArgumentNullException(nameof(routingService));
 		this.csvParser = csvParser ?? throw new ArgumentNullException(nameof(csvParser));
 		this.excelParser = excelParser ?? throw new ArgumentNullException(nameof(excelParser));
 	}
@@ -42,6 +45,7 @@ public sealed class QuickBooksImportService
 	{
 		logger.LogInformation("Previewing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var preview = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
+		var routedPreview = await routingService.ApplyRoutingAsync(preview, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
 		await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -58,17 +62,18 @@ public sealed class QuickBooksImportService
 			fileHash,
 			selectedEnterprise,
 			selectedFiscalYear,
-			preview.Count,
-			isDuplicate ? preview.Count : 0,
+			routedPreview.Count,
+			isDuplicate ? routedPreview.Count : 0,
 			isDuplicate,
 			statusMessage,
-			preview.Select(row => row with { IsDuplicate = isDuplicate }).ToList());
+			routedPreview.Select(row => row with { IsDuplicate = isDuplicate }).ToList());
 	}
 
 	public async Task<QuickBooksImportCommitResponse> CommitAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
 	{
 		logger.LogInformation("Committing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var parsedRows = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
+		var routedRows = await routingService.ApplyRoutingAsync(parsedRows, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
 		await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -114,39 +119,25 @@ public sealed class QuickBooksImportService
 
 		context.ImportBatches.Add(batch);
 		context.SourceFiles.Add(sourceFile);
+		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-		foreach (var row in parsedRows)
+		foreach (var row in routedRows)
 		{
-			context.LedgerEntries.Add(new LedgerEntry
-			{
-				SourceFile = sourceFile,
-				SourceRowNumber = row.RowNumber,
-				EntryDate = TryParseDateOnly(row.EntryDate),
-				EntryType = row.EntryType,
-				TransactionNumber = row.TransactionNumber,
-				Name = row.Name,
-				Memo = row.Memo,
-				AccountName = row.AccountName,
-				SplitAccount = row.SplitAccount,
-				Amount = row.Amount,
-				RunningBalance = row.RunningBalance,
-				ClearedFlag = row.ClearedFlag,
-				EntryScope = selectedEnterprise
-			});
+			context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
 		}
 
 		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, parsedRows.Count);
+		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, routedRows.Count);
 
 		return new QuickBooksImportCommitResponse(
 			Path.GetFileName(fileName),
 			fileHash,
 			selectedEnterprise,
 			selectedFiscalYear,
-			parsedRows.Count,
+			routedRows.Count,
 			batch.Id,
 			false,
-			$"Imported {parsedRows.Count} QuickBooks rows for {selectedEnterprise} FY {selectedFiscalYear}.",
+			$"Imported {routedRows.Count} QuickBooks routed row(s) for {selectedEnterprise} FY {selectedFiscalYear}.",
 			[]);
 	}
 
@@ -164,39 +155,4 @@ public sealed class QuickBooksImportService
 	private static string ComputeFileHash(byte[] fileBytes)
 		=> Convert.ToHexString(SHA256.HashData(fileBytes));
 
-	private static DateOnly? TryParseDateOnly(string? value)
-	{
-		if (string.IsNullOrWhiteSpace(value))
-		{
-			return null;
-		}
-
-		return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate)
-			? parsedDate
-			: TryParseExcelSerialDate(value, out parsedDate)
-				? parsedDate
-				: null;
-	}
-
-	private static bool TryParseExcelSerialDate(string? value, out DateOnly parsedDate)
-	{
-		parsedDate = default;
-
-		if (!double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var serialDate)
-			|| serialDate <= 0
-			|| serialDate >= 2958466)
-		{
-			return false;
-		}
-
-		try
-		{
-			parsedDate = DateOnly.FromDateTime(DateTime.FromOADate(serialDate));
-			return true;
-		}
-		catch (ArgumentException)
-		{
-			return false;
-		}
-	}
 }

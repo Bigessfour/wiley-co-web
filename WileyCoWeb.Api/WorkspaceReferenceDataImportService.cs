@@ -675,12 +675,70 @@ internal sealed partial class WorkspaceReferenceDataImportService
     private static string? NormalizeCompanyName(string? companyFileName)
     => string.IsNullOrWhiteSpace(companyFileName) ? null : NormalizeCompanyNameCore(companyFileName);
 
-    private static string NormalizeCompanyNameCore(string companyFileName) { var rawName = Path.GetFileNameWithoutExtension(companyFileName.Trim()); rawName = rawName.Replace('_', ' ').Trim(); rawName = System.Text.RegularExpressions.Regex.Replace(rawName, "\\s+\\d{2,4}$", string.Empty).Trim(); var overrideName = CompanyNameOverrides.FirstOrDefault(item => rawName.Contains(item.Pattern, StringComparison.OrdinalIgnoreCase)).Name; return string.IsNullOrWhiteSpace(overrideName) ? CultureInfo.InvariantCulture.TextInfo.ToTitleCase(rawName.ToLowerInvariant()) : overrideName; }
+    private static string NormalizeCompanyNameCore(string companyFileName) { var rawName = Path.GetFileNameWithoutExtension(companyFileName.Trim()); rawName = rawName.Replace('_', ' ').Trim(); rawName = System.Text.RegularExpressions.Regex.Replace(rawName, "\\s+\\d{2,4}$", string.Empty).Trim(); var overrideName = CompanyNameOverrides.FirstOrDefault(item => rawName.Contains(item.Pattern, StringComparison.OrdinalIgnoreCase)).Name; var resolvedName = string.IsNullOrWhiteSpace(overrideName) ? CultureInfo.InvariantCulture.TextInfo.ToTitleCase(rawName.ToLowerInvariant()) : overrideName; return NormalizeEnterpriseName(resolvedName); }
 
     private static string? ResolveEnterpriseNameFromFileName(string fileName)
-        => EnterpriseNameOverrides
-            .FirstOrDefault(item => fileName.Contains(item.Pattern, StringComparison.OrdinalIgnoreCase))
-            .Name;
+        => NormalizeResolvedEnterpriseName(
+            EnterpriseNameOverrides
+                .FirstOrDefault(item => fileName.Contains(item.Pattern, StringComparison.OrdinalIgnoreCase))
+                .Name);
+
+    private static string? NormalizeResolvedEnterpriseName(string? enterpriseName)
+        => string.IsNullOrWhiteSpace(enterpriseName)
+            ? enterpriseName
+            : NormalizeEnterpriseName(enterpriseName);
+
+    private static string NormalizeEnterpriseName(string enterpriseName)
+    {
+        foreach (var seed in WorkspaceEnterpriseSeedCatalog.All)
+        {
+            foreach (var alias in GetEnterpriseAliases(seed))
+            {
+                if (enterpriseName.Contains(alias, StringComparison.OrdinalIgnoreCase))
+                {
+                    return seed.Name;
+                }
+            }
+        }
+
+        return enterpriseName.Trim();
+    }
+
+    private static IEnumerable<string> GetEnterpriseAliases(WorkspaceEnterpriseSeed seed)
+    {
+        yield return seed.Name;
+        yield return seed.DepartmentName;
+
+        if (string.Equals(seed.Name, "Water Utility", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Water";
+            yield break;
+        }
+
+        if (string.Equals(seed.Name, "Wiley Sanitation District", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Sanitation";
+            yield return "Sanitation Utility";
+            yield return "Sewer";
+            yield return "WSD";
+            yield break;
+        }
+
+        if (string.Equals(seed.Name, "Trash", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Trash";
+            yield return "Trash Utility";
+            yield return "Refuse";
+            yield return "Garbage";
+            yield break;
+        }
+
+        if (string.Equals(seed.Name, "Apartments", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Apartment";
+            yield return "Apts";
+        }
+    }
 
     private static string DeriveEnterpriseType(string enterpriseName) => ResolveEnterpriseTypeOverride(enterpriseName) ?? "Water";
 

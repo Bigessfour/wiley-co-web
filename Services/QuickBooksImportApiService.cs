@@ -33,6 +33,18 @@ public sealed class QuickBooksImportApiService(HttpClient httpClient, ILogger<Qu
     public Task<QuickBooksImportGuidanceResponse> AskAsync(QuickBooksImportGuidanceRequest request, CancellationToken cancellationToken = default)
         => ExecuteAskAsync(request, cancellationToken);
 
+    public Task<QuickBooksRoutingConfigurationResponse> GetRoutingConfigurationAsync(CancellationToken cancellationToken = default)
+        => ExecuteGetAsync<QuickBooksRoutingConfigurationResponse>("api/imports/quickbooks/routing", "QuickBooks routing configuration", cancellationToken);
+
+    public Task<QuickBooksRoutingConfigurationResponse> SaveRoutingConfigurationAsync(QuickBooksRoutingConfigurationRequest request, CancellationToken cancellationToken = default)
+        => ExecuteSendJsonAsync<QuickBooksRoutingConfigurationResponse>(HttpMethod.Put, "api/imports/quickbooks/routing", request, "QuickBooks routing configuration update", cancellationToken);
+
+    public Task<QuickBooksImportHistoryResponse> GetImportHistoryAsync(CancellationToken cancellationToken = default)
+        => ExecuteGetAsync<QuickBooksImportHistoryResponse>("api/imports/quickbooks/history", "QuickBooks import history", cancellationToken);
+
+    public Task<QuickBooksHistoricalRerouteResponse> ReapplyRoutingAsync(QuickBooksHistoricalRerouteRequest request, CancellationToken cancellationToken = default)
+        => ExecuteSendJsonAsync<QuickBooksHistoricalRerouteResponse>(HttpMethod.Post, "api/imports/quickbooks/reroute", request, "QuickBooks historical reroute", cancellationToken);
+
     private async Task<TResponse> PostAsync<TResponse>(
         string requestUri,
         byte[] fileBytes,
@@ -84,6 +96,36 @@ public sealed class QuickBooksImportApiService(HttpClient httpClient, ILogger<Qu
 
         LogImportRequestSucceeded(context.RequestUri);
         return payload ?? throw new InvalidOperationException("The QuickBooks import response was empty.");
+    }
+
+    private async Task<TResponse> ExecuteGetAsync<TResponse>(string requestUri, string operation, CancellationToken cancellationToken)
+    {
+        logger?.LogInformation("Requesting {Operation} from {RequestUri}", operation, requestUri);
+
+        var payload = await httpClient.GetJsonAsync<TResponse>(
+            requestUri,
+            JsonOptions,
+            $"The {operation} response was not valid JSON.",
+            CreateFailureException(operation),
+            cancellationToken).ConfigureAwait(false);
+
+        return payload ?? throw new InvalidOperationException($"The {operation} response was empty.");
+    }
+
+    private async Task<TResponse> ExecuteSendJsonAsync<TResponse>(HttpMethod method, string requestUri, object requestBody, string operation, CancellationToken cancellationToken)
+    {
+        logger?.LogInformation("Posting {Operation} to {RequestUri}", operation, requestUri);
+
+        var payload = await httpClient.SendJsonAsync<TResponse>(
+            method,
+            requestUri,
+            requestBody,
+            JsonOptions,
+            $"The {operation} response was not valid JSON.",
+            CreateFailureException(operation),
+            cancellationToken).ConfigureAwait(false);
+
+        return payload ?? throw new InvalidOperationException($"The {operation} response was empty.");
     }
 
     private void LogImportRequest(QuickBooksImportRequestContext context)

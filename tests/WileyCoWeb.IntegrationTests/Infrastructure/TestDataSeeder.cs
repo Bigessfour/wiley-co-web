@@ -24,6 +24,7 @@ internal static class TestDataSeeder
             new Enterprise
             {
                 Name = "Water Utility",
+                Type = "Water",
                 CurrentRate = 55.25m,
                 MonthlyExpenses = 13250m,
                 CitizenCount = 240,
@@ -31,10 +32,29 @@ internal static class TestDataSeeder
             },
             new Enterprise
             {
-                Name = "Sanitation Utility",
+                Name = "Wiley Sanitation District",
+                Type = "Sewer",
                 CurrentRate = 41.10m,
                 MonthlyExpenses = 9100m,
                 CitizenCount = 180,
+                IsDeleted = false
+            },
+            new Enterprise
+            {
+                Name = "Trash",
+                Type = "Trash",
+                CurrentRate = 24.50m,
+                MonthlyExpenses = 7600m,
+                CitizenCount = 160,
+                IsDeleted = false
+            },
+            new Enterprise
+            {
+                Name = "Apartments",
+                Type = "Apartments",
+                CurrentRate = 725.00m,
+                MonthlyExpenses = 14500m,
+                CitizenCount = 24,
                 IsDeleted = false
             },
             new Enterprise
@@ -57,7 +77,8 @@ internal static class TestDataSeeder
                 ServiceCity = "Wiley",
                 ServiceState = "CO",
                 ServiceZipCode = "81092",
-                ServiceLocation = ServiceLocation.InsideCityLimits
+                ServiceLocation = ServiceLocation.InsideCityLimits,
+                Notes = "Water Utility seeded integration customer"
             },
             new UtilityCustomer
             {
@@ -70,7 +91,84 @@ internal static class TestDataSeeder
                 ServiceCity = "Wiley",
                 ServiceState = "CO",
                 ServiceZipCode = "81092",
-                ServiceLocation = ServiceLocation.OutsideCityLimits
+                ServiceLocation = ServiceLocation.OutsideCityLimits,
+                Notes = "Water Utility seeded integration customer"
+            });
+
+        context.DepartmentCurrentCharges.AddRange(
+            new DepartmentCurrentCharge
+            {
+                Department = "Water",
+                CurrentCharge = 55.25m,
+                CustomerCount = 240,
+                UpdatedBy = nameof(TestDataSeeder),
+                Notes = "Seeded from Water Utility.",
+                IsActive = true
+            },
+            new DepartmentCurrentCharge
+            {
+                Department = "Sewer",
+                CurrentCharge = 41.10m,
+                CustomerCount = 180,
+                UpdatedBy = nameof(TestDataSeeder),
+                Notes = "Seeded from Wiley Sanitation District.",
+                IsActive = true
+            },
+            new DepartmentCurrentCharge
+            {
+                Department = "Trash",
+                CurrentCharge = 24.50m,
+                CustomerCount = 160,
+                UpdatedBy = nameof(TestDataSeeder),
+                Notes = "Seeded from Trash.",
+                IsActive = true
+            },
+            new DepartmentCurrentCharge
+            {
+                Department = "Apartments",
+                CurrentCharge = 725.00m,
+                CustomerCount = 24,
+                UpdatedBy = nameof(TestDataSeeder),
+                Notes = "Seeded from Apartments.",
+                IsActive = true
+            });
+
+        context.DepartmentGoals.AddRange(
+            new DepartmentGoal
+            {
+                Department = "Water",
+                AdjustmentFactor = 1.02m,
+                TargetProfitMarginPercent = 2.00m,
+                RecommendationText = "Water Utility should stand on its own rates.",
+                Source = nameof(TestDataSeeder),
+                IsActive = true
+            },
+            new DepartmentGoal
+            {
+                Department = "Sewer",
+                AdjustmentFactor = 1.01m,
+                TargetProfitMarginPercent = 1.00m,
+                RecommendationText = "Wiley Sanitation District should stand on its own rates.",
+                Source = nameof(TestDataSeeder),
+                IsActive = true
+            },
+            new DepartmentGoal
+            {
+                Department = "Trash",
+                AdjustmentFactor = 1.03m,
+                TargetProfitMarginPercent = 3.00m,
+                RecommendationText = "Trash should stand on its own rates.",
+                Source = nameof(TestDataSeeder),
+                IsActive = true
+            },
+            new DepartmentGoal
+            {
+                Department = "Apartments",
+                AdjustmentFactor = 1.04m,
+                TargetProfitMarginPercent = 4.00m,
+                RecommendationText = "Apartments should stand on their own rents and fees.",
+                Source = nameof(TestDataSeeder),
+                IsActive = true
             });
 
         context.BudgetEntries.AddRange(

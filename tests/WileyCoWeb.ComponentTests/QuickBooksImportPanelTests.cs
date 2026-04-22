@@ -52,6 +52,9 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		Assert.Contains("Commit import", cut.Markup);
 		Assert.Contains("Ask assistant", cut.Markup);
 		Assert.Contains("No file selected", cut.Markup);
+		Assert.Contains("Routing Rules", cut.Markup);
+		Assert.Contains("Allocation Profiles", cut.Markup);
+		Assert.Contains("Import History", cut.Markup);
 	}
 
 	[Fact]
@@ -334,9 +337,273 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		Assert.False(GetPrivateField<bool>(cut.Instance, "ShowCommitDialog"));
 	}
 
+	[Fact]
+	public void OnInitializedAsync_LoadsRoutingWorkspace_AndRendersBoundRoutingData()
+	{
+		var state = new WorkspaceState();
+		var service = new QuickBooksImportApiService(new HttpClient(new StubHttpMessageHandler(request =>
+		{
+			var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+
+			if (path.EndsWith("/routing", StringComparison.Ordinal))
+			{
+				return CreateJsonResponse(new QuickBooksRoutingConfigurationResponse
+				{
+					StatusMessage = "Loaded 1 routing rule.",
+					Rules =
+					[
+						new QuickBooksRoutingRuleDefinition
+						{
+							Id = 5,
+							Name = "Brookside to Apartments",
+							Description = "Route Brookside costs to Apartments.",
+							Priority = 10,
+							IsActive = true,
+							MemoPattern = "BROOKSIDE",
+							TargetEnterprise = "Apartments",
+							AllocationProfileId = 3
+						}
+					],
+					AllocationProfiles =
+					[
+						new QuickBooksAllocationProfileDefinition
+						{
+							Id = 3,
+							Name = "Administrative split",
+							Description = "Split administrative overhead.",
+							IsActive = true,
+							Targets =
+							[
+								new QuickBooksAllocationTargetDefinition
+								{
+									Id = 30,
+									EnterpriseName = "Apartments",
+									AllocationPercent = 40m
+								},
+								new QuickBooksAllocationTargetDefinition
+								{
+									Id = 31,
+									EnterpriseName = "Trash",
+									AllocationPercent = 60m
+								}
+							]
+						}
+					]
+				});
+			}
+
+			if (path.EndsWith("/history", StringComparison.Ordinal))
+			{
+				return CreateJsonResponse(new QuickBooksImportHistoryResponse
+				{
+					StatusMessage = "Loaded 1 import history item.",
+					Items =
+					[
+						new QuickBooksImportHistoryItem
+						{
+							SourceFileId = 77,
+							BatchId = 91,
+							FileName = "brookside-journal.csv",
+							ScopeSummary = "Apartments, Trash",
+							RowCount = 2,
+							ImportedAtUtc = "2026-04-22T00:00:00Z"
+						}
+					]
+				});
+			}
+
+			return CreateJsonResponse(CreatePreviewResponse(isDuplicate: false));
+		}))
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		});
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(service);
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<QuickBooksImportPanel>(parameters => parameters
+			.Add(panel => panel.WorkspaceState, state));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Equal("Loaded 1 routing rule.", GetPrivateField<string>(cut.Instance, "RoutingStatusMessage"));
+			Assert.Equal("Loaded 1 import history item.", GetPrivateField<string>(cut.Instance, "ImportHistoryStatusMessage"));
+			var loadedRules = GetPrivateField<List<QuickBooksRoutingRuleDefinition>>(cut.Instance, "RoutingRules");
+			var loadedProfiles = GetPrivateField<List<QuickBooksAllocationProfileDefinition>>(cut.Instance, "AllocationProfiles");
+			var loadedHistory = GetPrivateField<List<QuickBooksImportHistoryItem>>(cut.Instance, "ImportHistoryItems");
+
+			var loadedRule = Assert.Single(loadedRules);
+			var loadedProfile = Assert.Single(loadedProfiles);
+			var loadedHistoryItem = Assert.Single(loadedHistory);
+
+			Assert.Equal("Brookside to Apartments", loadedRule.Name);
+			Assert.Equal("BROOKSIDE", loadedRule.MemoPattern);
+			Assert.Equal("Administrative split", loadedProfile.Name);
+			Assert.Equal("brookside-journal.csv", loadedHistoryItem.FileName);
+			Assert.Equal("Apartments, Trash", loadedHistoryItem.ScopeSummary);
+			Assert.Contains("Brookside to Apartments", cut.Markup);
+		});
+	}
+
+	[Fact]
+	public async Task SaveRoutingConfigurationAsync_PersistsEditedRoutingModels()
+	{
+		var state = new WorkspaceState();
+		string? savedRoutingJson = null;
+		var service = new QuickBooksImportApiService(new HttpClient(new StubHttpMessageHandler(request =>
+		{
+			var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+
+			if (path.EndsWith("/routing", StringComparison.Ordinal) && request.Method == HttpMethod.Put)
+			{
+				savedRoutingJson = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+				return CreateJsonResponse(new QuickBooksRoutingConfigurationResponse
+				{
+					StatusMessage = "Saved QuickBooks routing configuration.",
+					Rules =
+					[
+						new QuickBooksRoutingRuleDefinition
+						{
+							Id = 9,
+							Name = "Reserve transfer to Apartments",
+							Priority = 20,
+							IsActive = true,
+							MemoPattern = "APARTMENT RESERVE",
+							TargetEnterprise = "Apartments",
+							AllocationProfileId = 12
+						}
+					],
+					AllocationProfiles =
+					[
+						new QuickBooksAllocationProfileDefinition
+						{
+							Id = 12,
+							Name = "Reserve split",
+							Description = "Reserve allocation.",
+							IsActive = true,
+							Targets =
+							[
+								new QuickBooksAllocationTargetDefinition
+								{
+									EnterpriseName = "Apartments",
+									AllocationPercent = 100m
+								}
+							]
+						}
+					]
+				});
+			}
+
+			return CreateJsonResponse(new QuickBooksRoutingConfigurationResponse
+			{
+				StatusMessage = "Loaded QuickBooks routing configuration.",
+				Rules = [],
+				AllocationProfiles = []
+			});
+		}))
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		});
+
+		Services.AddSingleton(state);
+		Services.AddSingleton(service);
+		Services.AddSyncfusionBlazor();
+
+		SetRendererInfo(new RendererInfo("Server", true));
+		JSInterop.Mode = JSRuntimeMode.Loose;
+
+		var cut = RenderComponent<QuickBooksImportPanel>(parameters => parameters
+			.Add(panel => panel.WorkspaceState, state));
+
+		var routingRules = GetPrivateField<List<QuickBooksRoutingRuleDefinition>>(cut.Instance, "RoutingRules");
+		var allocationProfiles = GetPrivateField<List<QuickBooksAllocationProfileDefinition>>(cut.Instance, "AllocationProfiles");
+
+		routingRules.Add(new QuickBooksRoutingRuleDefinition
+		{
+			Name = "Reserve transfer to Apartments",
+			Priority = 20,
+			IsActive = true,
+			MemoPattern = "APARTMENT RESERVE",
+			TargetEnterprise = "Apartments",
+			AllocationProfileId = 12
+		});
+
+		allocationProfiles.Add(new QuickBooksAllocationProfileDefinition
+		{
+			Id = 12,
+			Name = "Reserve split",
+			Description = "Reserve allocation.",
+			IsActive = true,
+			Targets =
+			[
+				new QuickBooksAllocationTargetDefinition
+				{
+					EnterpriseName = "Apartments",
+					AllocationPercent = 100m
+				}
+			]
+		});
+
+		await InvokePrivateAsync(cut, "SaveRoutingConfigurationAsync");
+
+		Assert.False(string.IsNullOrWhiteSpace(savedRoutingJson));
+		var savedRequest = JsonSerializer.Deserialize<QuickBooksRoutingConfigurationRequest>(savedRoutingJson!, JsonOptions);
+		Assert.NotNull(savedRequest);
+		var savedRule = Assert.Single(savedRequest!.Rules);
+		Assert.Equal("Reserve transfer to Apartments", savedRule.Name);
+		Assert.Equal("APARTMENT RESERVE", savedRule.MemoPattern);
+		Assert.Equal("Apartments", savedRule.TargetEnterprise);
+		Assert.Equal(12, savedRule.AllocationProfileId);
+
+		var savedProfile = Assert.Single(savedRequest.AllocationProfiles);
+		Assert.Equal("Reserve split", savedProfile.Name);
+		Assert.Equal(100m, Assert.Single(savedProfile.Targets).AllocationPercent);
+		Assert.Equal("Saved QuickBooks routing configuration.", GetPrivateField<string>(cut.Instance, "RoutingStatusMessage"));
+	}
+
 	private static QuickBooksImportApiService CreateImportService(Func<HttpRequestMessage, HttpResponseMessage> responder)
 	{
-		return new QuickBooksImportApiService(new HttpClient(new StubHttpMessageHandler(responder))
+		return new QuickBooksImportApiService(new HttpClient(new StubHttpMessageHandler(request =>
+		{
+			var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+
+			if (path.EndsWith("/routing", StringComparison.Ordinal))
+			{
+				return CreateJsonResponse(new QuickBooksRoutingConfigurationResponse
+				{
+					StatusMessage = "Loaded QuickBooks routing configuration.",
+					Rules = [],
+					AllocationProfiles = []
+				});
+			}
+
+			if (path.EndsWith("/history", StringComparison.Ordinal))
+			{
+				return CreateJsonResponse(new QuickBooksImportHistoryResponse
+				{
+					StatusMessage = "No QuickBooks import history is available yet.",
+					Items = []
+				});
+			}
+
+			if (path.EndsWith("/reroute", StringComparison.Ordinal))
+			{
+				return CreateJsonResponse(new QuickBooksHistoricalRerouteResponse
+				{
+					SourceFileId = 1,
+					FileName = "quickbooks-ledger.csv",
+					SourceRowCount = 2,
+					RoutedRowCount = 2,
+					StatusMessage = "Reapplied QuickBooks routing."
+				});
+			}
+
+			return responder(request);
+		}))
 		{
 			BaseAddress = new Uri("https://workspace.local/")
 		});
@@ -397,15 +664,28 @@ public sealed class QuickBooksImportPanelTests : TestContext
 	private static T GetPrivateField<T>(object instance, string fieldName)
 	{
 		var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-		Assert.NotNull(field);
-		return (T)field!.GetValue(instance)!;
+		if (field is not null)
+		{
+			return (T)field.GetValue(instance)!;
+		}
+
+		var property = instance.GetType().GetProperty(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+		Assert.NotNull(property);
+		return (T)property!.GetValue(instance)!;
 	}
 
 	private static void SetPrivateField<T>(object instance, string fieldName, T value)
 	{
 		var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-		Assert.NotNull(field);
-		field!.SetValue(instance, value);
+		if (field is not null)
+		{
+			field.SetValue(instance, value);
+			return;
+		}
+
+		var property = instance.GetType().GetProperty(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+		Assert.NotNull(property);
+		property!.SetValue(instance, value);
 	}
 
 	private static HttpResponseMessage CreateJsonResponse<TValue>(TValue value)

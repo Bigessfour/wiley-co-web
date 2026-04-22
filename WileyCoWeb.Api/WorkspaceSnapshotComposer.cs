@@ -101,7 +101,7 @@ internal sealed class WorkspaceSnapshotComposer
         WorkspaceSnapshotSelectionData selectionData,
         CancellationToken cancellationToken)
     {
-        var customerData = await LoadWorkspaceSnapshotCustomerDataAsync(context, selectionData.PersistedSnapshot, cancellationToken).ConfigureAwait(false);
+        var customerData = await LoadWorkspaceSnapshotCustomerDataAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
         var rateData = await LoadWorkspaceSnapshotRateDataAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
 
         return new WorkspaceSnapshotDerivedData(
@@ -118,11 +118,11 @@ internal sealed class WorkspaceSnapshotComposer
 
     private async Task<WorkspaceSnapshotCustomerData> LoadWorkspaceSnapshotCustomerDataAsync(
         AppDbContext context,
-        WorkspaceBootstrapData? persistedSnapshot,
+        WorkspaceSnapshotSelectionData selectionData,
         CancellationToken cancellationToken)
     {
-        var customers = await LoadCustomersAsync(context, cancellationToken);
-        var customerRows = BuildCustomerRows(persistedSnapshot, customers);
+        var customers = await LoadCustomersAsync(context, selectionData.SelectedEnterprise.Name, cancellationToken);
+        var customerRows = BuildCustomerRows(selectionData.PersistedSnapshot, customers);
         var serviceOptions = BuildServiceOptions(customerRows);
 
         return new WorkspaceSnapshotCustomerData(customerRows, serviceOptions);
@@ -187,7 +187,7 @@ internal sealed class WorkspaceSnapshotComposer
     {
         return selectionData.PersistedSnapshot?.ScenarioItems is { Count: > 0 }
             ? BuildScenarioItemsFromPersisted(selectionData.PersistedSnapshot)
-            : await BuildScenarioItemsAsync(context, selectionData.SelectedFiscalYear, cancellationToken).ConfigureAwait(false);
+            : await BuildScenarioItemsAsync(selectionData.SelectedEnterprise).ConfigureAwait(false);
     }
 
     private static WorkspaceBootstrapData CreateWorkspaceBootstrapData(WorkspaceSnapshotBuildContext buildContext)
@@ -216,7 +216,8 @@ internal sealed class WorkspaceSnapshotComposer
         return await context.Enterprises
             .AsNoTracking()
             .Where(enterprise => !enterprise.IsDeleted)
-            .OrderBy(enterprise => enterprise.Name)
+            .OrderBy(enterprise => GetEnterpriseSortOrder(enterprise.Name))
+            .ThenBy(enterprise => enterprise.Name)
             .ToListAsync(cancellationToken);
     }
 
@@ -238,11 +239,12 @@ internal sealed class WorkspaceSnapshotComposer
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<List<UtilityCustomer>> LoadCustomersAsync(AppDbContext context, CancellationToken cancellationToken)
+    private async Task<List<UtilityCustomer>> LoadCustomersAsync(AppDbContext context, string selectedEnterpriseName, CancellationToken cancellationToken)
     {
         return (await context.UtilityCustomers
                 .AsNoTracking()
                 .ToListAsync(cancellationToken))
+            .Where(customer => CustomerBelongsToEnterprise(customer, selectedEnterpriseName))
             .OrderBy(customer => string.IsNullOrWhiteSpace(customer.DisplayName) ? customer.AccountNumber : customer.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(customer => customer.AccountNumber, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -250,9 +252,11 @@ internal sealed class WorkspaceSnapshotComposer
 
     private static List<CustomerRow> BuildCustomerRows(WorkspaceBootstrapData? persistedSnapshot, List<UtilityCustomer> customers)
     {
-        return persistedSnapshot?.CustomerRows is { Count: > 0 }
-            ? BuildPersistedCustomerRows(persistedSnapshot)
-            : BuildCustomerRowsFromUtilities(customers);
+        return customers.Count > 0
+            ? BuildCustomerRowsFromUtilities(customers)
+            : persistedSnapshot?.CustomerRows is { Count: > 0 }
+                ? BuildPersistedCustomerRows(persistedSnapshot)
+                : [];
     }
 
     private static List<CustomerRow> BuildPersistedCustomerRows(WorkspaceBootstrapData persistedSnapshot)
@@ -573,6 +577,96 @@ internal sealed class WorkspaceSnapshotComposer
         }
     }
 
+    private static int GetEnterpriseSortOrder(string? enterpriseName)
+    {
+        for (var index = 0; index < WorkspaceEnterpriseSeedCatalog.All.Count; index++)
+        {
+            if (string.Equals(WorkspaceEnterpriseSeedCatalog.All[index].Name, enterpriseName, StringComparison.OrdinalIgnoreCase))
+            {
+                return index;
+            }
+        }
+
+        return int.MaxValue;
+    }
+
+    private static bool CustomerBelongsToEnterprise(UtilityCustomer customer, string selectedEnterpriseName)
+    {
+        var inferredEnterpriseName = InferCustomerEnterpriseName(customer);
+        if (string.IsNullOrWhiteSpace(inferredEnterpriseName))
+        {
+            return string.Equals(selectedEnterpriseName, "Water Utility", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(inferredEnterpriseName, selectedEnterpriseName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? InferCustomerEnterpriseName(UtilityCustomer customer)
+    {
+        return MatchEnterpriseName(customer.Notes)
+            ?? MatchEnterpriseName(customer.DisplayName)
+            ?? MatchEnterpriseName(customer.CompanyName)
+            ?? MatchEnterpriseName(customer.AccountNumber)
+            ?? MatchEnterpriseName(customer.ServiceAddress)
+            ?? MatchEnterpriseName(customer.ServiceCity);
+    }
+
+    private static string? MatchEnterpriseName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        foreach (var seed in WorkspaceEnterpriseSeedCatalog.All)
+        {
+            foreach (var token in GetEnterpriseMatchTokens(seed))
+            {
+                if (value.Contains(token, StringComparison.OrdinalIgnoreCase))
+                {
+                    return seed.Name;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetEnterpriseMatchTokens(WorkspaceEnterpriseSeed seed)
+    {
+        yield return seed.Name;
+        yield return seed.DepartmentName;
+
+        if (string.Equals(seed.Name, "Water Utility", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Water";
+            yield break;
+        }
+
+        if (string.Equals(seed.Name, "Wiley Sanitation District", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "WSD";
+            yield return "Sanitation Utility";
+            yield return "Sanitation";
+            yield return "Sewer";
+            yield break;
+        }
+
+        if (string.Equals(seed.Name, "Trash", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Trash Utility";
+            yield return "Refuse";
+            yield return "Garbage";
+            yield break;
+        }
+
+        if (string.Equals(seed.Name, "Apartments", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return "Apartment";
+            yield return "Apts";
+        }
+    }
+
     private sealed record RateHistoryPoint(int FiscalYear, decimal Rate);
 
     private sealed record RateSnapshotEnvelope(DateOnly? SnapshotDate, string? Payload);
@@ -634,26 +728,16 @@ internal sealed class WorkspaceSnapshotComposer
         List<ProjectionRow> ProjectionRows,
         List<WorkspaceScenarioItemData> ScenarioItems);
 
-    private static async Task<List<WorkspaceScenarioItemData>> BuildScenarioItemsAsync(AppDbContext context, int fiscalYear, CancellationToken cancellationToken)
+    private static Task<List<WorkspaceScenarioItemData>> BuildScenarioItemsAsync(Enterprise selectedEnterprise)
     {
-        var topDepartments = await context.BudgetEntries
-            .AsNoTracking()
-            .Where(entry => entry.FiscalYear == fiscalYear)
-            .GroupBy(entry => entry.Department.Name)
-            .Select(group => new
+        var reserveTarget = Math.Round(Math.Max(0m, selectedEnterprise.MonthlyExpenses * 0.05m), 2, MidpointRounding.AwayFromZero);
+        var scenarioItems = reserveTarget > 0m
+            ? new List<WorkspaceScenarioItemData>
             {
-                Name = group.Key,
-                Amount = group.Sum(entry => entry.BudgetedAmount)
-            })
-            .OrderByDescending(group => group.Amount)
-            .Take(3)
-            .ToListAsync(cancellationToken);
+                new(Guid.NewGuid(), $"{selectedEnterprise.Name} reserve target", reserveTarget)
+            }
+            : [];
 
-        return topDepartments
-            .Select((department, index) => new WorkspaceScenarioItemData(
-                Guid.NewGuid(),
-                string.IsNullOrWhiteSpace(department.Name) ? $"Priority item {index + 1}" : department.Name,
-                Math.Round(Math.Max(0m, department.Amount * 0.05m), 2, MidpointRounding.AwayFromZero)))
-            .ToList();
+        return Task.FromResult(scenarioItems);
     }
 }

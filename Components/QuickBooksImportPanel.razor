@@ -132,6 +132,10 @@
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.EntryType)" HeaderText="Type" Width="110" />
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.Name)" HeaderText="Name" Width="140" />
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.AccountName)" HeaderText="Account" Width="160" />
+                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RoutedEnterprise)" HeaderText="Routed Enterprise" Width="160" />
+                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RoutingRuleName)" HeaderText="Rule" Width="150" />
+                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.AllocationSummary)" HeaderText="Allocation" Width="190" />
+                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.SourceAmount)" HeaderText="Source Amount" Format="C2" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.IsDuplicate)" HeaderText="Duplicate" Width="100" Type="Syncfusion.Blazor.Grids.ColumnType.Boolean" />
                             </GridColumns>
@@ -146,6 +150,191 @@
                     }
                 </div>
             </div>
+
+            <SfTab OverflowMode="OverflowMode.Scrollable">
+                <TabItems>
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Routing Rules" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="space-y-4 pt-4">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsRoutingBusy" OnClick="LoadRoutingWorkspaceAsync">Refresh routing</SfButton>
+                                    <SfButton Disabled="@IsRoutingBusy" OnClick="AddRoutingRule">Add rule</SfButton>
+                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsRoutingBusy" OnClick="SaveRoutingConfigurationAsync">Save routing</SfButton>
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite" aria-busy="@IsRoutingBusy">
+                                    <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Routing status</div>
+                                    <div class="mt-1 whitespace-pre-line">@RoutingStatusMessage</div>
+                                </div>
+
+                                @if (RoutingRules.Count == 0)
+                                {
+                                    <SfCard>
+                                        <CardHeader Title="No routing rules" SubTitle="Add a rule to override file-level enterprise routing." />
+                                        <CardContent Content="Rules can match file names, account names, memo text, names, or split accounts. Leave fields blank to keep a rule broad." />
+                                    </SfCard>
+                                }
+                                else
+                                {
+                                    @foreach (var rule in RoutingRules.OrderBy(item => item.Priority).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+                                    {
+                                        var currentRule = rule;
+                                        <SfCard>
+                                            <CardHeader Title="@GetRuleTitle(currentRule)" SubTitle="@GetRuleSubtitle(currentRule)" />
+                                            <CardContent>
+                                                <div class="space-y-3">
+                                                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                                        <SfTextBox Placeholder="Rule name" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.Name" />
+                                                        <SfNumericTextBox TValue="int" Placeholder="Priority" FloatLabelType="FloatLabelType.Auto" Min="0" Step="10" Format="n0" @bind-Value="currentRule.Priority" />
+                                                        <SfDropDownList TValue="string" TItem="string" DataSource="@RoutingEnterpriseOptions" @bind-Value="currentRule.TargetEnterprise" Placeholder="Target enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" Width="100%" />
+                                                        <SfDropDownList TValue="long?" TItem="QuickBooksAllocationProfileOption" DataSource="@GetAllocationProfileOptions()" @bind-Value="currentRule.AllocationProfileId" Placeholder="Allocation profile" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                                            <DropDownListFieldSettings Text="Name" Value="Id" />
+                                                        </SfDropDownList>
+                                                    </div>
+
+                                                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                                        <SfTextBox Placeholder="Source file pattern" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.SourceFilePattern" />
+                                                        <SfTextBox Placeholder="Default enterprise pattern" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.DefaultEnterprisePattern" />
+                                                        <SfTextBox Placeholder="Account pattern" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.AccountPattern" />
+                                                        <SfTextBox Placeholder="Memo pattern" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.MemoPattern" />
+                                                        <SfTextBox Placeholder="Name pattern" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.NamePattern" />
+                                                        <SfTextBox Placeholder="Split account pattern" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentRule.SplitAccountPattern" />
+                                                    </div>
+
+                                                    <SfTextBox Placeholder="Description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="2" @bind-Value="currentRule.Description" />
+
+                                                    <div class="flex flex-wrap items-center gap-3">
+                                                        <SfCheckBox TChecked="bool" Label="Rule active" @bind-Checked="currentRule.IsActive" />
+                                                        <SfButton Disabled="@IsRoutingBusy" OnClick="@(() => RemoveRoutingRule(currentRule))">Remove rule</SfButton>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </SfCard>
+                                    }
+                                }
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Allocation Profiles" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="space-y-4 pt-4">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <SfButton Disabled="@IsRoutingBusy" OnClick="AddAllocationProfile">Add profile</SfButton>
+                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsRoutingBusy" OnClick="SaveRoutingConfigurationAsync">Save routing</SfButton>
+                                </div>
+
+                                @if (AllocationProfiles.Count == 0)
+                                {
+                                    <SfCard>
+                                        <CardHeader Title="No allocation profiles" SubTitle="Create reusable shared-cost splits here." />
+                                        <CardContent Content="Allocation profiles let a single QuickBooks row distribute its amount across multiple enterprises and keep historical reroutes reproducible." />
+                                    </SfCard>
+                                }
+                                else
+                                {
+                                    @foreach (var profile in AllocationProfiles.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+                                    {
+                                        var currentProfile = profile;
+                                        <SfCard>
+                                            <CardHeader Title="@GetProfileTitle(currentProfile)" SubTitle="@GetProfileSubtitle(currentProfile)" />
+                                            <CardContent>
+                                                <div class="space-y-3">
+                                                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                                        <SfTextBox Placeholder="Profile name" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentProfile.Name" />
+                                                        <SfTextBox Placeholder="Description" FloatLabelType="FloatLabelType.Auto" @bind-Value="currentProfile.Description" />
+                                                        <div class="flex items-center pt-4">
+                                                            <SfCheckBox TChecked="bool" Label="Profile active" @bind-Checked="currentProfile.IsActive" />
+                                                        </div>
+                                                        <div class="flex items-center pt-2">
+                                                            <SfButton Disabled="@IsRoutingBusy" OnClick="@(() => RemoveAllocationProfile(currentProfile))">Remove profile</SfButton>
+                                                        </div>
+                                                    </div>
+
+                                                    @if (currentProfile.Targets.Count == 0)
+                                                    {
+                                                        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                                                            Add one or more enterprise targets. If the total is under 100%, the remainder stays with the rule target enterprise.
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        @foreach (var target in currentProfile.Targets.OrderBy(item => item.EnterpriseName, StringComparer.OrdinalIgnoreCase))
+                                                        {
+                                                            var currentTarget = target;
+                                                            <div class="grid gap-3 rounded-2xl border border-slate-200 p-3 md:grid-cols-[1fr_180px_auto]">
+                                                                <SfDropDownList TValue="string" TItem="string" DataSource="@RoutingEnterpriseOptions" @bind-Value="currentTarget.EnterpriseName" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" Width="100%" />
+                                                                <SfNumericTextBox TValue="decimal" Placeholder="Percent" FloatLabelType="FloatLabelType.Auto" Min="0" Max="100" Step="5" Decimals="2" Format="n2" @bind-Value="currentTarget.AllocationPercent" />
+                                                                <div class="flex items-center pt-2">
+                                                                    <SfButton Disabled="@IsRoutingBusy" OnClick="@(() => RemoveAllocationTarget(currentProfile, currentTarget))">Remove target</SfButton>
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    }
+
+                                                    <div class="flex flex-wrap items-center gap-3">
+                                                        <SfButton Disabled="@IsRoutingBusy" OnClick="@(() => AddAllocationTarget(currentProfile))">Add target</SfButton>
+                                                        <span class="text-sm text-slate-500">Current total: @GetAllocationPercentDisplay(currentProfile)</span>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </SfCard>
+                                    }
+                                }
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Import History" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="space-y-4 pt-4">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsRoutingBusy" OnClick="LoadImportHistoryAsync">Refresh history</SfButton>
+                                </div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite">
+                                    <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">History status</div>
+                                    <div class="mt-1 whitespace-pre-line">@ImportHistoryStatusMessage</div>
+                                </div>
+
+                                @if (ImportHistoryItems.Count == 0)
+                                {
+                                    <SfCard>
+                                        <CardHeader Title="No import history" SubTitle="Committed QuickBooks source files will appear here." />
+                                        <CardContent Content="Historical reroute lets you apply the latest routing rules to an already-imported source file so downstream calculations update consistently." />
+                                    </SfCard>
+                                }
+                                else
+                                {
+                                    @foreach (var item in ImportHistoryItems)
+                                    {
+                                        var currentItem = item;
+                                        <SfCard>
+                                            <CardHeader Title="@currentItem.FileName" SubTitle="@GetHistorySubtitle(currentItem)" />
+                                            <CardContent>
+                                                <div class="flex flex-wrap items-center gap-3">
+                                                    <span class="text-sm text-slate-600">Source file ID: @currentItem.SourceFileId</span>
+                                                    <span class="text-sm text-slate-600">Batch ID: @currentItem.BatchId</span>
+                                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(IsRoutingBusy || ReroutingSourceFileId == currentItem.SourceFileId)" OnClick="@(() => ReapplyRoutingAsync(currentItem))">
+                                                        @(ReroutingSourceFileId == currentItem.SourceFileId ? "Reapplying..." : "Reapply routing")
+                                                    </SfButton>
+                                                </div>
+                                            </CardContent>
+                                        </SfCard>
+                                    }
+                                }
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
+                </TabItems>
+            </SfTab>
         </div>
     </CardContent>
 </SfCard>
@@ -200,10 +389,17 @@
     private bool ShowCommitDialog;
     private bool IsBusy;
     private bool IsAskingAssistant;
+    private bool IsRoutingBusy;
     private int ActiveStep;
     private int ImportProgress;
     private string StatusHeadline = "Ready";
     private string StatusMessage = "Choose a QuickBooks export to begin.";
+    private string RoutingStatusMessage = "Routing rules and allocation profiles can be managed from this panel.";
+    private string ImportHistoryStatusMessage = "Load routing history to manage previously imported QuickBooks files.";
+    private long? ReroutingSourceFileId;
+    private List<QuickBooksRoutingRuleDefinition> RoutingRules { get; } = [];
+    private List<QuickBooksAllocationProfileDefinition> AllocationProfiles { get; } = [];
+    private List<QuickBooksImportHistoryItem> ImportHistoryItems { get; } = [];
 
     private string SelectedFileLabel => string.IsNullOrWhiteSpace(SelectedFileName) ? "No file selected" : SelectedFileName;
 
@@ -216,6 +412,17 @@
     private bool CanCommit => SelectedFileBytes is { Length: > 0 } && PreviewResponse is not null && !PreviewResponse.IsDuplicate;
 
     private bool CanAskAssistant => PreviewResponse is not null && !string.IsNullOrWhiteSpace(AssistantQuestion) && !IsBusy && !IsAskingAssistant;
+
+    private IReadOnlyList<string> RoutingEnterpriseOptions => WorkspaceState.EnterpriseOptions
+        .Where(option => !string.IsNullOrWhiteSpace(option) && !string.Equals(option, "general_ledger", StringComparison.OrdinalIgnoreCase) && !string.Equals(option, "transaction_list", StringComparison.OrdinalIgnoreCase))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(option => option, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRoutingWorkspaceAsync().ConfigureAwait(false);
+    }
 
     protected override void OnParametersSet()
     {
@@ -527,4 +734,278 @@
         var extension = Path.GetExtension(fileName);
         return SupportedFileExtensions.Contains(extension);
     }
+
+    private async Task LoadRoutingWorkspaceAsync()
+    {
+        try
+        {
+            IsRoutingBusy = true;
+            RoutingStatusMessage = "Loading QuickBooks routing configuration and import history...";
+            ImportHistoryStatusMessage = "Loading QuickBooks import history...";
+            await InvokeAsync(StateHasChanged);
+
+            var configurationTask = ImportApi.GetRoutingConfigurationAsync(CancellationToken.None);
+            var historyTask = ImportApi.GetImportHistoryAsync(CancellationToken.None);
+            await Task.WhenAll(configurationTask, historyTask).ConfigureAwait(false);
+
+            var configuration = await configurationTask.ConfigureAwait(false);
+            var history = await historyTask.ConfigureAwait(false);
+
+            ReplaceRoutingConfiguration(configuration);
+            ReplaceImportHistory(history);
+
+            RoutingStatusMessage = configuration.StatusMessage;
+            ImportHistoryStatusMessage = history.StatusMessage;
+        }
+        catch (Exception ex)
+        {
+            RoutingStatusMessage = ex.Message;
+            ImportHistoryStatusMessage = ex.Message;
+            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+        }
+        finally
+        {
+            IsRoutingBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadImportHistoryAsync()
+    {
+        try
+        {
+            IsRoutingBusy = true;
+            ImportHistoryStatusMessage = "Loading QuickBooks import history...";
+            await InvokeAsync(StateHasChanged);
+
+            var history = await ImportApi.GetImportHistoryAsync(CancellationToken.None).ConfigureAwait(false);
+            ReplaceImportHistory(history);
+            ImportHistoryStatusMessage = history.StatusMessage;
+        }
+        catch (Exception ex)
+        {
+            ImportHistoryStatusMessage = ex.Message;
+            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+        }
+        finally
+        {
+            IsRoutingBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void AddRoutingRule()
+    {
+        RoutingRules.Add(new QuickBooksRoutingRuleDefinition
+        {
+            Name = "New routing rule",
+            Priority = RoutingRules.Count == 0 ? 10 : RoutingRules.Max(item => item.Priority) + 10,
+            IsActive = true,
+            TargetEnterprise = GetDefaultRoutingEnterprise()
+        });
+    }
+
+    private void RemoveRoutingRule(QuickBooksRoutingRuleDefinition rule)
+    {
+        RoutingRules.Remove(rule);
+    }
+
+    private void AddAllocationProfile()
+    {
+        var profile = new QuickBooksAllocationProfileDefinition
+        {
+            Name = "New allocation profile",
+            IsActive = true
+        };
+
+        profile.Targets.Add(new QuickBooksAllocationTargetDefinition
+        {
+            EnterpriseName = GetDefaultRoutingEnterprise(),
+            AllocationPercent = 100m
+        });
+
+        AllocationProfiles.Add(profile);
+    }
+
+    private void RemoveAllocationProfile(QuickBooksAllocationProfileDefinition profile)
+    {
+        AllocationProfiles.Remove(profile);
+
+        foreach (var rule in RoutingRules.Where(item => item.AllocationProfileId == profile.Id))
+        {
+            rule.AllocationProfileId = null;
+        }
+    }
+
+    private void AddAllocationTarget(QuickBooksAllocationProfileDefinition profile)
+    {
+        profile.Targets.Add(new QuickBooksAllocationTargetDefinition
+        {
+            EnterpriseName = GetDefaultRoutingEnterprise(),
+            AllocationPercent = 0m
+        });
+    }
+
+    private void RemoveAllocationTarget(QuickBooksAllocationProfileDefinition profile, QuickBooksAllocationTargetDefinition target)
+    {
+        profile.Targets.Remove(target);
+    }
+
+    private async Task SaveRoutingConfigurationAsync()
+    {
+        try
+        {
+            IsRoutingBusy = true;
+            RoutingStatusMessage = "Saving QuickBooks routing configuration...";
+            await InvokeAsync(StateHasChanged);
+
+            var response = await ImportApi.SaveRoutingConfigurationAsync(new QuickBooksRoutingConfigurationRequest
+            {
+                Rules = RoutingRules.Select(CloneRule).ToList(),
+                AllocationProfiles = AllocationProfiles.Select(CloneProfile).ToList()
+            }, CancellationToken.None).ConfigureAwait(false);
+
+            ReplaceRoutingConfiguration(response);
+            RoutingStatusMessage = response.StatusMessage;
+            await ShowToastAsync("QuickBooks routing", response.StatusMessage).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            RoutingStatusMessage = ex.Message;
+            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+        }
+        finally
+        {
+            IsRoutingBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ReapplyRoutingAsync(QuickBooksImportHistoryItem item)
+    {
+        try
+        {
+            IsRoutingBusy = true;
+            ReroutingSourceFileId = item.SourceFileId;
+            ImportHistoryStatusMessage = $"Reapplying routing for {item.FileName}...";
+            await InvokeAsync(StateHasChanged);
+
+            var response = await ImportApi.ReapplyRoutingAsync(new QuickBooksHistoricalRerouteRequest
+            {
+                SourceFileId = item.SourceFileId
+            }, CancellationToken.None).ConfigureAwait(false);
+
+            ImportHistoryStatusMessage = response.StatusMessage;
+            await LoadImportHistoryAsync().ConfigureAwait(false);
+            await ShowToastAsync("QuickBooks routing", response.StatusMessage).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            ImportHistoryStatusMessage = ex.Message;
+            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+        }
+        finally
+        {
+            ReroutingSourceFileId = null;
+            IsRoutingBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ReplaceRoutingConfiguration(QuickBooksRoutingConfigurationResponse configuration)
+    {
+        RoutingRules.Clear();
+        RoutingRules.AddRange(configuration.Rules.Select(CloneRule));
+
+        AllocationProfiles.Clear();
+        AllocationProfiles.AddRange(configuration.AllocationProfiles.Select(CloneProfile));
+    }
+
+    private void ReplaceImportHistory(QuickBooksImportHistoryResponse history)
+    {
+        ImportHistoryItems.Clear();
+        ImportHistoryItems.AddRange(history.Items.Select(item => new QuickBooksImportHistoryItem
+        {
+            SourceFileId = item.SourceFileId,
+            BatchId = item.BatchId,
+            FileName = item.FileName,
+            ScopeSummary = item.ScopeSummary,
+            RowCount = item.RowCount,
+            ImportedAtUtc = item.ImportedAtUtc
+        }));
+    }
+
+    private QuickBooksRoutingRuleDefinition CloneRule(QuickBooksRoutingRuleDefinition rule)
+        => new()
+        {
+            Id = rule.Id,
+            Name = rule.Name,
+            Description = rule.Description,
+            Priority = rule.Priority,
+            IsActive = rule.IsActive,
+            SourceFilePattern = rule.SourceFilePattern,
+            DefaultEnterprisePattern = rule.DefaultEnterprisePattern,
+            AccountPattern = rule.AccountPattern,
+            MemoPattern = rule.MemoPattern,
+            NamePattern = rule.NamePattern,
+            SplitAccountPattern = rule.SplitAccountPattern,
+            TargetEnterprise = rule.TargetEnterprise,
+            AllocationProfileId = rule.AllocationProfileId
+        };
+
+    private QuickBooksAllocationProfileDefinition CloneProfile(QuickBooksAllocationProfileDefinition profile)
+        => new()
+        {
+            Id = profile.Id,
+            Name = profile.Name,
+            Description = profile.Description,
+            IsActive = profile.IsActive,
+            Targets = profile.Targets.Select(target => new QuickBooksAllocationTargetDefinition
+            {
+                Id = target.Id,
+                EnterpriseName = target.EnterpriseName,
+                AllocationPercent = target.AllocationPercent
+            }).ToList()
+        };
+
+    private IEnumerable<QuickBooksAllocationProfileOption> GetAllocationProfileOptions()
+    {
+        yield return new QuickBooksAllocationProfileOption(null, "No allocation profile");
+
+        foreach (var profile in AllocationProfiles.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            yield return new QuickBooksAllocationProfileOption(profile.Id, profile.Name);
+        }
+    }
+
+    private string GetDefaultRoutingEnterprise()
+    {
+        if (!string.IsNullOrWhiteSpace(WorkspaceState.SelectedEnterprise)
+            && RoutingEnterpriseOptions.Contains(WorkspaceState.SelectedEnterprise, StringComparer.OrdinalIgnoreCase))
+        {
+            return WorkspaceState.SelectedEnterprise;
+        }
+
+        return RoutingEnterpriseOptions.FirstOrDefault() ?? "Water Utility";
+    }
+
+    private static string GetRuleTitle(QuickBooksRoutingRuleDefinition rule)
+        => string.IsNullOrWhiteSpace(rule.Name) ? "Unnamed rule" : rule.Name;
+
+    private static string GetRuleSubtitle(QuickBooksRoutingRuleDefinition rule)
+        => $"Priority {rule.Priority} | {(rule.IsActive ? "Active" : "Inactive")}";
+
+    private static string GetProfileTitle(QuickBooksAllocationProfileDefinition profile)
+        => string.IsNullOrWhiteSpace(profile.Name) ? "Unnamed profile" : profile.Name;
+
+    private static string GetProfileSubtitle(QuickBooksAllocationProfileDefinition profile)
+        => $"{profile.Targets.Count} target(s) | {(profile.IsActive ? "Active" : "Inactive")}";
+
+    private static string GetAllocationPercentDisplay(QuickBooksAllocationProfileDefinition profile)
+        => $"{profile.Targets.Sum(item => item.AllocationPercent):0.##}%";
+
+    private static string GetHistorySubtitle(QuickBooksImportHistoryItem item)
+        => $"{item.RowCount} row(s) | {item.ScopeSummary} | Imported {item.ImportedAtUtc}";
+
+    private sealed record QuickBooksAllocationProfileOption(long? Id, string Name);
 }
