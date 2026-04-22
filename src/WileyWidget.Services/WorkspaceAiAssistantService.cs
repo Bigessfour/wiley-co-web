@@ -931,6 +931,7 @@ public sealed class WorkspaceAiAssistantService
 
     private static string SanitizeKey(string value)
     {
+        if (string.IsNullOrEmpty(value)) return "unknown";
         var normalized = new string(value.ToLowerInvariant().Select(character => char.IsLetterOrDigit(character) ? character : '-').ToArray());
         while (normalized.Contains("--", StringComparison.Ordinal))
         {

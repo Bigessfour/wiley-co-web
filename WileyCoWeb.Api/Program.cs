@@ -918,6 +918,13 @@ public partial class Program
             return Results.BadRequest("A question is required for workspace chat.");
         }
 
+        if (string.IsNullOrWhiteSpace(chatRequest.SelectedEnterprise) || chatRequest.SelectedFiscalYear <= 0)
+        {
+            logger.LogWarning("Rejected Jarvis chat request: Enterprise={Enterprise} FiscalYear={FiscalYear} — enterprise name and fiscal year are required.",
+                chatRequest.SelectedEnterprise, chatRequest.SelectedFiscalYear);
+            return Results.BadRequest("Enterprise name and fiscal year are required for workspace chat.");
+        }
+
         logger.LogInformation(
             "Jarvis chat request received: Enterprise={Enterprise} FiscalYear={FiscalYear} QuestionLength={QuestionLength} ConversationHistoryCount={ConversationHistoryCount}",
             chatRequest.SelectedEnterprise,
