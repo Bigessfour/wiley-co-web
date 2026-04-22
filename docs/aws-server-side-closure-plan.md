@@ -31,17 +31,19 @@ Validated through April 21, 2026 using the AWS CLI, hosted browser evidence, pub
 - Amplify app `d2ellat1y3ljd9` and branch `main` now carry `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com` without storing the Syncfusion license in Amplify environment variables.
 - The Syncfusion build-time license is now stored in the Amplify Gen 1 environment-secret path `/amplify/d2ellat1y3ljd9/main/SYNCFUSION_LICENSE_KEY`.
 - App Runner `/health` currently returns `200 Healthy`.
-- App Runner `/api/workspace/snapshot` currently returns `200` with populated enterprise options and live workspace data.
+- App Runner `/api/workspace/snapshot` currently returns `200` with populated enterprise options and live workspace data for all four intended enterprises: `Apartments`, `Trash`, `Water Utility`, and `Wiley Sanitation District`.
 - App Runner `/api/workspace/knowledge` currently returns `200` against the current snapshot payload.
 - App Runner `/api/ai/chat` currently returns `200` with a fallback onboarding response.
-- App Runner `/api/utility-customers` currently returns a partial live dataset with one active customer record, which confirms the environment is not fully customer-seeded yet.
-- App Runner `/api/workspace/reference-data/import` currently returns `400` with `Import data folder '/app/Import Data' was not found.`, which confirms the route is deployed and that production does not currently bundle the repo-local bootstrap folder.
-- CloudWatch currently has no App Runner or Aurora alarms for the Wiley API runtime, so monitoring hardening is still outstanding.
+- As of 2026-04-22, a second production `/api/ai/chat` turn for `Water Utility` / `FY2026` timed out upstream instead of returning a stable live answer, so Jarvis is not yet production-ready for council-facing use.
+- App Runner `/api/utility-customers` now returns a live imported dataset, and the public snapshot exposes all four intended enterprises with non-zero current rate, total cost, projected volume, projection rows, and scenario items for `FY2026`.
+- App Runner `/api/workspace/reference-data/import` still returns `400` when called without an explicit path or uploaded files, which confirms the route is deployed and that production does not bundle the repo-local bootstrap folder by default. A production multipart import was executed on 2026-04-22 using uploaded bootstrap files and returned `200`, updating two discovered enterprise sources plus ten utility-customer rows while skipping duplicate sample ledger inputs.
+- Integration coverage exists for snapshot persistence, reference-data bootstrap import, knowledge generation, and Jarvis history persistence. The current repo regression suite for `WorkspaceSnapshotApiTests`, `WorkspaceReferenceDataApiTests`, `WorkspaceKnowledgeApiTests`, `WorkspaceAiApiTests`, and `WorkspaceKnowledgeServiceTests` passed on 2026-04-22 after stopping the local `WileyCoWeb.Api` process that otherwise locks the API build outputs during test rebuilds.
+- CloudWatch alarms now exist for App Runner and Aurora, but monitoring sign-off is still open because the live set must be reviewed for correctness and operator readiness. Current alarm inventory includes `WileyCo-AppRunner-5xxRatePercent`, `WileyCo-AppRunner-ActiveInstancesLow`, `WileyCo-AppRunner-RequestLatencyHigh`, `WileyCo-Aurora-CPUHigh`, and `WileyCo-Aurora-ConnectionsHigh`, with `WileyCo-AppRunner-ActiveInstancesLow` currently in `ALARM` state.
 - App Runner custom-domain attachment is still empty, so `api.wileywidget.townofwiley.gov` has not been provisioned on the service.
 - Amplify production branch `main` is Git-connected to `https://github.com/Bigessfour/wiley-co-web`, and production job `43` successfully deployed commit `8620cf72f569058a5c72619e9e341e25fb0b34f1` to `https://main.d2ellat1y3ljd9.amplifyapp.com`.
 - Hosted browser proof is complete on the public Amplify site: both QuickBooks preview and QuickBooks assistant flows passed against `https://main.d2ellat1y3ljd9.amplifyapp.com` on 2026-04-16, confirming the shipped client now includes the `InputFile`-based uploader refactor.
 
-Production conclusion: the browser shell is deployed, the public Amplify cutover is verified, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. The remaining pre-meeting work is operational hardening plus one first-time admin seed pass: add monitoring, curate and run the reference-data bootstrap to complete missing customer data, keep release validation in place, keep the raw App Runner hostname as the current API baseline, and leave observability migration plus the longer-term API hosting roadmap on the post-release track.
+Production conclusion: the browser shell is deployed, the public Amplify cutover is verified, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. Phase 2 infrastructure and business-data proof are now materially complete: alarms exist, the raw App Runner hostname remains the accepted API baseline, Aurora encryption and rollback-cluster retirement are confirmed, a production reference-data import has been exercised, the live snapshot exposes all four intended enterprises, and current break-even/projection calculations can be spot-checked from production payloads. Production-ready sign-off is still blocked by live chat reliability because Jarvis non-onboarding production chat is not yet proven and the checked second turn still timed out upstream. Keep observability review and the longer-term API hosting roadmap on the post-release track.
 
 ## Provisioned Execution Checklist
 
@@ -64,6 +66,9 @@ Production conclusion: the browser shell is deployed, the public Amplify cutover
 - [ ] Curate the first-time reference-data seed folder, remove duplicate report variants, and run one admin bootstrap import to complete missing customer data.
 - [x] Keep the raw App Runner hostname as the current production API baseline.
 - [ ] Revisit `api.wileywidget.townofwiley.gov` only after the current raw-host release path, first-time seed import, and monitoring are stable.
+- [x] Complete one production reference-data import that results in all intended enterprises appearing in `/api/workspace/snapshot`, then capture the response summary as release evidence.
+- [x] Manually spot-check break-even, scenario impact, and projection outputs from `/api/workspace/snapshot` after the production import.
+- [ ] Confirm Jarvis returns live snapshot-grounded responses without timeout or deterministic fallback on a non-onboarding production conversation.
 
 ## Required AWS Additions
 
@@ -151,7 +156,7 @@ Make the thin API operable before the Council session.
 - Keep the current X-Ray startup wiring in place for now, but do not treat verified live trace emission as a release prerequisite.
 - As of 2026-04-16, startup wiring and IAM permissions for X-Ray are present, but the live App Runner service still reports `ObservabilityConfiguration=null` and a same-window `aws xray get-service-graph` check in `us-east-2` returned no Wiley API service nodes even after fresh `/health` traffic. AWS App Runner tracing is disabled by default unless observability configuration enables it, so treat trace emission as not yet proven and likely disabled at the service layer.
 - Capture the observability follow-up on the post-release infrastructure track, with OpenTelemetry as the preferred successor instead of spending more release time on the current App Runner X-Ray chain.
-- As of 2026-04-21, `aws cloudwatch describe-alarms --region us-east-2` shows no App Runner or Aurora alarms scoped to the Wiley API runtime, so alarm creation is still an explicit go-live task.
+- As of 2026-04-22, `aws cloudwatch describe-alarms --region us-east-2` shows App Runner and Aurora alarms for the Wiley runtime (`WileyCo-AppRunner-5xxRatePercent`, `WileyCo-AppRunner-ActiveInstancesLow`, `WileyCo-AppRunner-RequestLatencyHigh`, `WileyCo-Aurora-CPUHigh`, and `WileyCo-Aurora-ConnectionsHigh`), so the remaining go-live task is alarm review and tuning rather than initial creation.
 - Add App Runner alarms for `5xx` rate, latency, and unhealthy instance count:
   - `5xx` rate: alert when server errors are sustained across two consecutive 5-minute periods or exceed an agreed low-volume error threshold during active traffic; first response is to check App Runner events, CloudWatch logs, and the most recent deployment before deciding on rollback.
   - Latency: alert when request latency is materially above the current interactive baseline for two consecutive 5-minute periods; first response is to inspect import activity, database saturation, and recent deployments.
@@ -160,7 +165,21 @@ Make the thin API operable before the Council session.
   - CPU: alert on sustained elevated `CPUUtilization` so import or analytics spikes are visible before they degrade user flows.
   - Connections: alert when `DatabaseConnections` rises toward the observed operating ceiling or deviates sharply from current baseline, then inspect connection pooling and long-running queries before rerunning imports.
 - Attach all Wiley API runtime alarms to the same operator notification target and retain the alarm names, SNS target, and dashboard link in the release record.
+- Confirm `WileyCo-AppRunner-ActiveInstancesLow` is expected during idle traffic or tune the threshold; do not treat the alarm set as production-ready while a baseline alarm remains unexplained.
 - Retain a deployment log or release note for each pre-meeting push.
+
+### 7. Backend Business Logic Soundness
+
+These items are required for production sign-off even though the endpoints and tests already exist.
+
+- Run one full reference-data import against production using `POST /api/workspace/reference-data/import` with an explicit `ImportDataPath`, or complete the equivalent documented bootstrap through the QuickBooks/admin flow if that is the chosen operator path.
+- After the import, verify every enterprise exposed by `/api/workspace/snapshot` has viable customer counts, current rate, total cost, projected volume, and projection rows that match the intended live baseline.
+- Confirm break-even figures are realistic by comparing `CurrentRate`, `TotalCosts`, and `ProjectedVolume` from `/api/workspace/snapshot` against the expected calculation for at least Water Utility and Wiley Sanitation District.
+- Confirm scenario impact is realistic by loading at least one saved scenario per enterprise and checking that scenario totals and resulting reserve/rate narratives remain plausible for council-facing review.
+- Confirm projection outputs are realistic by spot-checking the returned `ProjectionRows` against the imported baseline and the known operating assumptions used by the existing widget calculations.
+- Treat the current integration tests as regression coverage, not production evidence: `WorkspaceSnapshotApiTests`, `WorkspaceReferenceDataApiTests`, `WorkspaceKnowledgeApiTests`, `WorkspaceAiApiTests`, and `WorkspaceKnowledgeServiceTests` should stay green, but production still requires manual live-data confirmation.
+- Confirm Jarvis knowledge and chat answers are grounded in the live snapshot after the import by checking both `/api/workspace/knowledge` and a non-onboarding `/api/ai/chat` turn for the same enterprise/fiscal-year context.
+- Production is not ready while Jarvis is still returning deterministic or legacy fallback responses for normal chat turns. Release evidence should show at least one non-onboarding response with `UsedFallback=false` and content that reflects current snapshot values.
 
 ## Code-Complete Closures
 
@@ -198,9 +217,10 @@ Current state:
 
 - The current repository and production API are now aligned on policy: production requires an explicit reference-data path and does not assume a bundled `Import Data` folder.
 - `WileyCoWeb.Api/appsettings.json` sets `WorkspaceReferenceData:RequireExplicitImportDataPath=true`.
-- The live App Runner route returns `400` with the missing-folder message, which confirms the container does not currently ship the repo-local sample set.
+- The live App Runner route returns `400` with the missing-folder message when called without an explicit path or uploaded files, which confirms the container does not currently ship the repo-local sample set.
 - Monthly clerk imports are already handled through the QuickBooks Import panel and the API commit flow into Aurora.
-- Public runtime checks now show that enterprise seed data exists, but `/api/utility-customers` only returns one active customer record, so the first production reference-data bootstrap is still partially outstanding.
+- A production multipart import was executed on 2026-04-22 using uploaded bootstrap files (`Full_Customers.xlsx WSD.xlsx`, `Full_GeneralLedger_FY2026.xlsx Util.xlsx`, and `Full_GeneralLedger_FY2026xlsx WSD.xlsx`) with `includeSampleLedgerData=true` and `applyDefaultEnterpriseBaselines=true`. The response reported `updatedEnterpriseCount=2`, `importedUtilityCustomerCount=10`, and duplicate-ledger skipping, which proves the admin route works with uploaded files even though the current attached seed subset only carries two discovered enterprise sources.
+- Public runtime checks now show that `/api/workspace/snapshot` exposes all four intended enterprises (`Apartments`, `Trash`, `Water Utility`, and `Wiley Sanitation District`) with current rate, total cost, projected volume, projection rows, and scenario items for `FY2026`.
 - The current attached `Import Data/` folder contains duplicate report variants for at least three basenames (`Full_GeneralLedger_FY2026.xlsx Util`, `Full_GeneralLedger_FY2026xlsx WSD`, and `Full_TransactionList_ByDate_All`), so the folder needs a first-pass sort before the admin bootstrap runs.
 - `WorkspaceReferenceDataImportService` already prefers `.xlsx` workbooks and groups sample-ledger files by basename before commit, but the operator should still curate one canonical workbook or report per dataset before the first production seed to avoid avoidable duplicate or stale inputs.
 
@@ -209,8 +229,9 @@ Ongoing action:
 - Keep recurring monthly imports on the QuickBooks panel and API commit path.
 - Treat `Import Data/` as a developer or admin bootstrap set only.
 - Before the first production bootstrap, sort the import folder down to one canonical customer workbook and one canonical ledger file per dataset, preferring the `.xlsx` versions that match the current parser expectations.
-- Run one admin `POST /api/workspace/reference-data/import` call with an explicit `ImportDataPath` after the folder is curated. Use `IncludeSampleLedgerData` and `ApplyDefaultEnterpriseBaselines` only if the operator intentionally wants the sample ledger and default baseline set to refresh live baseline analytics; otherwise keep those flags off and use the bootstrap strictly to complete customer/reference seeding.
-- Capture the import response summary and then recheck `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/utility-customers`, and the hosted workspace shell to confirm customer data is now complete.
+- Retain the 2026-04-22 production import response summary as release evidence, then recheck `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/utility-customers`, and the hosted workspace shell whenever the bootstrap set changes.
+- After the import, record manual spot-checks for break-even, scenario impact, and projection realism so the live baseline numbers are explicitly signed off instead of inferred from automated tests.
+- After the import, run one non-onboarding Jarvis chat turn in the same enterprise/fiscal-year scope and retain evidence that it returns promptly with `UsedFallback=false` before treating production chat as council-ready.
 - If production needs repeatable reference-data bootstrap, provide it through an explicit path or managed source such as S3 plus an admin-only import job, rather than baking files into the App Runner image.
 
 ### 3. Aurora Encryption Cutover And Rollback Retirement Are Complete

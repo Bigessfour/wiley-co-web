@@ -46,6 +46,7 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         var configuredConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
+            ["XaiApiEndpoint"] = "https://alias.example/v1",
             ["XaiModel"] = "grok-4.20-0309-reasoning",
             ["XAI:ChatEndpoint"] = "https://proxy.example/v1"
         }).Build();
@@ -291,6 +292,50 @@ public sealed class WorkspaceAiAssistantServiceTests
     }
 
     [Fact]
+    public async Task AskAsync_RoutesSemanticKernelChatThroughNamedHttpClient_ForAppRunnerTlsWorkaround()
+    {
+        // Regression for the App Runner production failure captured in CloudWatch (2026-04-22):
+        //   System.Security.Authentication.AuthenticationException:
+        //   The remote certificate is invalid because of errors in the certificate chain:
+        //   RevocationStatusUnknown, OfflineRevocation
+        // App Runner's VPC-connector egress cannot reach public OCSP/CRL responders, so the
+        // Semantic Kernel OpenAI connector must use our named IHttpClientFactory client (which
+        // registers a SocketsHttpHandler with revocation checks disabled). If SK silently
+        // constructs its own HttpClient, the production TLS handshake fails and every chat
+        // falls back to the deterministic answer. This test fails closed if the SK path stops
+        // requesting the named client.
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"legacy fallback\"}]}]}", Encoding.UTF8, "application/json")
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XAI:Endpoint"] = "https://legacy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+
+        _ = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.Contains(
+            nameof(WorkspaceAiAssistantService),
+            httpFactory.RequestedClientNames);
+    }
+
+    [Fact]
     public async Task AskAsync_WhenLegacyReturnsEmpty_UsesDeterministicFallback()
     {
         var repository = new RecordingConversationRepository();
@@ -393,12 +438,166 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         var request = Assert.Single(httpFactory.Requests);
         Assert.Equal("Bearer alias-key", request.Authorization);
-        Assert.Contains("https://alias.example/v1", request.Url, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://alias.example/v1/responses", request.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AskAsync_PrefersExplicitLegacyEndpointOverAlias_WhenLegacyFallbackExecutes()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Proxy fallback answer.\"}]}]}", Encoding.UTF8, "application/json")
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XaiApiKey"] = "alias-key",
+                ["XaiApiEndpoint"] = "https://alias.example/v1",
+                ["XAI:Endpoint"] = "https://proxy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory);
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.Contains("Proxy fallback answer.", response.Answer, StringComparison.Ordinal);
+
+        var request = Assert.Single(httpFactory.Requests);
+        Assert.Equal("Bearer alias-key", request.Authorization);
+        Assert.Contains("https://proxy.example/v1", request.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenFallbackPersistenceFails_ReturnsFallbackResponse()
+    {
+        var innerRepository = new RecordingConversationRepository();
+        SeedPersistedConversation(innerRepository);
+        var repository = new ThrowingConversationRepository(innerRepository)
+        {
+            ThrowOnSaveConversation = true
+        };
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository);
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "What is the current status?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("fallback mode is active", response.Answer, StringComparison.OrdinalIgnoreCase);
+        await WaitForConditionAsync(() => repository.SaveConversationAttempts > 0);
+        Assert.Empty(innerRepository.SavedConversations);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenLegacyProxyTimesOut_RetriesDirectXaiEndpoint()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(request =>
+        {
+            if (request.RequestUri?.Host.Contains("legacy.example", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                throw new HttpRequestException("502 Bad Gateway upstream request timeout");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Direct retry answer from api.x.ai.\"}]}]}", Encoding.UTF8, "application/json")
+            };
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XAI:Endpoint"] = "https://legacy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("Direct retry answer from api.x.ai.", response.Answer, StringComparison.Ordinal);
+        Assert.Equal(2, httpFactory.Requests.Count);
+        Assert.Contains("https://legacy.example/v1", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("https://api.x.ai/v1/responses", httpFactory.Requests[1].Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenLegacyProxyTimesOutInProduction_DoesNotRetryDirectXaiEndpoint()
+    {
+        var previousEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Production");
+
+        try
+        {
+            var repository = new RecordingConversationRepository();
+            SeedPersistedConversation(repository);
+            var httpFactory = new TestHttpClientFactory(_ => throw new HttpRequestException("502 Bad Gateway upstream request timeout"));
+
+            var service = CreateService(
+                new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+                repository,
+                settings: new Dictionary<string, string?>
+                {
+                    ["XAI:Enabled"] = "true",
+                    ["XAI:Endpoint"] = "https://legacy.example/v1",
+                    ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                    ["XAI:TimeoutSeconds"] = "1"
+                },
+                httpClientFactory: httpFactory,
+                apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+
+            var response = await service.AskAsync(new WorkspaceChatRequest(
+                "How should we close the gap?",
+                "Current workspace context",
+                "Water Utility",
+                2026));
+
+            Assert.True(response.UsedFallback);
+            Assert.False(response.IsFirstConversation);
+            Assert.Contains("fallback mode is active", response.Answer, StringComparison.OrdinalIgnoreCase);
+            Assert.Single(httpFactory.Requests);
+            Assert.Contains("https://legacy.example/v1", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(httpFactory.Requests, request => request.Url.Contains("https://api.x.ai/v1/responses", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", previousEnvironment);
+        }
     }
 
     private static WorkspaceAiAssistantService CreateService(
         TestUserContext userContext,
-        RecordingConversationRepository repository,
+        IConversationRepository repository,
         IReadOnlyDictionary<string, string?>? settings = null,
         IHttpClientFactory? httpClientFactory = null,
         IGrokApiKeyProvider? apiKeyProvider = null,
@@ -552,12 +751,28 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         public List<RequestSnapshot> Requests { get; } = [];
 
+        public List<string> RequestedClientNames { get; } = [];
+
         public HttpClient CreateClient(string name)
         {
-            _ = name;
+            RequestedClientNames.Add(name);
             return new HttpClient(new CallbackHttpMessageHandler(request =>
             {
-                var body = request.Content is null
+                // Tests configure XAI:ChatEndpoint to the loopback sentinel http://127.0.0.1:1
+                // so that the Semantic Kernel primary path is guaranteed to fail, exercising
+                // the legacy xAI fallback. Now that the SK connector shares this HttpClient
+                // (required for the App Runner TLS revocation workaround), the sentinel must
+                // continue to fail deterministically rather than hit the responder which is
+                // authored for the legacy /responses schema. This short-circuit preserves the
+                // original test intent while still recording the request so coverage holds.
+                if (request.RequestUri is not null
+                    && string.Equals(request.RequestUri.Host, "127.0.0.1", StringComparison.Ordinal)
+                    && request.RequestUri.Port == 1)
+                {
+                    throw new HttpRequestException("Connection refused (loopback sentinel)");
+                }
+
+                var realBody = request.Content is null
                     ? string.Empty
                     : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
@@ -565,7 +780,7 @@ public sealed class WorkspaceAiAssistantServiceTests
                     request.Method,
                     request.RequestUri?.ToString() ?? string.Empty,
                     request.Headers.Authorization?.ToString(),
-                    body));
+                    realBody));
 
                 return responder(request);
             }));
@@ -697,5 +912,57 @@ public sealed class WorkspaceAiAssistantServiceTests
                 CreatedAtUtc = recommendation.CreatedAtUtc
             };
         }
+    }
+
+    private sealed class ThrowingConversationRepository : IConversationRepository
+    {
+        private readonly IConversationRepository inner;
+
+        public ThrowingConversationRepository(IConversationRepository inner)
+        {
+            this.inner = inner;
+        }
+
+        public bool ThrowOnSaveConversation { get; init; }
+        public bool ThrowOnSaveRecommendation { get; init; }
+        public int SaveConversationAttempts { get; private set; }
+        public int SaveRecommendationAttempts { get; private set; }
+
+        public Task SaveConversationAsync(object conversation, CancellationToken cancellationToken = default)
+        {
+            SaveConversationAttempts++;
+            if (ThrowOnSaveConversation)
+            {
+                throw new OperationCanceledException("Simulated persistence cancellation.", cancellationToken);
+            }
+
+            return inner.SaveConversationAsync(conversation, cancellationToken);
+        }
+
+        public Task<object?> GetConversationAsync(string id, CancellationToken cancellationToken = default)
+            => inner.GetConversationAsync(id, cancellationToken);
+
+        public Task<List<object>> GetConversationsAsync(int skip, int limit, CancellationToken cancellationToken = default)
+            => inner.GetConversationsAsync(skip, limit, cancellationToken);
+
+        public Task DeleteConversationAsync(string conversationId, CancellationToken cancellationToken = default)
+            => inner.DeleteConversationAsync(conversationId, cancellationToken);
+
+        public Task SaveRecommendationAsync(object recommendation, CancellationToken cancellationToken = default)
+        {
+            SaveRecommendationAttempts++;
+            if (ThrowOnSaveRecommendation)
+            {
+                throw new OperationCanceledException("Simulated persistence cancellation.", cancellationToken);
+            }
+
+            return inner.SaveRecommendationAsync(recommendation, cancellationToken);
+        }
+
+        public Task<List<object>> GetRecommendationsAsync(string userId, string enterprise, int fiscalYear, int limit, CancellationToken cancellationToken = default)
+            => inner.GetRecommendationsAsync(userId, enterprise, fiscalYear, limit, cancellationToken);
+
+        public Task DeleteRecommendationsAsync(string conversationId, CancellationToken cancellationToken = default)
+            => inner.DeleteRecommendationsAsync(conversationId, cancellationToken);
     }
 }

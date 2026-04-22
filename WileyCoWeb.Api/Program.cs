@@ -3,6 +3,9 @@ using System.Diagnostics;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Net;
+using System.Net.Http;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using Amazon;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
@@ -151,8 +154,11 @@ public partial class Program
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:MaxTokens", settings.XaiMaxTokens.ToString(CultureInfo.InvariantCulture));
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Temperature", settings.XaiTemperature.ToString(CultureInfo.InvariantCulture));
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiKey", settings.XaiApiKey);
-            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiEndpoint", settings.XaiApiEndpoint);
-            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiBaseUrl", settings.XaiApiEndpoint);
+            if (!HasConfiguredCanonicalXaiEndpoint(builder.Configuration, injectedConfiguration))
+            {
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiEndpoint", settings.XaiApiEndpoint);
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiBaseUrl", settings.XaiApiEndpoint);
+            }
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiModel", settings.XaiModel);
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiTimeoutSeconds", settings.XaiTimeout.ToString(CultureInfo.InvariantCulture));
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiMaxTokens", settings.XaiMaxTokens.ToString(CultureInfo.InvariantCulture));
@@ -186,6 +192,15 @@ public partial class Program
         target[key] = value;
     }
 
+    private static bool HasConfiguredCanonicalXaiEndpoint(IConfiguration configuration, IReadOnlyDictionary<string, string?> injectedConfiguration)
+        => !string.IsNullOrWhiteSpace(configuration["XAI:ChatEndpoint"])
+            || !string.IsNullOrWhiteSpace(configuration["XAI:Endpoint"])
+            || HasInjectedValue(injectedConfiguration, "XAI:ChatEndpoint")
+            || HasInjectedValue(injectedConfiguration, "XAI:Endpoint");
+
+    private static bool HasInjectedValue(IReadOnlyDictionary<string, string?> injectedConfiguration, string key)
+        => injectedConfiguration.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+
     private static async Task<StartupRuntimeOptions> PrepareStartupRuntimeOptionsAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
         var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder).ConfigureAwait(false);
@@ -200,6 +215,7 @@ public partial class Program
             ?? xaiConfigDirectApiKey
             ?? xaiConfigNamedApiKey);
         var xaiKeySource = DetermineXaiKeySource(xaiEnvironmentApiKey, xaiSecretResolution, xaiConfigDirectApiKey, xaiConfigNamedApiKey);
+        var xaiEndpointResolution = DetermineXaiEndpointResolution(builder.Configuration);
 
         var configuredConnectionString = GetConfiguredConnectionString(builder.Configuration);
         var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
@@ -229,6 +245,7 @@ public partial class Program
             xaiSecretResolution,
             xaiKeySource,
             xaiKeyResolved,
+            xaiEndpointResolution,
             configuredConnectionString,
             allowDegradedStartup,
             seedDevelopmentData,
@@ -252,6 +269,11 @@ public partial class Program
             startupOptions.XaiKeySource,
             startupOptions.XaiKeyResolved,
             startupOptions.XaiSecretResolution,
+            builder.Environment.EnvironmentName);
+
+        LogXaiEndpointResolution(
+            logger,
+            startupOptions.XaiEndpointResolution,
             builder.Environment.EnvironmentName);
 
         LogRuntimeBaseline(
@@ -314,6 +336,7 @@ public partial class Program
         XaiSecretResolutionResult XaiSecretResolution,
         string XaiKeySource,
         bool XaiKeyResolved,
+        XaiEndpointResolution XaiEndpointResolution,
         string? ConfiguredConnectionString,
         bool AllowDegradedStartup,
         bool SeedDevelopmentData,
@@ -331,6 +354,48 @@ public partial class Program
                     : !string.IsNullOrWhiteSpace(xaiConfigNamedApiKey)
                         ? "config:XAI:ApiKey"
                         : "not-found";
+    }
+
+    private static XaiEndpointResolution DetermineXaiEndpointResolution(IConfiguration configuration)
+    {
+        var chatEndpoint = configuration["XAI:ChatEndpoint"];
+        var endpoint = configuration["XAI:Endpoint"];
+        var apiEndpoint = configuration["XaiApiEndpoint"];
+        var baseUrl = configuration["XaiBaseUrl"];
+
+        var hasAliasEndpoint = !string.IsNullOrWhiteSpace(apiEndpoint) || !string.IsNullOrWhiteSpace(baseUrl);
+        var resolvedSource = !string.IsNullOrWhiteSpace(chatEndpoint)
+            ? "config:XAI:ChatEndpoint"
+            : !string.IsNullOrWhiteSpace(endpoint) && (!string.Equals(endpoint?.TrimEnd('/'), "https://api.x.ai/v1", StringComparison.OrdinalIgnoreCase) || !hasAliasEndpoint)
+                ? "config:XAI:Endpoint"
+                : !string.IsNullOrWhiteSpace(apiEndpoint)
+                    ? "config:XaiApiEndpoint"
+                    : !string.IsNullOrWhiteSpace(baseUrl)
+                        ? "config:XaiBaseUrl"
+                        : !string.IsNullOrWhiteSpace(endpoint)
+                            ? "config:XAI:Endpoint"
+                            : "default:https://api.x.ai/v1";
+
+        var resolvedEndpoint = !string.IsNullOrWhiteSpace(chatEndpoint)
+            ? chatEndpoint
+            : !string.IsNullOrWhiteSpace(endpoint) && (!string.Equals(endpoint?.TrimEnd('/'), "https://api.x.ai/v1", StringComparison.OrdinalIgnoreCase) || !hasAliasEndpoint)
+                ? endpoint
+                : apiEndpoint
+                    ?? baseUrl
+                    ?? endpoint
+                    ?? "https://api.x.ai/v1";
+
+        return new XaiEndpointResolution(
+            !string.IsNullOrWhiteSpace(chatEndpoint),
+            TruncateForLog(chatEndpoint),
+            !string.IsNullOrWhiteSpace(endpoint),
+            TruncateForLog(endpoint),
+            !string.IsNullOrWhiteSpace(apiEndpoint),
+            TruncateForLog(apiEndpoint),
+            !string.IsNullOrWhiteSpace(baseUrl),
+            TruncateForLog(baseUrl),
+            resolvedSource,
+            TruncateForLog(resolvedEndpoint));
     }
 
     private static string? GetConfiguredConnectionString(IConfiguration configuration)
@@ -355,6 +420,21 @@ public partial class Program
             });
         });
         builder.Services.AddHttpClient();
+        // Named HttpClient for WorkspaceAiAssistantService.
+        // AWS App Runner's VPC-connector egress cannot reach public OCSP/CRL responders
+        // (e.g., ocsp.rootca1.amazontrust.com), so the default SslStream revocation check
+        // fails with "RevocationStatusUnknown, OfflineRevocation" when connecting to the
+        // API Gateway xAI proxy. The chain of trust is still validated; only the revocation
+        // lookup is skipped. This applies to both the Semantic Kernel primary path and the
+        // legacy xAI fallback path (both resolve this named client via IHttpClientFactory).
+        builder.Services.AddHttpClient(nameof(WorkspaceAiAssistantService))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                SslOptions = new SslClientAuthenticationOptions
+                {
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                }
+            });
         builder.Services.AddMemoryCache();
 
         builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
@@ -378,6 +458,7 @@ public partial class Program
         builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
         builder.Services.AddSingleton<QuickBooksCsvParser>();
         builder.Services.AddSingleton<QuickBooksExcelParser>();
+        builder.Services.AddSingleton<QuickBooksRoutingService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
         builder.Services.AddSingleton<WorkspaceAiAssistantService>();
@@ -629,6 +710,23 @@ public partial class Program
             logData.XaiConfigurationInjected);
     }
 
+    private static void LogXaiEndpointResolution(ILogger logger, XaiEndpointResolution resolution, string environmentName)
+    {
+        logger.LogInformation(
+            "WileyWidget.Startup.XaiEndpointResolution Environment={Environment} ResolvedEndpointSource={ResolvedEndpointSource} ResolvedEndpoint={ResolvedEndpoint} XaiChatEndpointPresent={XaiChatEndpointPresent} XaiChatEndpointValue={XaiChatEndpointValue} XaiEndpointPresent={XaiEndpointPresent} XaiEndpointValue={XaiEndpointValue} XaiApiEndpointPresent={XaiApiEndpointPresent} XaiApiEndpointValue={XaiApiEndpointValue} XaiBaseUrlPresent={XaiBaseUrlPresent} XaiBaseUrlValue={XaiBaseUrlValue}",
+            environmentName,
+            resolution.ResolvedEndpointSource,
+            resolution.ResolvedEndpoint,
+            resolution.XaiChatEndpointPresent,
+            resolution.XaiChatEndpointValue,
+            resolution.XaiEndpointPresent,
+            resolution.XaiEndpointValue,
+            resolution.XaiApiEndpointPresent,
+            resolution.XaiApiEndpointValue,
+            resolution.XaiBaseUrlPresent,
+            resolution.XaiBaseUrlValue);
+    }
+
     private static StartupKeyResolutionLogData BuildStartupKeyResolutionLogData(
         string syncfusionKeySource,
         string? syncfusionLicenseKey,
@@ -695,6 +793,18 @@ public partial class Program
         string? XaiSecretFetchErrorMessage,
         bool XaiConfigurationInjected);
 
+    private sealed record XaiEndpointResolution(
+        bool XaiChatEndpointPresent,
+        string? XaiChatEndpointValue,
+        bool XaiEndpointPresent,
+        string? XaiEndpointValue,
+        bool XaiApiEndpointPresent,
+        string? XaiApiEndpointValue,
+        bool XaiBaseUrlPresent,
+        string? XaiBaseUrlValue,
+        string ResolvedEndpointSource,
+        string? ResolvedEndpoint);
+
     private static void MapWorkspaceSnapshotEndpoints(WebApplication app)
     {
         MapWorkspaceSnapshotGetEndpoint(app);
@@ -726,6 +836,10 @@ public partial class Program
         app.MapPost("/api/imports/quickbooks/preview", MapQuickBooksPreviewEndpoint);
         app.MapPost("/api/imports/quickbooks/commit", MapQuickBooksCommitEndpoint);
         app.MapPost("/api/imports/quickbooks/assistant", MapQuickBooksAssistantEndpoint);
+        app.MapGet("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationEndpoint);
+        app.MapPut("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationUpdateEndpoint);
+        app.MapGet("/api/imports/quickbooks/history", MapQuickBooksImportHistoryEndpoint);
+        app.MapPost("/api/imports/quickbooks/reroute", MapQuickBooksHistoricalRerouteEndpoint);
     }
 
     private static async Task<IResult> MapQuickBooksPreviewEndpoint(HttpRequest request, QuickBooksImportService importService, CancellationToken cancellationToken)
@@ -764,6 +878,35 @@ public partial class Program
 
         var guidance = await assistantService.AskAsync(guidanceRequest, cancellationToken);
         return Results.Ok(guidance);
+    }
+
+    private static async Task<IResult> MapQuickBooksRoutingConfigurationEndpoint(QuickBooksRoutingService routingService, CancellationToken cancellationToken)
+    {
+        var configuration = await routingService.GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        return Results.Ok(configuration);
+    }
+
+    private static async Task<IResult> MapQuickBooksRoutingConfigurationUpdateEndpoint(QuickBooksRoutingConfigurationRequest request, QuickBooksRoutingService routingService, CancellationToken cancellationToken)
+    {
+        var configuration = await routingService.SaveConfigurationAsync(request, cancellationToken).ConfigureAwait(false);
+        return Results.Ok(configuration);
+    }
+
+    private static async Task<IResult> MapQuickBooksImportHistoryEndpoint(QuickBooksRoutingService routingService, CancellationToken cancellationToken)
+    {
+        var history = await routingService.GetImportHistoryAsync(cancellationToken).ConfigureAwait(false);
+        return Results.Ok(history);
+    }
+
+    private static async Task<IResult> MapQuickBooksHistoricalRerouteEndpoint(QuickBooksHistoricalRerouteRequest request, QuickBooksRoutingService routingService, CancellationToken cancellationToken)
+    {
+        if (request.SourceFileId <= 0)
+        {
+            return Results.BadRequest("A QuickBooks source file is required to reapply routing.");
+        }
+
+        var response = await routingService.ReapplyRoutingAsync(request, cancellationToken).ConfigureAwait(false);
+        return Results.Ok(response);
     }
 
     private static async Task<IResult> MapWorkspaceAiChatMessageEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, ILogger<Program> logger, CancellationToken cancellationToken)
@@ -937,22 +1080,17 @@ public partial class Program
         }
 
         context.Enterprises.AddRange(
-            new WileyWidget.Models.Enterprise
+            WorkspaceEnterpriseSeedCatalog.All.Select(seed => new WileyWidget.Models.Enterprise
             {
-                Name = "Water Utility",
-                CurrentRate = 31.25m,
-                MonthlyExpenses = 98000m,
-                CitizenCount = 4500,
+                Name = seed.Name,
+                Type = seed.Type,
+                CurrentRate = seed.CurrentRate,
+                MonthlyExpenses = seed.MonthlyExpenses,
+                CitizenCount = seed.CustomerCount,
                 IsDeleted = false
-            },
-            new WileyWidget.Models.Enterprise
-            {
-                Name = "Sanitation Utility",
-                CurrentRate = 21.50m,
-                MonthlyExpenses = 72000m,
-                CitizenCount = 3200,
-                IsDeleted = false
-            },
+            }));
+
+        context.Enterprises.Add(
             new WileyWidget.Models.Enterprise
             {
                 Name = "Archived Utility",
@@ -961,6 +1099,28 @@ public partial class Program
                 CitizenCount = 20,
                 IsDeleted = true
             });
+
+        context.DepartmentCurrentCharges.AddRange(
+            WorkspaceEnterpriseSeedCatalog.All.Select(seed => new WileyWidget.Models.DepartmentCurrentCharge
+            {
+                Department = seed.DepartmentName,
+                CurrentCharge = seed.CurrentRate,
+                CustomerCount = seed.CustomerCount,
+                UpdatedBy = nameof(Program),
+                Notes = $"Seeded from {seed.Name}.",
+                IsActive = true
+            }));
+
+        context.DepartmentGoals.AddRange(
+            WorkspaceEnterpriseSeedCatalog.All.Select(seed => new WileyWidget.Models.DepartmentGoal
+            {
+                Department = seed.DepartmentName,
+                AdjustmentFactor = seed.GoalAdjustmentFactor,
+                TargetProfitMarginPercent = seed.TargetProfitMarginPercent,
+                RecommendationText = $"{seed.Name} should cover its own operating costs without shifting rate pressure to other enterprises.",
+                Source = nameof(Program),
+                IsActive = true
+            }));
 
         context.UtilityCustomers.AddRange(
             new WileyWidget.Models.UtilityCustomer
@@ -973,7 +1133,8 @@ public partial class Program
                 ServiceCity = "Wiley",
                 ServiceState = "CO",
                 ServiceZipCode = "81092",
-                ServiceLocation = WileyWidget.Models.ServiceLocation.InsideCityLimits
+                ServiceLocation = WileyWidget.Models.ServiceLocation.InsideCityLimits,
+                Notes = "Seeded development customer for Water Utility."
             },
             new WileyWidget.Models.UtilityCustomer
             {
@@ -986,7 +1147,8 @@ public partial class Program
                 ServiceCity = "Wiley",
                 ServiceState = "CO",
                 ServiceZipCode = "81092",
-                ServiceLocation = WileyWidget.Models.ServiceLocation.OutsideCityLimits
+                ServiceLocation = WileyWidget.Models.ServiceLocation.OutsideCityLimits,
+                Notes = "Seeded development customer for Water Utility."
             });
 
         await context.SaveChangesAsync();

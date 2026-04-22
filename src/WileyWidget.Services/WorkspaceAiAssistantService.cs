@@ -34,6 +34,7 @@ public sealed class WorkspaceAiAssistantService
     private readonly IWorkspaceKnowledgeService workspaceKnowledgeService;
     private readonly Lazy<KernelContext?> kernelContext;
     private readonly bool legacyXaiEnabled;
+    private readonly bool allowDirectXaiRetry;
     private readonly string semanticKernelModel;
     private readonly Uri chatCompletionEndpoint;
     private readonly Uri legacyXaiEndpoint;
@@ -66,8 +67,9 @@ public sealed class WorkspaceAiAssistantService
         this.httpClientFactory = httpClientFactory;
         this.apiKeyProvider = apiKeyProvider;
         legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
+        allowDirectXaiRetry = GetConfiguredBoolean(!IsProductionEnvironment(configuration), "XAI:AllowDirectRetry");
         chatCompletionEndpoint = ResolveSemanticKernelChatEndpoint(configuration);
-        legacyXaiEndpoint = NormalizeResponsesEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:Endpoint"));
+        legacyXaiEndpoint = ResolveLegacyXaiEndpoint(configuration);
         // Per xAI docs (docs.x.ai/developers/models): prefer a reasoning-capable, function-capable Grok model for the live SK path.
         semanticKernelModel = ResolveSemanticKernelModel(configuration);
         legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
@@ -87,10 +89,59 @@ public sealed class WorkspaceAiAssistantService
         => GetConfiguredString(configuration, "XaiModel", "XAI:Model", "Grok:Model") ?? DefaultSemanticKernelModel;
 
     public static Uri ResolveSemanticKernelChatEndpoint(IConfiguration configuration)
-        => NormalizeChatCompletionEndpoint(GetConfiguredString(configuration, "XaiApiEndpoint", "XaiBaseUrl", "XAI:ChatEndpoint", "XAI:Endpoint"));
+        => ResolvePreferredXaiEndpoint(
+            configuration,
+            primaryKey: "XAI:ChatEndpoint",
+            secondaryKey: "XAI:Endpoint",
+            normalizeEndpoint: NormalizeChatCompletionEndpoint,
+            directEndpoint: directChatCompletionEndpoint);
 
     internal static string GetDefaultSemanticKernelModel()
         => DefaultSemanticKernelModel;
+
+    private static Uri ResolveLegacyXaiEndpoint(IConfiguration configuration)
+        => ResolvePreferredXaiEndpoint(
+            configuration,
+            primaryKey: "XAI:Endpoint",
+            secondaryKey: null,
+            normalizeEndpoint: NormalizeResponsesEndpoint,
+            directEndpoint: directResponsesEndpoint);
+
+    private static Uri ResolvePreferredXaiEndpoint(
+        IConfiguration configuration,
+        string primaryKey,
+        string? secondaryKey,
+        Func<string?, Uri> normalizeEndpoint,
+        Uri directEndpoint)
+    {
+        var primaryValue = configuration[primaryKey];
+        if (!string.IsNullOrWhiteSpace(primaryValue))
+        {
+            var primaryEndpoint = normalizeEndpoint(primaryValue);
+            if (!string.Equals(primaryEndpoint.Host, directEndpoint.Host, StringComparison.OrdinalIgnoreCase)
+                || (string.IsNullOrWhiteSpace(configuration["XaiApiEndpoint"]) && string.IsNullOrWhiteSpace(configuration["XaiBaseUrl"])))
+            {
+                return primaryEndpoint;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(secondaryKey))
+        {
+            var secondaryValue = configuration[secondaryKey];
+            if (!string.IsNullOrWhiteSpace(secondaryValue))
+            {
+                return normalizeEndpoint(secondaryValue);
+            }
+        }
+
+        var aliasValue = GetConfiguredString(configuration, "XaiApiEndpoint", "XaiBaseUrl");
+        if (!string.IsNullOrWhiteSpace(aliasValue))
+        {
+            return normalizeEndpoint(aliasValue);
+        }
+
+        return directEndpoint;
+    }
 
     public async Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
     {
@@ -161,55 +212,7 @@ public sealed class WorkspaceAiAssistantService
             }
         }
 
-                if (string.Equals(fallbackDiagnosticCode, "transport_tls_failed", StringComparison.Ordinal) && !IsDirectXaiEndpoint(chatCompletionEndpoint))
-                {
-                    try
-                    {
-                        var directAssistant = CreateKernelContext(directChatCompletionEndpoint);
-                        if (directAssistant is not null)
-                        {
-                            var directResponse = await ExecuteSemanticKernelAsync(directAssistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
-                            if (directResponse is not null)
-                            {
-                                logger.LogInformation(
-                                    "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy TLS failure.",
-                                    request.SelectedEnterprise,
-                                    request.SelectedFiscalYear);
-                                return directResponse;
-                            }
-                        }
-                    }
-                    catch (Exception directEx)
-                    {
-                        fallbackDiagnosticCode = TryClassifySemanticKernelFailure(directEx);
-                        fallbackDiagnosticMessage = $"{directEx.GetType().Name}: {directEx.Message}";
-                        logger.LogWarning(
-                            directEx,
-                            "Workspace AI direct xAI retry failed for {Enterprise} FY {FiscalYear} (model: {Model}, directChatEndpoint: {DirectChatEndpoint})",
-                            request.SelectedEnterprise,
-                            request.SelectedFiscalYear,
-                            legacyXaiModel,
-                            directChatCompletionEndpoint);
-                    }
-                }
-
-        if (string.Equals(fallbackDiagnosticCode, "rate_limited", StringComparison.Ordinal))
-        {
-            var rateLimitedAnswer = BuildFallbackAnswer(question, request, activeUser, fallbackDiagnosticCode, fallbackDiagnosticMessage);
-            conversationHistory = AppendTurn(conversationHistory, question, rateLimitedAnswer);
-            await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-            await SaveRecommendationAsync(conversationId, activeUser, request, question, rateLimitedAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
-
-            var rateLimitedResponse = new WorkspaceChatResponse(question, rateLimitedAnswer, true, contextSummary);
-            logger.LogWarning(
-                "Workspace AI returned rate-limit fallback for conversation {ConversationId} with {TurnCount} stored turns (Reason={Reason})",
-                conversationId,
-                conversationHistory.Count,
-                fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
-            return ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
-        }
-
-        if (string.Equals(fallbackDiagnosticCode, "transport_tls_failed", StringComparison.Ordinal) && !IsDirectXaiEndpoint(chatCompletionEndpoint))
+        if (allowDirectXaiRetry && ShouldRetrySemanticKernelDirect(fallbackDiagnosticCode, fallbackDiagnosticMessage, chatCompletionEndpoint))
         {
             try
             {
@@ -220,7 +223,7 @@ public sealed class WorkspaceAiAssistantService
                     if (directResponse is not null)
                     {
                         logger.LogInformation(
-                            "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy TLS failure.",
+                            "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy transport failure.",
                             request.SelectedEnterprise,
                             request.SelectedFiscalYear);
                         return directResponse;
@@ -241,12 +244,26 @@ public sealed class WorkspaceAiAssistantService
             }
         }
 
+        if (string.Equals(fallbackDiagnosticCode, "rate_limited", StringComparison.Ordinal))
+        {
+            var rateLimitedAnswer = BuildFallbackAnswer(question, request, activeUser, fallbackDiagnosticCode, fallbackDiagnosticMessage);
+            conversationHistory = AppendTurn(conversationHistory, question, rateLimitedAnswer);
+            _ = PersistFallbackConversationAsync(conversationId, activeUser, request, question, rateLimitedAnswer, conversationHistory);
+
+            var rateLimitedResponse = new WorkspaceChatResponse(question, rateLimitedAnswer, true, contextSummary);
+            logger.LogWarning(
+                "Workspace AI returned rate-limit fallback for conversation {ConversationId} with {TurnCount} stored turns (Reason={Reason})",
+                conversationId,
+                conversationHistory.Count,
+                fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
+            return ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
+        }
+
         var legacyResult = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(legacyResult.Answer))
         {
             conversationHistory = AppendTurn(conversationHistory, question, legacyResult.Answer);
-            await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-            await SaveRecommendationAsync(conversationId, activeUser, request, question, legacyResult.Answer, usedFallback: true, cancellationToken).ConfigureAwait(false);
+            _ = PersistFallbackConversationAsync(conversationId, activeUser, request, question, legacyResult.Answer, conversationHistory);
 
             var legacyResponse = new WorkspaceChatResponse(question, legacyResult.Answer, true, contextSummary);
             logger.LogInformation("Workspace AI returned legacy xAI fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
@@ -258,8 +275,7 @@ public sealed class WorkspaceAiAssistantService
 
         var fallbackAnswer = BuildFallbackAnswer(question, request, activeUser, fallbackDiagnosticCode, fallbackDiagnosticMessage);
         conversationHistory = AppendTurn(conversationHistory, question, fallbackAnswer);
-        await SaveConversationHistoryAsync(conversationId, activeUser, request, conversationHistory, cancellationToken).ConfigureAwait(false);
-        await SaveRecommendationAsync(conversationId, activeUser, request, question, fallbackAnswer, usedFallback: true, cancellationToken).ConfigureAwait(false);
+        _ = PersistFallbackConversationAsync(conversationId, activeUser, request, question, fallbackAnswer, conversationHistory);
 
         var fallbackChatResponse = new WorkspaceChatResponse(question, fallbackAnswer, true, contextSummary);
         logger.LogWarning(
@@ -351,8 +367,7 @@ public sealed class WorkspaceAiAssistantService
         }
 
         var updatedConversationHistory = AppendTurn(conversationHistory, question, answer);
-        await SaveConversationHistoryAsync(conversationId, activeUser, request, updatedConversationHistory, cancellationToken).ConfigureAwait(false);
-        await SaveRecommendationAsync(conversationId, activeUser, request, question, answer, usedFallback: false, cancellationToken).ConfigureAwait(false);
+        _ = PersistLiveConversationAsync(conversationId, activeUser, request, question, answer, updatedConversationHistory);
 
         var chatResponse = new WorkspaceChatResponse(question, answer, false, BuildContextSummary(request));
         logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, updatedConversationHistory.Count);
@@ -387,10 +402,18 @@ public sealed class WorkspaceAiAssistantService
 
             var model = semanticKernelModel;
             var kernelBuilder = Kernel.CreateBuilder();
+            // Route the Semantic Kernel OpenAI connector through our named HttpClient so that
+            // it inherits the App Runner-safe TLS handler (revocation check disabled). Without
+            // this, the SslStream handshake to the xAI proxy fails in App Runner with
+            // "RevocationStatusUnknown, OfflineRevocation" because the VPC-connector egress
+            // cannot reach public OCSP/CRL responders, forcing every chat into the
+            // deterministic fallback path.
+            var semanticKernelHttpClient = httpClientFactory?.CreateClient(nameof(WorkspaceAiAssistantService));
             kernelBuilder.AddOpenAIChatCompletion(
                 modelId: model,
                 apiKey: apiKeyResolution.ApiKey,
-                endpoint: chatEndpoint);
+                endpoint: chatEndpoint,
+                httpClient: semanticKernelHttpClient);
 
             kernelBuilder.Plugins.AddFromType<Plugins.System.TimePlugin>();
             kernelBuilder.Plugins.AddFromType<Plugins.Development.CodebaseInsightPlugin>();
@@ -493,6 +516,17 @@ public sealed class WorkspaceAiAssistantService
             if (!response.IsSuccessStatusCode)
             {
                 var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                if (allowDirectXaiRetry
+                    && !IsDirectXaiEndpoint(legacyXaiEndpoint)
+                    && ShouldRetryDirectly($"HTTP {(int)response.StatusCode} {response.ReasonPhrase} {responseBody}"))
+                {
+                    var directAnswer = await TryGetDirectLegacyXaiAnswerAsync(client, requestBody, apiKeyResolution.ApiKey, cancellationToken).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(directAnswer))
+                    {
+                        return new LegacyAnswerResult(directAnswer);
+                    }
+                }
+
                 logger.LogError(
                     "Workspace AI legacy xAI fallback returned {StatusCode} for conversation prompt: {Body}",
                     response.StatusCode,
@@ -517,35 +551,12 @@ public sealed class WorkspaceAiAssistantService
         }
         catch (Exception ex)
         {
-            if (!IsDirectXaiEndpoint(legacyXaiEndpoint) && ShouldRetryDirectly(ex))
+            if (allowDirectXaiRetry && !IsDirectXaiEndpoint(legacyXaiEndpoint) && ShouldRetryDirectly(ex))
             {
-                try
+                var directAnswer = await TryGetDirectLegacyXaiAnswerAsync(client, requestBody, apiKeyResolution.ApiKey, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(directAnswer))
                 {
-                    using var directRequestMessage = new HttpRequestMessage(HttpMethod.Post, directResponsesEndpoint)
-                    {
-                        Content = JsonContent.Create(requestBody, options: JsonOptions)
-                    };
-                    directRequestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKeyResolution.ApiKey);
-
-                    var directResponse = await client.SendAsync(directRequestMessage, cancellationToken).ConfigureAwait(false);
-                    if (directResponse.IsSuccessStatusCode)
-                    {
-                        var directXaiResponse = await directResponse.Content.ReadFromJsonAsync<LegacyXaiResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
-                        var directAnswer = directXaiResponse?.output?.FirstOrDefault()?.content?.FirstOrDefault()?.text?.Trim();
-                        if (!string.IsNullOrWhiteSpace(directAnswer))
-                        {
-                            logger.LogInformation("Workspace AI legacy xAI fallback succeeded directly against api.x.ai after proxy transport failure.");
-                            return new LegacyAnswerResult(directAnswer);
-                        }
-                    }
-
-                    logger.LogWarning(
-                        "Workspace AI direct xAI fallback retry did not return an answer (StatusCode={StatusCode}).",
-                        directResponse.StatusCode);
-                }
-                catch (Exception directEx)
-                {
-                    logger.LogWarning(directEx, "Workspace AI direct xAI fallback retry failed.");
+                    return new LegacyAnswerResult(directAnswer);
                 }
             }
 
@@ -834,6 +845,50 @@ public sealed class WorkspaceAiAssistantService
         }
     }
 
+    private async Task PersistLiveConversationAsync(
+        string conversationId,
+        ResolvedUserContext user,
+        WorkspaceChatRequest request,
+        string question,
+        string answer,
+        IReadOnlyList<WorkspaceChatMessage> conversationHistory)
+    {
+        try
+        {
+            await SaveConversationHistoryAsync(conversationId, user, request, conversationHistory, CancellationToken.None).ConfigureAwait(false);
+            await SaveRecommendationAsync(conversationId, user, request, question, answer, usedFallback: false, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Workspace AI live conversation persistence failed after returning a tool-backed answer for conversation {ConversationId}",
+                conversationId);
+        }
+    }
+
+    private async Task PersistFallbackConversationAsync(
+        string conversationId,
+        ResolvedUserContext user,
+        WorkspaceChatRequest request,
+        string question,
+        string answer,
+        IReadOnlyList<WorkspaceChatMessage> conversationHistory)
+    {
+        try
+        {
+            await SaveConversationHistoryAsync(conversationId, user, request, conversationHistory, CancellationToken.None).ConfigureAwait(false);
+            await SaveRecommendationAsync(conversationId, user, request, question, answer, usedFallback: true, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Workspace AI fallback conversation persistence failed after returning a fallback answer for conversation {ConversationId}",
+                conversationId);
+        }
+    }
+
     private async Task<IReadOnlyList<WorkspaceChatMessage>> ReadPersistedConversationAsync(string conversationId, CancellationToken cancellationToken)
     {
         var storedConversation = await conversationRepository.GetConversationAsync(conversationId, cancellationToken).ConfigureAwait(false);
@@ -992,6 +1047,7 @@ public sealed class WorkspaceAiAssistantService
             "missing_api_key" => "Runtime diagnostics: no usable XAI_API_KEY value was visible to the process, so Semantic Kernel chat did not initialize.",
             "rate_limited" => "Runtime diagnostics: xAI accepted the request but returned HTTP 429 Too Many Requests. Jarvis is connected, but the current xAI key or team tier is out of rate-limit headroom. Reduce request frequency, use xAI Console to review limits, or move to a higher tier.",
             "transport_tls_failed" => $"Runtime diagnostics: the live xAI endpoint failed the TLS handshake and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
+            "transport_proxy_failed" => $"Runtime diagnostics: the configured xAI proxy timed out or returned a gateway error before Jarvis could finish the live request ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "kernel_initialization_failed" => $"Runtime diagnostics: Semantic Kernel initialization failed before live chat became available ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "semantic_kernel_request_failed" => $"Runtime diagnostics: live Semantic Kernel execution failed and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "legacy_disabled" => "Runtime diagnostics: the legacy xAI fallback path is disabled, so Jarvis remained on deterministic guidance after live initialization failed.",
@@ -1019,16 +1075,94 @@ public sealed class WorkspaceAiAssistantService
             return "transport_tls_failed";
         }
 
+        if (ShouldRetryDirectly(message))
+        {
+            return "transport_proxy_failed";
+        }
+
         return "semantic_kernel_request_failed";
     }
 
     private static bool ShouldRetryDirectly(Exception exception)
     {
-        var message = DescribeException(exception);
+        return ShouldRetryDirectly(DescribeException(exception));
+    }
+
+    private static bool ShouldRetryDirectly(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
         return message.Contains("ssl connection could not be established", StringComparison.OrdinalIgnoreCase)
             || message.Contains("certificate", StringComparison.OrdinalIgnoreCase)
             || message.Contains("authenticationexception", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("handshake", StringComparison.OrdinalIgnoreCase);
+            || message.Contains("handshake", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("upstream request timeout", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("bad gateway", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("gateway timeout", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("taskcanceledexception", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("timed out", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("httpclient.timeout", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("502", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("504", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldRetrySemanticKernelDirect(string? diagnosticCode, string? diagnosticMessage, Uri endpoint)
+    {
+        if (IsDirectXaiEndpoint(endpoint))
+        {
+            return false;
+        }
+
+        return string.Equals(diagnosticCode, "transport_tls_failed", StringComparison.Ordinal)
+            || string.Equals(diagnosticCode, "transport_proxy_failed", StringComparison.Ordinal)
+            || ShouldRetryDirectly(diagnosticMessage);
+    }
+
+    private static bool IsProductionEnvironment(IConfiguration configuration)
+    {
+        var environmentName = configuration["ASPNETCORE_ENVIRONMENT"]
+            ?? configuration["DOTNET_ENVIRONMENT"]
+            ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+
+        return string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<string?> TryGetDirectLegacyXaiAnswerAsync(HttpClient client, object requestBody, string apiKey, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var directRequestMessage = new HttpRequestMessage(HttpMethod.Post, directResponsesEndpoint)
+            {
+                Content = JsonContent.Create(requestBody, options: JsonOptions)
+            };
+            directRequestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            var directResponse = await client.SendAsync(directRequestMessage, cancellationToken).ConfigureAwait(false);
+            if (directResponse.IsSuccessStatusCode)
+            {
+                var directXaiResponse = await directResponse.Content.ReadFromJsonAsync<LegacyXaiResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+                var directAnswer = directXaiResponse?.output?.FirstOrDefault()?.content?.FirstOrDefault()?.text?.Trim();
+                if (!string.IsNullOrWhiteSpace(directAnswer))
+                {
+                    logger.LogInformation("Workspace AI legacy xAI fallback succeeded directly against api.x.ai after proxy transport failure.");
+                    return directAnswer;
+                }
+            }
+
+            logger.LogWarning(
+                "Workspace AI direct xAI fallback retry did not return an answer (StatusCode={StatusCode}).",
+                directResponse.StatusCode);
+        }
+        catch (Exception directEx)
+        {
+            logger.LogWarning(directEx, "Workspace AI direct xAI fallback retry failed.");
+        }
+
+        return null;
     }
 
     private static bool IsDirectXaiEndpoint(Uri endpoint)

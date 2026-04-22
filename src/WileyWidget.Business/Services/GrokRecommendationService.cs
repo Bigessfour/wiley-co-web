@@ -52,7 +52,7 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
 
         _enabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
         _model = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4.1";
-        _endpoint = NormalizeChatCompletionsEndpoint(GetConfiguredString("XaiApiEndpoint", "XaiBaseUrl", "XAI:Endpoint", "XAI:ChatEndpoint"));
+        _endpoint = NormalizeChatCompletionsEndpoint(GetConfiguredString("XAI:ChatEndpoint", "XAI:Endpoint", "XaiApiEndpoint", "XaiBaseUrl"));
 
         if (_enabled && !string.IsNullOrWhiteSpace(_apiKey))
         {
