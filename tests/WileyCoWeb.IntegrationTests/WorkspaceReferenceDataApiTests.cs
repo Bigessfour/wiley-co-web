@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ContractCustomerStatus = WileyCoWeb.Contracts.CustomerStatus;
@@ -125,6 +126,40 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
 
         var wsdCollectionFeeBudget = await context.BudgetEntries.SingleAsync(item => item.FiscalYear == 2026 && item.AccountNumber == "310.00");
         Assert.Equal(1500m, wsdCollectionFeeBudget.ActualAmount);
+    }
+
+    [Fact]
+    public async Task PostReferenceDataImport_AcceptsMultipartUploads_AndImportsSeedFiles()
+    {
+        await factory.ResetDatabaseAsync();
+        await ClearWorkspaceReferenceDataAsync();
+
+        using var client = factory.CreateClient();
+        using var form = new MultipartFormDataContent();
+
+        AddImportFile(form, "Full_Customers.xlsx WSD.xlsx");
+        AddImportFile(form, "Full_GeneralLedger_FY2026.xlsx Util.xlsx");
+        AddImportFile(form, "Full_GeneralLedger_FY2026xlsx WSD.xlsx");
+        form.Add(new StringContent("true"), "includeSampleLedgerData");
+        form.Add(new StringContent("true"), "applyDefaultEnterpriseBaselines");
+
+        var response = await client.PostAsync("/api/workspace/reference-data/import", form);
+
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<WorkspaceReferenceDataImportResponse>(jsonOptions);
+
+        Assert.NotNull(payload);
+        Assert.True(payload.ImportedUtilityCustomerCount > 0);
+        Assert.True(payload.ImportedLedgerFileCount >= 2);
+        Assert.True(payload.ImportedLedgerRowCount > 0);
+        Assert.True(payload.SeededEnterpriseBaselineCount >= 2);
+        Assert.Contains("Imported", payload.UtilityCustomerImportStatus, StringComparison.OrdinalIgnoreCase);
+
+        var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
+        await using var context = await contextFactory.CreateDbContextAsync();
+        Assert.True(await context.UtilityCustomers.AnyAsync());
+        Assert.True(await context.LedgerEntries.AnyAsync());
+        Assert.True(await context.ImportBatches.AnyAsync());
     }
 
     [Fact]
@@ -278,5 +313,15 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         var attemptedPaths = string.Join(Environment.NewLine, candidates.Select(Path.GetFullPath));
         Assert.Fail($"Import Data folder was not found. Attempted:{Environment.NewLine}{attemptedPaths}");
         return string.Empty;
+    }
+
+    private static void AddImportFile(MultipartFormDataContent form, string fileName)
+    {
+        var filePath = Path.Combine(ResolveImportDataPath(), fileName);
+        Assert.True(File.Exists(filePath), $"Import seed file '{filePath}' was not found.");
+
+        var fileContent = new ByteArrayContent(File.ReadAllBytes(filePath));
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        form.Add(fileContent, "files", fileName);
     }
 }

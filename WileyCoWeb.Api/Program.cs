@@ -1027,14 +1027,17 @@ public partial class Program
     private static void MapWorkspaceReferenceDataImportEndpoint(WebApplication app)
     {
         app.MapPost("/api/workspace/reference-data/import", async (
-            WorkspaceReferenceDataImportRequest? request,
+            HttpRequest httpRequest,
             WorkspaceReferenceDataImportService importService,
             IWebHostEnvironment environment,
             CancellationToken cancellationToken) =>
         {
+            WorkspaceReferenceDataEndpointRequest? endpointRequest = null;
+
             try
             {
-                var response = await importService.ImportAsync(request, environment.ContentRootPath, cancellationToken);
+                endpointRequest = await ReadWorkspaceReferenceDataEndpointRequestAsync(httpRequest, cancellationToken);
+                var response = await importService.ImportAsync(endpointRequest?.Request, environment.ContentRootPath, cancellationToken);
                 return Results.Ok(response);
             }
             catch (DirectoryNotFoundException ex)
@@ -1045,8 +1048,109 @@ public partial class Program
             {
                 return Results.BadRequest(ex.Message);
             }
+            finally
+            {
+                CleanupTemporaryWorkspaceImportPath(endpointRequest?.TemporaryImportPath);
+            }
         });
     }
+
+    private static async Task<WorkspaceReferenceDataEndpointRequest?> ReadWorkspaceReferenceDataEndpointRequestAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        if (!request.HasFormContentType)
+        {
+            var importRequest = await request.ReadFromJsonAsync<WorkspaceReferenceDataImportRequest>(cancellationToken: cancellationToken);
+            return new WorkspaceReferenceDataEndpointRequest(importRequest, null);
+        }
+
+        var form = await request.ReadFormAsync(cancellationToken);
+        var includeSampleLedgerData = TryParseBooleanFormValue(form, "includeSampleLedgerData");
+        var applyDefaultEnterpriseBaselines = TryParseBooleanFormValue(form, "applyDefaultEnterpriseBaselines");
+        var explicitImportDataPath = GetOptionalFormValue(form, "importDataPath");
+
+        if (form.Files.Count == 0)
+        {
+            return new WorkspaceReferenceDataEndpointRequest(
+                new WorkspaceReferenceDataImportRequest(explicitImportDataPath, includeSampleLedgerData, applyDefaultEnterpriseBaselines),
+                null);
+        }
+
+        var temporaryImportPath = await StageWorkspaceReferenceImportFilesAsync(form.Files, cancellationToken);
+        return new WorkspaceReferenceDataEndpointRequest(
+            new WorkspaceReferenceDataImportRequest(temporaryImportPath, includeSampleLedgerData, applyDefaultEnterpriseBaselines),
+            temporaryImportPath);
+    }
+
+    private static bool TryParseBooleanFormValue(IFormCollection form, string key)
+        => bool.TryParse(form[key].ToString(), out var parsed) && parsed;
+
+    private static string? GetOptionalFormValue(IFormCollection form, string key)
+    {
+        var value = form[key].ToString();
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static async Task<string> StageWorkspaceReferenceImportFilesAsync(IFormFileCollection files, CancellationToken cancellationToken)
+    {
+        var temporaryImportPath = Path.Combine(Path.GetTempPath(), "wiley-reference-import", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryImportPath);
+
+        foreach (var file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var stagedFilePath = GetStagedWorkspaceReferenceImportFilePath(temporaryImportPath, file.FileName);
+            await using var stream = File.Create(stagedFilePath);
+            await file.CopyToAsync(stream, cancellationToken);
+        }
+
+        return temporaryImportPath;
+    }
+
+    private static string GetStagedWorkspaceReferenceImportFilePath(string importPath, string originalFileName)
+    {
+        var safeFileName = Path.GetFileName(string.IsNullOrWhiteSpace(originalFileName) ? "uploaded-file" : originalFileName);
+        var stagedFilePath = Path.Combine(importPath, safeFileName);
+
+        if (!File.Exists(stagedFilePath))
+        {
+            return stagedFilePath;
+        }
+
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(safeFileName);
+        var extension = Path.GetExtension(safeFileName);
+
+        for (var index = 1; ; index++)
+        {
+            var candidatePath = Path.Combine(importPath, $"{fileNameWithoutExtension}-{index}{extension}");
+            if (!File.Exists(candidatePath))
+            {
+                return candidatePath;
+            }
+        }
+    }
+
+    private static void CleanupTemporaryWorkspaceImportPath(string? temporaryImportPath)
+    {
+        if (string.IsNullOrWhiteSpace(temporaryImportPath) || !Directory.Exists(temporaryImportPath))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(temporaryImportPath, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private sealed record WorkspaceReferenceDataEndpointRequest(
+        WorkspaceReferenceDataImportRequest? Request,
+        string? TemporaryImportPath);
 
     private static void MapUtilityCustomerEndpoints(WebApplication app)
     {

@@ -14,7 +14,7 @@ Connect the thin API to the live Wiley Widget client so the product can achieve 
 
 ## Current Validated State
 
-Validated through April 17, 2026 using the AWS CLI, hosted browser evidence, and the current repository:
+Validated through April 21, 2026 using the AWS CLI, hosted browser evidence, public API checks, and the current repository:
 
 - Amplify app `d2ellat1y3ljd9` is a static `WEB` deployment for the Blazor WebAssembly client.
 - Aurora PostgreSQL now runs from encrypted cluster `wiley-co-aurora-db-encrypted` in `us-east-2`, and the original unencrypted cluster `wiley-co-aurora-db` is no longer present.
@@ -34,11 +34,14 @@ Validated through April 17, 2026 using the AWS CLI, hosted browser evidence, and
 - App Runner `/api/workspace/snapshot` currently returns `200` with populated enterprise options and live workspace data.
 - App Runner `/api/workspace/knowledge` currently returns `200` against the current snapshot payload.
 - App Runner `/api/ai/chat` currently returns `200` with a fallback onboarding response.
+- App Runner `/api/utility-customers` currently returns a partial live dataset with one active customer record, which confirms the environment is not fully customer-seeded yet.
 - App Runner `/api/workspace/reference-data/import` currently returns `400` with `Import data folder '/app/Import Data' was not found.`, which confirms the route is deployed and that production does not currently bundle the repo-local bootstrap folder.
+- CloudWatch currently has no App Runner or Aurora alarms for the Wiley API runtime, so monitoring hardening is still outstanding.
+- App Runner custom-domain attachment is still empty, so `api.wileywidget.townofwiley.gov` has not been provisioned on the service.
 - Amplify production branch `main` is Git-connected to `https://github.com/Bigessfour/wiley-co-web`, and production job `43` successfully deployed commit `8620cf72f569058a5c72619e9e341e25fb0b34f1` to `https://main.d2ellat1y3ljd9.amplifyapp.com`.
 - Hosted browser proof is complete on the public Amplify site: both QuickBooks preview and QuickBooks assistant flows passed against `https://main.d2ellat1y3ljd9.amplifyapp.com` on 2026-04-16, confirming the shipped client now includes the `InputFile`-based uploader refactor.
 
-Production conclusion: the browser shell is deployed, the public Amplify cutover is verified, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. The remaining pre-meeting work is operational hardening only: keep monitoring and release validation in place, decide whether final public API DNS is still needed, and leave observability migration plus the longer-term API hosting roadmap on the post-release track.
+Production conclusion: the browser shell is deployed, the public Amplify cutover is verified, and the current App Runner revision is serving the main workspace routes from the encrypted Aurora target. The remaining pre-meeting work is operational hardening plus one first-time admin seed pass: add monitoring, curate and run the reference-data bootstrap to complete missing customer data, keep release validation in place, keep the raw App Runner hostname as the current API baseline, and leave observability migration plus the longer-term API hosting roadmap on the post-release track.
 
 ## Provisioned Execution Checklist
 
@@ -58,7 +61,9 @@ Production conclusion: the browser shell is deployed, the public Amplify cutover
 - [x] Validate `/api/workspace/knowledge` successfully against the live snapshot payload.
 - [x] Validate that the deployed App Runner revision includes `/api/workspace/reference-data/import` and the other current repo routes.
 - [x] Start and verify the Amplify release that publishes `WILEY_WORKSPACE_API_BASE_ADDRESS` with the corrected pinned-SDK build spec.
-- [ ] Replace the raw App Runner hostname with final public API DNS if `api.wileywidget.townofwiley.gov` is required before go-live.
+- [ ] Curate the first-time reference-data seed folder, remove duplicate report variants, and run one admin bootstrap import to complete missing customer data.
+- [x] Keep the raw App Runner hostname as the current production API baseline.
+- [ ] Revisit `api.wileywidget.townofwiley.gov` only after the current raw-host release path, first-time seed import, and monitoring are stable.
 
 ## Required AWS Additions
 
@@ -122,15 +127,18 @@ Create or attach an instance role for the API host with the minimum permissions 
 
 The client must know where the thin API lives.
 
-Preferred option:
+Current release decision:
 
-- Create `api.wileywidget.townofwiley.gov` and point it at the App Runner service.
-- Set Amplify `WILEY_WORKSPACE_API_BASE_ADDRESS` to that URL.
-- Redeploy Amplify so [amplify.yml](../amplify.yml) emits the correct `wwwroot/appsettings.Workspace.local.json`.
+- Keep `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com` for the current hardening window.
+- Keep Amplify generating `wwwroot/appsettings.Workspace.local.json` from the raw App Runner hostname until the first-time seed import and monitoring rollout are complete.
+- Do not add Route 53, ACM validation, and App Runner custom-domain cutover risk in the same window as the remaining data-seed and alarm work.
 
-Alternative option:
+Deferred public-DNS option:
 
-- Use the raw App Runner URL temporarily for staging validation.
+- Create `api.wileywidget.townofwiley.gov` and point it at the App Runner service after the raw-host baseline is stable.
+- Set Amplify `WILEY_WORKSPACE_API_BASE_ADDRESS` to that URL only as part of a dedicated cutover release.
+- Redeploy Amplify so [amplify.yml](../amplify.yml) emits the updated `wwwroot/appsettings.Workspace.local.json`.
+- Smoke-test `/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, `/api/workspace/reference-data/import`, and the hosted workspace shell after the cutover.
 
 Do not point `WILEY_WORKSPACE_API_BASE_ADDRESS` at `w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod`. That gateway is only an xAI proxy today, not the workspace API.
 
@@ -143,7 +151,15 @@ Make the thin API operable before the Council session.
 - Keep the current X-Ray startup wiring in place for now, but do not treat verified live trace emission as a release prerequisite.
 - As of 2026-04-16, startup wiring and IAM permissions for X-Ray are present, but the live App Runner service still reports `ObservabilityConfiguration=null` and a same-window `aws xray get-service-graph` check in `us-east-2` returned no Wiley API service nodes even after fresh `/health` traffic. AWS App Runner tracing is disabled by default unless observability configuration enables it, so treat trace emission as not yet proven and likely disabled at the service layer.
 - Capture the observability follow-up on the post-release infrastructure track, with OpenTelemetry as the preferred successor instead of spending more release time on the current App Runner X-Ray chain.
-- Add alarms for `5xx` rate, latency, and unhealthy instance count.
+- As of 2026-04-21, `aws cloudwatch describe-alarms --region us-east-2` shows no App Runner or Aurora alarms scoped to the Wiley API runtime, so alarm creation is still an explicit go-live task.
+- Add App Runner alarms for `5xx` rate, latency, and unhealthy instance count:
+  - `5xx` rate: alert when server errors are sustained across two consecutive 5-minute periods or exceed an agreed low-volume error threshold during active traffic; first response is to check App Runner events, CloudWatch logs, and the most recent deployment before deciding on rollback.
+  - Latency: alert when request latency is materially above the current interactive baseline for two consecutive 5-minute periods; first response is to inspect import activity, database saturation, and recent deployments.
+  - Unhealthy instances: alert immediately when unhealthy instances are reported; first response is to inspect service health, deployment events, and restart or roll back if the condition persists.
+- Add Aurora alarms for CPU and connection pressure:
+  - CPU: alert on sustained elevated `CPUUtilization` so import or analytics spikes are visible before they degrade user flows.
+  - Connections: alert when `DatabaseConnections` rises toward the observed operating ceiling or deviates sharply from current baseline, then inspect connection pooling and long-running queries before rerunning imports.
+- Attach all Wiley API runtime alarms to the same operator notification target and retain the alarm names, SNS target, and dashboard link in the release record.
 - Retain a deployment log or release note for each pre-meeting push.
 
 ## Code-Complete Closures
@@ -184,11 +200,17 @@ Current state:
 - `WileyCoWeb.Api/appsettings.json` sets `WorkspaceReferenceData:RequireExplicitImportDataPath=true`.
 - The live App Runner route returns `400` with the missing-folder message, which confirms the container does not currently ship the repo-local sample set.
 - Monthly clerk imports are already handled through the QuickBooks Import panel and the API commit flow into Aurora.
+- Public runtime checks now show that enterprise seed data exists, but `/api/utility-customers` only returns one active customer record, so the first production reference-data bootstrap is still partially outstanding.
+- The current attached `Import Data/` folder contains duplicate report variants for at least three basenames (`Full_GeneralLedger_FY2026.xlsx Util`, `Full_GeneralLedger_FY2026xlsx WSD`, and `Full_TransactionList_ByDate_All`), so the folder needs a first-pass sort before the admin bootstrap runs.
+- `WorkspaceReferenceDataImportService` already prefers `.xlsx` workbooks and groups sample-ledger files by basename before commit, but the operator should still curate one canonical workbook or report per dataset before the first production seed to avoid avoidable duplicate or stale inputs.
 
 Ongoing action:
 
 - Keep recurring monthly imports on the QuickBooks panel and API commit path.
 - Treat `Import Data/` as a developer or admin bootstrap set only.
+- Before the first production bootstrap, sort the import folder down to one canonical customer workbook and one canonical ledger file per dataset, preferring the `.xlsx` versions that match the current parser expectations.
+- Run one admin `POST /api/workspace/reference-data/import` call with an explicit `ImportDataPath` after the folder is curated. Use `IncludeSampleLedgerData` and `ApplyDefaultEnterpriseBaselines` only if the operator intentionally wants the sample ledger and default baseline set to refresh live baseline analytics; otherwise keep those flags off and use the bootstrap strictly to complete customer/reference seeding.
+- Capture the import response summary and then recheck `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/utility-customers`, and the hosted workspace shell to confirm customer data is now complete.
 - If production needs repeatable reference-data bootstrap, provide it through an explicit path or managed source such as S3 plus an admin-only import job, rather than baking files into the App Runner image.
 
 ### 3. Aurora Encryption Cutover And Rollback Retirement Are Complete
@@ -211,6 +233,8 @@ Current handling:
 - Do not bundle the repo-local `Import Data/` folder into the App Runner image.
 - Keep `Import Data/` as a bootstrap/admin dataset for local seeding, diagnostics, and one-time environment initialization.
 - Use the QuickBooks Import panel and API commit flow for recurring monthly analysis files.
+- Complete one first-time admin bootstrap import from a curated `Import Data/` folder because production currently has enterprise data but incomplete customer seeding.
+- Before that first bootstrap, remove duplicate CSV/XLSX report variants and keep one canonical workbook per dataset, preferring `.xlsx` where the same report exists in multiple formats.
 - If production requires centralized bootstrap data, move the curated seed files to an explicit managed source such as S3 and invoke the reference-data import with an explicit path or background job.
 
 ### Aurora Encryption Cutover Record
@@ -286,21 +310,25 @@ Target: core validation is complete; keep this as recurring release-proof covera
 - Validate QuickBooks import preview and commit against canonical tables.
 - Validate `/api/ai/chat` and recommendation history.
 - Validate the hosted QuickBooks preview and assistant browser flow on the public site.
+- Run one first-time admin reference-data bootstrap from the curated import folder because public runtime checks still show incomplete customer seeding.
 - Validate server-side exports if Council packet generation is in scope.
 
 Exit criteria:
 
 - Water, Sewer, Trash, and Apartments each load live enterprise context.
 - Scenario changes rehydrate the widget correctly.
+- Utility customer data is fully seeded and visible through `/api/utility-customers` and the workspace snapshot filters.
 - Jarvis and Decision Support return live, matching financial context.
 
 ### Phase 4. Go-Live Hardening
 
 Target: complete before the Council rehearsal week.
 
-- Add CloudWatch alarms.
+- Verify that no Wiley App Runner or Aurora alarms exist yet, then create the missing CloudWatch alarms for App Runner `5xx` rate, latency, unhealthy instances, and Aurora CPU/connections.
+- Test the notification target for those alarms and retain the alarm names or dashboard link in the release notes.
 - Record a release checklist and rollback path.
-- Validate DNS and TLS for the final public URLs.
+- Keep the raw App Runner hostname as the current API baseline; do not make custom-domain cutover a pre-meeting blocker.
+- Treat `api.wileywidget.townofwiley.gov` as a separate follow-up release once the raw-host baseline, monitoring, and first-time seed import are stable.
 - Confirm no environment points the client back to the Grok gateway.
 - Run a full rehearsal with council-style workflows and meeting data.
 
@@ -327,22 +355,23 @@ Platform / AWS owner:
 - Keep App Runner on the current repo image and revision.
 - Keep VPC and security-group access to Aurora healthy.
 - Keep IAM role and secrets aligned with production settings.
-- Create API DNS if the final public hostname is still required.
-- Add monitoring and alarms.
+- Keep the raw App Runner hostname as the active API URL for now and only schedule custom-domain cutover as a separate follow-up.
+- Add monitoring and alarms for App Runner and Aurora.
 
 Application owner:
 
 - Confirm production env vars disable degraded mode.
 - Keep the migration runbook current and use it as the release path.
 - Validate API endpoints and live widget flows.
+- Curate the `Import Data/` folder, remove duplicate report variants, and run one first-time admin bootstrap import to complete customer/reference seeding.
 - Keep the town-clerk import procedure aligned with the live QuickBooks import path in [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md).
 
 Release owner:
 
 - Keep Amplify releases flowing from the tracked GitHub branch copy of the corrected pinned-SDK [amplify.yml](../amplify.yml).
-- Keep `WILEY_WORKSPACE_API_BASE_ADDRESS` pointed at the API URL.
+- Keep `WILEY_WORKSPACE_API_BASE_ADDRESS` pointed at `https://mr7zeizxxd.us-east-2.awsapprunner.com` until a separate custom-domain release is approved.
 - Run end-to-end smoke tests on each release before the Council meeting.
 
 ## Immediate Next Action
 
-The next server-side moves are operational hardening only: add monitoring and alarms, keep the release note and rollback path current, decide whether final public API DNS is still needed, and preserve the hosted browser validation sequence (`/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, `/api/workspace/reference-data/import` plus the QuickBooks assistant/browser smoke) on future Amplify releases. Observability migration remains post-release infrastructure work.
+The next server-side moves are now concrete: add the missing CloudWatch alarms for App Runner and Aurora, keep the release note and rollback path current, curate the attached `Import Data/` folder and run one first-time admin bootstrap import to complete customer/reference seeding, and preserve the hosted browser validation sequence (`/health`, `/api/workspace/snapshot`, `/api/workspace/knowledge`, `/api/ai/chat`, `/api/workspace/reference-data/import`, `/api/utility-customers`, plus the QuickBooks assistant/browser smoke) on future Amplify releases. Keep the raw App Runner hostname as the current API baseline. Observability migration and custom-domain cutover remain follow-up infrastructure work.
