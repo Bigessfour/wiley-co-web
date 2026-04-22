@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { waitForWorkspaceShell } from "./support/workspace";
-
-const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
+import {
+  seedLeftNavCollapsed,
+  waitForWorkspaceShell,
+} from "./support/workspace";
 
 test.describe("Workspace Shell", () => {
   test("Workspace shell and navigation stay usable on a fresh load", async ({
     page,
   }) => {
+    test.setTimeout(180000);
+
     // 1. Open /wiley-workspace in a fresh browser session.
     await page.goto("/wiley-workspace");
 
@@ -111,6 +114,7 @@ test.describe("Workspace Shell", () => {
   test("Workspace dashboard stays visible just below the Syncfusion media-query breakpoint", async ({
     page,
   }) => {
+    await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
     await waitForWorkspaceShell(page);
@@ -137,10 +141,11 @@ test.describe("Workspace Shell", () => {
     await expect(page.locator("#rates-panel")).toBeVisible();
   });
 
-  test("Collapsing the left rail stays inert below the desktop breakpoint across key panel routes", async ({
+  test("Collapsing the left rail stays consistent across key desktop routes", async ({
     page,
   }) => {
     test.setTimeout(120000);
+    await seedLeftNavCollapsed(page, false);
 
     const routeChecks = [
       {
@@ -162,17 +167,10 @@ test.describe("Workspace Shell", () => {
       },
     ];
 
-    await page.setViewportSize({ width: 1279, height: 900 });
+    await page.setViewportSize({ width: 1366, height: 900 });
 
     for (const routeCheck of routeChecks) {
       await page.goto(routeCheck.route);
-      await waitForWorkspaceShell(page);
-
-      await page.evaluate(
-        (storageKey) => localStorage.removeItem(storageKey),
-        leftNavStorageKey,
-      );
-      await page.reload();
       await waitForWorkspaceShell(page);
 
       await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();
@@ -191,22 +189,5 @@ test.describe("Workspace Shell", () => {
         "Collapse navigation rail",
       );
     }
-  });
-
-  test("Collapsing the left rail stays inert on mobile widths", async ({
-    page,
-  }) => {
-    await page.goto("/wiley-workspace");
-    await waitForWorkspaceShell(page);
-    await page.setViewportSize({ width: 900, height: 900 });
-
-    const sidebarToggle = page.locator("#app-shell-nav-toggle");
-
-    await sidebarToggle.evaluate((button) => {
-      (button as HTMLButtonElement).click();
-    });
-    await expect(sidebarToggle).toContainText("Collapse navigation rail");
-    await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
-    await expect(page.locator("#workspace-navigation-list")).toBeVisible();
   });
 });

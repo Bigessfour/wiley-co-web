@@ -4,6 +4,7 @@ import {
   enterNumericValue,
   gotoWorkspacePanel,
   prepareForVisualSnapshot,
+  seedLeftNavCollapsed,
   waitForWorkspaceShell,
 } from "./support/workspace";
 import {
@@ -73,6 +74,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
   test("workspace shell keeps the dashboard controls usable below the media-query breakpoint", async ({
     page,
   }) => {
+    await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
     await waitForWorkspaceShell(page);
@@ -102,6 +104,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
   test("workspace shell collapses the sidebar and opens and closes the Jarvis dock", async ({
     page,
   }) => {
+    await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
     await waitForWorkspaceShell(page);

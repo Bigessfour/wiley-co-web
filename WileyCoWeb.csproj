@@ -63,15 +63,41 @@
 
   <Target Name="GenerateSyncfusionAppSettings" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
+      <_SyncfusionLicenseKeyProcess>
+        $([System.Environment]::GetEnvironmentVariable('SYNCFUSION_LICENSE_KEY'))</_SyncfusionLicenseKeyProcess>
       <_SyncfusionLicenseKeyRaw Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
         $(SYNCFUSION_LICENSE_KEY)</_SyncfusionLicenseKeyRaw>
-      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKeyRaw)' != ''">
-        $([System.String]::Copy('$(_SyncfusionLicenseKeyRaw)').Trim())</_SyncfusionLicenseKey>
-      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKey)' != ''">$([System.Text.RegularExpressions.Regex]::Replace('$(_SyncfusionLicenseKey)',
+      <_SyncfusionLicenseKeyRaw
+        Condition="'$(_SyncfusionLicenseKeyRaw)' == '' and '$(_SyncfusionLicenseKeyProcess)' != ''">
+        $(_SyncfusionLicenseKeyProcess)</_SyncfusionLicenseKeyRaw>
+      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKeyRaw)' != ''">$([System.Text.RegularExpressions.Regex]::Replace($([System.String]::Copy('$(_SyncfusionLicenseKeyRaw)').Trim()),
         '^\"(.*)\"$', '$1'))</_SyncfusionLicenseKey>
       <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' != ''">{"SyncfusionLicenseKey":"$(_SyncfusionLicenseKey)"}</_GeneratedSyncfusionAppSettings>
       <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' == '' and !Exists('$(SyncfusionLocalSettingsFile)')">{}</_GeneratedSyncfusionAppSettings>
     </PropertyGroup>
+
+    <Exec Condition="'$(_SyncfusionLicenseKeyRaw)' == '' and '$(OS)' == 'Windows_NT'"
+      Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$value = [System.Environment]::GetEnvironmentVariable('SYNCFUSION_LICENSE_KEY', 'Machine'); if ([string]::IsNullOrWhiteSpace($value)) { $value = [System.Environment]::GetEnvironmentVariable('SYNCFUSION_LICENSE_KEY', 'User') }; if (-not [string]::IsNullOrWhiteSpace($value)) { Write-Output $value }&quot;"
+      ConsoleToMSBuild="true"
+      StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" ItemName="_SyncfusionScopedKey" />
+    </Exec>
+
+    <PropertyGroup>
+      <_SyncfusionLicenseKeyRaw
+        Condition="'$(_SyncfusionLicenseKeyRaw)' == '' and '@(_SyncfusionScopedKey)' != ''">@(_SyncfusionScopedKey,
+        '')</_SyncfusionLicenseKeyRaw>
+      <_SyncfusionLicenseKey Condition="'$(_SyncfusionLicenseKeyRaw)' != ''">$([System.Text.RegularExpressions.Regex]::Replace($([System.String]::Copy('$(_SyncfusionLicenseKeyRaw)').Trim()),
+        '^\"(.*)\"$', '$1'))</_SyncfusionLicenseKey>
+      <_GeneratedSyncfusionAppSettings Condition="'$(_SyncfusionLicenseKey)' != ''">
+        {"SyncfusionLicenseKey":"$(_SyncfusionLicenseKey)"}</_GeneratedSyncfusionAppSettings>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="'$(_GeneratedSyncfusionAppSettings)' != ''"
+      File="$(ProjectDir)wwwroot\appsettings.Syncfusion.local.json"
+      Lines="$(_GeneratedSyncfusionAppSettings)"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
 
     <Copy Condition="'$(_SyncfusionLicenseKey)' == '' and Exists('$(SyncfusionLocalSettingsFile)')"
       SourceFiles="$(SyncfusionLocalSettingsFile)"

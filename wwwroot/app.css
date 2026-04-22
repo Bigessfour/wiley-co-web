@@ -11,7 +11,6 @@ body {
     linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
   color: #0f172a;
 }
-
 body {
   min-height: 100vh;
 }
@@ -490,28 +489,4 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder,
 .form-floating > .form-control:focus::placeholder {
   text-align: start;
-}
-
-@media (max-width: 1024px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .app-shell-nav-collapsed {
-    grid-template-columns: 1fr;
-  }
-
-  .app-sidebar {
-    position: static;
-    min-height: auto;
-  }
-
-  .app-main {
-    padding-top: 0;
-  }
-
-  .app-header {
-    flex-direction: column;
-    align-items: start;
-  }
 }

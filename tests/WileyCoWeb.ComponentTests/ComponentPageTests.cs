@@ -144,6 +144,8 @@ public sealed class ComponentPageTests
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
+		Assert.Contains("class=\"flex w-full flex-col gap-4\"", cut.Markup);
+		Assert.DoesNotContain("mx-auto flex max-w-[96rem] flex-col gap-4", cut.Markup);
 	}
 
 	[Fact]

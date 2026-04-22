@@ -1,18 +1,75 @@
 import { expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
-export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
-  const statusCard = page.locator("#workspace-status-card");
+const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
 
-  await expect(statusCard).toBeVisible({ timeout });
-  await expect(statusCard).toContainText("Startup source:", { timeout });
-  await expect(statusCard).toContainText("Current state:", { timeout });
-  await expect(statusCard).not.toContainText(/pending/i, { timeout });
+export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
+  const effectiveTimeout = isHostedWorkspace(page)
+    ? Math.max(timeout, 90_000)
+    : timeout;
+  const dashboard = page.locator("#workspace-dashboard");
+  const globalActionsCard = page.locator("#workspace-global-actions-card");
+  const statusCard = page.locator("#workspace-status-card");
+  const workspaceLoadStatus = page.locator("#workspace-load-status");
+  const loadingShellHeadline = page.getByText("Loading Wiley Widget", {
+    exact: true,
+  });
+
+  if (await loadingShellHeadline.isVisible().catch(() => false)) {
+    await loadingShellHeadline
+      .waitFor({ state: "hidden", timeout: effectiveTimeout })
+      .catch(() => undefined);
+  }
+
+  await expect(dashboard).toBeVisible({ timeout: effectiveTimeout });
+  await expect(globalActionsCard).toBeVisible({ timeout: effectiveTimeout });
+  await expect(statusCard).toBeVisible({ timeout: effectiveTimeout });
+  await expect(workspaceLoadStatus).toBeVisible({ timeout: effectiveTimeout });
+  await expect
+    .poll(
+      async () => {
+        const globalActionsText =
+          (await globalActionsCard.textContent().catch(() => "")) ?? "";
+        const statusText =
+          (await statusCard.textContent().catch(() => "")) ?? "";
+        const workspaceLoadText =
+          (await workspaceLoadStatus.textContent().catch(() => "")) ?? "";
+
+        return (
+          !/Refreshing\.\.\./i.test(globalActionsText) &&
+          /Startup source:/i.test(statusText) &&
+          /Current state:/i.test(statusText) &&
+          !/pending/i.test(statusText) &&
+          !/Loading .*workspace API/i.test(workspaceLoadText)
+        );
+      },
+      {
+        timeout: effectiveTimeout,
+        message: "Wait for hosted workspace startup to settle",
+      },
+    )
+    .toBe(true);
 }
 
 export async function gotoWorkspacePanel(page: Page, route: string) {
   await page.goto(route);
   await waitForWorkspaceShell(page);
+}
+
+export async function seedLeftNavCollapsed(page: Page, collapsed: boolean) {
+  const storedValue = collapsed.toString();
+
+  await page.addInitScript(
+    ({ storageKey, initialValue }) => {
+      try {
+        window.localStorage.setItem(storageKey, initialValue);
+      } catch {}
+    },
+    {
+      storageKey: leftNavStorageKey,
+      initialValue: storedValue,
+    },
+  );
 }
 
 export async function enterNumericValue(input: Locator, value: string) {
@@ -70,4 +127,10 @@ export async function prepareForVisualSnapshot(page: Page) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isHostedWorkspace(page: Page) {
+  const url = page.url();
+
+  return url.length > 0 && !/^https?:\/\/localhost[:/]/i.test(url);
 }

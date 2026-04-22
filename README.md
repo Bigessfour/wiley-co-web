@@ -51,7 +51,7 @@ If you are working locally on macOS and user secrets are not being surfaced reli
 { "SyncfusionLicenseKey": "<your-license-key>" }
 ```
 
-The build copies that file into `wwwroot/appsettings.json`, and that generated file is already ignored by git.
+The build copies or generates that file into `wwwroot/appsettings.Syncfusion.local.json`, and that generated file is already ignored by git.
 
 Important: this app is a static Blazor WebAssembly site. That means the Syncfusion license is injected at build time and then included in the published client assets so `Program.cs` can read it from configuration at startup. This is not a private server-side runtime secret path.
 
