@@ -1,6 +1,8 @@
 *.key
 *.log
 appsettings.Syncfusion.local.json
+appsettings.Workspace.local.json
+WileyCoWeb.Api/appsettings.Development.local.json
 wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 .DS_Store
@@ -70,9 +72,12 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 playwright-report/
 test-results/
 .playwright/
+.playwright-mcp/
 logs/
 jarvis-*.json
 playwright-live-*.json
+CRAP-Analysis-Report.md
+crap_results_updated.csv
 Import Data/seed-pass-*/
 pids
 *.pid

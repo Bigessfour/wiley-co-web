@@ -1,0 +1,28 @@
+{
+  "ImageRepository": {
+    "ImageIdentifier": "570912405222.dkr.ecr.us-east-2.amazonaws.com/wiley-widget-api:latest",
+    "ImageConfiguration": {
+      "RuntimeEnvironmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Production",
+        "Database__AllowDegradedStartup": "false",
+        "Database__SeedDevelopmentData": "false",
+        "WorkspaceClientOrigins": "https://d2ellat1y3ljd9.amplifyapp.com;https://main.d2ellat1y3ljd9.amplifyapp.com;https://wileywidget.townofwiley.gov;https://www.wileywidget.townofwiley.gov",
+        "XAI__ChatEndpoint": "https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod/v1",
+        "XAI__Enabled": "true",
+        "XAI__Endpoint": "https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod/v1"
+      },
+      "Port": "8080",
+      "RuntimeEnvironmentSecrets": {
+        "ConnectionStrings__DefaultConnection": "arn:aws:secretsmanager:us-east-2:570912405222:secret:wiley-widget/api/database-url-q1w8lt",
+        "DATABASE_URL": "arn:aws:secretsmanager:us-east-2:570912405222:secret:wiley-widget/api/database-url-q1w8lt",
+        "SYNCFUSION_LICENSE_KEY": "arn:aws:secretsmanager:us-east-2:570912405222:secret:wiley-widget/api/syncfusion-license-key-Cbd2mF",
+        "XAI_API_KEY": "arn:aws:secretsmanager:us-east-2:570912405222:secret:wiley-widget/api/xai-api-key-Q1QIik"
+      }
+    },
+    "ImageRepositoryType": "ECR"
+  },
+  "AutoDeploymentsEnabled": true,
+  "AuthenticationConfiguration": {
+    "AccessRoleArn": "arn:aws:iam::570912405222:role/WileyWidgetAppRunnerEcrAccessRole"
+  }
+}
