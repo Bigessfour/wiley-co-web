@@ -27,6 +27,8 @@ jobs:
             project: tests/WileyCoWeb.IntegrationTests/WileyCoWeb.IntegrationTests.csproj
           - name: widget
             project: tests/WileyWidget.Tests/WileyWidget.Tests.csproj
+          - name: e2e
+            project: tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -172,6 +174,11 @@ jobs:
           $threshold = [double]$baselines['${{ matrix.name }}']
 
           Write-Host "${{ matrix.name }} line coverage: $coveragePercent% (baseline $threshold%)"
+
+          if ($threshold -eq 0) {
+            Write-Host "E2E coverage is reported separately because browser-only runs do not instrument app code in-process."
+            exit 0
+          }
 
           if ($coveragePercent -lt $threshold) {
             throw "Coverage gate failed for ${{ matrix.name }}: $coveragePercent% < $threshold% baseline."

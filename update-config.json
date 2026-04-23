@@ -7,9 +7,10 @@
         "Database__AllowDegradedStartup": "false",
         "Database__SeedDevelopmentData": "false",
         "WorkspaceClientOrigins": "https://d2ellat1y3ljd9.amplifyapp.com;https://main.d2ellat1y3ljd9.amplifyapp.com;https://wileywidget.townofwiley.gov;https://www.wileywidget.townofwiley.gov",
-        "XAI__ChatEndpoint": "https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod/v1",
+        "XAI__ChatEndpoint": "https://api.x.ai/v1",
         "XAI__Enabled": "true",
-        "XAI__Endpoint": "https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod/v1"
+        "XAI__Endpoint": "https://api.x.ai/v1",
+        "XAI__TimeoutSeconds": "45"
       },
       "Port": "8080",
       "RuntimeEnvironmentSecrets": {

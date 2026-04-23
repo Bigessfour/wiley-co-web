@@ -1,6 +1,6 @@
 # WileyCoWeb — AI Briefing
 
-> Generated: 2026-04-22 18:21 | Branch: `main` | Commit: `57043775e3`
+> Generated: 2026-04-23 06:31 | Branch: `main` | Commit: `3250c2cd94`
 
 ## Project Purpose
 
@@ -39,8 +39,8 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 - `Components/Panels/DecisionSupportPanel.razor` — Panel — priority 100
 - `Components/Panels/QuickBooksImportPanelWrapper.razor` — Panel — priority 100
 - `Components/Panels/RatesPanel.razor` — Panel — priority 100
-- `Components/Panels/ScenarioPlannerPanel.razor` — Panel — priority 100
 - `Components/Panels/TrendsPanel.razor` — Panel — priority 100
+- `Components/Panels/ScenarioPlannerPanel.razor` — Panel — priority 100
 - `WileyCoWeb.Api/Program.cs` — Program — priority 100
 - `Services/BrowserDownloadService.cs` — Service — priority 95
 - `Services/QuickBooksImportApiService.cs` — Service — priority 95
@@ -62,8 +62,8 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 11. `Components/Panels/DecisionSupportPanel.razor`
 12. `Components/Panels/QuickBooksImportPanelWrapper.razor`
 13. `Components/Panels/RatesPanel.razor`
-14. `Components/Panels/ScenarioPlannerPanel.razor`
-15. `Components/Panels/TrendsPanel.razor`
+14. `Components/Panels/TrendsPanel.razor`
+15. `Components/Panels/ScenarioPlannerPanel.razor`
 16. `WileyCoWeb.Api/Program.cs`
 17. `Services/BrowserDownloadService.cs`
 18. `Services/QuickBooksImportApiService.cs`
@@ -77,10 +77,10 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 | Views        | 0     |
 | Viewmodels   | 1     |
 | Panels       | 6     |
-| Services     | 47    |
+| Services     | 98    |
 | Controls     | 0     |
 | Repositories | 24    |
-| Factories    | 3     |
+| Factories    | 4     |
 
 ## Key Base Classes
 
@@ -145,24 +145,24 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 - `Services/WorkspaceSnapshotApiService.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Keywords.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Orchestration.cs`
-- `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Overrides.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Patterns.cs`
+- `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Overrides.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.cs`
 - `WileyCoWeb.Api/Configuration/StartupConfigurationService.cs`
 - `State/CustomerFilterService.cs`
 - `src/WileyWidget.Abstractions/IApplicationStateService.cs`
+- `src/WileyWidget.Abstractions/ICacheService.cs`
 - `src/WileyWidget.Abstractions/IViewRegistrationService.cs`
 - `src/WileyWidget.Business/Interfaces/IDepartmentExpenseService.cs`
 - `src/WileyWidget.Business/Interfaces/IGrokRecommendationService.cs`
 - `src/WileyWidget.Business/Services/AuditService.cs`
 - `src/WileyWidget.Business/Services/GrokRecommendationService.cs`
 - `src/WileyWidget.Models/ServiceChargeRecommendation.cs`
+- `src/WileyWidget.Services/AICacheWarmingService.cs`
+- `src/WileyWidget.Services/AILoggingService.cs`
+- `src/WileyWidget.Services/ActivityFallbackDataService.cs`
 - `src/WileyWidget.Services/AdaptiveTimeoutService.cs`
 - `src/WileyWidget.Services/AnalyticsService.cs`
-- `src/WileyWidget.Services/AnomalyDetectionService.cs`
-- `src/WileyWidget.Services/AuditService.cs`
-- `src/WileyWidget.Services/DataAnonymizerService.cs`
-- `src/WileyWidget.Services/ErrorReportingService.cs`
 
 ## Controls
 
@@ -170,9 +170,9 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 
 ## Manifest Stats
 
-- Total files indexed: **356**
-- Files with embedded content: **355**
-- Total source size: **38,484 KB**
+- Total files indexed: **412**
+- Files with embedded content: **400**
+- Total source size: **38,073 KB**
 - Manifest mode: **full-context**
 
 ---
