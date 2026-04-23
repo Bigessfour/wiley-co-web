@@ -202,7 +202,9 @@ namespace WileyWidget.Services.Plugins
         {
             var resolvedEnterpriseName = string.IsNullOrWhiteSpace(enterpriseName) ? TryResolveEnterpriseName(supportingData) : enterpriseName;
             var knowledge = TryLoadKnowledge(resolvedEnterpriseName ?? string.Empty, fiscalYear, recommendation, supportingData);
-            var rationale = _contextStore.ScenarioSummary ?? _contextService.GetEnterpriseContextAsync(1).GetAwaiter().GetResult();
+            var rationale = string.IsNullOrWhiteSpace(_contextStore.ScenarioSummary)
+                ? _contextService.GetEnterpriseContextAsync(1).GetAwaiter().GetResult()
+                : _contextStore.ScenarioSummary;
 
             if (knowledge is null)
             {

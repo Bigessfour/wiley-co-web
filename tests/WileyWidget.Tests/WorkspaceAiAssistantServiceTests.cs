@@ -40,9 +40,10 @@ public sealed class WorkspaceAiAssistantServiceTests
     public void SemanticKernelConnector_UsesDocumentedXaiDefaultsAndAutoFunctionChoice()
     {
         var defaultConfiguration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        var defaultAiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(defaultConfiguration);
 
-        Assert.Equal("grok-4.20-0309-reasoning", WorkspaceAiAssistantService.ResolveSemanticKernelModel(defaultConfiguration));
-        Assert.Equal(new Uri("https://api.x.ai/v1"), WorkspaceAiAssistantService.ResolveSemanticKernelChatEndpoint(defaultConfiguration));
+        Assert.Equal(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel(), defaultAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
+        Assert.Equal("https://api.x.ai/v1", defaultAiConfiguration.ChatCompletionEndpoint.ToString());
 
         var configuredConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -50,9 +51,10 @@ public sealed class WorkspaceAiAssistantServiceTests
             ["XaiModel"] = "grok-4.20-0309-reasoning",
             ["XAI:ChatEndpoint"] = "https://proxy.example/v1"
         }).Build();
+        var configuredAiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(configuredConfiguration);
 
-        Assert.Equal("grok-4.20-0309-reasoning", WorkspaceAiAssistantService.ResolveSemanticKernelModel(configuredConfiguration));
-        Assert.Equal(new Uri("https://proxy.example/v1"), WorkspaceAiAssistantService.ResolveSemanticKernelChatEndpoint(configuredConfiguration));
+        Assert.Equal("grok-4.20-0309-reasoning", configuredAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
+        Assert.Equal("https://proxy.example/v1", configuredAiConfiguration.ChatCompletionEndpoint.ToString());
 
         var executionSettings = WorkspaceAiAssistantService.CreateSemanticKernelExecutionSettings();
         var functionChoiceBehavior = executionSettings.FunctionChoiceBehavior;
@@ -595,13 +597,44 @@ public sealed class WorkspaceAiAssistantServiceTests
         }
     }
 
+    [Fact]
+    public async Task AskAsync_UsesInjectedKernelProviderDiagnostics_WhenLiveKernelIsUnavailable()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            kernelProvider: new TestWorkspaceAiKernelProvider(
+                new WorkspaceAiKernelInitializationResult(
+                    Context: null,
+                    IsAvailable: false,
+                    IsApiKeyVisibleToProcess: true,
+                    ApiKeySource: "provider:test",
+                    StatusCode: "kernel_initialization_failed",
+                    StatusMessage: "Injected provider failure")));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "What is the current status?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("Semantic Kernel initialization failed", response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Injected provider failure", response.Answer, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static WorkspaceAiAssistantService CreateService(
         TestUserContext userContext,
         IConversationRepository repository,
         IReadOnlyDictionary<string, string?>? settings = null,
         IHttpClientFactory? httpClientFactory = null,
         IGrokApiKeyProvider? apiKeyProvider = null,
-        IWorkspaceKnowledgeService? knowledgeService = null)
+        IWorkspaceKnowledgeService? knowledgeService = null,
+        IWorkspaceAiKernelProvider? kernelProvider = null)
     {
         var configurationValues = new Dictionary<string, string?>
         {
@@ -623,7 +656,7 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         var logger = LoggerFactory.Create(builder => { }).CreateLogger<WorkspaceAiAssistantService>();
         var contextService = new TestWileyWidgetContextService();
-        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService, knowledgeService ?? new TestWorkspaceKnowledgeService(), httpClientFactory, apiKeyProvider);
+        return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService, knowledgeService ?? new TestWorkspaceKnowledgeService(), httpClientFactory, apiKeyProvider, kernelProvider);
     }
 
     private static void SeedPersistedConversation(RecordingConversationRepository repository)
@@ -709,6 +742,29 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         public Task<string> GetOperationalContextAsync(CancellationToken cancellationToken = default)
             => Task.FromResult("Test operational context with audit metrics.");
+    }
+
+    private sealed class TestWorkspaceAiKernelProvider : IWorkspaceAiKernelProvider
+    {
+        private static readonly WorkspaceAiServiceConfiguration Configuration = new(
+            new WorkspaceAiApiKeyResolution("test-api-key", "test-provider", true, false, false, false, null),
+            true,
+            "grok-4.20-0309-reasoning",
+            new global::System.Uri("https://proxy.example/prod/v1"),
+            new global::System.Uri("https://proxy.example/prod/v1/responses"));
+
+        private readonly WorkspaceAiKernelInitializationResult initializationResult;
+
+        public TestWorkspaceAiKernelProvider(WorkspaceAiKernelInitializationResult initializationResult)
+        {
+            this.initializationResult = initializationResult;
+        }
+
+        public WorkspaceAiServiceConfiguration GetConfiguration()
+            => Configuration;
+
+        public WorkspaceAiKernelInitializationResult GetInitializationResult()
+            => initializationResult;
     }
 
     private sealed class TestUserContext : IUserContext

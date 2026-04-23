@@ -10,14 +10,16 @@ namespace WileyWidget.Services.HealthChecks;
 public class SyncfusionLicenseHealthCheck : IHealthCheck
 {
     private readonly ILogger<SyncfusionLicenseHealthCheck> _logger;
+    private readonly Func<string?> licenseKeyResolver;
     private string? _cachedVersion;
     private DateTime _lastCheck = DateTime.MinValue;
     private HealthCheckResult? _cachedResult;
     private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(5);
 
-    public SyncfusionLicenseHealthCheck(ILogger<SyncfusionLicenseHealthCheck> logger)
+    public SyncfusionLicenseHealthCheck(ILogger<SyncfusionLicenseHealthCheck> logger, Func<string?>? licenseKeyResolver = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.licenseKeyResolver = licenseKeyResolver ?? ResolveLicenseKey;
     }
 
     public Task<HealthCheckResult> CheckHealthAsync(
@@ -35,9 +37,7 @@ public class SyncfusionLicenseHealthCheck : IHealthCheck
             var data = new Dictionary<string, object>();
 
             // Check environment variable for license key
-            var licenseKey = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
-                           ?? Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY")
-                           ?? Environment.GetEnvironmentVariable("Syncfusion__LicenseKey");
+            var licenseKey = licenseKeyResolver();
 
             var hasLicense = !string.IsNullOrWhiteSpace(licenseKey);
             data["LicenseKeyPresent"] = hasLicense;
@@ -161,4 +161,9 @@ public class SyncfusionLicenseHealthCheck : IHealthCheck
     /// Gets the cached Syncfusion version if available
     /// </summary>
     public string? GetCachedVersion() => _cachedVersion;
+
+    private static string? ResolveLicenseKey()
+        => Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY")
+           ?? Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY")
+           ?? Environment.GetEnvironmentVariable("Syncfusion__LicenseKey");
 }

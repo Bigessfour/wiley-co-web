@@ -28,6 +28,7 @@ public sealed class WorkspaceAiAssistantService
     private readonly IConfiguration configuration;
     private readonly IHttpClientFactory? httpClientFactory;
     private readonly IGrokApiKeyProvider? apiKeyProvider;
+    private readonly IWorkspaceAiKernelProvider? kernelProvider;
     private readonly IUserContext userContext;
     private readonly IConversationRepository conversationRepository;
     private readonly IWileyWidgetContextService contextService;
@@ -56,7 +57,8 @@ public sealed class WorkspaceAiAssistantService
         IWileyWidgetContextService contextService,
         IWorkspaceKnowledgeService workspaceKnowledgeService,
         IHttpClientFactory? httpClientFactory = null,
-        IGrokApiKeyProvider? apiKeyProvider = null)
+        IGrokApiKeyProvider? apiKeyProvider = null,
+        IWorkspaceAiKernelProvider? kernelProvider = null)
     {
         this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -66,12 +68,14 @@ public sealed class WorkspaceAiAssistantService
         this.workspaceKnowledgeService = workspaceKnowledgeService ?? throw new ArgumentNullException(nameof(workspaceKnowledgeService));
         this.httpClientFactory = httpClientFactory;
         this.apiKeyProvider = apiKeyProvider;
+        this.kernelProvider = kernelProvider;
+        var aiConfiguration = kernelProvider?.GetConfiguration() ?? WorkspaceAiKernelFactory.ResolveConfiguration(configuration, apiKeyProvider);
         legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
         allowDirectXaiRetry = GetConfiguredBoolean(!IsProductionEnvironment(configuration), "XAI:AllowDirectRetry");
-        chatCompletionEndpoint = ResolveSemanticKernelChatEndpoint(configuration);
-        legacyXaiEndpoint = ResolveLegacyXaiEndpoint(configuration);
+        chatCompletionEndpoint = aiConfiguration.ChatCompletionEndpoint;
+        legacyXaiEndpoint = aiConfiguration.LegacyResponsesEndpoint;
         // Per xAI docs (docs.x.ai/developers/models): prefer a reasoning-capable, function-capable Grok model for the live SK path.
-        semanticKernelModel = ResolveSemanticKernelModel(configuration);
+        semanticKernelModel = aiConfiguration.ResolveModelOrDefault(DefaultSemanticKernelModel);
         legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
         legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
         legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
@@ -86,26 +90,16 @@ public sealed class WorkspaceAiAssistantService
         };
 
     public static string ResolveSemanticKernelModel(IConfiguration configuration)
-        => GetConfiguredString(configuration, "XaiModel", "XAI:Model", "Grok:Model") ?? DefaultSemanticKernelModel;
+        => WorkspaceAiKernelFactory.ResolveConfiguration(configuration).ResolveModelOrDefault(DefaultSemanticKernelModel);
 
     public static Uri ResolveSemanticKernelChatEndpoint(IConfiguration configuration)
-        => ResolvePreferredXaiEndpoint(
-            configuration,
-            primaryKey: "XAI:ChatEndpoint",
-            secondaryKey: "XAI:Endpoint",
-            normalizeEndpoint: NormalizeChatCompletionEndpoint,
-            directEndpoint: directChatCompletionEndpoint);
+        => WorkspaceAiKernelFactory.ResolveSemanticKernelChatEndpoint(configuration);
 
-    internal static string GetDefaultSemanticKernelModel()
+    public static string GetDefaultSemanticKernelModel()
         => DefaultSemanticKernelModel;
 
     private static Uri ResolveLegacyXaiEndpoint(IConfiguration configuration)
-        => ResolvePreferredXaiEndpoint(
-            configuration,
-            primaryKey: "XAI:Endpoint",
-            secondaryKey: null,
-            normalizeEndpoint: NormalizeResponsesEndpoint,
-            directEndpoint: directResponsesEndpoint);
+        => WorkspaceAiKernelFactory.ResolveLegacyXaiEndpoint(configuration);
 
     private static Uri ResolvePreferredXaiEndpoint(
         IConfiguration configuration,
@@ -212,7 +206,7 @@ public sealed class WorkspaceAiAssistantService
             }
         }
 
-        if (allowDirectXaiRetry && ShouldRetrySemanticKernelDirect(fallbackDiagnosticCode, fallbackDiagnosticMessage, chatCompletionEndpoint))
+        if (kernelProvider is null && allowDirectXaiRetry && ShouldRetrySemanticKernelDirect(fallbackDiagnosticCode, fallbackDiagnosticMessage, chatCompletionEndpoint))
         {
             try
             {
@@ -375,7 +369,23 @@ public sealed class WorkspaceAiAssistantService
     }
 
     private KernelContext? InitializeKernelContext()
-        => InitializeKernelContext(chatCompletionEndpoint);
+    {
+        if (kernelProvider is not null)
+        {
+            var initializationResult = kernelProvider.GetInitializationResult();
+            semanticKernelAvailable = initializationResult.IsAvailable;
+            apiKeyVisibleToProcess = initializationResult.IsApiKeyVisibleToProcess;
+            resolvedApiKeySource = initializationResult.ApiKeySource;
+            semanticKernelStatusCode = initializationResult.StatusCode;
+            semanticKernelStatusMessage = initializationResult.StatusMessage;
+
+            return initializationResult.Context is null
+                ? null
+                : new KernelContext(initializationResult.Context.Kernel, initializationResult.Context.ChatService);
+        }
+
+        return InitializeKernelContext(chatCompletionEndpoint);
+    }
 
     private KernelContext? InitializeKernelContext(Uri chatEndpoint)
     {

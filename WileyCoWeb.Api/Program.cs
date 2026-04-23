@@ -29,6 +29,7 @@ using WileyWidget.Services.HealthChecks;
 using WileyWidget.Services.Logging;
 using BusinessActivityLogRepository = WileyWidget.Business.Interfaces.IActivityLogRepository;
 using WileyCoWeb.Api.Configuration;
+using WileyCoWeb.Api.Middleware;
 
 namespace WileyCoWeb.Api;
 
@@ -68,6 +69,12 @@ public partial class Program
         try
         {
             builder = WebApplication.CreateBuilder(args);
+            if (builder.Environment.IsDevelopment())
+            {
+                builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
+                builder.Configuration.AddUserSecrets<Program>(optional: true);
+            }
+
             bootstrapLoggerFactory = CreateStartupLoggerFactory();
             bootstrapLogger = bootstrapLoggerFactory.CreateLogger("WileyCoWeb.Api.Startup");
             bootstrapLogger.LogInformation(
@@ -218,8 +225,7 @@ public partial class Program
         var xaiEndpointResolution = DetermineXaiEndpointResolution(builder.Configuration);
 
         var configuredConnectionString = GetConfiguredConnectionString(builder.Configuration);
-        var allowDegradedStartup = builder.Environment.IsEnvironment("IntegrationTest")
-            || builder.Configuration.GetValue<bool>("Database:AllowDegradedStartup");
+        var allowDegradedStartup = ShouldAllowDegradedStartup(builder.Environment, builder.Configuration);
         var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
 
         await StartupConfigurationService.TryActivateDegradedModeForUnavailableDevelopmentDatabaseAsync(
@@ -406,6 +412,12 @@ public partial class Program
             ?? Environment.GetEnvironmentVariable("DATABASE_URL");
     }
 
+    private static bool ShouldAllowDegradedStartup(IHostEnvironment environment, IConfiguration configuration)
+    {
+        return environment.IsEnvironment("IntegrationTest")
+            || (environment.IsDevelopment() && configuration.GetValue<bool>("Database:AllowDegradedStartup"));
+    }
+
     private static void ConfigureServices(WebApplicationBuilder builder, string? configuredConnectionString, IReadOnlySet<string> allowedWorkspaceClientOrigins)
     {
         builder.Services.AddCors(options =>
@@ -461,6 +473,7 @@ public partial class Program
         builder.Services.AddSingleton<QuickBooksRoutingService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
+        builder.Services.AddSingleton<IWorkspaceAiKernelProvider, WorkspaceAiKernelProvider>();
         builder.Services.AddSingleton<WorkspaceAiAssistantService>();
         builder.Services.AddSingleton<UserContext>();
         builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
@@ -474,6 +487,8 @@ public partial class Program
 
     private static void ConfigureMiddleware(WebApplication app, ILogger logger)
     {
+        app.UseExceptionLogging();
+
         app.Use(async (context, next) =>
         {
             var stopwatch = Stopwatch.StartNew();

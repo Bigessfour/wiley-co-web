@@ -13,8 +13,7 @@ public sealed class SyncfusionLicenseHealthCheckTests
     [Fact]
     public async Task CheckHealthAsync_ReturnsDegraded_WhenLicenseKeyIsMissing()
     {
-        using var scope = new SyncfusionLicenseEnvironmentScope(null);
-        var check = CreateCheck();
+        var check = CreateCheck(() => null);
 
         var result = await check.CheckHealthAsync(new HealthCheckContext());
 
@@ -26,8 +25,7 @@ public sealed class SyncfusionLicenseHealthCheckTests
     [Fact]
     public async Task CheckHealthAsync_ReturnsDegraded_WhenLicenseKeyIsTooShort()
     {
-        using var scope = new SyncfusionLicenseEnvironmentScope(new string('x', 24));
-        var check = CreateCheck();
+        var check = CreateCheck(() => new string('x', 24));
 
         var result = await check.CheckHealthAsync(new HealthCheckContext());
 
@@ -40,8 +38,7 @@ public sealed class SyncfusionLicenseHealthCheckTests
     public async Task CheckHealthAsync_ReturnsHealthy_WhenLicenseKeyIsPresent_AndSyncfusionAssemblyIsLoaded()
     {
         _ = typeof(PdfDocument).Assembly.FullName;
-        using var scope = new SyncfusionLicenseEnvironmentScope(new string('x', 88));
-        var check = CreateCheck();
+        var check = CreateCheck(() => new string('x', 88));
 
         var result = await check.CheckHealthAsync(new HealthCheckContext());
 
@@ -51,33 +48,8 @@ public sealed class SyncfusionLicenseHealthCheckTests
         Assert.Contains("appears valid", result.Description, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static SyncfusionLicenseHealthCheck CreateCheck()
-        => new(new Mock<ILogger<SyncfusionLicenseHealthCheck>>().Object);
-
-    private sealed class SyncfusionLicenseEnvironmentScope : IDisposable
-    {
-        private readonly string? previousCanonical;
-        private readonly string? previousLegacy;
-        private readonly string? previousConfiguration;
-
-        public SyncfusionLicenseEnvironmentScope(string? licenseKey)
-        {
-            previousCanonical = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
-            previousLegacy = Environment.GetEnvironmentVariable("SYNCUSION_LICENSE_KEY");
-            previousConfiguration = Environment.GetEnvironmentVariable("Syncfusion__LicenseKey");
-
-            Environment.SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", licenseKey);
-            Environment.SetEnvironmentVariable("SYNCUSION_LICENSE_KEY", null);
-            Environment.SetEnvironmentVariable("Syncfusion__LicenseKey", null);
-        }
-
-        public void Dispose()
-        {
-            Environment.SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", previousCanonical);
-            Environment.SetEnvironmentVariable("SYNCUSION_LICENSE_KEY", previousLegacy);
-            Environment.SetEnvironmentVariable("Syncfusion__LicenseKey", previousConfiguration);
-        }
-    }
+    private static SyncfusionLicenseHealthCheck CreateCheck(Func<string?> licenseKeyResolver)
+        => new(new Mock<ILogger<SyncfusionLicenseHealthCheck>>().Object, licenseKeyResolver);
 }
 
 [CollectionDefinition("Syncfusion license health", DisableParallelization = true)]
