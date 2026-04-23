@@ -52,9 +52,8 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		Assert.Contains("Commit import", cut.Markup);
 		Assert.Contains("Ask assistant", cut.Markup);
 		Assert.Contains("No file selected", cut.Markup);
-		Assert.Contains("Routing Rules", cut.Markup);
-		Assert.Contains("Allocation Profiles", cut.Markup);
-		Assert.Contains("Import History", cut.Markup);
+		Assert.Single(cut.FindComponents<Syncfusion.Blazor.Navigations.SfTab>());
+		Assert.Equal(3, cut.FindComponents<Syncfusion.Blazor.Navigations.TabItem>().Count);
 	}
 
 	[Fact]

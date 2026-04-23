@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
@@ -9,200 +10,177 @@ namespace WileyCoWeb.Services;
 
 public sealed class QuickBooksImportApiService(HttpClient httpClient, ILogger<QuickBooksImportApiService>? logger = null)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
+	private static readonly JsonSerializerOptions JsonOptions = new()
+	{
+		PropertyNameCaseInsensitive = true
+	};
 
-    public Task<QuickBooksImportPreviewResponse> PreviewAsync(
-        byte[] fileBytes,
-        string fileName,
-        string selectedEnterprise,
-        int selectedFiscalYear,
-        CancellationToken cancellationToken = default)
-        => PostAsync<QuickBooksImportPreviewResponse>("api/imports/quickbooks/preview", fileBytes, fileName, selectedEnterprise, selectedFiscalYear, cancellationToken);
+	public Task<QuickBooksImportPreviewResponse> PreviewAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
+		=> PostAsync<QuickBooksImportPreviewResponse>("api/imports/quickbooks/preview", fileBytes, fileName, selectedEnterprise, selectedFiscalYear, cancellationToken);
 
-    public Task<QuickBooksImportCommitResponse> CommitAsync(
-        byte[] fileBytes,
-        string fileName,
-        string selectedEnterprise,
-        int selectedFiscalYear,
-        CancellationToken cancellationToken = default)
-        => PostAsync<QuickBooksImportCommitResponse>("api/imports/quickbooks/commit", fileBytes, fileName, selectedEnterprise, selectedFiscalYear, cancellationToken);
+	public Task<QuickBooksImportCommitResponse> CommitAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
+		=> PostAsync<QuickBooksImportCommitResponse>("api/imports/quickbooks/commit", fileBytes, fileName, selectedEnterprise, selectedFiscalYear, cancellationToken);
 
-    public Task<QuickBooksImportGuidanceResponse> AskAsync(QuickBooksImportGuidanceRequest request, CancellationToken cancellationToken = default)
-        => ExecuteAskAsync(request, cancellationToken);
+	public async Task<QuickBooksImportGuidanceResponse> AskAsync(QuickBooksImportGuidanceRequest request, CancellationToken cancellationToken = default)
+	{
+		logger?.LogInformation("Requesting QuickBooks import guidance for question length {QuestionLength}", request.Question?.Length ?? 0);
+		var payload = await SendJsonAsync<QuickBooksImportGuidanceResponse>(HttpMethod.Post, "api/imports/quickbooks/assistant", request, "QuickBooks import assistance", cancellationToken).ConfigureAwait(false);
+		logger?.LogInformation("QuickBooks import guidance request completed successfully (usedFallback={UsedFallback}).", payload?.UsedFallback ?? false);
+		return payload ?? throw new InvalidOperationException("The QuickBooks import guidance response was empty.");
+	}
 
-    public Task<QuickBooksRoutingConfigurationResponse> GetRoutingConfigurationAsync(CancellationToken cancellationToken = default)
-        => ExecuteGetAsync<QuickBooksRoutingConfigurationResponse>("api/imports/quickbooks/routing", "QuickBooks routing configuration", cancellationToken);
+	public Task<QuickBooksRoutingConfigurationResponse> GetRoutingConfigurationAsync(CancellationToken cancellationToken = default)
+		=> GetAsync<QuickBooksRoutingConfigurationResponse>("api/imports/quickbooks/routing", "QuickBooks routing configuration", cancellationToken);
 
-    public Task<QuickBooksRoutingConfigurationResponse> SaveRoutingConfigurationAsync(QuickBooksRoutingConfigurationRequest request, CancellationToken cancellationToken = default)
-        => ExecuteSendJsonAsync<QuickBooksRoutingConfigurationResponse>(HttpMethod.Put, "api/imports/quickbooks/routing", request, "QuickBooks routing configuration update", cancellationToken);
+	public Task<QuickBooksImportHistoryResponse> GetImportHistoryAsync(CancellationToken cancellationToken = default)
+		=> GetAsync<QuickBooksImportHistoryResponse>("api/imports/quickbooks/history", "QuickBooks import history", cancellationToken);
 
-    public Task<QuickBooksImportHistoryResponse> GetImportHistoryAsync(CancellationToken cancellationToken = default)
-        => ExecuteGetAsync<QuickBooksImportHistoryResponse>("api/imports/quickbooks/history", "QuickBooks import history", cancellationToken);
+	public Task<QuickBooksRoutingConfigurationResponse> SaveRoutingConfigurationAsync(QuickBooksRoutingConfigurationRequest request, CancellationToken cancellationToken = default)
+		=> SendJsonAsync<QuickBooksRoutingConfigurationResponse>(HttpMethod.Put, "api/imports/quickbooks/routing", request, "QuickBooks routing configuration", cancellationToken);
 
-    public Task<QuickBooksHistoricalRerouteResponse> ReapplyRoutingAsync(QuickBooksHistoricalRerouteRequest request, CancellationToken cancellationToken = default)
-        => ExecuteSendJsonAsync<QuickBooksHistoricalRerouteResponse>(HttpMethod.Post, "api/imports/quickbooks/reroute", request, "QuickBooks historical reroute", cancellationToken);
+	public Task<QuickBooksHistoricalRerouteResponse> ReapplyRoutingAsync(QuickBooksHistoricalRerouteRequest request, CancellationToken cancellationToken = default)
+		=> SendJsonAsync<QuickBooksHistoricalRerouteResponse>(HttpMethod.Post, "api/imports/quickbooks/reroute", request, "QuickBooks historical reroute", cancellationToken);
 
-    private async Task<TResponse> PostAsync<TResponse>(
-        string requestUri,
-        byte[] fileBytes,
-        string fileName,
-        string selectedEnterprise,
-        int selectedFiscalYear,
-        CancellationToken cancellationToken)
-        => await ExecuteImportRequestAsync<TResponse>(new QuickBooksImportRequestContext(requestUri, fileBytes, fileName, selectedEnterprise, selectedFiscalYear), cancellationToken).ConfigureAwait(false);
+	private async Task<TResponse> PostAsync<TResponse>(string requestUri, byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken)
+	{
+		logger?.LogInformation("Posting QuickBooks import request to {RequestUri} for file {FileName} ({ByteCount} bytes) in {Enterprise} FY {FiscalYear}", requestUri, Path.GetFileName(fileName), fileBytes.LongLength, selectedEnterprise, selectedFiscalYear);
+		using var form = new MultipartFormDataContent();
+		using var fileContent = new ByteArrayContent(fileBytes);
+		fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-    private async Task<QuickBooksImportGuidanceResponse> ExecuteAskAsync(QuickBooksImportGuidanceRequest request, CancellationToken cancellationToken)
-    {
-        LogAskRequest(request);
+		form.Add(fileContent, "file", fileName);
+		form.Add(new StringContent(selectedEnterprise), "selectedEnterprise");
+		form.Add(new StringContent(selectedFiscalYear.ToString(CultureInfo.InvariantCulture)), "selectedFiscalYear");
 
-        var payload = await SendAskRequestAsync(request, cancellationToken).ConfigureAwait(false);
+		using var response = await httpClient.PostAsync(requestUri, form, cancellationToken).ConfigureAwait(false);
 
-        LogAskResponse(payload);
-        return payload ?? throw new InvalidOperationException("The QuickBooks import guidance response was empty.");
-    }
+		if (!response.IsSuccessStatusCode)
+		{
+			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+			logger?.LogWarning("QuickBooks import request to {RequestUri} failed with status {StatusCode}", requestUri, (int)response.StatusCode);
+			throw new InvalidOperationException(BuildFailureMessage(BuildOperationLabel(requestUri), response.StatusCode, responseBody));
+		}
 
-    private void LogAskRequest(QuickBooksImportGuidanceRequest request)
-    {
-        logger?.LogInformation("Requesting QuickBooks import guidance for question length {QuestionLength}", GetQuestionLength(request));
-    }
+		var payload = await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+		logger?.LogInformation("QuickBooks import request to {RequestUri} completed successfully.", requestUri);
+		return payload ?? throw new InvalidOperationException("The QuickBooks import response was empty.");
+	}
 
-    private void LogAskResponse(QuickBooksImportGuidanceResponse? payload)
-    {
-        logger?.LogInformation("QuickBooks import guidance request completed successfully (usedFallback={UsedFallback}).", GetUsedFallback(payload));
-    }
+	private async Task<TResponse> GetAsync<TResponse>(string requestUri, string operation, CancellationToken cancellationToken)
+	{
+		logger?.LogInformation("Requesting {Operation} from {RequestUri}", operation, requestUri);
+		using var response = await httpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
 
-    private Task<QuickBooksImportGuidanceResponse?> SendAskRequestAsync(QuickBooksImportGuidanceRequest request, CancellationToken cancellationToken)
-    {
-        return httpClient.SendJsonAsync<QuickBooksImportGuidanceResponse>(
-            HttpMethod.Post,
-            "api/imports/quickbooks/assistant",
-            request,
-            JsonOptions,
-            "The QuickBooks import guidance response was not valid JSON.",
-            CreateFailureException("QuickBooks import assistance"),
-            cancellationToken);
-    }
+		if (!response.IsSuccessStatusCode)
+		{
+			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+			logger?.LogWarning("{Operation} request failed with status {StatusCode}", operation, (int)response.StatusCode);
+			throw new InvalidOperationException(BuildFailureMessage(operation, response.StatusCode, responseBody));
+		}
 
-    private async Task<TResponse> ExecuteImportRequestAsync<TResponse>(QuickBooksImportRequestContext context, CancellationToken cancellationToken)
-    {
-        LogImportRequest(context);
+		try
+		{
+			var payload = await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+			return payload ?? throw new InvalidOperationException($"The {operation} response was empty.");
+		}
+		catch (JsonException ex)
+		{
+			throw new InvalidOperationException($"The {operation} response was not valid JSON.", ex);
+		}
+	}
 
-        using var form = CreateMultipartFormDataContent(context);
+	private async Task<TResponse> SendJsonAsync<TResponse>(HttpMethod method, string requestUri, object requestBody, string operation, CancellationToken cancellationToken)
+	{
+		logger?.LogInformation("Sending {Operation} request to {RequestUri}", operation, requestUri);
+		using var request = new HttpRequestMessage(method, requestUri)
+		{
+			Content = JsonContent.Create(requestBody, options: JsonOptions)
+		};
+		using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-        var payload = await SendImportRequestAsync<TResponse>(context, form, cancellationToken).ConfigureAwait(false);
+		if (!response.IsSuccessStatusCode)
+		{
+			var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+			logger?.LogWarning("{Operation} request failed with status {StatusCode}", operation, (int)response.StatusCode);
+			throw new InvalidOperationException(BuildFailureMessage(operation, response.StatusCode, responseBody));
+		}
 
-        LogImportRequestSucceeded(context.RequestUri);
-        return payload ?? throw new InvalidOperationException("The QuickBooks import response was empty.");
-    }
+		try
+		{
+			var payload = await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+			return payload ?? throw new InvalidOperationException($"The {operation} response was empty.");
+		}
+		catch (JsonException ex)
+		{
+			throw new InvalidOperationException($"The {operation} response was not valid JSON.", ex);
+		}
+	}
 
-    private async Task<TResponse> ExecuteGetAsync<TResponse>(string requestUri, string operation, CancellationToken cancellationToken)
-    {
-        logger?.LogInformation("Requesting {Operation} from {RequestUri}", operation, requestUri);
+	private static string BuildOperationLabel(string requestUri)
+	{
+		if (requestUri.EndsWith("/preview", StringComparison.OrdinalIgnoreCase))
+		{
+			return "QuickBooks preview";
+		}
 
-        var payload = await httpClient.GetJsonAsync<TResponse>(
-            requestUri,
-            JsonOptions,
-            $"The {operation} response was not valid JSON.",
-            CreateFailureException(operation),
-            cancellationToken).ConfigureAwait(false);
+		if (requestUri.EndsWith("/commit", StringComparison.OrdinalIgnoreCase))
+		{
+			return "QuickBooks import commit";
+		}
 
-        return payload ?? throw new InvalidOperationException($"The {operation} response was empty.");
-    }
+		return "QuickBooks import request";
+	}
 
-    private async Task<TResponse> ExecuteSendJsonAsync<TResponse>(HttpMethod method, string requestUri, object requestBody, string operation, CancellationToken cancellationToken)
-    {
-        logger?.LogInformation("Posting {Operation} to {RequestUri}", operation, requestUri);
+	private static string BuildFailureMessage(string operation, HttpStatusCode statusCode, string? responseBody)
+	{
+		var detail = ExtractFailureDetail(responseBody);
+		return string.IsNullOrWhiteSpace(detail)
+			? $"{operation} failed with status {(int)statusCode}."
+			: $"{operation} failed with status {(int)statusCode}: {detail}";
+	}
 
-        var payload = await httpClient.SendJsonAsync<TResponse>(
-            method,
-            requestUri,
-            requestBody,
-            JsonOptions,
-            $"The {operation} response was not valid JSON.",
-            CreateFailureException(operation),
-            cancellationToken).ConfigureAwait(false);
+	private static string? ExtractFailureDetail(string? responseBody)
+	{
+		if (string.IsNullOrWhiteSpace(responseBody))
+		{
+			return null;
+		}
 
-        return payload ?? throw new InvalidOperationException($"The {operation} response was empty.");
-    }
+		try
+		{
+			using var document = JsonDocument.Parse(responseBody);
+			var root = document.RootElement;
 
-    private void LogImportRequest(QuickBooksImportRequestContext context)
-    {
-        logger?.LogInformation(
-            "Posting QuickBooks import request to {RequestUri} for file {FileName} ({ByteCount} bytes) in {Enterprise} FY {FiscalYear}",
-            context.RequestUri,
-            Path.GetFileName(context.FileName),
-            context.FileBytes.LongLength,
-            context.SelectedEnterprise,
-            context.SelectedFiscalYear);
-    }
+			if (root.ValueKind == JsonValueKind.String)
+			{
+				return root.GetString();
+			}
 
-    private void LogImportRequestSucceeded(string requestUri)
-    {
-        logger?.LogInformation("QuickBooks import request to {RequestUri} completed successfully.", requestUri);
-    }
+			if (root.ValueKind == JsonValueKind.Object)
+			{
+				if (root.TryGetProperty("detail", out var detailElement) && detailElement.ValueKind == JsonValueKind.String)
+				{
+					var detail = detailElement.GetString();
+					if (!string.IsNullOrWhiteSpace(detail))
+					{
+						return detail;
+					}
+				}
 
-    private static MultipartFormDataContent CreateMultipartFormDataContent(QuickBooksImportRequestContext context)
-    {
-        var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(context.FileBytes);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+				if (root.TryGetProperty("title", out var titleElement) && titleElement.ValueKind == JsonValueKind.String)
+				{
+					var title = titleElement.GetString();
+					if (!string.IsNullOrWhiteSpace(title))
+					{
+						return title;
+					}
+				}
+			}
+		}
+		catch (JsonException)
+		{
+		}
 
-        form.Add(fileContent, "file", context.FileName);
-        form.Add(new StringContent(context.SelectedEnterprise), "selectedEnterprise");
-        form.Add(new StringContent(context.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture)), "selectedFiscalYear");
-        return form;
-    }
-
-    private async Task<TResponse?> SendImportRequestAsync<TResponse>(QuickBooksImportRequestContext context, MultipartFormDataContent form, CancellationToken cancellationToken)
-    {
-        using var response = await httpClient.PostAsync(context.RequestUri, form, cancellationToken).ConfigureAwait(false);
-        return await HttpApiResponseHelper.ReadJsonResponseAsync<TResponse>(
-            response,
-            JsonOptions,
-            "The QuickBooks import response was not valid JSON.",
-            CreateFailureException(BuildOperationLabel(context.RequestUri)),
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    private static string BuildOperationLabel(string requestUri)
-    {
-        if (requestUri.EndsWith("/preview", StringComparison.OrdinalIgnoreCase))
-        {
-            return "QuickBooks preview";
-        }
-
-        if (requestUri.EndsWith("/commit", StringComparison.OrdinalIgnoreCase))
-        {
-            return "QuickBooks import commit";
-        }
-
-        return "QuickBooks import request";
-    }
-
-    private static int GetQuestionLength(QuickBooksImportGuidanceRequest request)
-        => request.Question?.Length ?? 0;
-
-    private static bool GetUsedFallback(QuickBooksImportGuidanceResponse? payload)
-        => payload?.UsedFallback ?? false;
-
-    private static string BuildFailureMessage(string operation, HttpStatusCode statusCode, string? responseBody)
-    {
-        var detail = HttpProblemDetailsParser.ExtractMessage(responseBody);
-        return string.IsNullOrWhiteSpace(detail)
-            ? $"{operation} failed with status {(int)statusCode}."
-            : $"{operation} failed with status {(int)statusCode}: {detail}";
-    }
-
-    private static Func<HttpStatusCode, string?, Exception> CreateFailureException(string operation)
-        => (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage(operation, statusCode, responseBody));
-
-    private sealed record QuickBooksImportRequestContext(
-        string RequestUri,
-        byte[] FileBytes,
-        string FileName,
-        string SelectedEnterprise,
-        int SelectedFiscalYear);
+		return responseBody.Trim();
+	}
 }

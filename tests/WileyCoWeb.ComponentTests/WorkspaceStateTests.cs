@@ -39,7 +39,15 @@ public sealed class WorkspaceStateTests
 		Assert.Equal(WorkspaceTestData.BaselineCurrentRate, roundTripped.CurrentRate);
 		Assert.Equal(WorkspaceTestData.BaselineTotalCosts, roundTripped.TotalCosts);
 		Assert.Equal(WorkspaceTestData.BaselineProjectedVolume, roundTripped.ProjectedVolume);
-		Assert.Equal(new[] { WorkspaceTestData.WaterUtility, WorkspaceTestData.SanitationUtility }, roundTripped.EnterpriseOptions);
+		Assert.Equal(
+			new[]
+			{
+				WorkspaceTestData.WaterUtility,
+				WorkspaceTestData.SanitationUtility,
+				WorkspaceTestData.TrashUtility,
+				WorkspaceTestData.Apartments
+			},
+			roundTripped.EnterpriseOptions);
 		Assert.Equal(new[] { WorkspaceTestData.PriorFiscalYear, WorkspaceTestData.WaterFiscalYear, 2027 }, roundTripped.FiscalYearOptions);
 		Assert.Equal(new[] { "All Services", "Water", "Sewer" }, roundTripped.CustomerServiceOptions);
 		Assert.Single(roundTripped.ScenarioItems!);
