@@ -75,7 +75,8 @@ public sealed class QuickBooksImportApiTests : IClassFixture<ApiApplicationFacto
 		Assert.NotNull(firstCommit);
 		Assert.False(firstCommit.IsDuplicate);
 		Assert.Equal(2, firstCommit.ImportedRows);
-		Assert.Contains("Imported 2 QuickBooks rows", firstCommit.StatusMessage);
+		Assert.Contains("Imported 2 QuickBooks routed row", firstCommit.StatusMessage);
+		Assert.Contains("Water Utility", firstCommit.StatusMessage);
 
 		var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
 		await using var context = await contextFactory.CreateDbContextAsync();
