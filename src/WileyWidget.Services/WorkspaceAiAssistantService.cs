@@ -79,7 +79,7 @@ public sealed class WorkspaceAiAssistantService
         legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
         legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
         legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
-        legacyXaiTimeoutSeconds = GetConfiguredInt(15, "XaiTimeoutSeconds", "XAI:TimeoutSeconds");
+        legacyXaiTimeoutSeconds = GetConfiguredInt(30, "XaiTimeoutSeconds", "XAI:TimeoutSeconds");
         kernelContext = new Lazy<KernelContext?>(InitializeKernelContext);
     }
 

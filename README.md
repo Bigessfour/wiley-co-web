@@ -78,6 +78,10 @@ For AWS deployment:
 
 The API host now attempts to load the Grok secret from AWS Secrets Manager at startup only when `XAI_API_KEY` is not already present in configuration or the environment. Local `.NET user secrets` remain a development-only path.
 
+Local PowerShell testing shells now treat the machine-scoped `XAI_API_KEY` as canonical. The active profiles under `Documents/PowerShell` repair stale process and user copies from machine scope on startup, so a fresh `pwsh` session reflects the current workstation testing key instead of inheriting an older user-level value.
+
+Production App Runner now injects `XAI_API_KEY` from the runtime secret `wiley-widget/api/xai-api-key` and calls the direct xAI base URL `https://api.x.ai/v1`. AWS App Runner only refreshes runtime secret and environment-variable values when the service is deployed or updated, so any future xAI secret rotation requires an App Runner redeploy.
+
 ## Aurora Database
 
 The private Aurora PostgreSQL database is now provisioned in the dedicated `wiley-co-aurora-vpc` network and uses the canonical EF Core PostgreSQL migration under [src/WileyWidget.Data/Migrations](src/WileyWidget.Data/Migrations).
@@ -171,7 +175,7 @@ AWS CLI validation on April 15, 2026 confirms the current production support pic
 - Aurora PostgreSQL cluster `wiley-co-aurora-db` remains the system of record in private VPC `vpc-0b4e1d7362da22c17`.
 - Secrets Manager contains the existing `Grok` secret for server-side xAI access and now also contains App Runner runtime secrets for the API database connection string, xAI key, and Syncfusion license.
 - API Gateway `WileyJarvisApi` (`w544vrvb3i`) still serves only as the xAI proxy and is not the workspace API host.
-- The xAI proxy now follows the AWS HTTP proxy pattern for greedy resources: API Gateway exposes `/{proxy+}` and forwards that path to `https://api.x.ai/{proxy}`. This allows the API host to use xAI's documented `/v1/chat/completions` and `/v1/responses` paths through the same gateway.
+- The xAI proxy still follows the AWS HTTP proxy pattern for greedy resources, but live validation on April 23, 2026 showed its current resource policy rejects anonymous `execute-api:Invoke` calls with `403 AccessDeniedException`. App Runner therefore uses the direct xAI endpoint instead of the proxy until that gateway policy is intentionally opened or SigV4-signed invocation is added.
 - AWS CLI provisioning created the thin API runtime path:
   - ECR repository `wiley-widget-api`
   - App Runner service `wiley-widget-api` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`

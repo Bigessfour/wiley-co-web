@@ -162,7 +162,7 @@ public class AppOptions
     [Category("AI")]
     [Display(Name = "Timeout (seconds)")]
     [Range(5, 300, ErrorMessage = "Timeout must be between 5 and 300 seconds")]
-    public int XaiTimeoutSeconds { get; set; } = 15;
+    public int XaiTimeoutSeconds { get; set; } = 30;
 
     [Category("AI")]
     [Display(Name = "Model")]
