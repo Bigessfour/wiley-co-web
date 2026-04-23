@@ -395,11 +395,6 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     page,
     browserName,
   }) => {
-    test.skip(
-      browserName !== "chromium",
-      "Visual snapshots are baselined for chromium only.",
-    );
-
     await gotoWorkspacePanel(page, "/wiley-workspace");
 
     await page
@@ -409,7 +404,16 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     await prepareForVisualSnapshot(page);
 
-    await expect(page.locator("#data-dashboard-panel")).toHaveScreenshot(
+    const dataDashboardPanel = page.locator("#data-dashboard-panel");
+
+    if (browserName !== "chromium") {
+      await expect(dataDashboardPanel).toBeVisible();
+      await expect(page.locator("#budget-variance-chart")).toBeVisible();
+      await expect(page.locator("#coverage-ratio-gauge")).toBeVisible();
+      return;
+    }
+
+    await expect(dataDashboardPanel).toHaveScreenshot(
       "data-dashboard-panel.png",
       {
         animations: "disabled",
@@ -424,19 +428,21 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     page,
     browserName,
   }) => {
-    test.skip(
-      browserName !== "chromium",
-      "Visual snapshots are baselined for chromium only.",
-    );
-
     await gotoWorkspacePanel(page, "/wiley-workspace/decision-support");
 
     const jarvisSurface = page.locator("#jarvis-chat-ui");
     if (!(await jarvisSurface.isVisible())) {
-      test.skip(
-        true,
-        "Secure Jarvis surface is not enabled in the current environment.",
+      await expect(page.locator("#decision-support-panel")).toContainText(
+        /server-side Semantic Kernel assistant|Semantic Kernel assistant/,
       );
+      return;
+    }
+
+    if (browserName !== "chromium") {
+      await expect(jarvisSurface).toBeVisible();
+      await expect(page.locator("#jarvis-runtime-status")).toBeVisible();
+      await expect(page.locator("#jarvis-question-input")).toBeVisible();
+      return;
     }
 
     await prepareForVisualSnapshot(page);

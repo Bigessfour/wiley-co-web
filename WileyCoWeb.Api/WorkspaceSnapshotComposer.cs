@@ -213,12 +213,15 @@ internal sealed class WorkspaceSnapshotComposer
 
     private async Task<List<Enterprise>> LoadEnterprisesAsync(AppDbContext context, CancellationToken cancellationToken)
     {
-        return await context.Enterprises
+        var enterprises = await context.Enterprises
             .AsNoTracking()
             .Where(enterprise => !enterprise.IsDeleted)
-            .OrderBy(enterprise => GetEnterpriseSortOrder(enterprise.Name))
-            .ThenBy(enterprise => enterprise.Name)
             .ToListAsync(cancellationToken);
+
+        return enterprises
+            .OrderBy(enterprise => GetEnterpriseSortOrder(enterprise.Name))
+            .ThenBy(enterprise => enterprise.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static Enterprise SelectEnterprise(List<Enterprise> enterprises, string? enterpriseName)

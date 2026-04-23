@@ -8,17 +8,24 @@
     "copilot:cli:update": "npm install -g @github/copilot@latest",
     "playwright:mcp": "npx --no-install playwright-mcp --isolated",
     "playwright:mcp:test": "npx --no-install playwright run-test-mcp-server -c playwright.config.ts --headless",
+    "playwright:init-agents": "npx playwright init-agents --loop=vscode",
     "playwright:install": "playwright install chromium webkit",
     "playwright:test": "playwright test",
+    "playwright:test:progress": "playwright test --reporter=line",
+    "playwright:test:progress:single": "playwright test --reporter=line --workers=1",
     "playwright:test:ci": "playwright test --project=chromium --project=webkit",
+    "playwright:test:strict": "playwright test --project=chromium --project=webkit && node ./Scripts/assert-playwright-results.mjs",
     "playwright:test:hosted": "node scripts/run-playwright-hosted.js",
     "playwright:test:ui": "playwright test --ui",
     "playwright:test:update-snapshots": "playwright test --project=chromium --update-snapshots",
     "playwright:codegen": "playwright codegen http://localhost:5230/wiley-workspace",
     "playwright:report": "playwright show-report",
-    "playwright:agents": "playwright-cli --help",
-    "playwright:agents:install-skills": "playwright-cli install --skills",
-    "playwright:agents:show": "playwright-cli show"
+    "playwright:agent": "npx playwright-cli",
+    "playwright:agent:help": "npx playwright-cli --help",
+    "playwright:agent:run": "npx playwright-cli run",
+    "playwright:agent:show": "npx playwright-cli show",
+    "test:coverage": "pwsh -NoLogo -NoProfile -File ./Scripts/test-coverage.ps1",
+    "test:quality": "pwsh -NoLogo -NoProfile -File ./Scripts/test-coverage.ps1 && playwright test --project=chromium --project=webkit && node ./Scripts/assert-playwright-results.mjs"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -400,10 +400,11 @@
 		{
 			"label": "watch: debug full stack",
 			"dependsOn": [
+				"🛑 Kill Local Debug Web Stack",
 				"watch: api",
 				"watch: debug client"
 			],
-			"dependsOrder": "parallel",
+			"dependsOrder": "sequence",
 			"presentation": {
 				"panel": "dedicated",
 				"reveal": "always",
@@ -435,7 +436,7 @@
 				"${workspaceFolder}/Scripts/kill-dotnet.ps1",
 				"-Force",
 				"-Pattern",
-				"'WileyCoWeb(\\.Api)?\\.csproj'"
+				"'WileyCoWeb(\\.Api)?\\.(csproj|dll|exe)'"
 			],
 			"type": "shell",
 			"presentation": {
@@ -960,7 +961,7 @@
 				"-ExecutionPolicy",
 				"Bypass",
 				"-File",
-				"${workspaceFolder}/scripts/maintenance/clear-logs.ps1"
+				"${workspaceFolder}/Scripts/maintenance/clear-logs.ps1"
 			],
 			"presentation": {
 				"panel": "new",
@@ -2211,6 +2212,103 @@
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "test"
+		},
+		{
+			"label": "build: debug with symbols",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"WileyCoWeb.slnx",
+				"-c",
+				"Debug",
+				"-p:DebugType=portable",
+				"-p:DebugSymbols=true",
+				"-p:Optimize=false",
+				"--no-restore"
+			],
+			"type": "shell",
+			"group": {
+				"kind": "build",
+				"isDefault": false
+			},
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "🔍 Start with Exception Telemetry",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/WileyCoWeb.Api/WileyCoWeb.Api.csproj",
+				"--launch-profile",
+				"WileyCoWeb.Api"
+			],
+			"type": "shell",
+			"options": {
+				"env": {
+					"DOTNET_EnableEventPipe": "1",
+					"DOTNET_EventPipeConfig": "Microsoft-Windows-DotNETRuntime:0x4c14fccbd:5",
+					"COMPlus_EnableEventLog": "1",
+					"Logging__LogLevel__Default": "Debug",
+					"Logging__LogLevel__Microsoft": "Information",
+					"Logging__LogLevel__Microsoft.AspNetCore": "Warning"
+				}
+			},
+			"problemMatcher": "$msCompile",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated",
+				"showReuseMessage": true,
+				"clear": false
+			}
+		},
+		{
+			"label": "🔬 Collect Exception Trace (Live)",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$pid = (Get-Process -Name WileyCoWeb.Api -ErrorAction SilentlyContinue | Select-Object -First 1 | Select-Object -ExpandProperty Id); if ($pid) { Write-Host 'Collecting exception trace for PID' $pid; if (-not (Test-Path ./traces)) { mkdir ./traces }; dotnet trace collect --process-id $pid --providers Microsoft-Windows-DotNETRuntime:0x8000:5 --output ./traces/exceptions-$(Get-Date -Format 'yyyyMMdd-HHmmss').nettrace --duration 00:05:00 } else { Write-Host 'WileyCoWeb.Api process not found. Start the API first.' }"
+			],
+			"type": "shell",
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			},
+			"problemMatcher": [],
+			"isBackground": true
+		},
+		{
+			"label": "💾 Auto-Dump on Exception",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"$processName = 'WileyCoWeb.Api'; Write-Host 'Monitoring' $processName 'for exceptions...'; if (-not (Test-Path ./dumps)) { mkdir ./dumps }; while ($true) { $proc = Get-Process -Name $processName -ErrorAction SilentlyContinue | Select-Object -First 1; if ($proc) { $counters = (dotnet counters monitor -p $proc.Id --counters System.Runtime[exception-count] --format json 2>&1 | Out-String); if ($counters -match '\"exception-count\":\\s*(\\d+)' -and [int]$matches[1] -gt 0) { Write-Host 'Exception detected! Capturing dump...'; dotnet dump collect -p $proc.Id -o ./dumps/exception-dump-$(Get-Date -Format 'yyyyMMdd-HHmmss').dmp; Write-Host 'Dump saved to ./dumps/'; break } } Start-Sleep -Seconds 2 }"
+			],
+			"type": "shell",
+			"group": "test",
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "dedicated"
+			},
+			"problemMatcher": [],
+			"isBackground": true
 		}
 	],
 	"inputs": [

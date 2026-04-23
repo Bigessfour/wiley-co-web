@@ -228,7 +228,6 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         _ = TrackNavigationClickAsync(clickTelemetry);
 
-        IsSidebarOpen = false;
         IsJarvisOpen = false;
         NavigationManager.NavigateTo(route);
     }

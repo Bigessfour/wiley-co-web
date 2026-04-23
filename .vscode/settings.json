@@ -80,5 +80,20 @@
   "aws.resources.filterByTag": {
     "awsApplication": "arn:aws:resource-groups:us-east-2:570912405222:group/Wiley-Widget/08d8t52ldwuciha57h7wqvq8cb"
   },
-  "aws.aurora.showInExplorer": true
+  "aws.aurora.showInExplorer": true,
+
+  // Enhanced Debug Settings for Runtime Exception Capture
+  "debug.javascript.breakOnConditionalError": true,
+  "debug.allowBreakpointsEverywhere": true,
+  "debug.inlineValues": "on",
+  "debug.showBreakpointsInOverviewRuler": true,
+  "debug.showInlineBreakpointCandidates": true,
+  "debug.toolBarLocation": "docked",
+  "debug.console.fontSize": 14,
+  "debug.console.lineHeight": 20,
+  "debug.console.wordWrap": true,
+  "debug.openDebug": "openOnDebugBreak",
+  "debug.onTaskErrors": "showErrors",
+  "debug.saveBeforeStart": "allEditorsInActiveGroup",
+  "debug.terminal.clearBeforeReusing": true
 }

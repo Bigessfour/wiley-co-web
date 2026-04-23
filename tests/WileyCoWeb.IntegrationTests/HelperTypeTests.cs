@@ -1,7 +1,10 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
+using WileyCoWeb.Api;
 using WileyCoWeb.Api.Configuration;
 
 namespace WileyCoWeb.IntegrationTests;
@@ -76,6 +79,77 @@ public sealed class HelperTypeTests
             Assert.False(AppDbStartupState.FallbackActivated);
             Assert.False(AppDbStartupState.IsDegradedMode);
             Assert.Null(AppDbStartupState.FallbackReason);
+        }
+        finally
+        {
+            AppDbStartupState.ResetForTests();
+        }
+    }
+
+    [Fact]
+    public void Program_ShouldAllowDegradedStartup_RestrictsConfigFlagToDevelopment()
+    {
+        var method = typeof(Program).GetMethod("ShouldAllowDegradedStartup", BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:AllowDegradedStartup"] = "true"
+            })
+            .Build();
+
+        var developmentResult = (bool)method!.Invoke(null, new object[]
+        {
+            new TestWebHostEnvironment { EnvironmentName = "Development" },
+            configuration
+        })!;
+
+        var productionResult = (bool)method.Invoke(null, new object[]
+        {
+            new TestWebHostEnvironment { EnvironmentName = "Production" },
+            configuration
+        })!;
+
+        var integrationTestResult = (bool)method.Invoke(null, new object[]
+        {
+            new TestWebHostEnvironment { EnvironmentName = "IntegrationTest" },
+            configuration
+        })!;
+
+        Assert.True(developmentResult);
+        Assert.False(productionResult);
+        Assert.True(integrationTestResult);
+    }
+
+    [Fact]
+    public void Program_EnsureStartupConnectionString_ThrowsInProductionWhenConnectionStringIsMissing()
+    {
+        AppDbStartupState.ResetForTests();
+
+        try
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = "Production"
+            });
+
+            var method = typeof(Program).GetMethod("EnsureStartupConnectionString", BindingFlags.NonPublic | BindingFlags.Static);
+
+            Assert.NotNull(method);
+
+            var exception = Assert.Throws<TargetInvocationException>(() => method!.Invoke(null, new object?[]
+            {
+                builder,
+                null,
+                false,
+                NullLogger.Instance
+            }));
+
+            var innerException = Assert.IsType<InvalidOperationException>(exception.InnerException);
+            Assert.Contains("No database connection string was configured", innerException.Message, StringComparison.Ordinal);
+            Assert.False(AppDbStartupState.IsDegradedMode);
         }
         finally
         {

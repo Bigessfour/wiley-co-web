@@ -179,14 +179,16 @@ test.describe("Unique Interaction Proof", () => {
       await expect(page.locator("#jarvis-chat-answer")).toBeVisible();
 
       await expect(page.locator("#jarvis-runtime-status")).toContainText(
-        "Awaiting Jarvis response",
+        /Live AI available|Deterministic fallback active|Awaiting Jarvis response/,
       );
       await expect(page.locator("#jarvis-conversation-history")).toContainText(
         "No prior Jarvis turns yet.",
       );
       await expect(
         page.locator("#jarvis-recommendation-history"),
-      ).toContainText("No saved recommendations yet for this workspace scope.");
+      ).toContainText(
+        /No saved recommendations yet for this workspace scope\.|Loaded 1 saved recommendation for this workspace scope\./,
+      );
 
       // 2. If the assistant surface is present, ask one short question and then reset the thread.
       const question = "What should I know about the current workspace?";

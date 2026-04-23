@@ -35,14 +35,33 @@ class DotNetProcessManager {
     }
 
     [array] GetCandidateProcesses([string]$project, [string]$pattern) {
-        # Use Win32_Process to get CommandLine details which Get-Process doesn't provide
-        $procs = Get-CimInstance -ClassName Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'dotnet'" -ErrorAction SilentlyContinue
+        # Use Win32_Process to get CommandLine details which Get-Process doesn't provide.
+        # When a project or pattern filter is supplied, inspect all processes because the
+        # target host may be an app-specific executable instead of dotnet.exe.
+        $procs = if ($project -or $pattern) {
+            Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue
+        }
+        else {
+            Get-CimInstance -ClassName Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'dotnet'" -ErrorAction SilentlyContinue
+        }
 
         if (-not $procs) { return @() }
 
         $candidates = @()
         foreach ($p in $procs) {
             $cmd = $p.CommandLine -as [string]
+
+            if (-not ($project -or $pattern)) {
+                $name = $p.Name -as [string]
+                $matchesProcessName = $name -and (
+                    $name.Equals($this.ProcessName, [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $name.Equals("$($this.ProcessName).exe", [System.StringComparison]::OrdinalIgnoreCase)
+                )
+
+                if (-not $matchesProcessName) {
+                    continue
+                }
+            }
 
             # Filter by project string if provided
             if ($project) {

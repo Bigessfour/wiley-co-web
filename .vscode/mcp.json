@@ -40,14 +40,7 @@
     "playwright-test": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "--no-install",
-        "playwright",
-        "run-test-mcp-server",
-        "-c",
-        "playwright.config.ts",
-        "--headless"
-      ]
+      "args": ["playwright", "run-test-mcp-server"]
     }
   }
 }

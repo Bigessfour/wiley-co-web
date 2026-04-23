@@ -1,6 +1,6 @@
 # WileyCoWeb — AI Briefing
 
-> Generated: 2026-04-19 09:26 | Branch: `main` | Commit: `1acad1f7f5`
+> Generated: 2026-04-22 18:21 | Branch: `main` | Commit: `57043775e3`
 
 ## Project Purpose
 
@@ -77,7 +77,7 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 | Views        | 0     |
 | Viewmodels   | 1     |
 | Panels       | 6     |
-| Services     | 46    |
+| Services     | 47    |
 | Controls     | 0     |
 | Repositories | 24    |
 | Factories    | 3     |
@@ -170,9 +170,9 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 
 ## Manifest Stats
 
-- Total files indexed: **2609**
-- Files with embedded content: **400**
-- Total source size: **791,620 KB**
+- Total files indexed: **356**
+- Files with embedded content: **355**
+- Total source size: **38,484 KB**
 - Manifest mode: **full-context**
 
 ---

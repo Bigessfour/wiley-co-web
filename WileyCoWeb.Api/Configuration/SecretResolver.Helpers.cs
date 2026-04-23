@@ -11,7 +11,7 @@ public sealed partial class SecretResolver
     {
         return new SecretResolutionContext(
             SecretName: _configuration["XAI:SecretName"] ?? "Grok",
-            RegionName: _configuration["AWS:Region"] ?? "us-east-1",
+            RegionName: _configuration["AWS:Region"] ?? "us-east-2",
             EnvironmentApiKey: Environment.GetEnvironmentVariable("XAI_API_KEY"),
             ConfigDirectApiKey: _configuration["XAI_API_KEY"],
             ConfigNamedApiKey: _configuration["XAI:ApiKey"]);

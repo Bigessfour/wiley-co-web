@@ -30,10 +30,10 @@ static partial class ClientStartup
         => value.Length > 1 && value.StartsWith('"') && value.EndsWith('"');
 
     static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(string baseAddress, IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
-        => await LoadValidatedLocalSettingsPropertyAsync(baseAddress, "appsettings.Syncfusion.local.json", "The client will continue with environment/config fallback.", "SyncfusionLicenseKey", NormalizeSyncfusionLicenseKey, static value => !string.IsNullOrWhiteSpace(value), "appsettings.Syncfusion.local.json was loaded but did not contain SyncfusionLicenseKey. The client will continue with environment/config fallback.", static _ => "appsettings.Syncfusion.local.json contained SyncfusionLicenseKey, but the value was empty after normalization. The client will continue with environment/config fallback.", startupDiagnostics).ConfigureAwait(false);
+        => await LoadValidatedLocalSettingsPropertyAsync(baseAddress, "appsettings.Syncfusion.local.json", "The client will continue with environment/config fallback.", "SyncfusionLicenseKey", NormalizeSyncfusionLicenseKey, static value => !string.IsNullOrWhiteSpace(value), LogLevel.Information, "appsettings.Syncfusion.local.json was loaded but did not contain SyncfusionLicenseKey. The client will continue with environment/config fallback.", static _ => "appsettings.Syncfusion.local.json contained SyncfusionLicenseKey, but the value was empty after normalization. The client will continue with environment/config fallback.", startupDiagnostics).ConfigureAwait(false);
 
     static async Task<string?> LoadWorkspaceApiBaseAddressFromLocalSettingsAsync(string baseAddress, IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
-        => await LoadValidatedLocalSettingsPropertyAsync(baseAddress, "appsettings.Workspace.local.json", "The client will continue with environment/config/default fallback.", "WorkspaceApiBaseAddress", value => value.Trim(), static value => !string.IsNullOrWhiteSpace(value) && Uri.TryCreate(value, UriKind.Absolute, out _), "appsettings.Workspace.local.json was loaded but did not contain WorkspaceApiBaseAddress. The client will continue with environment/config/default fallback.", value => $"appsettings.Workspace.local.json contained a non-absolute WorkspaceApiBaseAddress '{value}'. The client will continue with environment/config/default fallback.", startupDiagnostics).ConfigureAwait(false);
+        => await LoadValidatedLocalSettingsPropertyAsync(baseAddress, "appsettings.Workspace.local.json", "The client will continue with environment/config/default fallback.", "WorkspaceApiBaseAddress", value => value.Trim(), static value => !string.IsNullOrWhiteSpace(value) && Uri.TryCreate(value, UriKind.Absolute, out _), LogLevel.Information, "appsettings.Workspace.local.json was loaded but did not contain WorkspaceApiBaseAddress. The client will continue with environment/config/default fallback.", value => $"appsettings.Workspace.local.json contained a non-absolute WorkspaceApiBaseAddress '{value}'. The client will continue with environment/config/default fallback.", startupDiagnostics).ConfigureAwait(false);
 
     static async Task<string?> LoadValidatedLocalSettingsPropertyAsync(
         string baseAddress,
@@ -42,6 +42,7 @@ static partial class ClientStartup
         string propertyName,
         Func<string, string?> normalizeValue,
         Func<string?, bool> isValidValue,
+        LogLevel missingPropertyLevel,
         string missingPropertyMessage,
         Func<string, string> invalidValueMessageFactory,
         IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
@@ -51,6 +52,7 @@ static partial class ClientStartup
             propertyName,
             normalizeValue,
             isValidValue,
+            missingPropertyLevel,
             missingPropertyMessage,
             invalidValueMessageFactory,
             fallbackMessage,
@@ -134,13 +136,14 @@ static partial class ClientStartup
         string propertyName,
         Func<string, string?> normalizeValue,
         Func<string?, bool> isValidValue,
+        LogLevel missingPropertyLevel,
         string missingPropertyMessage,
         Func<string, string> invalidValueMessageFactory,
         string fallbackMessage,
         IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
         => string.IsNullOrWhiteSpace(localSettingsJson)
             ? null
-            : TryValidateLocalSettingsPropertyValue(TryReadLocalSettingsPropertyValue(localSettingsJson, fileName, propertyName, fallbackMessage, startupDiagnostics), normalizeValue, isValidValue, missingPropertyMessage, invalidValueMessageFactory, startupDiagnostics);
+            : TryValidateLocalSettingsPropertyValue(TryReadLocalSettingsPropertyValue(localSettingsJson, fileName, propertyName, fallbackMessage, startupDiagnostics), normalizeValue, isValidValue, missingPropertyLevel, missingPropertyMessage, invalidValueMessageFactory, startupDiagnostics);
 
     static string? TryReadLocalSettingsPropertyValue(
         string localSettingsJson,
@@ -187,11 +190,12 @@ static partial class ClientStartup
         string? propertyValue,
         Func<string, string?> normalizeValue,
         Func<string?, bool> isValidValue,
+        LogLevel missingPropertyLevel,
         string missingPropertyMessage,
         Func<string, string> invalidValueMessageFactory,
         IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
         => string.IsNullOrWhiteSpace(propertyValue)
-            ? HandleLocalSettingsLoadFailure(startupDiagnostics, LogLevel.Warning, missingPropertyMessage, null)
+            ? HandleLocalSettingsLoadFailure(startupDiagnostics, missingPropertyLevel, missingPropertyMessage, null)
             : ValidateLocalSettingsPropertyValue(propertyValue, normalizeValue, isValidValue, invalidValueMessageFactory, startupDiagnostics);
 
     static string? ValidateLocalSettingsPropertyValue(

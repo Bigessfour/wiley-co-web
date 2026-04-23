@@ -9,7 +9,8 @@ Set-StrictMode -Version Latest
 
 function Get-TestProjectPaths {
     param(
-        [string[]]$ExplicitPaths
+        [string[]]$ExplicitPaths,
+        [hashtable]$Baselines
     )
 
     if ($ExplicitPaths.Count -gt 0) {
@@ -18,6 +19,9 @@ function Get-TestProjectPaths {
 
     return Get-ChildItem -Path "tests" -Recurse -Filter "*.csproj" |
         Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
+        Where-Object {
+            (Get-PlatformCoverageThreshold -ProjectName $_.BaseName -Baselines $Baselines) -gt 0
+        } |
         Sort-Object FullName |
         Select-Object -ExpandProperty FullName
 }
@@ -94,28 +98,59 @@ function Get-CoveragePercent {
     return [double]$CoverageXml.DocumentElement.'line-rate' * 100
 }
 
-function Get-PlatformCoverageThreshold {
+function Get-CoverageBaselines {
+    $baselinePath = Join-Path ".github" "coverage-baselines.json"
+
+    if (-not (Test-Path $baselinePath)) {
+        throw "Coverage baseline file not found: $baselinePath"
+    }
+
+    return Get-Content -Path $baselinePath -Raw | ConvertFrom-Json -AsHashtable
+}
+
+function Get-CoverageBaselineName {
     param(
         [Parameter(Mandatory = $true)]
         [string]$ProjectName
     )
 
     switch ($ProjectName) {
-        'WileyCoWeb.ComponentTests' { return 68 }
-        'WileyCoWeb.IntegrationTests' { return 11 }
-        'WileyWidget.Tests' { return 32 }
-        'WileyCoWeb.E2ETests' { return 0 }
-        default { return 0 }
+        'WileyCoWeb.ComponentTests' { return 'component' }
+        'WileyCoWeb.IntegrationTests' { return 'integration' }
+        'WileyWidget.Tests' { return 'widget' }
+        'WileyCoWeb.E2ETests' { return 'e2e' }
+        default { return $null }
     }
+}
+
+function Get-PlatformCoverageThreshold {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Baselines
+    )
+
+    $baselineName = Get-CoverageBaselineName -ProjectName $ProjectName
+    if ($null -eq $baselineName) {
+        return 0
+    }
+
+    if (-not $Baselines.ContainsKey($baselineName)) {
+        throw "Coverage baseline '$baselineName' was not configured for $ProjectName"
+    }
+
+    return [double]$Baselines[$baselineName]
 }
 
 if (-not (Test-Path "tests")) {
     throw "tests directory not found"
 }
 
+$coverageBaselines = Get-CoverageBaselines
 New-Item -ItemType Directory -Force -Path $ResultsDirectory | Out-Null
 
-$projectPaths = Get-TestProjectPaths -ExplicitPaths $TestProjectPaths
+$projectPaths = Get-TestProjectPaths -ExplicitPaths $TestProjectPaths -Baselines $coverageBaselines
 
 if ($projectPaths.Count -eq 0) {
     throw "No test project files were found"
@@ -156,7 +191,7 @@ foreach ($projectPath in $projectPaths) {
     $coverageResults += [pscustomobject]@{
         ProjectName = $projectName
         CoveragePercent = [math]::Round((Get-CoveragePercent -CoverageXml $projectCoverageXml), 2)
-        Threshold = (Get-PlatformCoverageThreshold -ProjectName $projectName)
+        Threshold = (Get-PlatformCoverageThreshold -ProjectName $projectName -Baselines $coverageBaselines)
         ReportPath = $projectCoverageReport.FullName
     }
 }

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Linq;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
@@ -19,11 +18,21 @@ public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<W
     {
         var requestUri = BuildSnapshotRequestUri(enterprise, fiscalYear);
         logger?.LogInformation("Requesting workspace snapshot from {RequestUri}", requestUri);
-        return await GetRequiredJsonAsync<WorkspaceBootstrapData>(
+        var snapshot = await httpClient.GetJsonAsync<WorkspaceBootstrapData>(
             requestUri,
+            JsonOptions,
             $"The workspace snapshot response from {requestUri} was not valid JSON.",
-            "workspace snapshot request",
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("workspace snapshot request", statusCode, responseBody)),
             cancellationToken).ConfigureAwait(false);
+
+        if (snapshot == null)
+        {
+            logger?.LogWarning("Workspace snapshot request returned no payload from {RequestUri}", requestUri);
+            throw new InvalidOperationException("The workspace snapshot response was empty.");
+        }
+
+        logger?.LogInformation("Workspace snapshot loaded for {Enterprise} FY {FiscalYear}", snapshot.SelectedEnterprise, snapshot.SelectedFiscalYear);
+        return snapshot;
     }
 
     public async Task<WorkspaceSnapshotSaveResponse> SaveRateSnapshotAsync(object snapshot, CancellationToken cancellationToken = default)
@@ -31,25 +40,38 @@ public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<W
         ArgumentNullException.ThrowIfNull(snapshot);
 
         logger?.LogInformation("Saving rate snapshot payload of type {SnapshotType}", snapshot.GetType().Name);
-        return await SendRequiredJsonAsync<WorkspaceSnapshotSaveResponse>(
+        var savedSnapshot = await httpClient.SendJsonAsync<WorkspaceSnapshotSaveResponse>(
             HttpMethod.Post,
             "api/workspace/snapshot",
             snapshot,
+            JsonOptions,
             "The workspace snapshot save response was not valid JSON.",
-            "rate snapshot save",
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("rate snapshot save", statusCode, responseBody)),
             cancellationToken).ConfigureAwait(false);
+
+        if (savedSnapshot == null)
+        {
+            logger?.LogWarning("Rate snapshot save returned an empty payload.");
+            throw new InvalidOperationException("The workspace snapshot save response was empty.");
+        }
+
+        logger?.LogInformation("Rate snapshot saved with ID {SnapshotId}", savedSnapshot.SnapshotId);
+        return savedSnapshot;
     }
 
     public async Task<WorkspaceScenarioCollectionResponse> GetScenariosAsync(string? enterprise = null, int? fiscalYear = null, CancellationToken cancellationToken = default)
     {
         var requestUri = BuildScenarioRequestUri(enterprise, fiscalYear);
         logger?.LogInformation("Requesting workspace scenarios from {RequestUri}", requestUri);
-        return await GetJsonOrDefaultAsync(
+        var scenarioResponse = await httpClient.GetJsonAsync<WorkspaceScenarioCollectionResponse>(
             requestUri,
+            JsonOptions,
             $"The workspace scenarios response from {requestUri} was not valid JSON.",
-            new WorkspaceScenarioCollectionResponse([]),
-            "workspace scenarios request",
-            cancellationToken).ConfigureAwait(false);
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("workspace scenarios request", statusCode, responseBody)),
+            cancellationToken).ConfigureAwait(false) ?? new WorkspaceScenarioCollectionResponse([]);
+
+        logger?.LogInformation("Workspace scenarios loaded: {Count}", scenarioResponse.Scenarios.Count);
+        return scenarioResponse;
     }
 
     public async Task<WorkspaceScenarioSummaryResponse> SaveScenarioAsync(WorkspaceScenarioSaveRequest request, CancellationToken cancellationToken = default)
@@ -57,13 +79,23 @@ public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<W
         ArgumentNullException.ThrowIfNull(request);
 
         logger?.LogInformation("Saving workspace scenario {ScenarioName} for {Enterprise} FY {FiscalYear}", request.ScenarioName, request.Snapshot.SelectedEnterprise, request.Snapshot.SelectedFiscalYear);
-        return await SendRequiredJsonAsync<WorkspaceScenarioSummaryResponse>(
+        var savedScenario = await httpClient.SendJsonAsync<WorkspaceScenarioSummaryResponse>(
             HttpMethod.Post,
             "api/workspace/scenarios",
             request,
+            JsonOptions,
             "The workspace scenario save response was not valid JSON.",
-            "workspace scenario save",
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("workspace scenario save", statusCode, responseBody)),
             cancellationToken).ConfigureAwait(false);
+
+        if (savedScenario == null)
+        {
+            logger?.LogWarning("Workspace scenario save returned an empty payload.");
+            throw new InvalidOperationException("The workspace scenario save response was empty.");
+        }
+
+        logger?.LogInformation("Workspace scenario saved with snapshot ID {SnapshotId}", savedScenario.SnapshotId);
+        return savedScenario;
     }
 
     public async Task<WorkspaceBaselineUpdateResponse> SaveWorkspaceBaselineAsync(WorkspaceBaselineUpdateRequest request, CancellationToken cancellationToken = default)
@@ -71,95 +103,44 @@ public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<W
         ArgumentNullException.ThrowIfNull(request);
 
         logger?.LogInformation("Saving workspace baseline for {Enterprise} FY {FiscalYear}", request.SelectedEnterprise, request.SelectedFiscalYear);
-        return await SendRequiredJsonAsync<WorkspaceBaselineUpdateResponse>(
+        var savedBaseline = await httpClient.SendJsonAsync<WorkspaceBaselineUpdateResponse>(
             HttpMethod.Put,
             "api/workspace/baseline",
             request,
+            JsonOptions,
             "The workspace baseline save response was not valid JSON.",
-            "workspace baseline save",
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage("workspace baseline save", statusCode, responseBody)),
             cancellationToken).ConfigureAwait(false);
+
+        if (savedBaseline == null)
+        {
+            logger?.LogWarning("Workspace baseline save returned an empty payload.");
+            throw new InvalidOperationException("The workspace baseline save response was empty.");
+        }
+
+        logger?.LogInformation("Workspace baseline saved for {Enterprise} FY {FiscalYear}", savedBaseline.SelectedEnterprise, savedBaseline.SelectedFiscalYear);
+        return savedBaseline;
     }
 
     public async Task<WorkspaceBootstrapData> GetScenarioSnapshotAsync(long snapshotId, CancellationToken cancellationToken = default)
     {
-        var requestUri = $"api/workspace/scenarios/{snapshotId}";
-        return await GetRequiredJsonAsync<WorkspaceBootstrapData>(
-            requestUri,
+        var operationName = $"saved scenario payload for {snapshotId}";
+        var snapshot = await httpClient.GetJsonAsync<WorkspaceBootstrapData>(
+            $"api/workspace/scenarios/{snapshotId}",
+            JsonOptions,
             $"The saved scenario payload for {snapshotId} was not valid JSON.",
-            $"saved scenario payload for {snapshotId}",
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<TResponse> GetRequiredJsonAsync<TResponse>(string requestUri, string invalidJsonMessage, string operationName, CancellationToken cancellationToken)
-    {
-        var payload = await httpClient.GetJsonAsync<TResponse>(
-            requestUri,
-            JsonOptions,
-            invalidJsonMessage,
-            BuildFailureException(operationName),
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage(operationName, statusCode, responseBody)),
             cancellationToken).ConfigureAwait(false);
 
-        return payload ?? throw new InvalidOperationException($"{operationName} response was empty.");
-    }
-
-    private async Task<TResponse> GetJsonOrDefaultAsync<TResponse>(string requestUri, string invalidJsonMessage, TResponse defaultValue, string operationName, CancellationToken cancellationToken)
-    {
-        var payload = await httpClient.GetJsonAsync<TResponse>(
-            requestUri,
-            JsonOptions,
-            invalidJsonMessage,
-            BuildFailureException(operationName),
-            cancellationToken).ConfigureAwait(false);
-
-        return payload ?? defaultValue;
-    }
-
-    private async Task<TResponse> SendRequiredJsonAsync<TResponse>(HttpMethod method, string requestUri, object requestBody, string invalidJsonMessage, string operationName, CancellationToken cancellationToken)
-    {
-        var payload = await httpClient.SendJsonAsync<TResponse>(
-            method,
-            requestUri,
-            requestBody,
-            JsonOptions,
-            invalidJsonMessage,
-            BuildFailureException(operationName),
-            cancellationToken).ConfigureAwait(false);
-
-        return payload ?? throw new InvalidOperationException($"{operationName} response was empty.");
-    }
-
-    private static Func<HttpStatusCode, string?, Exception> BuildFailureException(string operationName)
-        => (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage(operationName, statusCode, responseBody));
-
-    private static string BuildFailureMessage(string operationName, HttpStatusCode statusCode, string? responseBody)
-    {
-        var detail = HttpProblemDetailsParser.ExtractMessage(responseBody);
-        return string.IsNullOrWhiteSpace(detail)
-            ? $"{operationName} failed with status {(int)statusCode}."
-            : $"{operationName} failed with status {(int)statusCode}: {detail}";
-    }
-
-    private static string BuildQueryString(string? enterprise, int? fiscalYear)
-    {
-        var parts = new[]
+        if (snapshot == null)
         {
-            BuildEnterpriseQueryPart(enterprise),
-            BuildFiscalYearQueryPart(fiscalYear)
-        }.Where(part => part is not null).Select(part => part!);
+            logger?.LogWarning("Workspace scenario snapshot {SnapshotId} returned no payload", snapshotId);
+            throw new InvalidOperationException("The saved scenario payload was empty.");
+        }
 
-        var query = string.Join("&", parts);
-        return string.IsNullOrEmpty(query) ? string.Empty : $"?{query}";
+        logger?.LogInformation("Loaded workspace scenario snapshot {SnapshotId} for {Enterprise} FY {FiscalYear}", snapshotId, snapshot.SelectedEnterprise, snapshot.SelectedFiscalYear);
+        return snapshot;
     }
-
-    private static string? BuildEnterpriseQueryPart(string? enterprise)
-        => string.IsNullOrWhiteSpace(enterprise)
-            ? null
-            : $"enterprise={Uri.EscapeDataString(enterprise.Trim())}";
-
-    private static string? BuildFiscalYearQueryPart(int? fiscalYear)
-        => fiscalYear is > 0
-            ? $"fiscalYear={fiscalYear.Value}"
-            : null;
 
     private static string BuildSnapshotRequestUri(string? enterprise, int? fiscalYear)
     {
@@ -171,5 +152,29 @@ public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<W
     {
         var query = BuildQueryString(enterprise, fiscalYear);
         return string.IsNullOrEmpty(query) ? "api/workspace/scenarios" : $"api/workspace/scenarios{query}";
+    }
+
+    private static string BuildQueryString(string? enterprise, int? fiscalYear)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(enterprise))
+        {
+            parts.Add($"enterprise={Uri.EscapeDataString(enterprise.Trim())}");
+        }
+
+        if (fiscalYear is > 0)
+        {
+            parts.Add($"fiscalYear={fiscalYear.Value}");
+        }
+
+        return parts.Count == 0 ? string.Empty : $"?{string.Join("&", parts)}";
+    }
+
+    private static string BuildFailureMessage(string operationName, HttpStatusCode statusCode, string? responseBody)
+    {
+        var detail = HttpProblemDetailsParser.ExtractMessage(responseBody);
+        return string.IsNullOrWhiteSpace(detail)
+            ? $"{operationName} failed with status {(int)statusCode}."
+            : $"{operationName} failed with status {(int)statusCode}: {detail}";
     }
 }

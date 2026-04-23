@@ -9,6 +9,7 @@
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
     <UserSecretsId>f6ce628b-59d0-4238-ad1f-5b6f977fd5b9</UserSecretsId>
     <SyncfusionLocalSettingsFile>$(ProjectDir)appsettings.Syncfusion.local.json</SyncfusionLocalSettingsFile>
+    <WorkspaceLocalSettingsFile>$(ProjectDir)appsettings.Workspace.local.json</WorkspaceLocalSettingsFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -102,6 +103,37 @@
     <Copy Condition="'$(_SyncfusionLicenseKey)' == '' and Exists('$(SyncfusionLocalSettingsFile)')"
       SourceFiles="$(SyncfusionLocalSettingsFile)"
       DestinationFiles="$(ProjectDir)wwwroot\appsettings.Syncfusion.local.json"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="GenerateWorkspaceAppSettings" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <_WorkspaceApiBaseAddressProcess>
+        $([System.Environment]::GetEnvironmentVariable('WILEY_WORKSPACE_API_BASE_ADDRESS'))</_WorkspaceApiBaseAddressProcess>
+      <_WorkspaceApiBaseAddressRaw Condition="'$(WILEY_WORKSPACE_API_BASE_ADDRESS)' != ''">
+        $(WILEY_WORKSPACE_API_BASE_ADDRESS)</_WorkspaceApiBaseAddressRaw>
+      <_WorkspaceApiBaseAddressRaw
+        Condition="'$(_WorkspaceApiBaseAddressRaw)' == '' and '$(_WorkspaceApiBaseAddressProcess)' != ''">
+        $(_WorkspaceApiBaseAddressProcess)</_WorkspaceApiBaseAddressRaw>
+      <_WorkspaceApiBaseAddress Condition="'$(_WorkspaceApiBaseAddressRaw)' != ''">$([System.Text.RegularExpressions.Regex]::Replace($([System.String]::Copy('$(_WorkspaceApiBaseAddressRaw)').Trim()),
+        '^\"(.*)\"$', '$1'))</_WorkspaceApiBaseAddress>
+      <_GeneratedWorkspaceAppSettings Condition="'$(_WorkspaceApiBaseAddress)' != ''">
+        {"WorkspaceApiBaseAddress":"$(_WorkspaceApiBaseAddress)"}</_GeneratedWorkspaceAppSettings>
+      <_GeneratedWorkspaceAppSettings
+        Condition="'$(_WorkspaceApiBaseAddress)' == '' and !Exists('$(WorkspaceLocalSettingsFile)')">
+        {}</_GeneratedWorkspaceAppSettings>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="'$(_GeneratedWorkspaceAppSettings)' != ''"
+      File="$(ProjectDir)wwwroot\appsettings.Workspace.local.json"
+      Lines="$(_GeneratedWorkspaceAppSettings)"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
+
+    <Copy
+      Condition="'$(_WorkspaceApiBaseAddress)' == '' and Exists('$(WorkspaceLocalSettingsFile)')"
+      SourceFiles="$(WorkspaceLocalSettingsFile)"
+      DestinationFiles="$(ProjectDir)wwwroot\appsettings.Workspace.local.json"
       SkipUnchangedFiles="true" />
   </Target>
 

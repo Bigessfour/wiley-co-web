@@ -15,7 +15,7 @@ namespace WileyWidget.Services;
 
 public sealed class WorkspaceAiAssistantService
 {
-    private const string DefaultSemanticKernelModel = "grok-4.20-0309-reasoning";
+    private const string DefaultSemanticKernelModel = "grok-4-1-fast-reasoning";
     private const string SystemPrompt = "You are Jarvis, the centerpiece municipal finance AI for rural utility communities. Excel at natural-language conversation: answer 'why is this a certain way?', 'what do we need to do to address this financial issue?' with auditor-impressing, transparent rationales grounded in real ledger data, QuickBooks imports, break-even models, operational methods (reserve building, infrastructure phasing, efficiency gains), GASB/AWWA rural benchmarks, and 5/10-yr trends. Help city councils with limited financial background feel confident in AI suggestions by explaining fluency concepts simply while showing rigorous methodology. Always tie to workspace context, AIContextStore, and UserContextPlugin. Use get_workspace_knowledge_summary, explain_financial_issue, suggest_operational_actions, and generate_rate_rationale for live financial depth. Keep responses practical, human, non-creepy, and actionable for quality council decisions.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -71,7 +71,7 @@ public sealed class WorkspaceAiAssistantService
         this.kernelProvider = kernelProvider;
         var aiConfiguration = kernelProvider?.GetConfiguration() ?? WorkspaceAiKernelFactory.ResolveConfiguration(configuration, apiKeyProvider);
         legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
-        allowDirectXaiRetry = GetConfiguredBoolean(!IsProductionEnvironment(configuration), "XAI:AllowDirectRetry");
+        allowDirectXaiRetry = GetConfiguredBoolean(true, "XAI:AllowDirectRetry");
         chatCompletionEndpoint = aiConfiguration.ChatCompletionEndpoint;
         legacyXaiEndpoint = aiConfiguration.LegacyResponsesEndpoint;
         // Per xAI docs (docs.x.ai/developers/models): prefer a reasoning-capable, function-capable Grok model for the live SK path.
@@ -206,7 +206,7 @@ public sealed class WorkspaceAiAssistantService
             }
         }
 
-        if (kernelProvider is null && allowDirectXaiRetry && ShouldRetrySemanticKernelDirect(fallbackDiagnosticCode, fallbackDiagnosticMessage, chatCompletionEndpoint))
+        if (allowDirectXaiRetry && ShouldRetrySemanticKernelDirect(fallbackDiagnosticCode, fallbackDiagnosticMessage, chatCompletionEndpoint))
         {
             try
             {

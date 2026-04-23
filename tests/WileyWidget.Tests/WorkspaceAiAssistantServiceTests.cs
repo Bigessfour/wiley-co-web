@@ -554,7 +554,7 @@ public sealed class WorkspaceAiAssistantServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WhenLegacyProxyTimesOutInProduction_DoesNotRetryDirectXaiEndpoint()
+    public async Task AskAsync_WhenLegacyProxyTimesOutInProduction_RetriesDirectXaiEndpoint_ByDefault()
     {
         var previousEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Production");
@@ -563,7 +563,18 @@ public sealed class WorkspaceAiAssistantServiceTests
         {
             var repository = new RecordingConversationRepository();
             SeedPersistedConversation(repository);
-            var httpFactory = new TestHttpClientFactory(_ => throw new HttpRequestException("502 Bad Gateway upstream request timeout"));
+            var httpFactory = new TestHttpClientFactory(request =>
+            {
+                if (request.RequestUri?.Host.Contains("legacy.example", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    throw new HttpRequestException("502 Bad Gateway upstream request timeout");
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Direct retry answer from api.x.ai.\"}]}]}", Encoding.UTF8, "application/json")
+                };
+            });
 
             var service = CreateService(
                 new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
@@ -586,10 +597,10 @@ public sealed class WorkspaceAiAssistantServiceTests
 
             Assert.True(response.UsedFallback);
             Assert.False(response.IsFirstConversation);
-            Assert.Contains("fallback mode is active", response.Answer, StringComparison.OrdinalIgnoreCase);
-            Assert.Single(httpFactory.Requests);
+            Assert.Contains("Direct retry answer from api.x.ai.", response.Answer, StringComparison.Ordinal);
+            Assert.Equal(2, httpFactory.Requests.Count);
             Assert.Contains("https://legacy.example/v1", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain(httpFactory.Requests, request => request.Url.Contains("https://api.x.ai/v1/responses", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("https://api.x.ai/v1/responses", httpFactory.Requests[1].Url, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -625,6 +636,55 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.False(response.IsFirstConversation);
         Assert.Contains("Semantic Kernel initialization failed", response.Answer, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Injected provider failure", response.Answer, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenInjectedKernelProviderReportsTransportFailure_RetriesDirectSemanticKernelChat()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{" +
+                "\"id\":\"chatcmpl-test\"," +
+                "\"object\":\"chat.completion\"," +
+                "\"created\":1735689600," +
+                "\"model\":\"grok-4.20-0309-reasoning\"," +
+                "\"choices\":[{" +
+                    "\"index\":0," +
+                    "\"message\":{\"role\":\"assistant\",\"content\":\"Direct Semantic Kernel retry answer.\"}," +
+                    "\"finish_reason\":\"stop\"" +
+                "}]," +
+                "\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":6,\"total_tokens\":18}" +
+            "}", Encoding.UTF8, "application/json")
+        });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"),
+            kernelProvider: new TestWorkspaceAiKernelProvider(
+                new WorkspaceAiKernelInitializationResult(
+                    Context: null,
+                    IsAvailable: false,
+                    IsApiKeyVisibleToProcess: true,
+                    ApiKeySource: "provider:test",
+                    StatusCode: "transport_proxy_failed",
+                    StatusMessage: "Injected provider transport failure")));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.False(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("Direct Semantic Kernel retry answer.", response.Answer, StringComparison.Ordinal);
+        Assert.Single(httpFactory.Requests);
+        Assert.Contains("api.x.ai", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(nameof(WorkspaceAiAssistantService), httpFactory.RequestedClientNames);
     }
 
     private static WorkspaceAiAssistantService CreateService(

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Syncfusion.Licensing;
+using System.Text.Json;
 
 namespace WileyCoWeb.Api.Configuration;
 
@@ -69,6 +70,16 @@ public static class LicenseBootstrapper
         yield return new ConfiguredSyncfusionLicenseCandidate(configuration["SYNCFUSION_LICENSE_KEY"], "config:SYNCFUSION_LICENSE_KEY");
         yield return new ConfiguredSyncfusionLicenseCandidate(configuration["SyncfusionLicenseKey"], "config:SyncfusionLicenseKey");
         yield return new ConfiguredSyncfusionLicenseCandidate(Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY"), "env:SYNCFUSION_LICENSE_KEY");
+
+        if (OperatingSystem.IsWindows())
+        {
+            yield return new ConfiguredSyncfusionLicenseCandidate(
+                Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.User),
+                "env-user:SYNCFUSION_LICENSE_KEY");
+            yield return new ConfiguredSyncfusionLicenseCandidate(
+                Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.Machine),
+                "env-machine:SYNCFUSION_LICENSE_KEY");
+        }
     }
 
     private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(IWebHostEnvironment environment)
@@ -95,7 +106,7 @@ public static class LicenseBootstrapper
     }
 
     private static string GetLocalSettingsPath(IWebHostEnvironment environment)
-        => Path.Combine(environment.ContentRootPath, "..", "..", "appsettings.Syncfusion.local.json");
+        => Path.Combine(environment.ContentRootPath, "..", "appsettings.Syncfusion.local.json");
 
     private static async Task<Dictionary<string, object>?> LoadLocalSettingsAsync(string localSettingsPath)
     {
@@ -105,12 +116,37 @@ public static class LicenseBootstrapper
 
     private static string? TryExtractLocalSettingsLicenseKey(Dictionary<string, object>? settings)
     {
-        if (settings?.TryGetValue("SYNCFUSION_LICENSE_KEY", out var key) != true)
+        if (TryGetLocalSettingsString(settings, "SYNCFUSION_LICENSE_KEY", out var canonicalKey))
         {
-            return null;
+            return canonicalKey;
         }
 
-        return key as string;
+        if (TryGetLocalSettingsString(settings, "SyncfusionLicenseKey", out var namedKey))
+        {
+            return namedKey;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetLocalSettingsString(Dictionary<string, object>? settings, string key, out string? value)
+    {
+        value = null;
+        if (settings?.TryGetValue(key, out var rawValue) != true)
+        {
+            return false;
+        }
+
+        value = rawValue switch
+        {
+            string stringValue => stringValue,
+            JsonElement { ValueKind: JsonValueKind.String } jsonElement => jsonElement.GetString(),
+            JsonElement jsonElement => jsonElement.ToString(),
+            _ => rawValue?.ToString()
+        };
+
+        value = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        return !string.IsNullOrWhiteSpace(value);
     }
 
     private sealed record ConfiguredSyncfusionLicenseCandidate(string? LicenseKey, string KeySource);

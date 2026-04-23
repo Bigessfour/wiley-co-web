@@ -44,7 +44,7 @@ public sealed class ComponentPageTests
 		Assert.Contains("Syncfusion Finance Workspace", cut.Markup);
 		Assert.Contains("e-appbar", cut.Markup);
 		Assert.Contains("e-sidebar", cut.Markup);
-		Assert.Contains("workspace-navigation-list", cut.Markup);
+		Assert.Contains("app-shell-navigation-list", cut.Markup);
 		Assert.Contains("Reload", cut.Markup);
 	}
 
@@ -658,7 +658,7 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
-	public void WileyWorkspaceBaseHarness_OpenPanel_CloseSidebarAndNavigates()
+	public void WileyWorkspaceBaseHarness_OpenPanel_PreservesSidebarState()
 	{
 		using var context = CreateContext();
 		var cut = context.RenderComponent<WileyWorkspaceBaseHarness>();
@@ -667,7 +667,7 @@ public sealed class ComponentPageTests
 
 		cut.Instance.InvokeOpenPanel("break-even");
 
-		Assert.False(cut.Instance.SidebarOpen);
+		Assert.True(cut.Instance.SidebarOpen);
 	}
 
 	[Fact]
@@ -810,8 +810,8 @@ public sealed class ComponentPageTests
 
 		cut.WaitForAssertion(() => Assert.EndsWith("/wiley-workspace/break-even", navigationManager.Uri));
 
-		var quickBooksSidebarButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "QuickBooks Import", StringComparison.Ordinal));
-		quickBooksSidebarButton.Click();
+		var quickBooksSidebarLink = cut.FindAll("a").First(link => string.Equals(link.TextContent.Trim(), "QuickBooks Import", StringComparison.Ordinal));
+		quickBooksSidebarLink.Click();
 
 		cut.WaitForAssertion(() => Assert.EndsWith("/wiley-workspace/quickbooks-import", navigationManager.Uri));
 	}

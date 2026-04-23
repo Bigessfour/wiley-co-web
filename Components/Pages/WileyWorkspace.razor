@@ -113,14 +113,15 @@
 
                         <div id="workspace-navigation-card" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace Navigation</p>
-                            <div class="mt-2 grid gap-2">
+                            <div id="workspace-navigation-list" class="mt-2 grid gap-2">
                                 @foreach (var panelNavItem in PanelNavItems)
                                 {
-                                    <button type="button"
-                                            class="workspace-panel-link @(ActivePanelKey == panelNavItem.Key ? "is-active" : string.Empty)"
-                                            @onclick="() => OpenPanel(panelNavItem.Key)">
+                                    <a href="@GetPanelRoute(panelNavItem.Key)"
+                                       class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors @(ActivePanelKey == panelNavItem.Key ? "bg-sky-100 text-sky-900 font-semibold border-sky-200" : "text-slate-600 hover:bg-slate-100")"
+                                       @onclick="() => OpenPanel(panelNavItem.Key)"
+                                       @onclick:preventDefault>
                                         @panelNavItem.Label
-                                    </button>
+                                    </a>
                                 }
                             </div>
                         </div>

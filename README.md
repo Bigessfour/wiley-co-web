@@ -53,6 +53,14 @@ If you are working locally on macOS and user secrets are not being surfaced reli
 
 The build copies or generates that file into `wwwroot/appsettings.Syncfusion.local.json`, and that generated file is already ignored by git.
 
+If you want the browser client to point at a separately running local API host without emitting startup 404s, create an ignored file named `appsettings.Workspace.local.json` in the repository root with this shape:
+
+```json
+{ "WorkspaceApiBaseAddress": "http://localhost:5231" }
+```
+
+The build copies or generates that file into `wwwroot/appsettings.Workspace.local.json`. If neither the root file nor `WILEY_WORKSPACE_API_BASE_ADDRESS` is present, the build now emits an empty JSON object so the client no longer probes a missing file on startup.
+
 Important: this app is a static Blazor WebAssembly site. That means the Syncfusion license is injected at build time and then included in the published client assets so `Program.cs` can read it from configuration at startup. This is not a private server-side runtime secret path.
 
 ### Grok And xAI Secrets
@@ -79,6 +87,34 @@ The private Aurora PostgreSQL database is now provisioned in the dedicated `wile
 - Cluster: `wiley-co-aurora-db`
 - Writer instance: `wiley-co-aurora-db-1`
 - Database name: `wileyco`
+
+### Local API Database Secrets
+
+The API host now supports `.NET user secrets` for local database overrides. That gives local debug a non-committed path for a real PostgreSQL target instead of relying on the checked-in localhost development placeholder.
+
+To sync the current Aurora connection string into the API project's user secrets:
+
+```powershell
+./Scripts/sync-local-api-database-url.ps1
+```
+
+That script reads the `wiley-widget/api/database-url` secret from AWS Secrets Manager, writes it to `WileyCoWeb.Api/appsettings.Development.local.json`, and also stores it in API user secrets. The explicit local JSON file is ignored by git, is loaded ahead of the checked-in development placeholder, and disables degraded startup so a real-target local session does not silently fall back to seeded data.
+
+If you use a port-forwarded or otherwise local-only PostgreSQL endpoint instead, set that value directly in `WileyCoWeb.Api/appsettings.Development.local.json` with this shape:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "<connection-string>"
+  },
+  "Database": {
+    "AllowDegradedStartup": false,
+    "SeedDevelopmentData": false
+  }
+}
+```
+
+Note: this workstation still needs TCP reachability to whatever PostgreSQL endpoint you store. If the target is the private Aurora writer, you must use a VPC-attached host, SSM tunnel, or another reachable endpoint; otherwise the API will still activate degraded mode.
 
 ## UI Rebuild Roadmap
 

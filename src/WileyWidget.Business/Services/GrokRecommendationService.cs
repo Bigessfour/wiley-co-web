@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -42,33 +43,28 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
     public GrokRecommendationService(
         IGrokApiKeyProvider? apiKeyProvider,
         ILogger<GrokRecommendationService> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
-        _apiKey = apiKeyProvider?.ApiKey
-            ?? GetConfiguredString("XaiApiKey", "XAI:ApiKey", "xAI:ApiKey", "XAI_API_KEY");
+        var aiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(configuration, apiKeyProvider);
 
-        _enabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
-        _model = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4.1";
-        _endpoint = NormalizeChatCompletionsEndpoint(GetConfiguredString("XAI:ChatEndpoint", "XAI:Endpoint", "XaiApiEndpoint", "XaiBaseUrl"));
+        _apiKey = aiConfiguration.ApiKeyResolution.ApiKey;
+        _enabled = aiConfiguration.Enabled;
+        _model = aiConfiguration.ResolveModelOrDefault("grok-4.1");
+        _endpoint = aiConfiguration.ChatCompletionEndpoint;
 
         if (_enabled && !string.IsNullOrWhiteSpace(_apiKey))
         {
-            var kernelBuilder = Kernel.CreateBuilder();
-            kernelBuilder.AddOpenAIChatCompletion(
-                modelId: _model,
-                apiKey: _apiKey,
-                endpoint: _endpoint);
-
-            var kernel = kernelBuilder.Build();
-            _chatService = kernel.GetRequiredService<IChatCompletionService>();
+            var kernelContext = WorkspaceAiKernelFactory.CreateKernelContext(aiConfiguration, "grok-4.1", httpClientFactory);
+            _chatService = kernelContext.ChatService;
 
             _logger.LogInformation(
                 "Grok recommendation service initialized with Semantic Kernel (model: {Model}, apiKeySource: {Source})",
                 _model,
-                apiKeyProvider?.GetConfigurationSource() ?? "configuration");
+                aiConfiguration.ApiKeyResolution.ApiKeySource);
         }
         else
         {
@@ -199,33 +195,6 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
         var departmentCount = departmentExpenses.Count;
 
         return $"Based on monthly expenses totaling ${totalExpenses:N2} across {departmentCount} departments and a target profit margin of {targetProfitMargin}%, the recommended adjustments support full cost recovery and reserve stability. Water, Sewer, Trash, Apartments, Electric, and Gas are weighted with small operating differences to reflect typical municipal cost structures. This fallback result is deterministic and safe to use when Grok is unavailable.";
-    }
-
-    private string? GetConfiguredString(params string[] keys)
-    {
-        foreach (var key in keys)
-        {
-            var value = _configuration[key];
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private bool GetConfiguredBoolean(bool fallback, params string[] keys)
-    {
-        foreach (var key in keys)
-        {
-            if (bool.TryParse(_configuration[key], out var parsed))
-            {
-                return parsed;
-            }
-        }
-
-        return fallback;
     }
 
     private static string BuildSystemPrompt()
@@ -366,19 +335,4 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
         }
     }
 
-    private static Uri NormalizeChatCompletionsEndpoint(string? endpoint)
-    {
-        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
-        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-        {
-            return new Uri(candidate, UriKind.Absolute);
-        }
-
-        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/responses".Length];
-        }
-
-        return new Uri($"{candidate}/chat/completions", UriKind.Absolute);
-    }
 }

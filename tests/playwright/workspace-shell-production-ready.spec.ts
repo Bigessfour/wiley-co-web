@@ -131,12 +131,19 @@ test.describe("Workspace Shell", () => {
     await sidebarToggle.evaluate((button) => {
       (button as HTMLButtonElement).click();
     });
-    await expect(sidebarToggle).toContainText("Collapse navigation rail");
+    await expect(sidebarToggle).toContainText("Expand navigation rail");
     await expect(page.locator("#workspace-navigation-list")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
+    await expect(
+      page
+        .locator("#workspace-navigation-list")
+        .getByRole("link", { name: "Rates" }),
+    ).toBeVisible();
     await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
 
-    await page.getByRole("link", { name: "Rates" }).click();
+    await page
+      .locator("#workspace-navigation-list")
+      .getByRole("link", { name: "Rates" })
+      .click();
     await expect(sidebarToggle).toContainText("Expand navigation rail");
     await expect(page.locator("#rates-panel")).toBeVisible();
   });
@@ -178,10 +185,14 @@ test.describe("Workspace Shell", () => {
         (button as HTMLButtonElement).click();
       });
       await expect(page.locator("#app-shell-nav-toggle")).toContainText(
-        "Collapse navigation rail",
+        "Expand navigation rail",
       );
       await expect(page.locator("#workspace-navigation-list")).toBeVisible();
-      await expect(page.getByRole("link", { name: "Rates" })).toBeVisible();
+      await expect(
+        page
+          .locator("#workspace-navigation-list")
+          .getByRole("link", { name: "Rates" }),
+      ).toBeVisible();
 
       await page.reload();
       await waitForWorkspaceShell(page);

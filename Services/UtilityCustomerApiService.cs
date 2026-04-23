@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
@@ -17,107 +18,176 @@ public sealed class UtilityCustomerApiService(HttpClient httpClient, ILogger<Uti
     {
         logger?.LogInformation("Requesting utility customers from api/utility-customers");
 
-        var customers = await httpClient.GetJsonAsync<List<UtilityCustomerRecord>>(
-            "api/utility-customers",
-            JsonOptions,
-            "The utility customer list response was not valid JSON.",
-            (statusCode, responseBody) => CreateApiException(statusCode, responseBody, "list"),
-            cancellationToken).ConfigureAwait(false);
-
-        return customers ?? [];
+        try
+        {
+            var customers = await httpClient.GetFromJsonAsync<List<UtilityCustomerRecord>>("api/utility-customers", JsonOptions, cancellationToken);
+            return customers ?? [];
+        }
+        catch (JsonException ex)
+        {
+            logger?.LogWarning(ex, "Utility customer list response was not valid JSON.");
+            throw new InvalidOperationException("The utility customer list response was not valid JSON.", ex);
+        }
     }
 
     public async Task<UtilityCustomerRecord> CreateCustomerAsync(UtilityCustomerUpsertRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        logger?.LogInformation("Creating utility customer record.");
-
-        var customer = await httpClient.SendJsonAsync<UtilityCustomerRecord>(
-            HttpMethod.Post,
-            "api/utility-customers",
-            request,
-            JsonOptions,
-            "The utility customer create response was not valid JSON.",
-            (statusCode, responseBody) => CreateApiException(statusCode, responseBody, "create"),
-            cancellationToken).ConfigureAwait(false);
-
-        return customer ?? throw new InvalidOperationException("The utility customer create response was empty.");
+        using var response = await httpClient.PostAsJsonAsync("api/utility-customers", request, JsonOptions, cancellationToken);
+        return await ReadCustomerResponseAsync(response, "create", cancellationToken);
     }
 
     public async Task<UtilityCustomerRecord> UpdateCustomerAsync(int customerId, UtilityCustomerUpsertRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(customerId);
         ArgumentNullException.ThrowIfNull(request);
-        logger?.LogInformation("Updating utility customer {CustomerId}.", customerId);
 
-        var customer = await httpClient.SendJsonAsync<UtilityCustomerRecord>(
-            HttpMethod.Put,
-            $"api/utility-customers/{customerId}",
-            request,
-            JsonOptions,
-            "The utility customer update response was not valid JSON.",
-            (statusCode, responseBody) => CreateApiException(statusCode, responseBody, "update"),
-            cancellationToken).ConfigureAwait(false);
-
-        return customer ?? throw new InvalidOperationException("The utility customer update response was empty.");
+        using var response = await httpClient.PutAsJsonAsync($"api/utility-customers/{customerId}", request, JsonOptions, cancellationToken);
+        return await ReadCustomerResponseAsync(response, "update", cancellationToken);
     }
 
     public async Task DeleteCustomerAsync(int customerId, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(customerId);
-        logger?.LogInformation("Deleting utility customer {CustomerId}.", customerId);
 
-        await httpClient.SendAsync(
-            HttpMethod.Delete,
-            $"api/utility-customers/{customerId}",
-            (statusCode, responseBody) => CreateApiException(statusCode, responseBody, "delete"),
-            cancellationToken).ConfigureAwait(false);
+        using var response = await httpClient.DeleteAsync($"api/utility-customers/{customerId}", cancellationToken);
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        throw await CreateApiExceptionAsync(response, "delete", cancellationToken);
     }
 
-    private static UtilityCustomerApiException CreateApiException(HttpStatusCode statusCode, string? responseBody, string operationName)
-        => CreateApiExceptionCore(statusCode, responseBody, operationName);
-
-    private static UtilityCustomerApiException CreateApiExceptionCore(HttpStatusCode statusCode, string? responseBody, string operationName)
+    private async Task<UtilityCustomerRecord> ReadCustomerResponseAsync(HttpResponseMessage response, string operationName, CancellationToken cancellationToken)
     {
-        var validationErrors = HttpProblemDetailsParser.ExtractValidationErrors(responseBody);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw await CreateApiExceptionAsync(response, operationName, cancellationToken);
+        }
+
+        try
+        {
+            var customer = await response.Content.ReadFromJsonAsync<UtilityCustomerRecord>(JsonOptions, cancellationToken);
+            return customer ?? throw new InvalidOperationException($"The utility customer {operationName} response was empty.");
+        }
+        catch (JsonException ex)
+        {
+            logger?.LogWarning(ex, "Utility customer {OperationName} response was not valid JSON.", operationName);
+            throw new InvalidOperationException($"The utility customer {operationName} response was not valid JSON.", ex);
+        }
+    }
+
+    private static async Task<UtilityCustomerApiException> CreateApiExceptionAsync(HttpResponseMessage response, string operationName, CancellationToken cancellationToken)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var (message, validationErrors) = ParseError(response.StatusCode, responseBody, operationName);
+        return new UtilityCustomerApiException(message, response.StatusCode, validationErrors);
+    }
+
+    private static (string Message, IReadOnlyDictionary<string, string[]> ValidationErrors) ParseError(HttpStatusCode statusCode, string? responseBody, string operationName)
+    {
+        var validationErrors = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var defaultMessage = $"The utility customer {operationName} request failed with status {(int)statusCode}.";
+
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return (defaultMessage, validationErrors);
+        }
+
+        return TryParseJsonError(responseBody, defaultMessage, validationErrors);
+    }
+
+    private static (string Message, IReadOnlyDictionary<string, string[]> ValidationErrors) TryParseJsonError(string responseBody, string defaultMessage, Dictionary<string, string[]> validationErrors)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.String)
+            {
+                var stringMessage = root.GetString();
+                return (string.IsNullOrWhiteSpace(stringMessage) ? defaultMessage : stringMessage.Trim(), validationErrors);
+            }
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                return ParseObjectError(root, defaultMessage, validationErrors);
+            }
+        }
+        catch (JsonException)
+        {
+            // Fall back to plain-text normalization below.
+        }
+
+        return ParsePlainTextError(responseBody, defaultMessage);
+    }
+
+    private static (string Message, IReadOnlyDictionary<string, string[]> ValidationErrors) ParseObjectError(JsonElement root, string defaultMessage, Dictionary<string, string[]> validationErrors)
+    {
+        ExtractValidationErrors(root, validationErrors);
+
+        var title = GetStringProperty(root, "title");
+        var detail = GetStringProperty(root, "detail");
 
         if (validationErrors.Count > 0)
         {
-            return CreateValidationApiException(statusCode, responseBody, operationName, validationErrors);
+            var firstValidationMessage = validationErrors.Values.SelectMany(messages => messages).FirstOrDefault();
+            return (!string.IsNullOrWhiteSpace(firstValidationMessage)
+                    ? firstValidationMessage
+                    : title ?? detail ?? defaultMessage,
+                validationErrors);
         }
 
-        return CreateProblemApiException(statusCode, responseBody, operationName, validationErrors);
+        var problemMessage = detail ?? title;
+        if (!string.IsNullOrWhiteSpace(problemMessage))
+        {
+            return (problemMessage, validationErrors);
+        }
+
+        return (defaultMessage, validationErrors);
     }
 
-    private static UtilityCustomerApiException CreateValidationApiException(
-        HttpStatusCode statusCode,
-        string? responseBody,
-        string operationName,
-        IReadOnlyDictionary<string, string[]> validationErrors)
+    private static void ExtractValidationErrors(JsonElement root, Dictionary<string, string[]> validationErrors)
     {
-        var defaultMessage = $"The utility customer {operationName} request failed with status {(int)statusCode}.";
-        var firstValidationMessage = validationErrors.Values.SelectMany(messages => messages).FirstOrDefault();
-        var detail = HttpProblemDetailsParser.ExtractMessage(responseBody);
-        var message = !string.IsNullOrWhiteSpace(firstValidationMessage)
-            ? firstValidationMessage
-            : detail ?? defaultMessage;
+        if (root.TryGetProperty("errors", out var errorsElement) && errorsElement.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in errorsElement.EnumerateObject())
+            {
+                var messages = property.Value.ValueKind == JsonValueKind.Array
+                    ? property.Value.EnumerateArray()
+                        .Where(item => item.ValueKind == JsonValueKind.String)
+                        .Select(item => item.GetString())
+                        .Where(item => !string.IsNullOrWhiteSpace(item))
+                        .Select(item => item!.Trim())
+                        .ToArray()
+                    : [];
 
-        return new UtilityCustomerApiException(message, statusCode, validationErrors);
+                if (messages.Length > 0)
+                {
+                    validationErrors[property.Name] = messages;
+                }
+            }
+        }
     }
 
-    private static UtilityCustomerApiException CreateProblemApiException(
-        HttpStatusCode statusCode,
-        string? responseBody,
-        string operationName,
-        IReadOnlyDictionary<string, string[]> validationErrors)
+    private static string? GetStringProperty(JsonElement element, string propertyName)
     {
-        var defaultMessage = $"The utility customer {operationName} request failed with status {(int)statusCode}.";
-        var problemMessage = HttpProblemDetailsParser.ExtractMessage(responseBody);
+        return element.TryGetProperty(propertyName, out var propertyElement) && propertyElement.ValueKind == JsonValueKind.String
+            ? propertyElement.GetString()?.Trim()
+            : null;
+    }
 
-        return new UtilityCustomerApiException(
-            string.IsNullOrWhiteSpace(problemMessage) ? defaultMessage : problemMessage,
-            statusCode,
-            validationErrors);
+    private static (string Message, IReadOnlyDictionary<string, string[]> ValidationErrors) ParsePlainTextError(string responseBody, string defaultMessage)
+    {
+        var normalizedBody = responseBody.Trim();
+        if (normalizedBody.Length >= 2 && normalizedBody.StartsWith('"') && normalizedBody.EndsWith('"'))
+        {
+            normalizedBody = normalizedBody[1..^1];
+        }
+
+        return (string.IsNullOrWhiteSpace(normalizedBody) ? defaultMessage : normalizedBody, new Dictionary<string, string[]>());
     }
 }
 
