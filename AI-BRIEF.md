@@ -1,6 +1,6 @@
 # WileyCoWeb — AI Briefing
 
-> Generated: 2026-04-23 06:31 | Branch: `main` | Commit: `3250c2cd94`
+> Generated: 2026-04-24 11:20 | Branch: `feature/break-even-4-enterprises-dataviz` | Commit: `73c2f0bbd2`
 
 ## Project Purpose
 
@@ -29,46 +29,46 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 - `Components/JarvisChatPanel.razor` — Panel — priority 100
 - `Components/JarvisChatPanel.razor.cs` — Panel — priority 100
 - `Components/QuickBooksImportPanel.razor` — Panel — priority 100
+- `Components/Panels/AffordabilityDashboardPanel.razor` — Panel — priority 100
+- `Components/Panels/ApartmentConfigPanel.razor` — Panel — priority 100
 - `Components/Panels/BreakEvenPanel.razor` — Panel — priority 100
+- `Components/Panels/BreakEvenPanel.razor.cs` — Panel — priority 100
+- `Components/Panels/CapitalGapPanel.razor` — Panel — priority 100
 - `Components/Panels/CustomerViewerPanel.Bindings.cs` — Panel — priority 100
 - `Components/Panels/CustomerViewerPanel.Helpers.cs` — Panel — priority 100
 - `Components/Panels/CustomerViewerPanel.Shared.cs` — Panel — priority 100
 - `Components/Panels/CustomerViewerPanel.razor` — Panel — priority 100
-- `Components/Panels/CustomerViewerPanel.razor.cs` — Panel — priority 100
 - `Components/Panels/DataDashboardPanel.razor` — Panel — priority 100
+- `Components/Panels/CustomerViewerPanel.razor.cs` — Panel — priority 100
+- `Components/Panels/DebtCoveragePanel.razor` — Panel — priority 100
 - `Components/Panels/DecisionSupportPanel.razor` — Panel — priority 100
-- `Components/Panels/QuickBooksImportPanelWrapper.razor` — Panel — priority 100
 - `Components/Panels/RatesPanel.razor` — Panel — priority 100
-- `Components/Panels/TrendsPanel.razor` — Panel — priority 100
+- `Components/Panels/QuickBooksImportPanelWrapper.razor` — Panel — priority 100
+- `Components/Panels/ReserveTrajectoryPanel.razor` — Panel — priority 100
 - `Components/Panels/ScenarioPlannerPanel.razor` — Panel — priority 100
-- `WileyCoWeb.Api/Program.cs` — Program — priority 100
-- `Services/BrowserDownloadService.cs` — Service — priority 95
-- `Services/QuickBooksImportApiService.cs` — Service — priority 95
-- `Services/UtilityCustomerApiService.cs` — Service — priority 95
-- `Services/WorkspaceAiApiService.cs` — Service — priority 95
 
 ## Recommended Reading Order
 
 1. `Components/JarvisChatPanel.razor`
 2. `Components/JarvisChatPanel.razor.cs`
 3. `Components/QuickBooksImportPanel.razor`
-4. `Components/Panels/BreakEvenPanel.razor`
-5. `Components/Panels/CustomerViewerPanel.Bindings.cs`
-6. `Components/Panels/CustomerViewerPanel.Helpers.cs`
-7. `Components/Panels/CustomerViewerPanel.Shared.cs`
-8. `Components/Panels/CustomerViewerPanel.razor`
-9. `Components/Panels/CustomerViewerPanel.razor.cs`
-10. `Components/Panels/DataDashboardPanel.razor`
-11. `Components/Panels/DecisionSupportPanel.razor`
-12. `Components/Panels/QuickBooksImportPanelWrapper.razor`
-13. `Components/Panels/RatesPanel.razor`
-14. `Components/Panels/TrendsPanel.razor`
-15. `Components/Panels/ScenarioPlannerPanel.razor`
-16. `WileyCoWeb.Api/Program.cs`
-17. `Services/BrowserDownloadService.cs`
-18. `Services/QuickBooksImportApiService.cs`
-19. `Services/UtilityCustomerApiService.cs`
-20. `Services/WorkspaceAiApiService.cs`
+4. `Components/Panels/AffordabilityDashboardPanel.razor`
+5. `Components/Panels/ApartmentConfigPanel.razor`
+6. `Components/Panels/BreakEvenPanel.razor`
+7. `Components/Panels/BreakEvenPanel.razor.cs`
+8. `Components/Panels/CapitalGapPanel.razor`
+9. `Components/Panels/CustomerViewerPanel.Bindings.cs`
+10. `Components/Panels/CustomerViewerPanel.Helpers.cs`
+11. `Components/Panels/CustomerViewerPanel.Shared.cs`
+12. `Components/Panels/CustomerViewerPanel.razor`
+13. `Components/Panels/DataDashboardPanel.razor`
+14. `Components/Panels/CustomerViewerPanel.razor.cs`
+15. `Components/Panels/DebtCoveragePanel.razor`
+16. `Components/Panels/DecisionSupportPanel.razor`
+17. `Components/Panels/RatesPanel.razor`
+18. `Components/Panels/QuickBooksImportPanelWrapper.razor`
+19. `Components/Panels/ReserveTrajectoryPanel.razor`
+20. `Components/Panels/ScenarioPlannerPanel.razor`
 
 ## Architecture Summary
 
@@ -76,8 +76,8 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 | ------------ | ----- |
 | Views        | 0     |
 | Viewmodels   | 1     |
-| Panels       | 6     |
-| Services     | 98    |
+| Panels       | 7     |
+| Services     | 107   |
 | Controls     | 0     |
 | Repositories | 24    |
 | Factories    | 4     |
@@ -87,6 +87,7 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 ### ComponentBase
 
 - `Components/JarvisChatPanel.razor.cs`
+- `Components/Panels/BreakEvenPanel.razor.cs`
 - `Components/Panels/CustomerViewerPanel.razor.cs`
 - `Components/Pages/WileyWorkspaceBase.cs`
 
@@ -125,6 +126,7 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 ## Panels
 
 - `Components/JarvisChatPanel.razor.cs`
+- `Components/Panels/BreakEvenPanel.razor.cs`
 - `Components/Panels/CustomerViewerPanel.Bindings.cs`
 - `Components/Panels/CustomerViewerPanel.Helpers.cs`
 - `Components/Panels/CustomerViewerPanel.Shared.cs`
@@ -133,20 +135,23 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 
 ## Services
 
+- `Services/AffordabilityAnalysisService.cs`
+- `Services/CapitalGapApiService.cs`
 - `Services/BrowserDownloadService.cs`
+- `Services/DebtCoverageApiService.cs`
 - `Services/QuickBooksImportApiService.cs`
 - `Services/UtilityCustomerApiService.cs`
 - `Services/WorkspaceAiApiService.cs`
 - `Services/WorkspaceBootstrapService.cs`
 - `Services/WorkspaceDocumentExportService.cs`
 - `Services/WorkspaceKnowledgeApiService.cs`
-- `Services/WorkspaceLocalBootstrapService.cs`
 - `Services/WorkspacePersistenceService.cs`
+- `Services/WorkspaceLocalBootstrapService.cs`
 - `Services/WorkspaceSnapshotApiService.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Keywords.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Orchestration.cs`
-- `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Patterns.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Overrides.cs`
+- `WileyCoWeb.Api/WorkspaceReferenceDataImportService.Patterns.cs`
 - `WileyCoWeb.Api/WorkspaceReferenceDataImportService.cs`
 - `WileyCoWeb.Api/Configuration/StartupConfigurationService.cs`
 - `State/CustomerFilterService.cs`
@@ -160,9 +165,6 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 - `src/WileyWidget.Models/ServiceChargeRecommendation.cs`
 - `src/WileyWidget.Services/AICacheWarmingService.cs`
 - `src/WileyWidget.Services/AILoggingService.cs`
-- `src/WileyWidget.Services/ActivityFallbackDataService.cs`
-- `src/WileyWidget.Services/AdaptiveTimeoutService.cs`
-- `src/WileyWidget.Services/AnalyticsService.cs`
 
 ## Controls
 
@@ -170,9 +172,9 @@ WileyCoWeb is a Blazor WebAssembly application built with Syncfusion Blazor comp
 
 ## Manifest Stats
 
-- Total files indexed: **412**
+- Total files indexed: **425**
 - Files with embedded content: **400**
-- Total source size: **38,073 KB**
+- Total source size: **26,190 KB**
 - Manifest mode: **full-context**
 
 ---
