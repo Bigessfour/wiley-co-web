@@ -164,6 +164,37 @@ internal sealed partial class WorkspaceReferenceDataImportService
                     IsActive = true
                 });
             }
+
+            if (string.Equals(seed.Name, "Apartments", StringComparison.OrdinalIgnoreCase))
+            {
+                var apartmentEnterprise = context.Enterprises.FirstOrDefault(item => !item.IsDeleted && string.Equals(item.Name, seed.Name, StringComparison.OrdinalIgnoreCase));
+                if (apartmentEnterprise is not null && !context.Set<ApartmentUnitType>().Any(item => item.EnterpriseId == apartmentEnterprise.Id && !item.IsDeleted))
+                {
+                    context.Set<ApartmentUnitType>().AddRange(
+                        new ApartmentUnitType
+                        {
+                            EnterpriseId = apartmentEnterprise.Id,
+                            Name = "2 Bedroom",
+                            BedroomCount = 2,
+                            UnitCount = 8,
+                            MonthlyRent = 444.44m,
+                            CreatedBy = nameof(WorkspaceReferenceDataImportService),
+                            ModifiedBy = nameof(WorkspaceReferenceDataImportService),
+                            IsDeleted = false
+                        },
+                        new ApartmentUnitType
+                        {
+                            EnterpriseId = apartmentEnterprise.Id,
+                            Name = "3 Bedroom",
+                            BedroomCount = 3,
+                            UnitCount = 8,
+                            MonthlyRent = 555.55m,
+                            CreatedBy = nameof(WorkspaceReferenceDataImportService),
+                            ModifiedBy = nameof(WorkspaceReferenceDataImportService),
+                            IsDeleted = false
+                        });
+                }
+            }
         }
     }
 

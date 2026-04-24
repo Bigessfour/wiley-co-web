@@ -1,33 +1,10 @@
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
-@using Syncfusion.Blazor.CircularGauge
 @using Syncfusion.Blazor.Inputs
-@using WileyCoWeb.State
+@using WileyCoWeb.Contracts
 
 <div id="break-even-panel" class="space-y-4">
-    <section id="break-even-summary-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Summary</p>
-        <div id="break-even-kpi-grid" class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SfCard>
-                <CardHeader Title="Total Costs" SubTitle="@TotalCostsDisplay" />
-                <CardContent Content="Operating and capital inputs used in the current scenario." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Projected Volume" SubTitle="@ProjectedVolumeDisplay" />
-                <CardContent Content="Illustrative service volume for the selected enterprise." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Rate Delta" SubTitle="@RateDeltaDisplay" />
-                <CardContent Content="Gap between the current rate and the break-even rate." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
-                <CardContent Content="Calculated break-even rate for the current scenario." />
-            </SfCard>
-        </div>
-    </section>
-
     <section id="break-even-input-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Inputs</p>
         <div id="break-even-input-row" class="mt-3 grid gap-4 md:grid-cols-2">
@@ -62,62 +39,83 @@
         </div>
     </section>
 
-    <section id="break-even-visuals-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Visuals</p>
-        <div class="mt-3 grid gap-4 xl:grid-cols-[1fr_1.4fr]">
-            <div id="break-even-gauge-card" class="rounded-2xl border border-slate-200 p-3">
-                <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
-                    <CircularGaugeAxes>
-                        <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
-                            <CircularGaugeAxisLineStyle Width="8" Color="#e2e8f0" />
-                            <CircularGaugeRanges>
-                                <CircularGaugeRange Start="0" End="@Math.Max(0, GaugeMaximum * 0.55)" Color="#bae6fd" StartWidth="8" EndWidth="8" />
-                                <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.55)" End="@Math.Max(0, GaugeMaximum * 0.85)" Color="#7dd3fc" StartWidth="8" EndWidth="8" />
-                                <CircularGaugeRange Start="@Math.Max(0, GaugeMaximum * 0.85)" End="@GaugeMaximum" Color="#0f172a" StartWidth="8" EndWidth="8" />
-                            </CircularGaugeRanges>
-                            <CircularGaugePointers>
-                                <CircularGaugePointer Value="@GaugeCurrentRateValue" Radius="70%" Color="#0f172a" />
-                            </CircularGaugePointers>
-                        </CircularGaugeAxis>
-                    </CircularGaugeAxes>
-                </SfCircularGauge>
-            </div>
+    <section id="break-even-quadrant-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-2">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Break-Even Quadrants</p>
+            <p class="text-sm text-slate-600">Normalized to $/customer for Water, Sewer, Trash, and Apartments.</p>
+        </div>
 
-            <div id="break-even-chart-card" class="rounded-2xl border border-slate-200 p-3">
-                <SfChart ID="break-even-rate-comparison-chart" Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%">
-                    <ChartArea>
-                        <ChartAreaBorder Width="0"></ChartAreaBorder>
-                    </ChartArea>
-                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-                        <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-                    </ChartPrimaryXAxis>
-                    <ChartPrimaryYAxis LabelFormat="C2">
-                        <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-                    </ChartPrimaryYAxis>
-                    <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-                    <ChartLegendSettings Visible="false"></ChartLegendSettings>
-                    <ChartSeriesCollection>
-                        <ChartSeries DataSource="@RateComparison" XName="Label" YName="Value" Type="ChartSeriesType.Column" Name="Rate" ColumnSpacing="0.25" />
-                    </ChartSeriesCollection>
-                </SfChart>
-            </div>
+        <div id="break-even-quadrant-grid" class="mt-4 grid gap-4 lg:grid-cols-2 auto-rows-fr">
+            @foreach (var quadrant in VisibleQuadrants)
+            {
+                <section class="flex h-full flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                    <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@quadrant.EnterpriseName</p>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">@quadrant.EnterpriseType</h3>
+                            <p class="mt-1 text-sm text-slate-600">@quadrant.EffectiveCustomerCount.ToString("N0") effective customers</p>
+                        </div>
+                        <SfCard>
+                            <CardHeader Title="KPI Summary" SubTitle="@GetQuadrantSummary(quadrant)" />
+                            <CardContent Content="Current rate, balance, and break-even are normalized to $/customer." />
+                        </SfCard>
+                    </div>
+
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+                        <SfChart ID="@GetQuadrantChartId(quadrant)"
+                                 Title="@($"{quadrant.EnterpriseName} break-even")"
+                                 AccessibilityDescription="@($"Line chart showing revenue, expenses, and break-even for {quadrant.EnterpriseName}.")"
+                                 EnableAnimation="true"
+                                 UseGroupingSeparator="true"
+                                 Width="100%"
+                                 Height="320px">
+                            <ChartArea>
+                                <ChartAreaBorder Width="0"></ChartAreaBorder>
+                            </ChartArea>
+                            <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
+                                <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+                            </ChartPrimaryXAxis>
+                            <ChartPrimaryYAxis LabelFormat="C2">
+                                <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                            </ChartPrimaryYAxis>
+                            <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top"></ChartLegendSettings>
+                            <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
+                            <ChartSeriesCollection>
+                                <ChartSeries DataSource="@quadrant.SeriesPoints"
+                                             XName="@nameof(BreakEvenSeriesPoint.PeriodLabel)"
+                                             YName="@nameof(BreakEvenSeriesPoint.RevenuePerCustomer)"
+                                             Type="ChartSeriesType.Line"
+                                             Name="Revenue"
+                                             Fill="#15803d"
+                                             Width="3">
+                                    <ChartMarker Visible="true" Width="8" Height="8" Fill="#15803d" />
+                                </ChartSeries>
+                                <ChartSeries DataSource="@quadrant.SeriesPoints"
+                                             XName="@nameof(BreakEvenSeriesPoint.PeriodLabel)"
+                                             YName="@nameof(BreakEvenSeriesPoint.ExpensesPerCustomer)"
+                                             Type="ChartSeriesType.Line"
+                                             Name="Expenses"
+                                             Fill="#dc2626"
+                                             Width="3">
+                                    <ChartMarker Visible="true" Width="8" Height="8" Fill="#dc2626" />
+                                </ChartSeries>
+                                <ChartSeries DataSource="@quadrant.SeriesPoints"
+                                             XName="@nameof(BreakEvenSeriesPoint.PeriodLabel)"
+                                             YName="@nameof(BreakEvenSeriesPoint.BreakEvenPerCustomer)"
+                                             Type="ChartSeriesType.Line"
+                                             Name="Break-Even"
+                                             Fill="#111827"
+                                             Width="2"
+                                             DashArray="6,4">
+                                    <ChartMarker Visible="false" />
+                                </ChartSeries>
+                            </ChartSeriesCollection>
+                        </SfChart>
+                    </div>
+                </section>
+            }
         </div>
     </section>
-</div>
 
-@code {
-    [Parameter] public decimal TotalCosts { get; set; }
-    [Parameter] public decimal ProjectedVolume { get; set; }
-    [Parameter] public string TotalCostsDisplay { get; set; } = string.Empty;
-    [Parameter] public string ProjectedVolumeDisplay { get; set; } = string.Empty;
-    [Parameter] public string RateDeltaDisplay { get; set; } = string.Empty;
-    [Parameter] public string BreakEvenRateDisplay { get; set; } = string.Empty;
-    [Parameter] public bool IsSavingBaseline { get; set; }
-    [Parameter] public string BaselineSaveStatus { get; set; } = string.Empty;
-    [Parameter] public double GaugeMaximum { get; set; }
-    [Parameter] public double GaugeCurrentRateValue { get; set; }
-    [Parameter] public IReadOnlyList<RateComparisonPoint> RateComparison { get; set; } = [];
-    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnTotalCostsChanged { get; set; }
-    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnProjectedVolumeChanged { get; set; }
-    [Parameter] public EventCallback OnSaveWorkspaceBaseline { get; set; }
-}
+    <ApartmentConfigPanel UnitTypes="@ApartmentUnitTypes" OnUnitTypesChanged="OnApartmentUnitTypesChanged" />
+</div>

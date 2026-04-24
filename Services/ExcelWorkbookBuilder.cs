@@ -1,5 +1,6 @@
 using Syncfusion.Drawing;
 using Syncfusion.XlsIO;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -17,6 +18,11 @@ public sealed class ExcelWorkbookBuilder
     public WorkspaceExportDocument CreateScenarioWorkbook(WorkspaceState workspaceState)
     {
         return CreateScenarioWorkbookCore(workspaceState);
+    }
+
+    public WorkspaceExportDocument CreateReserveTrajectoryWorkbook(WorkspaceState workspaceState)
+    {
+        return CreateReserveTrajectoryWorkbookCore(workspaceState);
     }
 
     private static ExcelEngine CreateExcelEngine()
@@ -55,6 +61,24 @@ public sealed class ExcelWorkbookBuilder
         PopulateScenarioItemsWorksheet(scenarioSheet, workspaceState);
 
         return CreateWorkbookExport(workbook, $"{BuildFileStem(workspaceState)}-scenario.xlsx");
+    }
+
+    private WorkspaceExportDocument CreateReserveTrajectoryWorkbookCore(WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceState);
+
+        using var excelEngine = CreateExcelEngine();
+        var workbook = excelEngine.Excel.Workbooks.Create(2);
+
+        var summarySheet = workbook.Worksheets[0];
+        summarySheet.Name = "Overview";
+        PopulateReserveTrajectorySummaryWorksheet(summarySheet, workspaceState);
+
+        var forecastSheet = workbook.Worksheets[1];
+        forecastSheet.Name = "Forecast";
+        PopulateReserveTrajectoryForecastWorksheet(forecastSheet, workspaceState);
+
+        return CreateWorkbookExport(workbook, $"{BuildFileStem(workspaceState)}-reserve-trajectory.xlsx");
     }
 
     private static void PopulateCustomerWorksheet(IWorksheet worksheet, WorkspaceState workspaceState)
@@ -119,6 +143,47 @@ public sealed class ExcelWorkbookBuilder
 
         scenarioSheet.AutoFilters.FilterRange = scenarioSheet.Range[3, 1, Math.Max(rowIndex - 1, 3), 3];
         scenarioSheet.UsedRange.AutofitColumns();
+    }
+
+    private static void PopulateReserveTrajectorySummaryWorksheet(IWorksheet summarySheet, WorkspaceState workspaceState)
+    {
+        WriteWorkbookTitle(summarySheet, $"{workspaceState.SelectedEnterprise} reserve trajectory", 1, 2);
+        summarySheet.Range[3, 1].Text = "Current Reserves";
+        summarySheet.Range[3, 2].Number = (double)(workspaceState.ReserveTrajectory?.CurrentReserves ?? 0m);
+        summarySheet.Range[3, 2].NumberFormat = CurrencyNumberFormat;
+        summarySheet.Range[4, 1].Text = "Recommended Reserve Level";
+        summarySheet.Range[4, 2].Number = (double)(workspaceState.ReserveTrajectory?.RecommendedReserveLevel ?? 0m);
+        summarySheet.Range[4, 2].NumberFormat = CurrencyNumberFormat;
+        summarySheet.Range[5, 1].Text = "Risk Assessment";
+        summarySheet.Range[5, 2].Text = workspaceState.ReserveTrajectory?.RiskAssessment ?? "Unavailable";
+        summarySheet.Range[6, 1].Text = "Forecast Points";
+        summarySheet.Range[6, 2].Number = workspaceState.ReserveTrajectory?.ForecastPoints.Count ?? 0;
+        summarySheet.UsedRange.AutofitColumns();
+    }
+
+    private static void PopulateReserveTrajectoryForecastWorksheet(IWorksheet forecastSheet, WorkspaceState workspaceState)
+    {
+        WriteWorkbookTitle(forecastSheet, $"{workspaceState.SelectedEnterprise} reserve forecast", 1, 4);
+        WriteHeaderRow(forecastSheet, 3, ["Date", "Projected Reserves", "Confidence Interval", "Policy Floor"]);
+
+        var forecastPoints = workspaceState.ReserveTrajectory?.ForecastPoints ?? [];
+        var rowIndex = 4;
+
+        foreach (var point in forecastPoints)
+        {
+            forecastSheet.Range[rowIndex, 1].DateTime = point.DateUtc;
+            forecastSheet.Range[rowIndex, 1].NumberFormat = "mmm yy";
+            forecastSheet.Range[rowIndex, 2].Number = (double)point.PredictedReserves;
+            forecastSheet.Range[rowIndex, 2].NumberFormat = CurrencyNumberFormat;
+            forecastSheet.Range[rowIndex, 3].Number = (double)point.ConfidenceInterval;
+            forecastSheet.Range[rowIndex, 3].NumberFormat = CurrencyNumberFormat;
+            forecastSheet.Range[rowIndex, 4].Number = (double)(workspaceState.ReserveTrajectory?.RecommendedReserveLevel ?? 0m);
+            forecastSheet.Range[rowIndex, 4].NumberFormat = CurrencyNumberFormat;
+            rowIndex++;
+        }
+
+        forecastSheet.AutoFilters.FilterRange = forecastSheet.Range[3, 1, Math.Max(rowIndex - 1, 3), 4];
+        forecastSheet.UsedRange.AutofitColumns();
     }
 
     private static WorkspaceExportDocument CreateWorkbookExport(IWorkbook workbook, string fileName)

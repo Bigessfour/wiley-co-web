@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Http.Resilience;
 using Npgsql;
 using Syncfusion.Licensing;
 using WileyCoWeb.Contracts;
@@ -439,13 +440,22 @@ public partial class Program
         // API Gateway xAI proxy. The chain of trust is still validated; only the revocation
         // lookup is skipped. This applies to both the Semantic Kernel primary path and the
         // legacy xAI fallback path (both resolve this named client via IHttpClientFactory).
-        builder.Services.AddHttpClient(nameof(WorkspaceAiAssistantService))
+        builder.Services.AddHttpClient(WorkspaceAiKernelFactory.HttpClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
+                AutomaticDecompression = DecompressionMethods.All,
+                ConnectTimeout = TimeSpan.FromSeconds(10),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 SslOptions = new SslClientAuthenticationOptions
                 {
                     CertificateRevocationCheckMode = X509RevocationMode.NoCheck
                 }
+            })
+            .SetHandlerLifetime(Timeout.InfiniteTimeSpan)
+            .AddStandardResilienceHandler(options =>
+            {
+                options.Retry.MaxRetryAttempts = 2;
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
             });
         builder.Services.AddMemoryCache();
 
@@ -464,6 +474,8 @@ public partial class Program
         builder.Services.AddTransient<IAnalyticsRepository, AnalyticsRepository>();
         builder.Services.AddTransient<IBudgetAnalyticsRepository, BudgetAnalyticsRepository>();
         builder.Services.AddTransient<IAnalyticsService, AnalyticsService>();
+        builder.Services.AddTransient<IDebtCoverageService, DebtCoverageService>();
+        builder.Services.AddTransient<ICapitalGapService, CapitalGapService>();
         builder.Services.AddTransient<IWorkspaceKnowledgeService, WorkspaceKnowledgeService>();
         builder.Services.AddSingleton<WorkspaceSnapshotComposer>();
         builder.Services.AddSingleton<WorkspaceSnapshotExportArchiveService>();
@@ -825,6 +837,8 @@ public partial class Program
         MapWorkspaceSnapshotGetEndpoint(app);
         MapWorkspaceSnapshotPostEndpoint(app);
         MapWorkspaceKnowledgeEndpoint(app);
+        MapWorkspaceDebtCoverageEndpoint(app);
+        MapWorkspaceCapitalGapEndpoint(app);
         MapWorkspaceNavigationTelemetryEndpoint(app);
         MapWorkspaceBaselinePutEndpoint(app);
         MapWorkspaceScenarioListEndpoint(app);
@@ -1494,6 +1508,148 @@ public partial class Program
             }
         });
     }
+
+    private static void MapWorkspaceDebtCoverageEndpoint(WebApplication app)
+    {
+        var logger = app.Logger;
+
+        app.MapPost("/api/workspace/debt-coverage", async (
+            DebtCoverageRequest request,
+            IDebtCoverageService debtCoverageService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!TryValidateDebtCoverageRequest(request, out var validationError))
+            {
+                return validationError;
+            }
+
+            try
+            {
+                var debtCoverage = await debtCoverageService.BuildAsync(request.SelectedEnterprise.Trim(), request.SelectedFiscalYear, cancellationToken).ConfigureAwait(false);
+                return Results.Ok(ToDebtCoverageResponse(debtCoverage));
+            }
+            catch (DebtCoverageNotFoundException ex)
+            {
+                return Results.NotFound(ex.Message);
+            }
+            catch (DebtCoverageUnavailableException ex)
+            {
+                logger.LogError(ex, "Debt coverage request failed for {Enterprise} FY {FiscalYear}", request.SelectedEnterprise, request.SelectedFiscalYear);
+                return Results.Problem(
+                    title: "Debt coverage unavailable",
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        });
+    }
+
+    private static void MapWorkspaceCapitalGapEndpoint(WebApplication app)
+    {
+        var logger = app.Logger;
+
+        app.MapPost("/api/workspace/capital-gap", async (
+            CapitalGapRequest request,
+            ICapitalGapService capitalGapService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!TryValidateCapitalGapRequest(request, out var validationError))
+            {
+                return validationError;
+            }
+
+            try
+            {
+                var capitalGap = await capitalGapService.BuildAsync(request.SelectedEnterprise.Trim(), request.SelectedFiscalYear, cancellationToken).ConfigureAwait(false);
+                return Results.Ok(ToCapitalGapResponse(capitalGap));
+            }
+            catch (CapitalGapNotFoundException ex)
+            {
+                return Results.NotFound(ex.Message);
+            }
+            catch (CapitalGapUnavailableException ex)
+            {
+                logger.LogError(ex, "Capital gap request failed for {Enterprise} FY {FiscalYear}", request.SelectedEnterprise, request.SelectedFiscalYear);
+                return Results.Problem(
+                    title: "Capital gap unavailable",
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+        });
+    }
+
+    private static bool TryValidateDebtCoverageRequest(DebtCoverageRequest request, out IResult? validationError)
+    {
+        validationError = null;
+
+        if (string.IsNullOrWhiteSpace(request.SelectedEnterprise))
+        {
+            validationError = Results.BadRequest("A workspace enterprise is required to calculate debt coverage.");
+            return false;
+        }
+
+        if (request.SelectedFiscalYear <= 0)
+        {
+            validationError = Results.BadRequest("A valid fiscal year is required to calculate debt coverage.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryValidateCapitalGapRequest(CapitalGapRequest request, out IResult? validationError)
+    {
+        validationError = null;
+
+        if (string.IsNullOrWhiteSpace(request.SelectedEnterprise))
+        {
+            validationError = Results.BadRequest("A workspace enterprise is required to calculate capital gap.");
+            return false;
+        }
+
+        if (request.SelectedFiscalYear <= 0)
+        {
+            validationError = Results.BadRequest("A valid fiscal year is required to calculate capital gap.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static DebtCoverageResponse ToDebtCoverageResponse(DebtCoverageResult debtCoverage)
+        => new(
+            debtCoverage.SelectedEnterprise,
+            debtCoverage.SelectedFiscalYear,
+            debtCoverage.AnnualRevenue,
+            debtCoverage.AnnualDebtService,
+            debtCoverage.ReserveHeadroom,
+            debtCoverage.DebtServiceCoverageRatio,
+            debtCoverage.CovenantThreshold,
+            debtCoverage.CovenantHeadroom,
+            debtCoverage.CovenantStatus,
+            debtCoverage.ExecutiveSummary,
+            debtCoverage.GeneratedAtUtc.ToString("O"),
+            debtCoverage.WaterfallPoints.Select(point => new WileyCoWeb.Contracts.DebtCoverageWaterfallPoint(point.Label, point.Value)).ToList());
+
+    private static CapitalGapResponse ToCapitalGapResponse(CapitalGapResult capitalGap)
+        => new(
+            capitalGap.SelectedEnterprise,
+            capitalGap.SelectedFiscalYear,
+            capitalGap.AnnualRateRevenue,
+            capitalGap.AnnualCapitalNeed,
+            capitalGap.RateRevenueGap,
+            capitalGap.CapitalNeedCoverageRatio,
+            capitalGap.CapitalItemCount,
+            capitalGap.CapitalStatus,
+            capitalGap.ExecutiveSummary,
+            capitalGap.GeneratedAtUtc.ToString("O"),
+            capitalGap.CapitalItems.Select(point => new WileyCoWeb.Contracts.CapitalGapItemPoint(
+                point.Label,
+                point.Tag,
+                point.BudgetedAmount,
+                point.ActualAmount,
+                point.CumulativeGap,
+                point.DepartmentName,
+                point.AccountName)).ToList());
 
     private static bool TryValidateWorkspaceKnowledgeRequest(
         WorkspaceKnowledgeRequest request,

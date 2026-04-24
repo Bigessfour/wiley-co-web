@@ -5,7 +5,7 @@ This file is the repository-level canonical policy for AI agents working in this
 ## Core Stack
 
 - This is a Wiley.co Blazor WebAssembly workspace.
-- Syncfusion Essential Studio 33.1.44 is mandatory for all UI work.
+- Syncfusion Essential Studio 33.2.3 is mandatory for all UI work.
 - Keep recommendations aligned with the current AWS stack: Amplify, App Runner, Aurora PostgreSQL, AWS Secrets Manager, and the thin WileyCoWeb.Api host.
 - Prioritize the Jarvis User Context Plugin section in docs/wileyco-ui-rebuild-plan.md when the task overlaps the rebuild plan.
 

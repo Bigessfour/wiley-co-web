@@ -160,6 +160,60 @@ public sealed class QuickBooksImportServiceTests
     }
 
     [Fact]
+    public async Task CommitAsync_BlocksSemanticDuplicateAcrossDifferentFileFormats()
+    {
+        var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
+        var routingService = new QuickBooksRoutingService(contextFactory);
+        var csvParser = new QuickBooksCsvParser();
+        var excelParser = new QuickBooksExcelParser();
+        var service = new QuickBooksImportService(
+            _loggerFactory.CreateLogger<QuickBooksImportService>(),
+            contextFactory,
+            routingService,
+            csvParser,
+            excelParser);
+
+        var csvBytes = Encoding.UTF8.GetBytes(CreateSparseTransactionListCsv());
+        var workbookBytes = CreateWorkbook(
+            ["", "", "", "Type", "", "Date", "", "Num", "", "Name", "", "Memo", "", "Account", "", "Clr", "", "Split", "", "Amount", "", "Balance"],
+            ["Jan - Dec 26"],
+            ["", "", "", "Deposit", "", "01/02/2026", "", "", "", "", "", "Deposit", "", "101 · CASH IN BANK - UTILITY", "", "C", "", "105 · ACCOUNTS RECEIVABLE", "", "362.90", "", "362.90"],
+            ["", "", "", "Deposit", "", "01/02/2026", "", "", "", "WATER PAYMENTS", "", "VIA CREDIT CARD", "", "105 · ACCOUNTS RECEIVABLE", "", "", "", "101 · CASH IN BANK - UTILITY", "", "-362.90", "", "0.00"]);
+
+        var firstCommit = await service.CommitAsync(
+            csvBytes,
+            "transaction-list-by-date-all.csv",
+            "Water Utility",
+            2026);
+
+        var duplicatePreview = await service.PreviewAsync(
+            workbookBytes,
+            "quickbooks-ledger.xlsx",
+            "Water Utility",
+            2026);
+
+        var duplicateCommit = await service.CommitAsync(
+            workbookBytes,
+            "quickbooks-ledger.xlsx",
+            "Water Utility",
+            2026);
+
+        Assert.False(firstCommit.IsDuplicate);
+        Assert.True(duplicatePreview.IsDuplicate);
+        Assert.Equal(2, duplicatePreview.DuplicateRows);
+        Assert.All(duplicatePreview.Rows, row => Assert.True(row.IsDuplicate));
+        Assert.Contains("commit step will be blocked", duplicatePreview.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.True(duplicateCommit.IsDuplicate);
+        Assert.Equal(0, duplicateCommit.ImportedRows);
+        Assert.Contains("already exist", duplicateCommit.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        await using var context = await contextFactory.CreateDbContextAsync();
+        Assert.Equal(1, await context.SourceFiles.CountAsync());
+        Assert.Equal(1, await context.ImportBatches.CountAsync());
+        Assert.Equal(2, await context.LedgerEntries.CountAsync());
+    }
+
+    [Fact]
     public async Task PreviewAsync_WhenCsvContainsBadData_ThrowsReadableInvalidOperationException()
     {
         var service = CreateService();

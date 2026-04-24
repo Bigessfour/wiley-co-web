@@ -2,9 +2,32 @@ namespace WileyCoWeb.Contracts;
 
 public sealed record WorkspaceScenarioItemData(Guid Id, string Name, decimal Cost);
 
+public sealed record ApartmentUnitTypeData(Guid Id, string Name, int BedroomCount, int UnitCount, decimal MonthlyRent);
+
+public sealed record BreakEvenSeriesPoint(string PeriodLabel, decimal RevenuePerCustomer, decimal ExpensesPerCustomer, decimal BreakEvenPerCustomer);
+
+public sealed record BreakEvenQuadrantData(
+    string EnterpriseName,
+    string EnterpriseType,
+    decimal CurrentRate,
+    decimal MonthlyExpenses,
+    decimal MonthlyRevenue,
+    decimal MonthlyBalance,
+    decimal BreakEvenRate,
+    decimal EffectiveCustomerCount,
+    List<BreakEvenSeriesPoint> SeriesPoints);
+
 public sealed record CustomerRow(string Name, string Service, string CityLimits);
 
 public sealed record ProjectionRow(string Year, decimal Rate);
+
+public sealed record WorkspaceReserveTrajectoryPointData(DateTime DateUtc, decimal PredictedReserves, decimal ConfidenceInterval);
+
+public sealed record WorkspaceReserveTrajectoryData(
+    decimal CurrentReserves,
+    decimal RecommendedReserveLevel,
+    string RiskAssessment,
+    List<WorkspaceReserveTrajectoryPointData> ForecastPoints);
 
 public sealed record WorkspaceSnapshotSaveResponse(long SnapshotId, string SnapshotName, string SavedAtUtc);
 
@@ -85,4 +108,7 @@ public sealed record WorkspaceBootstrapData(
     public List<CustomerRow>? CustomerRows { get; init; }
     public List<ProjectionRow>? ProjectionRows { get; init; }
     public List<WorkspaceScenarioItemData>? ScenarioItems { get; init; }
+    public List<BreakEvenQuadrantData>? BreakEvenQuadrants { get; init; }
+    public List<ApartmentUnitTypeData>? ApartmentUnitTypes { get; init; }
+    public WorkspaceReserveTrajectoryData? ReserveTrajectory { get; init; }
 }

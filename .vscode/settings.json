@@ -65,24 +65,27 @@
   "FSharp.suggestGitignore": false,
   "workbench.settings.alwaysShowAdvancedSettings": true,
 
-  // Complete AWS Toolkit Extension Configuration for this Wiley.co Amplify + Aurora project
-  "aws.profile": "default",
-  "aws.region": "us-east-2",
-  "aws.explorer.enabled": true,
-  "aws.resources.enabled": true,
-  "aws.explorer.showRegion": true,
-  "aws.lambda.enableCodeLenses": true,
+  "aws.cwl.limit": 10000,
+  "aws.telemetry": false,
   "aws.suppressPrompts": {
     "createCredentialsProfile": true,
-    "showRegionPrompt": true
+    "regionAddAutomatically": true,
+    "apprunnerNotifyPricing": true,
+    "apprunnerNotifyPause": true
   },
-  "aws.amplify.showAmplifyView": true,
-  "aws.resources.filterByTag": {
-    "awsApplication": "arn:aws:resource-groups:us-east-2:570912405222:group/Wiley-Widget/08d8t52ldwuciha57h7wqvq8cb"
+  "aws.cloudformation.telemetry.enabled": false,
+  "aws.cloudformation.hover.enabled": true,
+  "aws.cloudformation.completion.enabled": true,
+  "aws.cloudformation.diagnostics.cfnLint.enabled": true,
+  "aws.cloudformation.diagnostics.cfnLint.lintOnChange": true,
+  "aws.cloudformation.diagnostics.cfnGuard.enabled": true,
+  "aws.cloudformation.s3": "alwaysAsk",
+  "aws.cloudformation.diagnostics.cfnLint.customization": {
+    "regions": [
+      "us-east-2",
+      "us-east-1"
+    ]
   },
-  "aws.aurora.showInExplorer": true,
-
-  // Enhanced Debug Settings for Runtime Exception Capture
   "debug.javascript.breakOnConditionalError": true,
   "debug.allowBreakpointsEverywhere": true,
   "debug.inlineValues": "on",

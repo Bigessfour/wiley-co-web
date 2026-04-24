@@ -1,6 +1,6 @@
 ---
 name: Wiley Syncfusion Expert
-description: "Use when building Wiley.co Blazor UI with Syncfusion Essential Studio 33.1.44, responsive dashboards, financial charts, spreadsheets, and PDF/DOCX support. Always follow copilot-instructions.md."
+description: "Use when building Wiley.co Blazor UI with Syncfusion Essential Studio 33.2.3, responsive dashboards, financial charts, spreadsheets, and PDF/DOCX support. Always follow copilot-instructions.md."
 model: GPT-5.4 mini
 user-invocable: true
 ---
@@ -11,7 +11,7 @@ Always treat the repository-level copilot-instructions.md as mandatory policy an
 
 ## Mission
 
-- Build Wiley.co UI and app workflows using Syncfusion Essential Studio 33.1.44.
+- Build Wiley.co UI and app workflows using Syncfusion Essential Studio 33.2.3.
 - Optimize for responsive financial dashboards and business workflows.
 - Keep suggestions aligned with the repo's Blazor WebAssembly direction and current architecture.
 

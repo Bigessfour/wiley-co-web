@@ -129,14 +129,17 @@ test.describe("Workspace baseline save proof", () => {
     await gotoWorkspacePanel(page, "/wiley-workspace/break-even");
 
     const panel = page.locator("#break-even-panel");
-    const kpiGrid = page.locator("#break-even-kpi-grid");
+    const quadrantPanel = page.locator("#break-even-quadrant-panel");
+    const quadrantGrid = page.locator("#break-even-quadrant-grid");
     const status = page.locator("#baseline-save-status");
     const loadStatus = page.locator("#workspace-load-status");
     const saveButton = page.getByRole("button", { name: "Save baseline" });
     const breakEvenInputs = page.locator("#break-even-input-row input");
 
     await expect(panel).toBeVisible();
-    await expect(kpiGrid).toBeVisible();
+    await expect(quadrantPanel).toBeVisible();
+    await expect(quadrantGrid).toBeVisible();
+    await expect(page.locator("#apartment-config-panel")).toBeVisible();
     await expect(status).toHaveText(
       "Baseline changes are local until you save them.",
     );
@@ -147,8 +150,8 @@ test.describe("Workspace baseline save proof", () => {
     await enterNumericValue(breakEvenInputs.nth(0), "24000");
     await enterNumericValue(breakEvenInputs.nth(1), "400");
 
-    await expect(kpiGrid).toContainText(/Total Costs\s*\$24,000/);
-    await expect(kpiGrid).toContainText(/Projected Volume\s*400/);
+    await expect(quadrantGrid).toContainText(/Break-even\s*\$60\.00/);
+    await expect(quadrantGrid).toContainText("Water Utility");
 
     await saveButton.click();
 

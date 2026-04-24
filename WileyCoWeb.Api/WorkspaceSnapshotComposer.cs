@@ -64,6 +64,7 @@ internal sealed class WorkspaceSnapshotComposer
     {
         var selectionData = await LoadWorkspaceSnapshotSelectionAsync(context, enterpriseName, fiscalYear, cancellationToken).ConfigureAwait(false);
         var derivedData = await LoadWorkspaceSnapshotDerivedDataAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
+        var reserveTrajectory = BuildWorkspaceReserveTrajectory(selectionData.SelectedEnterprise, selectionData.SelectedFiscalYear, derivedData.CurrentRate, derivedData.TotalCosts, derivedData.ProjectedVolume, derivedData.RecommendedRate, derivedData.ProjectionRows, selectionData.PersistedSnapshot?.ReserveTrajectory);
 
         return new WorkspaceSnapshotBuildContext(
             selectionData.Enterprises,
@@ -78,7 +79,8 @@ internal sealed class WorkspaceSnapshotComposer
             derivedData.RecommendedRate,
             derivedData.RateHistory,
             derivedData.ProjectionRows,
-            derivedData.ScenarioItems);
+            derivedData.ScenarioItems,
+            reserveTrajectory);
     }
 
     private async Task<WorkspaceSnapshotSelectionData> LoadWorkspaceSnapshotSelectionAsync(
@@ -192,6 +194,9 @@ internal sealed class WorkspaceSnapshotComposer
 
     private static WorkspaceBootstrapData CreateWorkspaceBootstrapData(WorkspaceSnapshotBuildContext buildContext)
     {
+        var breakEvenQuadrants = BuildBreakEvenQuadrants(buildContext.Enterprises, buildContext.ProjectionRows);
+        var apartmentUnitTypes = BuildApartmentUnitTypes(buildContext.Enterprises);
+
         return new WorkspaceBootstrapData(
             buildContext.SelectedEnterprise.Name,
             buildContext.SelectedFiscalYear,
@@ -207,13 +212,74 @@ internal sealed class WorkspaceSnapshotComposer
             CustomerCityLimitOptions = ["All", "Yes", "No"],
             ScenarioItems = buildContext.ScenarioItems,
             CustomerRows = buildContext.CustomerRows,
-            ProjectionRows = buildContext.ProjectionRows
+            ProjectionRows = buildContext.ProjectionRows,
+            BreakEvenQuadrants = breakEvenQuadrants,
+            ApartmentUnitTypes = apartmentUnitTypes,
+            ReserveTrajectory = buildContext.ReserveTrajectory
         };
+    }
+
+    private WorkspaceReserveTrajectoryData BuildWorkspaceReserveTrajectory(
+        Enterprise selectedEnterprise,
+        int selectedFiscalYear,
+        decimal currentRate,
+        decimal totalCosts,
+        decimal projectedVolume,
+        decimal recommendedRate,
+        IReadOnlyList<ProjectionRow> projectionRows,
+        WorkspaceReserveTrajectoryData? persistedTrajectory)
+    {
+        if (persistedTrajectory is { ForecastPoints.Count: > 0 })
+        {
+            return NormalizeReserveTrajectory(persistedTrajectory);
+        }
+
+        var monthlyReserveBaseline = Math.Round(Math.Max(0m, totalCosts) * 6m, 2, MidpointRounding.AwayFromZero);
+        var recommendedReserveLevel = Math.Round(Math.Max(monthlyReserveBaseline, totalCosts * 9m), 2, MidpointRounding.AwayFromZero);
+        var reserveTrend = Math.Round(Math.Max(0m, recommendedRate - currentRate) * Math.Max(1m, projectedVolume) * 0.04m, 2, MidpointRounding.AwayFromZero);
+        var forecastYears = Math.Max(5, projectionRows.Count);
+        var confidenceInterval = Math.Round(monthlyReserveBaseline * 0.08m, 2, MidpointRounding.AwayFromZero);
+
+        var forecastPoints = Enumerable.Range(1, forecastYears)
+            .Select(index => new WorkspaceReserveTrajectoryPointData(
+                new DateTime(selectedFiscalYear + index, 6, 30, 0, 0, 0, DateTimeKind.Utc),
+                Math.Round(monthlyReserveBaseline + (reserveTrend * index), 2, MidpointRounding.AwayFromZero),
+                confidenceInterval))
+            .ToList();
+
+        var riskAssessment = monthlyReserveBaseline < recommendedReserveLevel * 0.5m
+            ? "High"
+            : monthlyReserveBaseline < recommendedReserveLevel
+                ? "Moderate"
+                : "Low";
+
+        logger.LogInformation(
+            "Built reserve trajectory for {Enterprise} FY {FiscalYear} using derived snapshot data.",
+            selectedEnterprise.Name,
+            selectedFiscalYear);
+
+        return new WorkspaceReserveTrajectoryData(
+            monthlyReserveBaseline,
+            recommendedReserveLevel,
+            riskAssessment,
+            forecastPoints);
+    }
+
+    private static WorkspaceReserveTrajectoryData NormalizeReserveTrajectory(WorkspaceReserveTrajectoryData trajectory)
+    {
+        return new WorkspaceReserveTrajectoryData(
+            trajectory.CurrentReserves,
+            trajectory.RecommendedReserveLevel,
+            string.IsNullOrWhiteSpace(trajectory.RiskAssessment) ? "Unavailable" : trajectory.RiskAssessment.Trim(),
+            trajectory.ForecastPoints
+                .Select(point => new WorkspaceReserveTrajectoryPointData(point.DateUtc, point.PredictedReserves, point.ConfidenceInterval))
+                .ToList());
     }
 
     private async Task<List<Enterprise>> LoadEnterprisesAsync(AppDbContext context, CancellationToken cancellationToken)
     {
         var enterprises = await context.Enterprises
+            .Include(enterprise => enterprise.ApartmentUnitTypes)
             .AsNoTracking()
             .Where(enterprise => !enterprise.IsDeleted)
             .ToListAsync(cancellationToken);
@@ -344,6 +410,90 @@ internal sealed class WorkspaceSnapshotComposer
         return persistedSnapshot.ScenarioItems!
             .Select(item => new WorkspaceScenarioItemData(item.Id, item.Name, item.Cost))
             .ToList();
+    }
+
+    private static List<BreakEvenQuadrantData> BuildBreakEvenQuadrants(List<Enterprise> enterprises, IReadOnlyList<ProjectionRow> projectionRows)
+    {
+        return enterprises
+            .Where(enterprise => !enterprise.IsDeleted)
+            .OrderBy(enterprise => GetEnterpriseSortOrder(enterprise.Name))
+            .ThenBy(enterprise => enterprise.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(enterprise => BuildBreakEvenQuadrant(enterprise, projectionRows))
+            .ToList();
+    }
+
+    private static BreakEvenQuadrantData BuildBreakEvenQuadrant(Enterprise enterprise, IReadOnlyList<ProjectionRow> projectionRows)
+    {
+        var effectiveCustomers = Math.Max(1m, enterprise.EffectiveCustomerCount);
+        var breakEvenRate = Math.Round(enterprise.MonthlyExpenses / effectiveCustomers, 2, MidpointRounding.AwayFromZero);
+        var monthlyRevenue = Math.Round(enterprise.MonthlyRevenue, 2, MidpointRounding.AwayFromZero);
+        var monthlyBalance = Math.Round(enterprise.MonthlyBalance, 2, MidpointRounding.AwayFromZero);
+        var expensesPerCustomer = Math.Round(enterprise.MonthlyExpenses / effectiveCustomers, 2, MidpointRounding.AwayFromZero);
+
+        var seriesPoints = BuildBreakEvenSeriesPoints(projectionRows, enterprise.CurrentRate, breakEvenRate, expensesPerCustomer);
+
+        return new BreakEvenQuadrantData(
+            enterprise.Name,
+            enterprise.Type ?? string.Empty,
+            enterprise.CurrentRate,
+            enterprise.MonthlyExpenses,
+            monthlyRevenue,
+            monthlyBalance,
+            breakEvenRate,
+            effectiveCustomers,
+            seriesPoints);
+    }
+
+    private static List<BreakEvenSeriesPoint> BuildBreakEvenSeriesPoints(IReadOnlyList<ProjectionRow> projectionRows, decimal currentRate, decimal breakEvenRate, decimal expensesPerCustomer)
+    {
+        if (projectionRows.Count == 0)
+        {
+            return
+            [
+                new BreakEvenSeriesPoint("Current", currentRate, expensesPerCustomer, breakEvenRate),
+                new BreakEvenSeriesPoint("Break-Even", breakEvenRate, expensesPerCustomer, breakEvenRate)
+            ];
+        }
+
+        var count = Math.Max(1, projectionRows.Count - 1);
+
+        return projectionRows.Select((row, index) =>
+        {
+            var progress = (decimal)index / count;
+            var revenue = Math.Round(currentRate + ((breakEvenRate - currentRate) * progress), 2, MidpointRounding.AwayFromZero);
+            return new BreakEvenSeriesPoint(row.Year, revenue, expensesPerCustomer, breakEvenRate);
+        }).ToList();
+    }
+
+    private static List<ApartmentUnitTypeData> BuildApartmentUnitTypes(List<Enterprise> enterprises)
+    {
+        var apartmentEnterprise = enterprises.FirstOrDefault(enterprise => string.Equals(enterprise.Name, "Apartments", StringComparison.OrdinalIgnoreCase));
+        if (apartmentEnterprise is null)
+        {
+            return
+            [
+                new ApartmentUnitTypeData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1c01"), "2 Bedroom", 2, 8, 444.44m),
+                new ApartmentUnitTypeData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1c02"), "3 Bedroom", 3, 8, 555.55m)
+            ];
+        }
+
+        var unitTypes = apartmentEnterprise.ApartmentUnitTypes
+            .Where(unitType => !unitType.IsDeleted)
+            .Select(unitType => new ApartmentUnitTypeData(
+                Guid.NewGuid(),
+                unitType.Name,
+                unitType.BedroomCount,
+                unitType.UnitCount,
+                unitType.MonthlyRent))
+            .ToList();
+
+        return unitTypes.Count > 0
+            ? unitTypes
+            :
+            [
+                new ApartmentUnitTypeData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1c01"), "2 Bedroom", 2, 8, 444.44m),
+                new ApartmentUnitTypeData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1c02"), "3 Bedroom", 3, 8, 555.55m)
+            ];
     }
 
     private static int ResolveFiscalYear(int? fiscalYear, List<int> budgetYears)
@@ -687,7 +837,8 @@ internal sealed class WorkspaceSnapshotComposer
         decimal RecommendedRate,
         IReadOnlyList<RateHistoryPoint> RateHistory,
         List<ProjectionRow> ProjectionRows,
-        List<WorkspaceScenarioItemData> ScenarioItems);
+        List<WorkspaceScenarioItemData> ScenarioItems,
+        WorkspaceReserveTrajectoryData ReserveTrajectory);
 
     private sealed record WorkspaceSnapshotSelectionData(
         List<Enterprise> Enterprises,

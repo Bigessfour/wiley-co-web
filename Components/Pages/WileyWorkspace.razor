@@ -224,6 +224,33 @@
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("customers")'>Open Customer Viewer</button>
                                 </article>
 
+                                <article id="overview-affordability" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Affordability</p>
+                                        <h3>Bill burden versus MHI</h3>
+                                        <p>See how modeled monthly bills compare to median household income across customer classes and rate scenarios.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("affordability")'>Open Affordability</button>
+                                </article>
+
+                                <article id="overview-debt-coverage" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Debt Coverage</p>
+                                        <h3>DSCR and covenant headroom</h3>
+                                        <p>Check annual revenue against debt service, compare the ratio to a covenant floor, and inspect residual headroom.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("debt-coverage")'>Open Debt Coverage</button>
+                                </article>
+
+                                <article id="overview-capital-gap" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Capital Gap</p>
+                                        <h3>Capital needs versus rate revenue</h3>
+                                        <p>Track capital-tagged budget items against rate revenue and watch the cumulative headroom line move as items accumulate.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("capital-gap")'>Open Capital Gap</button>
+                                </article>
+
                                 <article id="overview-trends" class="workspace-overview-card">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Trends</p>
@@ -272,12 +299,12 @@
                                                         BreakEvenRateDisplay="@BreakEvenRateDisplay"
                                                         IsSavingBaseline="@IsSavingBaseline"
                                                         BaselineSaveStatus="@BaselineSaveStatus"
-                                                        GaugeMaximum="@GaugeMaximum"
-                                                        GaugeCurrentRateValue="@GaugeCurrentRateValue"
-                                                        RateComparison="@RateComparison"
+                                                        Quadrants="@BreakEvenQuadrants"
+                                                        ApartmentUnitTypes="@ApartmentUnitTypes"
                                                         OnTotalCostsChanged="HandleTotalCostsChanged"
                                                         OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
-                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync" />
+                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync"
+                                                        OnApartmentUnitTypesChanged="HandleApartmentUnitTypesChanged" />
                                         break;
                                     case "rates":
                                         <RatesPanel @key="ActivePanelKey"
@@ -310,8 +337,30 @@
                                     case "customers":
                                         <CustomerViewerPanel @key="ActivePanelKey" />
                                         break;
+                                    case "affordability":
+                                        <AffordabilityDashboardPanel @key="ActivePanelKey"
+                                                                     Customers="@Customers"
+                                                                     SelectedEnterprise="@SelectedEnterprise"
+                                                                     SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
                                     case "trends":
                                         <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
+                                        break;
+                                    case "reserve-trajectory":
+                                        <ReserveTrajectoryPanel @key="ActivePanelKey"
+                                                               Trajectory="@ReserveTrajectory"
+                                                               OnExportPdf="ExportReserveTrajectoryPdfAsync"
+                                                               OnExportExcel="ExportReserveTrajectoryWorkbookAsync" />
+                                        break;
+                                    case "debt-coverage":
+                                        <DebtCoveragePanel @key="ActivePanelKey"
+                                                           SelectedEnterprise="@SelectedEnterprise"
+                                                           SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
+                                    case "capital-gap":
+                                        <CapitalGapPanel @key="ActivePanelKey"
+                                                         SelectedEnterprise="@SelectedEnterprise"
+                                                         SelectedFiscalYear="@SelectedFiscalYear" />
                                         break;
                                     case "decision-support":
                                         <DecisionSupportPanel @key="ActivePanelKey" />

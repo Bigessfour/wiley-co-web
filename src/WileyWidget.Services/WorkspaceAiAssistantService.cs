@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
@@ -15,7 +16,7 @@ namespace WileyWidget.Services;
 
 public sealed class WorkspaceAiAssistantService
 {
-    private const string DefaultSemanticKernelModel = "grok-4-1-fast-reasoning";
+    private const string DefaultSemanticKernelModel = WorkspaceAiKernelFactory.DefaultSemanticKernelModel;
     private const string SystemPrompt = "You are Jarvis, the centerpiece municipal finance AI for rural utility communities. Excel at natural-language conversation: answer 'why is this a certain way?', 'what do we need to do to address this financial issue?' with auditor-impressing, transparent rationales grounded in real ledger data, QuickBooks imports, break-even models, operational methods (reserve building, infrastructure phasing, efficiency gains), GASB/AWWA rural benchmarks, and 5/10-yr trends. Help city councils with limited financial background feel confident in AI suggestions by explaining fluency concepts simply while showing rigorous methodology. Always tie to workspace context, AIContextStore, and UserContextPlugin. Use get_workspace_knowledge_summary, explain_financial_issue, suggest_operational_actions, and generate_rate_rationale for live financial depth. Keep responses practical, human, non-creepy, and actionable for quality council decisions.";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -36,6 +37,7 @@ public sealed class WorkspaceAiAssistantService
     private readonly Lazy<KernelContext?> kernelContext;
     private readonly bool legacyXaiEnabled;
     private readonly bool allowDirectXaiRetry;
+    private readonly bool storeResponses;
     private readonly string semanticKernelModel;
     private readonly Uri chatCompletionEndpoint;
     private readonly Uri legacyXaiEndpoint;
@@ -71,7 +73,8 @@ public sealed class WorkspaceAiAssistantService
         this.kernelProvider = kernelProvider;
         var aiConfiguration = kernelProvider?.GetConfiguration() ?? WorkspaceAiKernelFactory.ResolveConfiguration(configuration, apiKeyProvider);
         legacyXaiEnabled = GetConfiguredBoolean(true, "EnableAI", "XAI:Enabled");
-        allowDirectXaiRetry = GetConfiguredBoolean(true, "XAI:AllowDirectRetry");
+        allowDirectXaiRetry = GetConfiguredBoolean(false, "XAI:AllowDirectRetry");
+        storeResponses = aiConfiguration.StoreResponses;
         chatCompletionEndpoint = aiConfiguration.ChatCompletionEndpoint;
         legacyXaiEndpoint = aiConfiguration.LegacyResponsesEndpoint;
         // Per xAI docs (docs.x.ai/developers/models): prefer a reasoning-capable, function-capable Grok model for the live SK path.
@@ -140,6 +143,7 @@ public sealed class WorkspaceAiAssistantService
     public async Task<WorkspaceChatResponse> AskAsync(WorkspaceChatRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var requestStopwatch = Stopwatch.StartNew();
         logger.LogInformation("Workspace AI request started for {Enterprise} FY {FiscalYear} (question length {QuestionLength})", request.SelectedEnterprise, request.SelectedFiscalYear, request.Question?.Length ?? 0);
 
         var question = string.IsNullOrWhiteSpace(request.Question)
@@ -168,6 +172,7 @@ public sealed class WorkspaceAiAssistantService
             };
 
             logger.LogInformation("Workspace AI returned onboarding fallback for first conversation {ConversationId}", conversationId);
+            LogRequestCompleted(request, onboardingResponse, conversationId, conversationHistory.Count, "onboarding", null, requestStopwatch.ElapsedMilliseconds);
             return onboardingResponse;
         }
 
@@ -188,6 +193,7 @@ public sealed class WorkspaceAiAssistantService
                 var liveResponse = await ExecuteSemanticKernelAsync(assistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
                 if (liveResponse is not null)
                 {
+                    LogRequestCompleted(request, liveResponse, conversationId, liveResponse.ConversationMessageCount, "semantic_kernel", null, requestStopwatch.ElapsedMilliseconds);
                     return liveResponse;
                 }
             }
@@ -220,6 +226,7 @@ public sealed class WorkspaceAiAssistantService
                             "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy transport failure.",
                             request.SelectedEnterprise,
                             request.SelectedFiscalYear);
+                        LogRequestCompleted(request, directResponse, conversationId, directResponse.ConversationMessageCount, "semantic_kernel_direct_retry", fallbackDiagnosticCode, requestStopwatch.ElapsedMilliseconds);
                         return directResponse;
                     }
                 }
@@ -250,7 +257,9 @@ public sealed class WorkspaceAiAssistantService
                 conversationId,
                 conversationHistory.Count,
                 fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
-            return ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
+            var finalRateLimitedResponse = ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
+            LogRequestCompleted(request, finalRateLimitedResponse, conversationId, conversationHistory.Count, "rate_limit_fallback", fallbackDiagnosticCode ?? "rate_limited", requestStopwatch.ElapsedMilliseconds);
+            return finalRateLimitedResponse;
         }
 
         var legacyResult = await TryGetLegacyXaiAnswerAsync(activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
@@ -261,7 +270,9 @@ public sealed class WorkspaceAiAssistantService
 
             var legacyResponse = new WorkspaceChatResponse(question, legacyResult.Answer, true, contextSummary);
             logger.LogInformation("Workspace AI returned legacy xAI fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
-            return ApplyUserMetadata(legacyResponse, activeUser, conversationId, conversationHistory.Count);
+            var finalLegacyResponse = ApplyUserMetadata(legacyResponse, activeUser, conversationId, conversationHistory.Count);
+            LogRequestCompleted(request, finalLegacyResponse, conversationId, conversationHistory.Count, "legacy_xai_fallback", fallbackDiagnosticCode ?? legacyResult.FailureCode, requestStopwatch.ElapsedMilliseconds);
+            return finalLegacyResponse;
         }
 
         fallbackDiagnosticCode ??= legacyResult.FailureCode;
@@ -278,7 +289,9 @@ public sealed class WorkspaceAiAssistantService
             conversationHistory.Count,
             fallbackDiagnosticCode ?? semanticKernelStatusCode,
             fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
-        return ApplyUserMetadata(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count);
+        var finalFallbackResponse = ApplyUserMetadata(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count);
+        LogRequestCompleted(request, finalFallbackResponse, conversationId, conversationHistory.Count, "deterministic_fallback", fallbackDiagnosticCode ?? semanticKernelStatusCode, requestStopwatch.ElapsedMilliseconds);
+        return finalFallbackResponse;
     }
 
     public async Task ResetConversationAsync(WorkspaceConversationResetRequest request, CancellationToken cancellationToken = default)
@@ -418,7 +431,7 @@ public sealed class WorkspaceAiAssistantService
             // "RevocationStatusUnknown, OfflineRevocation" because the VPC-connector egress
             // cannot reach public OCSP/CRL responders, forcing every chat into the
             // deterministic fallback path.
-            var semanticKernelHttpClient = httpClientFactory?.CreateClient(nameof(WorkspaceAiAssistantService));
+            var semanticKernelHttpClient = httpClientFactory?.CreateClient(WorkspaceAiKernelFactory.HttpClientName);
             kernelBuilder.AddOpenAIChatCompletion(
                 modelId: model,
                 apiKey: apiKeyResolution.ApiKey,
@@ -500,11 +513,11 @@ public sealed class WorkspaceAiAssistantService
             stream = false,
             temperature = legacyXaiTemperature,
             max_output_tokens = legacyXaiMaxTokens,
-            store = true,
+            store = storeResponses,
             prompt_cache_key = BuildConversationId(user, request)
         };
 
-        var client = httpClientFactory?.CreateClient(nameof(WorkspaceAiAssistantService));
+        var client = httpClientFactory?.CreateClient(WorkspaceAiKernelFactory.HttpClientName);
         var ownsClient = false;
         if (client is null)
         {
@@ -583,37 +596,10 @@ public sealed class WorkspaceAiAssistantService
     }
 
     private static Uri NormalizeResponsesEndpoint(string? endpoint)
-    {
-        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
-        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
-        {
-            return new Uri(candidate, UriKind.Absolute);
-        }
-
-        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/chat/completions".Length];
-        }
-
-        return new Uri($"{candidate}/responses", UriKind.Absolute);
-    }
+        => WorkspaceAiKernelFactory.NormalizeResponsesEndpoint(endpoint);
 
     private static Uri NormalizeChatCompletionEndpoint(string? endpoint)
-    {
-        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
-
-        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/responses".Length];
-        }
-
-        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/chat/completions".Length];
-        }
-
-        return new Uri(candidate, UriKind.Absolute);
-    }
+        => WorkspaceAiKernelFactory.NormalizeChatCompletionEndpoint(endpoint);
 
     private static int ParseInt(string? value, int fallback)
         => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : fallback;
@@ -934,6 +920,28 @@ public sealed class WorkspaceAiAssistantService
             IsFirstConversation = messageCount <= 2,
             CanResetConversation = true
         };
+    }
+
+    private void LogRequestCompleted(
+        WorkspaceChatRequest request,
+        WorkspaceChatResponse response,
+        string conversationId,
+        int turnCount,
+        string answerSource,
+        string? failureCode,
+        long elapsedMilliseconds)
+    {
+        logger.LogInformation(
+            "Workspace AI request completed for {Enterprise} FY {FiscalYear} (ConversationId={ConversationId}, AnswerSource={AnswerSource}, UsedFallback={UsedFallback}, IsFirstConversation={IsFirstConversation}, TurnCount={TurnCount}, FailureCode={FailureCode}, ElapsedMs={ElapsedMs})",
+            request.SelectedEnterprise,
+            request.SelectedFiscalYear,
+            conversationId,
+            answerSource,
+            response.UsedFallback,
+            response.IsFirstConversation,
+            turnCount,
+            failureCode ?? "none",
+            elapsedMilliseconds);
     }
 
     private static string BuildConversationId(ResolvedUserContext user, WorkspaceChatRequest request)

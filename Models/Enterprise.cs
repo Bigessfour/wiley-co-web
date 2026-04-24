@@ -2,9 +2,8 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Runtime.CompilerServices;
-// using WileyWidget.Attributes; (same namespace now)
-// using WileyWidget.Data; (interfaces moved to Models)
 
 namespace WileyWidget.Models;
 
@@ -19,7 +18,7 @@ public enum EnterpriseStatus
 /// Represents a municipal enterprise (Water, Sewer, Trash, Apartments)
 /// Implements audit tracking and soft delete for compliance
 /// </summary>
-public class Enterprise : ISoftDeletable
+public partial class Enterprise : ISoftDeletable
 {
     /// <summary>
     /// <summary>
@@ -47,30 +46,20 @@ public class Enterprise : ISoftDeletable
     /// </summary>
     public Enterprise()
     {
-        // Ensure string properties are initialized to empty strings
         _name = string.Empty;
         _type = string.Empty;
         _notes = string.Empty;
     }
 
-    /// <summary>
-    /// Unique identifier for the enterprise
-    /// </summary>
     [Key]
-    [GridDisplay(99, 80, Visible = true)] // Put ID at the end
+    [GridDisplay(99, 80, Visible = true)]
     public int Id { get; set; }
 
-    /// <summary>
-    /// Row version for optimistic concurrency control
-    /// </summary>
     [Timestamp]
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     private string _name;
 
-    /// <summary>
-    /// Name of the enterprise (Water, Sewer, Trash, Apartments)
-    /// </summary>
     [Required(ErrorMessage = "Enterprise name is required")]
     [StringLength(100, ErrorMessage = "Enterprise name cannot exceed 100 characters")]
     [GridDisplay(1, 150)]
@@ -89,9 +78,6 @@ public class Enterprise : ISoftDeletable
 
     private string? _description;
 
-    /// <summary>
-    /// Description of the enterprise
-    /// </summary>
     [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
     public string? Description
     {
@@ -109,9 +95,6 @@ public class Enterprise : ISoftDeletable
 
     private decimal _currentRate;
 
-    /// <summary>
-    /// Current rate charged per citizen (e.g., $5.00 per month for water)
-    /// </summary>
     [Required(ErrorMessage = "Current rate is required")]
     [Range(0.01, 9999.99, ErrorMessage = "Rate must be between 0.01 and 9999.99")]
     [Column(TypeName = "decimal(18,2)")]
@@ -124,16 +107,13 @@ public class Enterprise : ISoftDeletable
             if (_currentRate != value)
             {
                 _currentRate = value;
-                OnPropertyChanged(nameof(CurrentRate), nameof(MonthlyRevenue), nameof(MonthlyBalance), nameof(BreakEvenRate));
+                OnPropertyChanged(nameof(CurrentRate), nameof(MonthlyRevenue), nameof(MonthlyBalance), nameof(BreakEvenRate), nameof(RevenuePerCustomer), nameof(BalancePerCustomer));
             }
         }
     }
 
     private decimal _monthlyExpenses;
 
-    /// <summary>
-    /// Monthly expenses (sum of employee compensation + maintenance + other operational costs)
-    /// </summary>
     [Required(ErrorMessage = "Monthly expenses are required")]
     [Range(0, double.MaxValue, ErrorMessage = "Monthly expenses cannot be negative")]
     [Column(TypeName = "decimal(18,2)")]
@@ -151,18 +131,18 @@ public class Enterprise : ISoftDeletable
         }
     }
 
-    /// <summary>
-    /// Monthly revenue (calculated as CitizenCount * CurrentRate)
-    /// </summary>
     [NotMapped]
     [GridDisplay(6, 120, DecimalDigits = 2)]
-    public decimal MonthlyRevenue => CitizenCount * CurrentRate;
+    public decimal MonthlyRevenue => string.Equals(Type, "Apartments", StringComparison.OrdinalIgnoreCase)
+        ? ApartmentUnitTypes.Sum(unitType => unitType.MonthlyRevenue)
+        : CitizenCount * CurrentRate;
+
+    [NotMapped]
+    [GridDisplay(6, 120, DecimalDigits = 2)]
+    public decimal RevenuePerCustomer => EffectiveCustomerCount > 0 ? MonthlyRevenue / EffectiveCustomerCount : 0m;
 
     private int _citizenCount;
 
-    /// <summary>
-    /// Number of citizens served by this enterprise
-    /// </summary>
     [Required(ErrorMessage = "Citizen count is required")]
     [Range(1, int.MaxValue, ErrorMessage = "Citizen count must be at least 1")]
     [GridDisplay(4, 80, DecimalDigits = 0)]
@@ -174,16 +154,17 @@ public class Enterprise : ISoftDeletable
             if (_citizenCount != value)
             {
                 _citizenCount = value;
-                OnPropertyChanged(nameof(CitizenCount), nameof(MonthlyRevenue), nameof(MonthlyBalance), nameof(BreakEvenRate));
+                OnPropertyChanged(nameof(CitizenCount), nameof(MonthlyRevenue), nameof(MonthlyBalance), nameof(BreakEvenRate), nameof(EffectiveCustomerCount), nameof(RevenuePerCustomer), nameof(BalancePerCustomer));
             }
         }
     }
 
+    [NotMapped]
+    [GridDisplay(7, 120, DecimalDigits = 2)]
+    public decimal BalancePerCustomer => EffectiveCustomerCount > 0 ? MonthlyBalance / EffectiveCustomerCount : 0m;
+
     private decimal _totalBudget;
 
-    /// <summary>
-    /// Total budget allocated for this enterprise
-    /// </summary>
     [Column(TypeName = "decimal(18,2)")]
     [GridDisplay(8, 120, DecimalDigits = 2)]
     public decimal TotalBudget
@@ -201,9 +182,6 @@ public class Enterprise : ISoftDeletable
 
     private decimal _budgetAmount;
 
-    /// <summary>
-    /// Budget amount for this enterprise
-    /// </summary>
     [Column(TypeName = "decimal(18,2)")]
     public decimal BudgetAmount
     {
@@ -218,16 +196,10 @@ public class Enterprise : ISoftDeletable
         }
     }
 
-    /// <summary>
-    /// Last modified date for this enterprise
-    /// </summary>
     public DateTime? LastModified { get; set; }
 
     private string? _type;
 
-    /// <summary>
-    /// Type of enterprise (Water, Sewer, etc.)
-    /// </summary>
     [StringLength(50, ErrorMessage = "Type cannot exceed 50 characters")]
     public string? Type
     {
@@ -245,9 +217,6 @@ public class Enterprise : ISoftDeletable
 
     private string? _notes;
 
-    /// <summary>
-    /// Additional notes about the enterprise
-    /// </summary>
     [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters")]
     [GridDisplay(9, 200)]
     public string? Notes
@@ -266,9 +235,6 @@ public class Enterprise : ISoftDeletable
 
     private EnterpriseStatus _status = EnterpriseStatus.Active;
 
-    /// <summary>
-    /// Operational status of the enterprise for grouping and filtering
-    /// </summary>
     [GridDisplay(7, 100)]
     public EnterpriseStatus Status
     {
@@ -283,33 +249,37 @@ public class Enterprise : ISoftDeletable
         }
     }
 
-    /// <summary>
-    /// Convenience: Last updated timestamp (for UI binding)
-    /// </summary>
     [NotMapped]
     public DateTime LastUpdated => DateTime.Now;
 
-    /// <summary>
-    /// Navigation property for budget interactions
-    /// </summary>
     public virtual ICollection<BudgetInteraction> BudgetInteractions { get; set; } = new List<BudgetInteraction>();
 
-    /// <summary>
-    /// Calculated property: Monthly deficit/surplus (Revenue - Expenses)
-    /// </summary>
     [NotMapped]
     [GridDisplay(7, 120, DecimalDigits = 2)]
     public decimal MonthlyBalance => MonthlyRevenue - MonthlyExpenses;
 
-    /// <summary>
-    /// Calculated property: Break-even rate needed to cover expenses
-    /// </summary>
     [NotMapped]
-    public decimal BreakEvenRate => CitizenCount > 0 ? MonthlyExpenses / CitizenCount : 0;
+    public decimal BreakEvenRate => EffectiveCustomerCount > 0 ? MonthlyExpenses / EffectiveCustomerCount : 0;
 
-    /// <summary>
-    /// Selection state for bulk operations (not persisted)
-    /// </summary>
+    [NotMapped]
+    public string UnitLabel => string.Equals(Type, "Apartments", StringComparison.OrdinalIgnoreCase) ? "Units" : "Customers";
+
+    [NotMapped]
+    public decimal EffectiveCustomerCount
+    {
+        get
+        {
+            if (string.Equals(Type, "Apartments", StringComparison.OrdinalIgnoreCase))
+            {
+                return ApartmentUnitTypes.Sum(unitType => unitType.UnitCount * unitType.BedroomCount);
+            }
+
+            return CitizenCount;
+        }
+    }
+
+    public virtual ICollection<ApartmentUnitType> ApartmentUnitTypes { get; set; } = new List<ApartmentUnitType>();
+
     [NotMapped]
     public bool IsSelected
     {
@@ -325,13 +295,8 @@ public class Enterprise : ISoftDeletable
     }
     private bool _isSelected;
 
-    // ========== Meter Reading Fields (Water Enterprise Only) ==========
-
     private decimal? _meterReading;
 
-    /// <summary>
-    /// Current meter reading value (Water enterprise only)
-    /// </summary>
     [Column(TypeName = "decimal(18,2)")]
     [GridDisplay(10, 100, DecimalDigits = 2)]
     public decimal? MeterReading
@@ -349,9 +314,6 @@ public class Enterprise : ISoftDeletable
 
     private DateTime? _meterReadDate;
 
-    /// <summary>
-    /// Date and time the meter was read (Water enterprise only)
-    /// </summary>
     [GridDisplay(11, 120)]
     public DateTime? MeterReadDate
     {
@@ -368,9 +330,6 @@ public class Enterprise : ISoftDeletable
 
     private decimal? _previousMeterReading;
 
-    /// <summary>
-    /// Previous meter reading value for consumption calculation (Water enterprise only)
-    /// </summary>
     [Column(TypeName = "decimal(18,2)")]
     [GridDisplay(12, 100, DecimalDigits = 2)]
     public decimal? PreviousMeterReading
@@ -388,9 +347,6 @@ public class Enterprise : ISoftDeletable
 
     private DateTime? _previousMeterReadDate;
 
-    /// <summary>
-    /// Date of the previous meter reading (Water enterprise only)
-    /// </summary>
     [GridDisplay(13, 120)]
     public DateTime? PreviousMeterReadDate
     {
@@ -405,9 +361,6 @@ public class Enterprise : ISoftDeletable
         }
     }
 
-    /// <summary>
-    /// Calculated water consumption (Current - Previous meter reading)
-    /// </summary>
     [NotMapped]
     [GridDisplay(14, 100, DecimalDigits = 2)]
     public decimal? WaterConsumption =>
@@ -415,71 +368,28 @@ public class Enterprise : ISoftDeletable
             ? MeterReading.Value - PreviousMeterReading.Value
             : null;
 
-    #region IAuditable Implementation
-
-    /// <summary>
-    /// Date and time when the enterprise was created (UTC)
-    /// </summary>
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// Date and time when the enterprise was last modified (UTC)
-    /// </summary>
     public DateTime? ModifiedDate { get; set; }
 
-    /// <summary>
-    /// User who created the enterprise
-    /// </summary>
     public string? CreatedBy { get; set; }
 
-    /// <summary>
-    /// User who last modified the enterprise
-    /// </summary>
     public string? ModifiedBy { get; set; }
 
-    /// <summary>
-    /// Date and time when the enterprise was created (UTC) - IAuditable implementation
-    /// </summary>
     public DateTime CreatedAt { get => CreatedDate; set => CreatedDate = value; }
 
-    /// <summary>
-    /// Date and time when the enterprise was last modified (UTC) - IAuditable implementation
-    /// </summary>
     public DateTime? UpdatedAt { get => ModifiedDate; set => ModifiedDate = value; }
 
-    #endregion
-
-    #region ISoftDeletable Implementation
-
-    /// <summary>
-    /// Whether the enterprise has been soft-deleted (retained for audit/compliance)
-    /// </summary>
     public bool IsDeleted { get; set; }
 
-    /// <summary>
-    /// Date and time when the enterprise was soft-deleted (UTC)
-    /// </summary>
     public DateTime? DeletedDate { get; set; }
 
-    /// <summary>
-    /// User who soft-deleted the enterprise
-    /// </summary>
     public string? DeletedBy { get; set; }
 
-    #endregion
-
-    #region Domain Behavior Methods
-
-    /// <summary>
-    /// Determines if the enterprise is operating profitably
-    /// </summary>
     public bool IsProfitable() => MonthlyBalance > 0;
 
-    /// <summary>
-    /// Calculates the rate adjustment needed to reach a target balance
-    /// </summary>
-    /// <param name="targetBalance">Desired monthly balance</param>
-    /// <returns>Required rate adjustment (positive = increase, negative = decrease)</returns>
+    public decimal CalculateBreakEvenVariance() => MonthlyRevenue - MonthlyExpenses;
+
     public decimal CalculateRateAdjustmentForTarget(decimal targetBalance)
     {
         if (CitizenCount == 0)
@@ -490,12 +400,6 @@ public class Enterprise : ISoftDeletable
         return targetRate - CurrentRate;
     }
 
-    /// <summary>
-    /// Validates if a rate change would result in a reasonable outcome
-    /// </summary>
-    /// <param name="proposedRate">The rate to validate</param>
-    /// <param name="errorMessage">Error message if invalid</param>
-    /// <returns>True if valid, false otherwise</returns>
     public bool ValidateRateChange(decimal proposedRate, out string? errorMessage)
     {
         if (proposedRate < 0)
@@ -510,82 +414,14 @@ public class Enterprise : ISoftDeletable
             return false;
         }
 
-        // Warn if rate increase is > 50% (unusual for municipal services)
         var percentIncrease = CurrentRate > 0 ? ((proposedRate - CurrentRate) / CurrentRate) * 100 : 0;
         if (percentIncrease > 50)
         {
             errorMessage = $"Warning: Rate increase of {percentIncrease:F1}% exceeds typical adjustment range";
-            return true; // Return true but with warning
+            return true;
         }
 
         errorMessage = null;
         return true;
     }
-
-    /// <summary>
-    /// Calculates the annual revenue projection
-    /// </summary>
-    public decimal ProjectAnnualRevenue() => MonthlyRevenue * 12;
-
-    /// <summary>
-    /// Calculates the annual expense projection
-    /// </summary>
-    public decimal ProjectAnnualExpenses() => MonthlyExpenses * 12;
-
-    /// <summary>
-    /// Calculates variance from break-even (positive = profitable, negative = loss)
-    /// </summary>
-    public decimal CalculateBreakEvenVariance() => CurrentRate - BreakEvenRate;
-
-    /// <summary>
-    /// Determines the recommended rate adjustment based on current financial health
-    /// </summary>
-    public string GetRateRecommendation()
-    {
-        var variance = CalculateBreakEvenVariance();
-
-        if (variance >= 1.0m)
-            return $"Current rate is ${variance:F2} above break-even. Consider rate reduction or reserve building.";
-        else if (variance >= 0)
-            return "Current rate is at or near break-even. Monitor closely.";
-        else if (variance >= -1.0m)
-            return $"Current rate is ${Math.Abs(variance):F2} below break-even. Minor rate increase recommended.";
-        else
-            return $"Current rate is ${Math.Abs(variance):F2} below break-even. Immediate rate adjustment required.";
-    }
-
-    /// <summary>
-    /// Updates meter readings and validates water consumption
-    /// </summary>
-    public bool UpdateMeterReading(decimal newReading, DateTime readDate, out string? errorMessage)
-    {
-        if (newReading < 0)
-        {
-            errorMessage = "Meter reading cannot be negative";
-            return false;
-        }
-
-        if (MeterReading.HasValue && newReading < MeterReading.Value)
-        {
-            errorMessage = "New meter reading cannot be less than previous reading (meter rollover not supported)";
-            return false;
-        }
-
-        if (readDate < MeterReadDate)
-        {
-            errorMessage = "New read date cannot be before previous read date";
-            return false;
-        }
-
-        // Update readings
-        PreviousMeterReading = MeterReading;
-        PreviousMeterReadDate = MeterReadDate;
-        MeterReading = newReading;
-        MeterReadDate = readDate;
-
-        errorMessage = null;
-        return true;
-    }
-
-    #endregion
 }

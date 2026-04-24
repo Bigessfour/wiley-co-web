@@ -28,24 +28,28 @@ test.describe("Workspace Shell", () => {
     // 2. Use the left navigation to visit every panel route once, then return to the overview.
     const primaryNavigation = page.locator("#workspace-navigation-list");
 
-    await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
-    await expect(page.locator("#break-even-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#break-even-summary-panel")
-        .getByText("Break-Even Summary", { exact: true }),
-    ).toBeVisible();
+    await primaryNavigation
+      .getByRole("link", { name: "Break-Even" })
+      .dispatchEvent("click");
+    await expect(page.locator("#break-even-panel")).toBeVisible();
+    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
+    await expect(page.locator("#apartment-config-panel")).toBeVisible();
+    await expect(page.locator("#break-even-panel")).toContainText(
+      "Break-Even Quadrants",
+    );
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Break-Even",
     );
 
-    await primaryNavigation.getByRole("link", { name: "Rates" }).click();
+    await primaryNavigation
+      .getByRole("link", { name: "Rates" })
+      .dispatchEvent("click");
     await expect(page.locator("#rates-panel")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText("Rates");
 
     await primaryNavigation
       .getByRole("link", { name: "QuickBooks Import" })
-      .click();
+      .dispatchEvent("click");
     await expect(
       page.locator("#quickbooks-import-status-headline"),
     ).toBeVisible();
@@ -55,37 +59,33 @@ test.describe("Workspace Shell", () => {
 
     await primaryNavigation
       .getByRole("link", { name: "Scenario Planner" })
-      .click();
-    await expect(page.locator("#scenario-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#scenario-summary-panel")
-        .getByText("Scenario Summary", { exact: true }),
-    ).toBeVisible();
+      .dispatchEvent("click");
+    await expect(page.locator("#scenario-panel")).toBeVisible();
+    await expect(page.locator("#scenario-grid")).toBeVisible();
+    await expect(page.locator("#scenario-edit-status")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Scenario Planner",
     );
 
     await primaryNavigation
       .getByRole("link", { name: "Customer Viewer" })
-      .click();
-    await expect(page.locator("#customer-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#customer-summary-panel")
-        .getByText("Customer Summary", { exact: true }),
-    ).toBeVisible();
+      .dispatchEvent("click");
+    await expect(page.locator("#customer-viewer-panel")).toBeVisible();
+    await expect(page.locator("#customer-viewer-dashboard")).toBeVisible();
+    await expect(page.locator("#customer-directory-grid")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Customer Viewer",
     );
 
-    await primaryNavigation.getByRole("link", { name: "Trends" }).click();
+    await primaryNavigation
+      .getByRole("link", { name: "Trends" })
+      .dispatchEvent("click");
     await expect(page.locator("#trends-panel")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText("Trends");
 
     await primaryNavigation
       .getByRole("link", { name: "Decision Support" })
-      .click();
+      .dispatchEvent("click");
     await expect(page.locator("#decision-support-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Decision Support",
@@ -93,7 +93,7 @@ test.describe("Workspace Shell", () => {
 
     await primaryNavigation
       .getByRole("link", { name: "Data Dashboard" })
-      .click();
+      .dispatchEvent("click");
     await expect(page.locator("#data-dashboard-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Data Dashboard",

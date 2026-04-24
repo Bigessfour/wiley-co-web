@@ -9,8 +9,10 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Syncfusion.Blazor;
+using Syncfusion.Blazor.Buttons;
 using Syncfusion.Blazor.Charts;
 using Syncfusion.Blazor.CircularGauge;
+using Syncfusion.Blazor.Cards;
 using Syncfusion.Blazor.DropDowns;
 using Syncfusion.Blazor.Grids;
 using Syncfusion.Blazor.Inputs;
@@ -59,8 +61,9 @@ public sealed class ComponentPageTests
 		Assert.Contains("e-listview", cut.Markup);
 		Assert.Contains("Workspace Overview", cut.Markup);
 		Assert.Contains("Break-Even", cut.Markup);
-		Assert.Contains("Syncfusion 33.1.44", cut.Markup);
-		Assert.Equal(9, cut.FindAll(".app-nav-link").Count);
+		Assert.Contains("Capital Gap", cut.Markup);
+		Assert.Contains("Syncfusion 33.2.3", cut.Markup);
+		Assert.True(cut.FindAll(".app-nav-link").Count >= 10);
 	}
 
 	[Fact]
@@ -149,6 +152,60 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void WileyWorkspace_DebtCoverageRoute_RendersGaugeWaterfallAndThresholdEditing()
+	{
+		using var context = CreateContext(configureServices: services => services.AddScoped(_ => new DebtCoverageApiService(new HttpClient(new DebtCoverageHttpMessageHandler())
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		})));
+
+		var cut = context.RenderComponent<DebtCoveragePanel>(parameters => parameters
+			.Add(panel => panel.SelectedEnterprise, "Town of Wiley")
+			.Add(panel => panel.SelectedFiscalYear, 2026));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("debt-coverage-panel", cut.Markup);
+			Assert.Contains("Debt service coverage ratio and covenant check", cut.Markup);
+			Assert.NotEmpty(cut.FindComponents<SfCircularGauge>());
+			Assert.NotEmpty(cut.FindComponents<SfChart>());
+			Assert.Contains("$42,000", cut.Markup);
+			Assert.Contains("1.34x", cut.Markup);
+			Assert.Contains("Compliant", cut.Markup);
+		});
+
+		var thresholdInput = cut.Find("input[role='spinbutton']");
+		thresholdInput.Change("1.50");
+
+		cut.WaitForAssertion(() => Assert.Contains("At Risk", cut.Markup));
+	}
+
+	[Fact]
+	public void WileyWorkspace_CapitalGapRoute_RendersChartSummaryAndBreakdown()
+	{
+		using var context = CreateContext(configureServices: services => services.AddScoped(_ => new CapitalGapApiService(new HttpClient(new CapitalGapHttpMessageHandler())
+		{
+			BaseAddress = new Uri("https://workspace.local/")
+		})));
+
+		var cut = context.RenderComponent<CapitalGapPanel>(parameters => parameters
+			.Add(panel => panel.SelectedEnterprise, "Town of Wiley")
+			.Add(panel => panel.SelectedFiscalYear, 2026));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("capital-gap-panel", cut.Markup);
+			Assert.Contains("Capital needs versus rate revenue gap analysis", cut.Markup);
+			Assert.NotEmpty(cut.FindComponents<SfChart>());
+			Assert.Contains("$45,000", cut.Markup);
+			Assert.Contains("$17,500", cut.Markup);
+			Assert.Contains("$27,500", cut.Markup);
+			Assert.Contains("Capital", cut.Markup);
+			Assert.Contains("Operating Station Rehabilitation", cut.Markup);
+		});
+	}
+
+	[Fact]
 	public void WileyWorkspace_JarvisLauncher_OpensFloatingDock()
 	{
 		using var context = CreateContext();
@@ -203,15 +260,15 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			Assert.Equal(2, cut.FindComponents<SfNumericTextBox<decimal>>().Count);
-			Assert.Single(cut.FindComponents<SfCircularGauge>());
-			Assert.Single(cut.FindComponents<SfChart>());
-			Assert.Contains("break-even-rate-gauge", cut.Markup);
-			Assert.Contains("break-even-rate-comparison-chart", cut.Markup);
+			Assert.Equal(4, cut.FindComponents<SfChart>().Count);
+			Assert.Single(cut.FindComponents<SfGrid<ApartmentUnitTypeData>>());
+			Assert.Contains("break-even-quadrant-grid", cut.Markup);
+			Assert.Contains("apartment-config-panel", cut.Markup);
 		});
 	}
 
 	[Fact]
-	public void WileyWorkspace_BreakEvenPanel_RebindsGaugeAndComparisonInputs_WhenWorkspaceStateChanges()
+	public void WileyWorkspace_BreakEvenPanel_RebindsQuadrantData_WhenWorkspaceStateChanges()
 	{
 		using var context = CreateContext();
 		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
@@ -230,9 +287,8 @@ public sealed class ComponentPageTests
 		{
 			var panel = cut.FindComponent<BreakEvenPanel>().Instance;
 
-			Assert.Equal((double)workspaceState.CurrentRate, panel.GaugeCurrentRateValue, 3);
-			Assert.Equal((double)Math.Max(workspaceState.RecommendedRate, workspaceState.CurrentRate) * 1.5d, panel.GaugeMaximum, 3);
-			Assert.Equal(2, panel.RateComparison.Count);
+			Assert.Equal(4, panel.VisibleQuadrants.Count);
+			Assert.All(panel.VisibleQuadrants, quadrant => Assert.NotEmpty(quadrant.SeriesPoints));
 		});
 
 		workspaceState.SetTotalCosts(24000m);
@@ -241,11 +297,10 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			var panel = cut.FindComponent<BreakEvenPanel>().Instance;
-			var breakEvenPoint = Assert.Single(panel.RateComparison, point => point.Label == "Break-Even");
 
-			Assert.Equal(60d, breakEvenPoint.Value, 3);
-			Assert.Equal((double)Math.Max(workspaceState.RecommendedRate, workspaceState.CurrentRate) * 1.5d, panel.GaugeMaximum, 3);
-			Assert.Equal((double)workspaceState.CurrentRate, panel.GaugeCurrentRateValue, 3);
+			Assert.Equal(4, panel.VisibleQuadrants.Count);
+			Assert.Contains(panel.VisibleQuadrants, quadrant => quadrant.EnterpriseName == WorkspaceTestData.WaterUtility);
+			Assert.Contains("60.00", cut.Markup);
 		});
 	}
 
@@ -929,6 +984,39 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void AffordabilityDashboardPanel_RendersManualMhiSummaryHeatmapAndCharts_WhenCustomersArePresent()
+	{
+		using var context = CreateContext();
+
+		context.Services.AddScoped<AffordabilityAnalysisService>();
+
+		var cut = context.RenderComponent<AffordabilityDashboardPanel>(parameters => parameters
+			.Add(panel => panel.Customers, new List<CustomerRow>
+			{
+				new("North Plant", "Water", "Yes"),
+				new("South Lift", "Sewer", "No"),
+				new("East Hub", "Water", "Yes"),
+				new("West Storage", "Commercial", "No")
+			})
+			.Add(panel => panel.SelectedEnterprise, WorkspaceTestData.WaterUtility)
+			.Add(panel => panel.SelectedFiscalYear, WorkspaceTestData.WaterFiscalYear));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("affordability-dashboard-panel", cut.Markup);
+			Assert.Contains("Monthly bill burden versus MHI", cut.Markup);
+			Assert.Contains("affordability-monthly-mhi-input", cut.Markup);
+			Assert.Contains("Affordability Status", cut.Markup);
+			Assert.Contains("Bill % of MHI", cut.Markup);
+			Assert.Contains("Customer class", cut.Markup);
+			Assert.Contains("Manageable", cut.Markup);
+			Assert.Equal(5, cut.FindComponents<SfCard>().Count);
+			Assert.Single(cut.FindComponents<SfCircularGauge>());
+			Assert.Single(cut.FindComponents<SfChart>());
+		});
+	}
+
+	[Fact]
 	public void DataDashboardPanel_RendersAllSections_WhenOptionalDataIsPresent()
 	{
 		using var context = CreateContext();
@@ -1013,6 +1101,31 @@ public sealed class ComponentPageTests
 		});
 	}
 
+	[Fact]
+	public void ReserveTrajectoryPanel_RendersForecastBandAndPolicyFloor_WhenTrajectoryIsPresent()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<ReserveTrajectoryPanel>(parameters => parameters
+			.Add(panel => panel.Trajectory, WorkspaceTestData.CreateReserveTrajectory()));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("reserve-trajectory-panel", cut.Markup);
+			Assert.Contains("Stress band", cut.Markup);
+			Assert.Contains("Policy minimum", cut.Markup);
+			Assert.Contains("Risk assessment", cut.Markup);
+			Assert.Contains("Current Reserves", cut.Markup);
+			Assert.Contains("Current Reserve Months", cut.Markup);
+			Assert.Contains("5-Year Solvency Score", cut.Markup);
+			Assert.Contains("Export PDF", cut.Markup);
+			Assert.Contains("Export Excel", cut.Markup);
+			Assert.Equal(3, cut.FindComponents<SfCard>().Count);
+			Assert.Equal(2, cut.FindComponents<SfButton>().Count);
+			Assert.Single(cut.FindComponents<SfChart>());
+		});
+	}
+
 	private static TestContext CreateContext(HttpClient? snapshotClient = null, FakeJsRuntime? jsRuntime = null, Action<IServiceCollection>? configureServices = null, HttpClient? telemetryClient = null)
 	{
 		var context = new TestContext();
@@ -1029,6 +1142,7 @@ public sealed class ComponentPageTests
 		telemetryClient ??= CreateNavigationTelemetryClient();
 		context.Services.AddScoped(_ => snapshotService);
 		context.Services.AddScoped(_ => new UtilityCustomerApiService(snapshotClient));
+		context.Services.AddScoped<AffordabilityAnalysisService>();
 		context.Services.AddScoped(_ => new WorkspaceDocumentExportService());
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
@@ -1454,6 +1568,69 @@ public sealed class ComponentPageTests
 		{
 			storage.Remove(arguments[0]?.ToString() ?? string.Empty);
 			return null;
+		}
+	}
+
+	private sealed class DebtCoverageHttpMessageHandler : HttpMessageHandler
+	{
+		private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+		protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+		{
+			var response = new DebtCoverageResponse(
+				"Town of Wiley",
+				2026,
+				42_000m,
+				31_250m,
+				10_750m,
+				1.34m,
+				1.25m,
+				0.09m,
+				"Compliant",
+				"Town of Wiley FY 2026 posts a 1.34x DSCR against a 1.25x covenant floor.",
+				"2026-04-19T00:00:00Z",
+				[
+					new DebtCoverageWaterfallPoint("Annual Revenue", 42_000d),
+					new DebtCoverageWaterfallPoint("Debt Service", -31_250d),
+					new DebtCoverageWaterfallPoint("Reserve Headroom", 10_750d)
+				]);
+
+			var json = JsonSerializer.Serialize(response, JsonOptions);
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+			{
+				Content = new StringContent(json, Encoding.UTF8, "application/json")
+			});
+		}
+	}
+
+	private sealed class CapitalGapHttpMessageHandler : HttpMessageHandler
+	{
+		private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+		protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+		{
+			var response = new CapitalGapResponse(
+				"Town of Wiley",
+				2026,
+				45_000m,
+				17_500m,
+				27_500m,
+				2.57m,
+				3,
+				"Covered",
+				"Town of Wiley FY 2026 has a 2.57x coverage ratio and positive revenue headroom.",
+				"2026-04-19T00:00:00Z",
+				[
+					new CapitalGapItemPoint("Operating Station Rehabilitation", "Capital", 17_500m, 4_500m, 27_500m, "Public Works", "Operating Station Rehabilitation"),
+					new CapitalGapItemPoint("Pump Replacement", "Capital", 15_000m, 8_000m, 10_000m, "Public Works", "Pump Replacement"),
+					new CapitalGapItemPoint("Equipment Purchases", "Capital", 12_500m, 5_000m, -2_500m, "Parks", "Equipment Purchases")
+				]);
+
+			var json = JsonSerializer.Serialize(response, JsonOptions);
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+			{
+				Content = new StringContent(json, Encoding.UTF8, System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json"))
+			});
 		}
 	}
 

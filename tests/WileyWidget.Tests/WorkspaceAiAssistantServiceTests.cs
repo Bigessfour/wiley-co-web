@@ -42,8 +42,10 @@ public sealed class WorkspaceAiAssistantServiceTests
         var defaultConfiguration = new ConfigurationBuilder().AddInMemoryCollection().Build();
         var defaultAiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(defaultConfiguration);
 
-        Assert.Equal(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel(), defaultAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
+        Assert.Equal(WileyWidget.Services.Abstractions.WorkspaceAiKernelFactory.DefaultSemanticKernelModel, defaultAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
         Assert.Equal("https://api.x.ai/v1", defaultAiConfiguration.ChatCompletionEndpoint.ToString());
+        Assert.Equal("https://api.x.ai/v1/responses", defaultAiConfiguration.LegacyResponsesEndpoint.ToString());
+        Assert.False(defaultAiConfiguration.StoreResponses);
 
         var configuredConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -61,6 +63,22 @@ public sealed class WorkspaceAiAssistantServiceTests
 
         Assert.NotNull(functionChoiceBehavior);
         Assert.Contains("Auto", functionChoiceBehavior!.GetType().Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("https://proxy.example/v1/chat/completions", "https://proxy.example/v1")]
+    [InlineData("https://proxy.example/v1/responses", "https://proxy.example/v1")]
+    [InlineData("https://proxy.example/v1", "https://proxy.example/v1")]
+    public void SemanticKernelConnector_NormalizesCustomChatEndpoints_ToDocumentedBaseUrl(string configuredEndpoint, string expectedEndpoint)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["XAI:ChatEndpoint"] = configuredEndpoint
+        }).Build();
+
+        var aiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(configuration);
+
+        Assert.Equal(expectedEndpoint, aiConfiguration.ChatCompletionEndpoint.ToString());
     }
 
     [Fact]
@@ -333,7 +351,7 @@ public sealed class WorkspaceAiAssistantServiceTests
             2026));
 
         Assert.Contains(
-            nameof(WorkspaceAiAssistantService),
+            WileyWidget.Services.Abstractions.WorkspaceAiKernelFactory.HttpClientName,
             httpFactory.RequestedClientNames);
     }
 
@@ -532,6 +550,7 @@ public sealed class WorkspaceAiAssistantServiceTests
             settings: new Dictionary<string, string?>
             {
                 ["XAI:Enabled"] = "true",
+                ["XAI:AllowDirectRetry"] = "true",
                 ["XAI:Endpoint"] = "https://legacy.example/v1",
                 ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
                 ["XAI:TimeoutSeconds"] = "1"
@@ -554,58 +573,47 @@ public sealed class WorkspaceAiAssistantServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WhenLegacyProxyTimesOutInProduction_RetriesDirectXaiEndpoint_ByDefault()
+    public async Task AskAsync_WhenLegacyProxyTimesOut_DoesNotRetryDirectXaiEndpoint_UnlessEnabled()
     {
-        var previousEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Production");
-
-        try
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+        var httpFactory = new TestHttpClientFactory(request =>
         {
-            var repository = new RecordingConversationRepository();
-            SeedPersistedConversation(repository);
-            var httpFactory = new TestHttpClientFactory(request =>
+            if (request.RequestUri?.Host.Contains("legacy.example", StringComparison.OrdinalIgnoreCase) == true)
             {
-                if (request.RequestUri?.Host.Contains("legacy.example", StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    throw new HttpRequestException("502 Bad Gateway upstream request timeout");
-                }
+                throw new HttpRequestException("502 Bad Gateway upstream request timeout");
+            }
 
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Direct retry answer from api.x.ai.\"}]}]}", Encoding.UTF8, "application/json")
-                };
-            });
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"output\":[{\"content\":[{\"text\":\"Direct retry answer from api.x.ai.\"}]}]}", Encoding.UTF8, "application/json")
+            };
+        });
 
-            var service = CreateService(
-                new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
-                repository,
-                settings: new Dictionary<string, string?>
-                {
-                    ["XAI:Enabled"] = "true",
-                    ["XAI:Endpoint"] = "https://legacy.example/v1",
-                    ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
-                    ["XAI:TimeoutSeconds"] = "1"
-                },
-                httpClientFactory: httpFactory,
-                apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:Enabled"] = "true",
+                ["XAI:Endpoint"] = "https://legacy.example/v1",
+                ["XAI:ChatEndpoint"] = "http://127.0.0.1:1",
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            httpClientFactory: httpFactory,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"));
 
-            var response = await service.AskAsync(new WorkspaceChatRequest(
-                "How should we close the gap?",
-                "Current workspace context",
-                "Water Utility",
-                2026));
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
 
-            Assert.True(response.UsedFallback);
-            Assert.False(response.IsFirstConversation);
-            Assert.Contains("Direct retry answer from api.x.ai.", response.Answer, StringComparison.Ordinal);
-            Assert.Equal(2, httpFactory.Requests.Count);
-            Assert.Contains("https://legacy.example/v1", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("https://api.x.ai/v1/responses", httpFactory.Requests[1].Url, StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", previousEnvironment);
-        }
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.DoesNotContain("Direct retry answer from api.x.ai.", response.Answer, StringComparison.Ordinal);
+        Assert.Single(httpFactory.Requests);
+        Assert.Contains("https://legacy.example/v1", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -639,7 +647,7 @@ public sealed class WorkspaceAiAssistantServiceTests
     }
 
     [Fact]
-    public async Task AskAsync_WhenInjectedKernelProviderReportsTransportFailure_RetriesDirectSemanticKernelChat()
+    public async Task AskAsync_WhenInjectedKernelProviderReportsTransportFailure_AndDirectRetryEnabled_RetriesDirectSemanticKernelChat()
     {
         var repository = new RecordingConversationRepository();
         SeedPersistedConversation(repository);
@@ -662,6 +670,10 @@ public sealed class WorkspaceAiAssistantServiceTests
         var service = CreateService(
             new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
             repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:AllowDirectRetry"] = "true"
+            },
             httpClientFactory: httpFactory,
             apiKeyProvider: new TestGrokApiKeyProvider("test-key"),
             kernelProvider: new TestWorkspaceAiKernelProvider(
@@ -684,7 +696,7 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Contains("Direct Semantic Kernel retry answer.", response.Answer, StringComparison.Ordinal);
         Assert.Single(httpFactory.Requests);
         Assert.Contains("api.x.ai", httpFactory.Requests[0].Url, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(nameof(WorkspaceAiAssistantService), httpFactory.RequestedClientNames);
+        Assert.Contains(WileyWidget.Services.Abstractions.WorkspaceAiKernelFactory.HttpClientName, httpFactory.RequestedClientNames);
     }
 
     private static WorkspaceAiAssistantService CreateService(
@@ -810,6 +822,7 @@ public sealed class WorkspaceAiAssistantServiceTests
             new WorkspaceAiApiKeyResolution("test-api-key", "test-provider", true, false, false, false, null),
             true,
             "grok-4.20-0309-reasoning",
+            false,
             new global::System.Uri("https://proxy.example/prod/v1"),
             new global::System.Uri("https://proxy.example/prod/v1/responses"));
 
