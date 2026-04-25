@@ -155,12 +155,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       await route.continue();
     });
 
-    await page.goto("/wiley-workspace");
-    await waitForWorkspaceShell(page);
-    await page
-      .locator("#workspace-navigation-card")
-      .getByRole("button", { name: "Customer Viewer" })
-      .click();
+    await gotoWorkspacePanel(page, "/wiley-workspace/customers");
 
     const panel = page.locator("#customer-viewer-panel");
     const directoryStatus = page.locator("#customer-directory-status");
@@ -324,14 +319,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
   test("data dashboard and trends render Syncfusion charts and gauges", async ({
     page,
   }) => {
-    await page.goto("/wiley-workspace");
-
-    await waitForWorkspaceShell(page);
-
-    await page
-      .locator("#workspace-navigation-card")
-      .getByRole("button", { name: "Data Dashboard" })
-      .click();
+    await gotoWorkspacePanel(page, "/wiley-workspace/data-dashboard");
 
     await expect(page.locator("#data-dashboard-panel")).toBeVisible();
     await expect(page.locator("#kpi-net-position")).toBeVisible();
@@ -395,12 +383,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     page,
     browserName,
   }) => {
-    await gotoWorkspacePanel(page, "/wiley-workspace");
-
-    await page
-      .locator("#workspace-navigation-card")
-      .getByRole("button", { name: "Data Dashboard" })
-      .click();
+    await gotoWorkspacePanel(page, "/wiley-workspace/data-dashboard");
 
     await prepareForVisualSnapshot(page);
 

@@ -239,12 +239,10 @@ test.describe("Unique Interaction Proof", () => {
 
     await saveButton.click();
 
-    await expect(directoryStatus).toContainText(
-      /Saved E2E-SEED-001 and updated the live utility-customer directory\./i,
-    );
     await expect(
       page.getByRole("dialog", { name: "Edit Utility Customer" }),
     ).toBeHidden();
+    await expect(directoryGrid).toContainText("Aurora");
 
     // 2. Reload the page and confirm the edited record still opens with the saved city.
     await page.reload();
