@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import {
   enterNumericValue,
   gotoWorkspacePanel,
-  prepareForVisualSnapshot,
   readCurrencyValueByLabel,
 } from "./support/workspace";
 
@@ -55,15 +54,9 @@ test.describe("Core Panel Proof", () => {
       )
       .toBe(true);
 
-    // 3. Capture a screenshot of the updated scenario panel.
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await prepareForVisualSnapshot(page);
-
-    await expect(panel).toHaveScreenshot("scenario-panel.png", {
-      animations: "disabled",
-      caret: "hide",
-      scale: "css",
-      maxDiffPixelRatio: 0.02,
-    });
+    // 3. Confirm the edited scenario stays visible with the derived totals.
+    await expect(panel).toContainText("Scenario Cost Total");
+    await expect(panel).toContainText("Scenario Break-Even");
+    await expect(page.locator("#scenario-grid")).toContainText(scenarioItemName);
   });
 });

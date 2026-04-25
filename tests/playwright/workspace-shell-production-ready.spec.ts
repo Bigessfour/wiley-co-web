@@ -8,7 +8,7 @@ test.describe("Workspace Shell", () => {
   test("Workspace shell and navigation stay usable on a fresh load", async ({
     page,
   }) => {
-    test.setTimeout(180000);
+    test.setTimeout(150000);
 
     // 1. Open /wiley-workspace in a fresh browser session.
     await page.goto("/wiley-workspace");
@@ -29,7 +29,7 @@ test.describe("Workspace Shell", () => {
     const primaryNavigation = page.locator("#workspace-navigation-list");
 
     await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
-    await expect(page.locator("#break-even-summary-panel")).toBeAttached();
+    await expect(page.locator("#break-even-summary-panel")).toBeAttached();`r`n    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();`r`n    await expect(page.locator("#break-even-quadrant-grid > section")).toHaveCount(4);
     await expect(
       page
         .locator("#break-even-summary-panel")
@@ -151,7 +151,7 @@ test.describe("Workspace Shell", () => {
   test("Collapsing the left rail stays consistent across key desktop routes", async ({
     page,
   }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     await seedLeftNavCollapsed(page, false);
 
     const routeChecks = [
@@ -178,13 +178,15 @@ test.describe("Workspace Shell", () => {
 
     for (const routeCheck of routeChecks) {
       await page.goto(routeCheck.route);
-      await waitForWorkspaceShell(page);
+      await waitForWorkspaceShell(page, 30_000);
 
+      const sidebarToggle = page.locator("#app-shell-nav-toggle");
       await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();
-      await page.locator("#app-shell-nav-toggle").evaluate((button) => {
+      await expect(sidebarToggle).toContainText("Collapse navigation rail");
+      await sidebarToggle.evaluate((button) => {
         (button as HTMLButtonElement).click();
       });
-      await expect(page.locator("#app-shell-nav-toggle")).toContainText(
+      await expect(sidebarToggle).toContainText(
         "Expand navigation rail",
       );
       await expect(page.locator("#workspace-navigation-list")).toBeVisible();
@@ -193,12 +195,18 @@ test.describe("Workspace Shell", () => {
           .locator("#workspace-navigation-list")
           .getByRole("link", { name: "Rates" }),
       ).toBeVisible();
-
-      await page.reload();
-      await waitForWorkspaceShell(page);
-      await expect(page.locator("#app-shell-nav-toggle")).toContainText(
-        "Collapse navigation rail",
-      );
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            window.localStorage.getItem("wiley.workspace.left-nav-collapsed.v2"),
+          ),
+        )
+        .toBe("True");
+      await sidebarToggle.evaluate((button) => {
+        (button as HTMLButtonElement).click();
+      });
+      await expect(sidebarToggle).toContainText("Collapse navigation rail");
     }
   });
 });
+

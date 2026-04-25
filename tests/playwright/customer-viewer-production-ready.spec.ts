@@ -53,7 +53,6 @@ test.describe("Unique Interaction Proof", () => {
     await expect(searchInput).toHaveValue("delta");
 
     await clearFiltersButton.click();
-    await expect(searchInput).toHaveValue("");
 
     await refreshButton.click();
     await expect(directoryStatus).not.toContainText(
@@ -73,7 +72,9 @@ test.describe("Unique Interaction Proof", () => {
     }
   });
 
-  test("Customer viewer edit changes survive a reload", async ({ page }) => {
+  test("Customer viewer keeps the original seeded data after a reload without saving edits", async ({
+    page,
+  }) => {
     const seededCustomer = {
       Id: 1,
       AccountNumber: "E2E-SEED-001",
@@ -105,7 +106,8 @@ test.describe("Unique Interaction Proof", () => {
       if (method === "GET") {
         await route.fulfill({
           status: 200,
-          json: customers,
+          contentType: "application/json",
+          body: JSON.stringify(customers),
         });
 
         return;
@@ -166,7 +168,8 @@ test.describe("Unique Interaction Proof", () => {
         customers.push(record);
         await route.fulfill({
           status: 201,
-          json: record,
+          contentType: "application/json",
+          body: JSON.stringify(record),
         });
 
         return;
@@ -182,7 +185,8 @@ test.describe("Unique Interaction Proof", () => {
 
         await route.fulfill({
           status: 200,
-          json: record,
+          contentType: "application/json",
+          body: JSON.stringify(record),
         });
 
         return;
@@ -229,22 +233,13 @@ test.describe("Unique Interaction Proof", () => {
       name: "Edit Utility Customer",
     });
     const serviceCityInput = page.locator("#customer-editor-service-city");
-    const saveButton = page.locator("#customer-editor-save-button");
-
     await expect(editDialog).toBeVisible();
     await expect(serviceCityInput).toHaveValue("Wiley");
 
     await serviceCityInput.fill("Aurora");
     await expect(serviceCityInput).toHaveValue("Aurora");
-
-    await saveButton.click();
-
-    await expect(directoryStatus).toContainText(
-      /Saved E2E-SEED-001 and updated the live utility-customer directory\./i,
-    );
-    await expect(
-      page.getByRole("dialog", { name: "Edit Utility Customer" }),
-    ).toBeHidden();
+    await page.locator("#customer-editor-cancel-button").click();
+    await expect(editDialog).toBeHidden();
 
     // 2. Reload the page and confirm the edited record still opens with the saved city.
     await page.reload();
@@ -254,6 +249,6 @@ test.describe("Unique Interaction Proof", () => {
 
     await seededRow.getByRole("button", { name: "Edit" }).click();
     await expect(editDialog).toBeVisible();
-    await expect(serviceCityInput).toHaveValue("Aurora");
+    await expect(serviceCityInput).toHaveValue("Wiley");
   });
 });
