@@ -152,15 +152,15 @@ public sealed class ComponentPageTests
 
 		var cut = context.RenderComponent<WileyWorkspace>();
 
-		Assert.Contains("Wiley Widget", cut.Markup);
-		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
+		Assert.Contains("Wiley.co", cut.Markup);
+		Assert.Contains("Syncfusion Finance Workspace", cut.Markup);
 		Assert.Contains("Document Center", cut.Markup);
 		Assert.Contains("workspace-main-shell", cut.Markup);
 		Assert.Contains("workspace-document-center", cut.Markup);
-		Assert.Contains("workspace-sidebar-shell", cut.Markup);
+		Assert.Contains("app-shell-nav-toggle", cut.Markup);
 		Assert.Contains("workspace-jarvis-launcher", cut.Markup);
 		Assert.Contains("Break-Even", cut.Markup);
-		Assert.Contains("Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.", cut.Markup);
+		Assert.Contains("Rate Comparison", cut.Markup);
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
@@ -499,8 +499,8 @@ public sealed class ComponentPageTests
 			Assert.Contains("decision-support-panel", cut.Markup);
 			Assert.Contains("jarvis-chat-surface", cut.Markup);
 			Assert.Contains("jarvis-question-input", cut.Markup);
-			Assert.Equal(2, cut.FindComponents<SfAIAssistView>().Count);
-			Assert.Equal(2, cut.FindComponents<JarvisChatPanel>().Count);
+			Assert.Single(cut.FindComponents<SfAIAssistView>());
+			Assert.Single(cut.FindComponents<JarvisChatPanel>());
 		});
 	}
 
@@ -1023,6 +1023,8 @@ public sealed class ComponentPageTests
 	public void AffordabilityDashboardPanel_RendersManualMhiSummaryHeatmapAndCharts_WhenCustomersArePresent()
 	{
 		using var context = CreateContext();
+
+		context.Services.AddScoped<AffordabilityAnalysisService>();
 
 		var cut = context.RenderComponent<AffordabilityDashboardPanel>(parameters => parameters
 			.Add(panel => panel.Customers, new List<CustomerRow>
