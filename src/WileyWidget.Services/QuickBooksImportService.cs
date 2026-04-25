@@ -184,10 +184,22 @@ public sealed class QuickBooksImportService
 	private static string NormalizeSignatureText(string? value)
 		=> string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToUpperInvariant();
 
+	private static string NormalizeSignatureDate(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+			? parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+			: NormalizeSignatureText(value);
+	}
+
 	private static string BuildLedgerSignature(QuickBooksImportPreviewRow row)
 		=> string.Join("|",
 			NormalizeSignatureText(row.RoutedEnterprise),
-			NormalizeSignatureText(row.EntryDate),
+			NormalizeSignatureDate(row.EntryDate),
 			NormalizeSignatureText(row.EntryType),
 			NormalizeSignatureText(row.TransactionNumber),
 			NormalizeSignatureText(row.Name),
