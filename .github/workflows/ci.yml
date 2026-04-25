@@ -52,7 +52,7 @@ jobs:
         run: dotnet build ${{ matrix.project }} --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Run tests with coverage
-        run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --settings coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }} --blame-hang --blame-hang-timeout 3m
+        run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --settings coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }}
 
       - name: Generate source coverage summary
         if: matrix.name != 'e2e'
