@@ -22,6 +22,18 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		PropertyNameCaseInsensitive = true
 	};
 
+	private static readonly bool SyncfusionLicenseInitialized = InitializeSyncfusionLicense();
+
+	private static bool InitializeSyncfusionLicense()
+	{
+		var key = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+		if (!string.IsNullOrWhiteSpace(key))
+		{
+			Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(key);
+		}
+		return true;
+	}
+
 	[Fact]
 	public void RendersQuickBooksImportWorkflowChrome()
 	{

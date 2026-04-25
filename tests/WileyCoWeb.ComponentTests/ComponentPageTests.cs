@@ -34,6 +34,22 @@ public sealed class ComponentPageTests
 {
 	private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+	// Register the Syncfusion license once per test process. Without this on CI the library
+	// makes outbound HTTP calls to the Syncfusion licensing server; each times out after ~100 s,
+	// causing the test run to hang for several minutes. The key is provided by the CI secret;
+	// on dev machines with the license in the Windows registry this call is a no-op.
+	private static readonly bool SyncfusionLicenseInitialized = InitializeSyncfusionLicense();
+
+	private static bool InitializeSyncfusionLicense()
+	{
+		var key = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+		if (!string.IsNullOrWhiteSpace(key))
+		{
+			Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(key);
+		}
+		return true;
+	}
+
 	[Fact]
 	public void MainLayout_RendersNavigationChrome_AndBodyContent()
 	{
