@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Syncfusion.Blazor.Grids;
+using Syncfusion.Blazor.Navigations;
 using Action = System.Action;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
@@ -12,6 +13,8 @@ namespace WileyCoWeb.Components.Panels;
 
 public partial class CustomerViewerPanel : ComponentBase
 {
+    private static IReadOnlyList<string> CustomerDirectoryToolbarItems { get; } = ["ExcelExport"];
+
     [Inject] private UtilityCustomerApiService UtilityCustomerApiService { get; set; } = default!;
     [Inject] private WorkspaceState WorkspaceState { get; set; } = default!;
     [Inject] private ToastService ToastService { get; set; } = default!;
@@ -40,6 +43,16 @@ public partial class CustomerViewerPanel : ComponentBase
     private async Task RefreshCustomerDirectoryAsync()
     {
         await LoadCustomersAsync("Refreshed the live utility-customer directory.");
+    }
+
+    private async Task HandleToolbarClickAsync(ClickEventArgs args)
+    {
+        if (!string.Equals(args.Item?.Id, "customer-directory-grid_excelexport", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await ExportCustomerDirectoryAsync();
     }
 
     private async Task ExportCustomerDirectoryAsync()

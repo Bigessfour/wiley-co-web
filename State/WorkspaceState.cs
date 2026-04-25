@@ -543,17 +543,32 @@ public sealed class WorkspaceState
 
     public void SetCurrentRate(decimal rate)
     {
-        if (SetDecimalWithoutNotify(ref currentRate, rate, currentRate)) NotifyChanged();
+        var hasChanged = SetDecimalWithoutNotify(ref currentRate, rate, currentRate);
+        if (hasChanged)
+        {
+            hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("current-rate");
+            NotifyChanged();
+        }
     }
 
     public void SetTotalCosts(decimal costs)
     {
-        if (SetDecimalWithoutNotify(ref totalCosts, costs, totalCosts)) NotifyChanged();
+        var hasChanged = SetDecimalWithoutNotify(ref totalCosts, costs, totalCosts);
+        if (hasChanged)
+        {
+            hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("total-costs");
+            NotifyChanged();
+        }
     }
 
     public void SetProjectedVolume(decimal volume)
     {
-        if (SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume)) NotifyChanged();
+        var hasChanged = SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume);
+        if (hasChanged)
+        {
+            hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("projected-volume");
+            NotifyChanged();
+        }
     }
 
     public void SetBreakEvenQuadrants(IReadOnlyList<BreakEvenQuadrantData> quadrants)
@@ -687,6 +702,75 @@ public sealed class WorkspaceState
         var hasChanged = !ReserveTrajectoryEquals(reserveTrajectory, normalizedTrajectory);
         reserveTrajectory = normalizedTrajectory;
         return hasChanged;
+    }
+
+    private bool RecalculateBreakEvenQuadrantsWithoutNotify(string reason)
+    {
+        if (breakEvenQuadrants.Count == 0)
+        {
+            Console.WriteLine($"[workspace-state] Break-even quadrant recompute skipped ({reason}) because no quadrants are loaded.");
+            return false;
+        }
+
+        var updatedQuadrants = breakEvenQuadrants
+            .Select(RecalculateBreakEvenQuadrant)
+            .ToList();
+
+        var hasChanged = !breakEvenQuadrants.SequenceEqual(updatedQuadrants);
+        if (!hasChanged)
+        {
+            Console.WriteLine($"[workspace-state] Break-even quadrant recompute ({reason}) produced no changes.");
+            return false;
+        }
+
+        breakEvenQuadrants.Clear();
+        breakEvenQuadrants.AddRange(updatedQuadrants);
+
+        Console.WriteLine(
+            $"[workspace-state] Recomputed break-even quadrants ({reason}) | quadrants={breakEvenQuadrants.Count} | currentRate={CurrentRate:F2} | totalCosts={TotalCosts:F2} | projectedVolume={ProjectedVolume:F2} | recommendedRate={RecommendedRate:F2}");
+
+        return true;
+    }
+
+    private BreakEvenQuadrantData RecalculateBreakEvenQuadrant(BreakEvenQuadrantData quadrant)
+    {
+        var effectiveCustomerCount = Math.Max(1m, ProjectedVolume);
+        var breakEvenRate = Math.Round(RateCalculator.CalculateRecommendedRate(TotalCosts, ProjectedVolume), 2, MidpointRounding.AwayFromZero);
+        var monthlyRevenue = Math.Round(quadrant.CurrentRate * effectiveCustomerCount, 2, MidpointRounding.AwayFromZero);
+        var monthlyBalance = Math.Round(monthlyRevenue - TotalCosts, 2, MidpointRounding.AwayFromZero);
+        var seriesPoints = RecalculateBreakEvenSeriesPoints(quadrant.SeriesPoints, quadrant.CurrentRate, breakEvenRate);
+
+        return new BreakEvenQuadrantData(
+            quadrant.EnterpriseName,
+            quadrant.EnterpriseType,
+            quadrant.CurrentRate,
+            TotalCosts,
+            monthlyRevenue,
+            monthlyBalance,
+            breakEvenRate,
+            effectiveCustomerCount,
+            seriesPoints);
+    }
+
+    private static List<BreakEvenSeriesPoint> RecalculateBreakEvenSeriesPoints(
+        IReadOnlyList<BreakEvenSeriesPoint> existingSeriesPoints,
+        decimal currentRate,
+        decimal breakEvenRate)
+    {
+        var labels = existingSeriesPoints.Count > 0
+            ? existingSeriesPoints.Select(point => point.PeriodLabel).ToList()
+            : ["Current", "Break-Even"];
+
+        var divisor = Math.Max(1, labels.Count - 1);
+
+        return labels
+            .Select((label, index) =>
+            {
+                var progress = (decimal)index / divisor;
+                var revenue = Math.Round(currentRate + ((breakEvenRate - currentRate) * progress), 2, MidpointRounding.AwayFromZero);
+                return new BreakEvenSeriesPoint(label, revenue, breakEvenRate, breakEvenRate);
+            })
+            .ToList();
     }
 
     private static List<CustomerRow> NormalizeCustomerRows(IReadOnlyList<CustomerRow>? rows) => rows?.Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits)).ToList() ?? [];

@@ -6,9 +6,7 @@
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Layouts
-@using Syncfusion.Blazor.Popups
 @using Syncfusion.Blazor.Spinner
-@using WileyCoWeb.Components.Layout
 @using WileyCoWeb.Components.Panels
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
@@ -19,12 +17,9 @@
 
 <LoggingErrorBoundary BoundaryName="WileyWorkspace">
     <ChildContent>
-<div class="wiley-workspace min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8" role="document">
+<div class="wiley-workspace min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
     <div class="flex w-full flex-col gap-4">
-        <div id="workspace-overview-hero"
-             class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 px-6 py-5 text-white shadow-lg"
-             role="banner"
-             aria-label="Workspace overview header">
+        <div id="workspace-overview-hero" class="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 px-6 py-5 text-white shadow-lg">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley Widget</p>
@@ -72,91 +67,31 @@
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Document Center</p>
                     <h2 class="mt-1 text-lg font-semibold text-slate-900">Syncfusion Excel & PDF Deliverables</h2>
-                    <p class="mt-1 text-sm text-slate-600">Export the filtered customer set, the active scenario workbook, a PDF rate packet, or a full rate packet ZIP bundle (PDF + Excel) from the current workspace state.</p>
+                    <p class="mt-1 text-sm text-slate-600">Export the filtered customer set, the active scenario workbook, or a PDF rate packet from the current workspace state.</p>
                 </div>
-                <div class="flex flex-col gap-3 xl:min-w-[52rem]">
-                    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="flex flex-col gap-3 xl:min-w-[38rem]">
+                    <div class="grid gap-3 md:grid-cols-3">
                         @* Export buttons disable during any export operation so concurrent file-writes are prevented *@
-                        @* SfTooltip provides keyboard-accessible descriptions (shown on focus or hover).            *@
-                        <div class="space-y-1">
-                            <SfTooltip Content="Export the filtered customer list to a Microsoft Excel workbook (.xlsx). Keyboard shortcut: Alt+Shift+C"
-                                       Position="Position.TopCenter"
-                                       OpensOn="Hover Focus"
-                                       ShowTipPointer="true"
-                                       CloseDelay="200"
-                                       EnableRtl="@(LayoutContext?.EnableRtl ?? false)">
-                                <SfButton id="export-customers-excel-button"
-                                          CssClass="e-primary"
-                                          IsPrimary="true"
-                                          Disabled="@IsExportingDocuments"
-                                          IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
-                                          title="Export customers to Excel — Alt+Shift+C"
-                                          aria-label="Export filtered customers to Excel"
-                                          aria-disabled="@IsExportingDocuments.ToString().ToLowerInvariant()"
-                                          OnClick="ExportCustomerWorkbookAsync">
-                                    @(IsExportingDocuments ? "Exporting…" : "Export customers to Excel")
-                                </SfButton>
-                            </SfTooltip>
-                            <p class="text-xs text-slate-500">Last exported: @GetLastExportedDisplay("customer-excel")</p>
-                        </div>
-                        <div class="space-y-1">
-                            <SfTooltip Content="Export the active scenario cost items to a Microsoft Excel workbook (.xlsx). Keyboard shortcut: Alt+Shift+S"
-                                       Position="Position.TopCenter"
-                                       OpensOn="Hover Focus"
-                                       ShowTipPointer="true"
-                                       CloseDelay="200"
-                                       EnableRtl="@(LayoutContext?.EnableRtl ?? false)">
-                                <SfButton id="export-scenario-excel-button"
-                                          Disabled="@IsExportingDocuments"
-                                          IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
-                                          title="Export scenario to Excel — Alt+Shift+S"
-                                          aria-label="Export scenario plan to Excel"
-                                          aria-disabled="@IsExportingDocuments.ToString().ToLowerInvariant()"
-                                          OnClick="ExportScenarioWorkbookAsync">
-                                    @(IsExportingDocuments ? "Exporting…" : "Export scenario to Excel")
-                                </SfButton>
-                            </SfTooltip>
-                            <p class="text-xs text-slate-500">Last exported: @GetLastExportedDisplay("scenario-excel")</p>
-                        </div>
-                        <div class="space-y-1">
-                            <SfTooltip Content="Download a PDF rate packet summarising the current workspace state for council review. Keyboard shortcut: Alt+Shift+P"
-                                       Position="Position.TopCenter"
-                                       OpensOn="Hover Focus"
-                                       ShowTipPointer="true"
-                                       CloseDelay="200"
-                                       EnableRtl="@(LayoutContext?.EnableRtl ?? false)">
-                                <SfButton id="export-workspace-pdf-button"
-                                          Disabled="@IsExportingDocuments"
-                                          IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
-                                          title="Download PDF rate packet — Alt+Shift+P"
-                                          aria-label="Download PDF rate packet"
-                                          aria-disabled="@IsExportingDocuments.ToString().ToLowerInvariant()"
-                                          OnClick="ExportWorkspacePdfAsync">
-                                    @(IsExportingDocuments ? "Building PDF…" : "Download PDF rate packet")
-                                </SfButton>
-                            </SfTooltip>
-                            <p class="text-xs text-slate-500">Last exported: @GetLastExportedDisplay("workspace-pdf")</p>
-                        </div>
-                        <div class="space-y-1">
-                            <SfTooltip Content="Download a full rate packet ZIP bundle containing the branded PDF and a multi-sheet Excel workbook. Keyboard shortcut: Alt+Shift+Z"
-                                       Position="Position.TopCenter"
-                                       OpensOn="Hover Focus"
-                                       ShowTipPointer="true"
-                                       CloseDelay="200"
-                                       EnableRtl="@(LayoutContext?.EnableRtl ?? false)">
-                                <SfButton id="export-rate-packet-zip-button"
-                                          CssClass="e-success"
-                                          Disabled="@IsExportingDocuments"
-                                          IconCss="@(IsExportingDocuments ? "" : "e-icons e-download")"
-                                          title="Download rate packet ZIP (PDF + Excel) — Alt+Shift+Z"
-                                          aria-label="Download rate packet ZIP bundle"
-                                          aria-disabled="@IsExportingDocuments.ToString().ToLowerInvariant()"
-                                          OnClick="ExportRatePacketZipAsync">
-                                    @(IsExportingDocuments ? "Building ZIP…" : "Download rate packet ZIP")
-                                </SfButton>
-                            </SfTooltip>
-                            <p class="text-xs text-slate-500">Last exported: @GetLastExportedDisplay("rate-packet-zip")</p>
-                        </div>
+                        <SfButton id="export-customers-excel-button"
+                                  CssClass="e-primary"
+                                  IsPrimary="true"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
+                                  OnClick="ExportCustomerWorkbookAsync">
+                            @(IsExportingDocuments ? "Exporting…" : "Export customers to Excel")
+                        </SfButton>
+                        <SfButton id="export-scenario-excel-button"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
+                                  OnClick="ExportScenarioWorkbookAsync">
+                            @(IsExportingDocuments ? "Exporting…" : "Export scenario to Excel")
+                        </SfButton>
+                        <SfButton id="export-workspace-pdf-button"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
+                                  OnClick="ExportWorkspacePdfAsync">
+                            @(IsExportingDocuments ? "Building PDF…" : "Download PDF rate packet")
+                        </SfButton>
                     </div>
                     @* Export status row: shows inline spinner dot while export is in-flight *@
                     <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -176,277 +111,16 @@
             </div>
         </div>
 
-        @* ── Offline indicator banner ──────────────────────────────────────────
-           Shown when navigator.onLine is false.  WorkspaceState.IsOffline is
-           set by WileyWorkspaceBase via the wileyNetworkStatus JS bridge.
-           aria-live="assertive" ensures screen readers announce the change
-           immediately so users are not silently blocked from syncing.
-           ──────────────────────────────────────────────────────────────────── *@
-        @if (IsOffline)
-        {
-            <div id="workspace-offline-banner"
-                 role="alert"
-                 aria-live="assertive"
-                 class="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <span class="e-icons e-warning text-amber-600 flex-shrink-0" aria-hidden="true"></span>
-                <span><strong>You are offline.</strong> Workspace changes are saved locally and will sync automatically when connectivity is restored.</span>
-            </div>
-        }
-
-        @* ── Mobile stacked layout ─────────────────────────────────────────────
-           When LayoutMode == Mobile the SfSplitter is replaced by a vertical
-           stack.  A native <details> element provides the accordion for the
-           context rail content — zero JS, fully accessible, touch-friendly.
-           The main panel content renders below with full width.
-           ──────────────────────────────────────────────────────────────────── *@
-        @if (LayoutMode == WorkspaceLayoutMode.Mobile)
-        {
-            <div class="wiley-workspace-stack">
-                @* ── Mobile context rail (collapsible) ── *@
-                <details class="wiley-mobile-context-rail">
-                    <summary class="wiley-mobile-context-summary">
-                        <span>
-                            <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Controls</span>
-                            <span class="ml-2 text-slate-700">@SelectedEnterprise · @SelectedFiscalYear</span>
-                        </span>
-                    </summary>
-                    <div class="wiley-mobile-context-body">
-                        @* Enterprise + fiscal year + scenario dropdowns *@
-                        <SfCard ID="workspace-enterprise-context-card-mobile">
-                            <CardContent>
-                                <div class="space-y-4">
-                                    <SfDropDownList ID="enterprise-select-mobile" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="200px" Width="100%">
-                                        <DropDownListEvents TValue="string" TItem="string" ValueChange="HandleEnterpriseChanged" />
-                                    </SfDropDownList>
-                                    <SfDropDownList ID="fiscal-year-select-mobile" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="200px" Width="100%">
-                                        <DropDownListEvents TValue="int" TItem="int" ValueChange="HandleFiscalYearChanged" />
-                                    </SfDropDownList>
-                                </div>
-                            </CardContent>
-                        </SfCard>
-                        @* Quick panel navigation grid — 2-column touch-friendly buttons *@
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">Navigate</p>
-                            <div class="wiley-mobile-panel-nav">
-                                @foreach (var item in PanelNavItems)
-                                {
-                                    <button type="button"
-                                            class="wiley-mobile-panel-nav-item @(ActivePanelKey == item.Key ? "is-active" : "")"
-                                            @onclick="() => OpenPanel(item.Key)">
-                                        @item.Label
-                                    </button>
-                                }
-                            </div>
-                        </div>
-                        @* Global actions *@
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 mb-2">Actions</p>
-                            <div class="grid gap-2">
-                                <SfButton Disabled="@IsLoadingWorkspace" OnClick="RefreshWorkspaceAsync">@(IsLoadingWorkspace ? "Refreshing…" : "Reload workspace")</SfButton>
-                                <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="SaveWorkspaceBaselineAsync">@(IsSavingBaseline ? "Saving baseline…" : "Save baseline")</SfButton>
-                                <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingScenario" OnClick="SaveScenarioAsync">@(IsSavingScenario ? "Saving…" : "Save scenario")</SfButton>
-                            </div>
-                        </div>
-                        @* Status *@
-                        <div class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
-                            <div><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
-                            <div class="mt-1"><span class="font-semibold text-slate-700">Scenarios:</span> @ScenarioPersistenceStatus</div>
-                        </div>
-                    </div>
-                </details>
-
-                @* ── Mobile main content ── *@
-                <div class="wiley-mobile-main-content">
-                    <div class="wiley-mobile-breadcrumb">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@BreadcrumbSection</p>
-                        <div class="flex items-center gap-2 mt-0.5 text-sm text-slate-500">
-                            <span>Workspace</span><span>/</span>
-                            <span class="font-semibold text-slate-800">@ActivePanelLabel</span>
-                        </div>
-                    </div>
-                    @if (IsInitializingWorkspace)
-                    {
-                        <div class="wiley-panel-spinner-host" style="min-height: 12rem;" aria-busy="true" aria-label="Workspace initializing">
-                            <SfSpinner Visible="true" Label="Initializing workspace…" Size="36" Type="SpinnerType.Material" />
-                        </div>
-                    }
-                    else if (IsLoadingWorkspace)
-                    {
-                        <div class="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 mb-3" aria-busy="true">
-                            <div class="wiley-panel-spinner-host" style="min-height:2.5rem; width:2.5rem;">
-                                <SfSpinner Visible="true" Size="24" Type="SpinnerType.Material" />
-                            </div>
-                            <p class="text-sm text-sky-800">@WorkspaceLoadStatus</p>
-                        </div>
-                    }
-                    else if (IsOverviewMode)
-                    {
-                        @* On mobile the overview grid stacks to single column (via @@media in inline style) *@
-                        <section class="workspace-overview-grid" aria-label="Workspace overview panels">
-                            @* Brief single-column overview cards for mobile *@
-                            @foreach (var item in PanelNavItems.Where(p => p.Key != "overview"))
-                            {
-                                <article class="workspace-overview-card">
-                                    <div class="workspace-overview-card-copy">
-                                        <p class="workspace-overview-card-kicker">@item.Label</p>
-                                    </div>
-                                    <button type="button" class="workspace-card-link w-full" @onclick="() => OpenPanel(item.Key)">
-                                        Open @item.Label
-                                    </button>
-                                </article>
-                            }
-                        </section>
-                    }
-                    else
-                    {
-                        @* Full panel content — same switch as desktop.
-                           LoggingErrorBoundary isolates a panel crash from the rest of
-                           the shell.  Its LocationChanged handler auto-recovers when
-                           the user navigates to a different panel. *@
-                        <LoggingErrorBoundary BoundaryName="@($"Panel:{ActivePanelKey}")">
-                            <ChildContent>
-                        <div class="flex-1 overflow-auto">
-                            @switch (ActivePanelKey)
-                            {
-                                case "break-even":
-                                    <BreakEvenPanel @key="ActivePanelKey"
-                                                    TotalCosts="@TotalCosts"
-                                                    ProjectedVolume="@ProjectedVolume"
-                                                    TotalCostsDisplay="@TotalCostsDisplay"
-                                                    ProjectedVolumeDisplay="@ProjectedVolumeDisplay"
-                                                    RateDeltaDisplay="@RateDeltaDisplay"
-                                                    BreakEvenRateDisplay="@BreakEvenRateDisplay"
-                                                    IsSavingBaseline="@IsSavingBaseline"
-                                                    BaselineSaveStatus="@BaselineSaveStatus"
-                                                    Quadrants="@BreakEvenQuadrants"
-                                                    ApartmentUnitTypes="@ApartmentUnitTypes"
-                                                    OnTotalCostsChanged="HandleTotalCostsChanged"
-                                                    OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
-                                                    OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync"
-                                                    OnApartmentUnitTypesChanged="HandleApartmentUnitTypesChanged" />
-                                    break;
-                                case "apartment-config":
-                                    <ApartmentConfigPanel @key="ActivePanelKey"
-                                                          UnitTypes="@ApartmentUnitTypes"
-                                                          OnUnitTypesChanged="HandleApartmentUnitTypesChanged" />
-                                    break;
-                                case "rates":
-                                    <RatesPanel @key="ActivePanelKey"
-                                                CurrentRate="@CurrentRate"
-                                                CurrentRateDisplay="@CurrentRateDisplay"
-                                                BreakEvenRateDisplay="@BreakEvenRateDisplay"
-                                                IsSavingSnapshot="@IsSavingSnapshot"
-                                                SnapshotSaveStatus="@SnapshotSaveStatus"
-                                                RateComparison="@RateComparison"
-                                                OnCurrentRateChanged="HandleCurrentRateChanged"
-                                                OnSaveRateSnapshot="SaveRateSnapshotAsync" />
-                                    break;
-                                case "quickbooks-import":
-                                    <QuickBooksImportPanelWrapper @key="ActivePanelKey" WorkspaceState="@WorkspaceState" />
-                                    break;
-                                case "scenario":
-                                    <ScenarioPlannerPanel @key="ActivePanelKey"
-                                                          ScenarioAdjustedRate="@ScenarioAdjustedRate"
-                                                          ScenarioCostTotal="@ScenarioCostTotal"
-                                                          ScenarioAdjustedDelta="@ScenarioAdjustedDelta"
-                                                          CurrentRate="@CurrentRate"
-                                                          BreakEvenRateDisplay="@BreakEvenRateDisplay"
-                                                          ScenarioAdjustedRateDisplay="@ScenarioAdjustedRateDisplay"
-                                                          ScenarioCostTotalDisplay="@ScenarioCostTotalDisplay"
-                                                          ScenarioAdjustedDeltaDisplay="@ScenarioAdjustedDeltaDisplay"
-                                                          ScenarioItems="@ScenarioItems"
-                                                          ScenarioToolbarItems="@ScenarioToolbarItems"
-                                                          OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
-                                    break;
-                                case "customers":
-                                    <CustomerViewerPanel @key="ActivePanelKey" />
-                                    break;
-                                case "affordability":
-                                    <AffordabilityDashboardPanel @key="ActivePanelKey"
-                                                                 Customers="@Customers"
-                                                                 SelectedEnterprise="@SelectedEnterprise"
-                                                                 SelectedFiscalYear="@SelectedFiscalYear" />
-                                    break;
-                                case "trends":
-                                    <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
-                                    break;
-                                case "reserve-trajectory":
-                                    <ReserveTrajectoryPanel @key="ActivePanelKey"
-                                                           Trajectory="@ReserveTrajectory"
-                                                           OnExportPdf="ExportReserveTrajectoryPdfAsync"
-                                                           OnExportExcel="ExportReserveTrajectoryWorkbookAsync" />
-                                    break;
-                                case "debt-coverage":
-                                    <DebtCoveragePanel @key="ActivePanelKey"
-                                                       SelectedEnterprise="@SelectedEnterprise"
-                                                       SelectedFiscalYear="@SelectedFiscalYear" />
-                                    break;
-                                case "capital-gap":
-                                    <CapitalGapPanel @key="ActivePanelKey"
-                                                     SelectedEnterprise="@SelectedEnterprise"
-                                                     SelectedFiscalYear="@SelectedFiscalYear" />
-                                    break;
-                                case "decision-support":
-                                    <DecisionSupportPanel @key="ActivePanelKey" />
-                                    break;
-                                case "data-dashboard":
-                                    <DataDashboardPanel @key="ActivePanelKey"
-                                                        CurrentRate="@CurrentRate"
-                                                        TotalCosts="@TotalCosts"
-                                                        ProjectedVolume="@ProjectedVolume"
-                                                        RecommendedRate="@RecommendedRate"
-                                                        AdjustedRecommendedRate="@ScenarioAdjustedRate"
-                                                        ScenarioCostTotal="@ScenarioCostTotal"
-                                                        ScenarioItems="@ScenarioItems"
-                                                        ProjectionSeries="@ProjectionSeries"
-                                                        Customers="@Customers"
-                                                        RateComparison="@RateComparison"
-                                                        SelectedEnterprise="@SelectedEnterprise"
-                                                        SelectedFiscalYear="@SelectedFiscalYear" />
-                                    break;
-                                default:
-                                    NavigationManager.NavigateTo("/wiley-workspace", replace: true);
-                                    break;
-                            }
-                        </div>
-                            </ChildContent>
-                            <ErrorContent Context="panelEx">
-                                <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-slate-800" role="alert" aria-live="assertive">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">Panel Error</p>
-                                    <h3 class="mt-1 font-semibold">The @ActivePanelLabel panel encountered an unexpected error.</h3>
-                                    <p class="mt-1 text-slate-600">Navigate to another panel to recover, or reload the workspace.</p>
-                                </div>
-                            </ErrorContent>
-                        </LoggingErrorBoundary>
-                    }
-                </div>
-            </div>
-        }
-        else
-        {
-        @* ── Tablet / Desktop splitter layout ─────────────────────────────────
-           SfSplitter renders for tablet (≥640px) and desktop (≥1024px).
-           Context-rail pane sizes are narrowed on tablet so the main panel
-           remains usable at iPad portrait width (~768px - docked rail ~80px).
-           ──────────────────────────────────────────────────────────────────── *@
         <SfSplitter @ref="_workspaceSplitter"
                     ID="workspace-main-splitter"
                     Height="calc(100vh - 20rem)"
                     Width="100%"
                     EnablePersistence="true"
-                    CssClass="workspace-splitter"
-                    EnableRtl="@(LayoutContext?.EnableRtl ?? false)">
+                    CssClass="workspace-splitter">
             <SplitterEvents Collapsed="HandleSplitterCollapsed" Expanded="HandleSplitterExpanded" />
             <SplitterPanes>
                 @* Context Rail – pane 0: enterprise context, navigation, actions *@
-                @* Min reduced to 48px so the pane can be fully collapsed on tablet
-                   and Max reduced to 340px to prevent the context rail stealing too
-                   much real estate on compact laptop/tablet screens. *@
-                <SplitterPane Size="@(LayoutMode == WorkspaceLayoutMode.Tablet ? "220px" : "280px")"
-                              Min="48px"
-                              Max="@(LayoutMode == WorkspaceLayoutMode.Tablet ? "280px" : "420px")"
-                              Resizable="true"
-                              Collapsible="true">
+                <SplitterPane Size="280px" Min="48px" Max="420px" Resizable="true" Collapsible="true">
                     <ContentTemplate>
                         <div id="workspace-sidebar-shell" class="workspace-pane-context-rail h-full overflow-y-auto overflow-x-hidden space-y-4 p-4">
                     <SfCard ID="workspace-enterprise-context-card">
@@ -475,10 +149,7 @@
                             </CardContent>
                         </SfCard>
 
-                        <div id="workspace-hosting-information"
-                             class="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                             role="region"
-                             aria-label="Hosting information">
+                        <div id="workspace-hosting-information" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Hosting Information</p>
                             <div class="mt-3 grid gap-2 text-xs text-slate-600">
                                 <div><span class="font-semibold text-slate-700">Environment:</span> @HostingEnvironmentName</div>
@@ -489,17 +160,13 @@
                             </div>
                         </div>
 
-                        <div id="workspace-navigation-card"
-                             class="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                             role="region"
-                             aria-label="Workspace panel navigation">
+                        <div id="workspace-navigation-card" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace Navigation</p>
                             <div id="workspace-navigation-list" class="mt-2 grid gap-2">
                                 @foreach (var panelNavItem in PanelNavItems)
                                 {
                                     <a href="@GetPanelRoute(panelNavItem.Key)"
                                        class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors @(ActivePanelKey == panelNavItem.Key ? "bg-sky-100 text-sky-900 font-semibold border-sky-200" : "text-slate-600 hover:bg-slate-100")"
-                                       aria-current="@(ActivePanelKey == panelNavItem.Key ? "page" : null)"
                                        @onclick="() => OpenPanel(panelNavItem.Key)"
                                        @onclick:preventDefault>
                                         @panelNavItem.Label
@@ -508,10 +175,7 @@
                             </div>
                         </div>
 
-                        <div id="workspace-global-actions-card"
-                             class="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                             role="region"
-                             aria-label="Global workspace actions">
+                        <div id="workspace-global-actions-card" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Global Actions</p>
                             <div class="mt-2 grid gap-2">
                                 <SfButton Disabled="@IsLoadingWorkspace" OnClick="RefreshWorkspaceAsync">@(IsLoadingWorkspace ? "Refreshing..." : "Reload workspace")</SfButton>
@@ -522,19 +186,12 @@
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers</SfButton>
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario</SfButton>
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">Export PDF packet</SfButton>
-                                    <SfButton CssClass="e-success" Disabled="@IsExportingDocuments" OnClick="ExportRatePacketZipAsync">Download rate packet ZIP</SfButton>
                                 </div>
                             </div>
                         </div>
 
-                        <div id="workspace-status-card"
-                             class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600"
-                             role="status"
-                             aria-live="polite"
-                             aria-label="Workspace status">
-                            <div id="workspace-load-status" aria-live="polite">
-                                <span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus
-                            </div>
+                        <div id="workspace-status-card" class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                            <div id="workspace-load-status"><span class="font-semibold text-slate-700">Workspace:</span> @WorkspaceLoadStatus</div>
                             <div class="mt-2"><span class="font-semibold text-slate-700">Scenarios:</span> <span id="scenario-persistence-status">@ScenarioPersistenceStatus</span></div>
                             <div class="mt-2">
                                 <span class="font-semibold text-slate-700">Startup source:</span>
@@ -549,10 +206,8 @@
                     </ContentTemplate>
                 </SplitterPane>
 
-                @* Main Content – pane 1: active panel router.
-                   Min reduced on tablet so the pane remains usable at 768px
-                   viewport width (iPad portrait with sidebar docked). *@
-                <SplitterPane Min="@(LayoutMode == WorkspaceLayoutMode.Tablet ? "280px" : "420px")" Resizable="true" Collapsible="false">
+                @* Main Content – pane 1: active panel router *@
+                <SplitterPane Min="420px" Resizable="true" Collapsible="false">
                     <ContentTemplate>
                         <div id="workspace-main-content" class="workspace-pane-main h-full overflow-y-auto overflow-x-hidden">
                         <div id="workspace-dashboard" class="w-full">
@@ -786,11 +441,6 @@
                         }
                         else
                         {
-                            @* LoggingErrorBoundary isolates a panel crash from the rest of the shell.
-                               Its LocationChanged handler auto-recovers when the user navigates
-                               to a different panel. *@
-                            <LoggingErrorBoundary BoundaryName="@($"Panel:{ActivePanelKey}")">
-                                <ChildContent>
                             <div class="flex-1 overflow-auto pr-1">
                                 @switch (ActivePanelKey)
                                 {
@@ -895,15 +545,6 @@
                                         break;
                                 }
                             </div>
-                                </ChildContent>
-                                <ErrorContent Context="panelEx">
-                                    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-slate-800" role="alert" aria-live="assertive">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-rose-700">Panel Error</p>
-                                        <h3 class="mt-1 font-semibold">The @ActivePanelLabel panel encountered an unexpected error.</h3>
-                                        <p class="mt-1 text-slate-600">Navigate to another panel to recover, or reload the workspace.</p>
-                                    </div>
-                                </ErrorContent>
-                            </LoggingErrorBoundary>
                         }
                     </div>
                         </div>
@@ -911,32 +552,26 @@
                     </ContentTemplate>
                 </SplitterPane>
 
-                @* Jarvis Rail – pane 2: AI chat, starts collapsed.
-                   The dedicated decision-support route already renders Jarvis as the main panel,
-                   so the global rail is omitted there to avoid mounting a duplicate assist surface. *@
-                @if (!string.Equals(ActivePanelKey, "decision-support", StringComparison.Ordinal))
-                {
-                    <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true" Collapsed="true">
-                        <ContentTemplate>
-                            <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
-                                <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b border-slate-200 px-4 py-3 flex-shrink-0">
-                                    <span class="e-icons e-ai-chat text-sky-600 text-base flex-shrink-0" aria-hidden="true"></span>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Jarvis</p>
-                                        <p class="mt-0.5 text-[0.7rem] text-slate-400 leading-tight">AI workspace guidance</p>
-                                    </div>
-                                </div>
-                                <div class="min-h-0 flex-1 overflow-auto p-3">
-                                    <JarvisChatPanel />
+                @* Jarvis Rail – pane 2: AI chat, starts collapsed *@
+                <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true" Collapsed="true">
+                    <ContentTemplate>
+                        <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
+                            <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b border-slate-200 px-4 py-3 flex-shrink-0">
+                                <span class="e-icons e-ai-chat text-sky-600 text-base flex-shrink-0" aria-hidden="true"></span>
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Jarvis</p>
+                                    <p class="mt-0.5 text-[0.7rem] text-slate-400 leading-tight">AI workspace guidance</p>
                                 </div>
                             </div>
-                        </ContentTemplate>
-                    </SplitterPane>
-                }
+                            <div class="min-h-0 flex-1 overflow-auto p-3">
+                                <JarvisChatPanel />
+                            </div>
+                        </div>
+                    </ContentTemplate>
+                </SplitterPane>
             </SplitterPanes>
         </SfSplitter>
 
-        @* Jarvis FAB: show on tablet/desktop only when not in decision-support *@
         @if (!string.Equals(ActivePanelKey, "decision-support", StringComparison.Ordinal) && !IsJarvisOpen)
         {
             <SfButton id="workspace-jarvis-launcher"
@@ -948,7 +583,6 @@
                 Jarvis
             </SfButton>
         }
-        } @* end else (tablet/desktop splitter layout) *@
     </div>
 </div>
     </ChildContent>
@@ -1174,53 +808,6 @@
             grid-template-columns: 1fr;
         }
     }
-
-    /* ── Workspace splitter: tablet height override ─────────────────────────
-       When the hero + doc-center sections stack on tablet viewports they grow
-       taller, so the splitter height must shrink to avoid viewport overflow.
-       The C# LayoutMode binding handles pane sizes; these rules handle height.
-       ──────────────────────────────────────────────────────────────────────── */
-    @@media (max-width: 1023px) {
-        #workspace-main-splitter.e-splitter {
-            height: calc(100vh - 26rem) !important;
-            min-height: 24rem;
-        }
-    }
-
-    /* ── Mobile stacked layout: workspace-overview-grid single column ─────── */
-    @@media (max-width: 639px) {
-        .wiley-workspace .workspace-overview-card,
-        .wiley-workspace .workspace-overview-card-featured,
-        .wiley-workspace .workspace-overview-card-wide {
-            grid-column: span 1;
-            min-height: 7rem;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.875rem 1rem;
-        }
-
-        .wiley-workspace .workspace-overview-card-copy p {
-            display: none; /* Hide description on mobile to keep cards compact */
-        }
-
-        .wiley-workspace .workspace-overview-card-metrics {
-            display: none; /* Hide metric pills on mobile */
-        }
-
-        .wiley-workspace .workspace-overview-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .wiley-mobile-main-content {
-            padding: 0.75rem;
-        }
-
-        /* Pane main scrollable area on mobile */
-        .workspace-pane-main {
-            padding: 0.75rem;
-        }
-    }
 </style>
 
 @code {
@@ -1233,22 +820,14 @@
     /// </summary>
     private async Task ToggleJarvisAsync()
     {
+        // ToggleJarvis() calls LayoutContext.SetJarvisOpen(!current) which fires
+        // OnChange — any subscriber (e.g. a decision-support badge) re-renders.
         ToggleJarvis();
 
-        if (_workspaceSplitter is not null)
-        {
-            // Desktop / tablet: expand or collapse the Jarvis splitter pane.
-            if (IsJarvisOpen)
-                await _workspaceSplitter.ExpandAsync(2);
-            else
-                await _workspaceSplitter.CollapseAsync(2);
-        }
-        else if (IsJarvisOpen)
-        {
-            // Mobile stacked layout has no splitter — navigate to the
-            // decision-support panel instead of the Jarvis rail.
-            OpenPanel("decision-support");
-        }
+        if (IsJarvisOpen)
+            await (_workspaceSplitter?.ExpandAsync(2) ?? Task.CompletedTask);
+        else
+            await (_workspaceSplitter?.CollapseAsync(2) ?? Task.CompletedTask);
     }
 
     /// <summary>
