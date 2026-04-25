@@ -73,7 +73,7 @@ test.describe("Unique Interaction Proof", () => {
     }
   });
 
-  test("Customer viewer opens the seeded customer before and after a reload", async ({
+  test("Customer viewer keeps the seeded customer accessible across a reload", async ({
     page,
   }) => {
     const seededCustomer = {
