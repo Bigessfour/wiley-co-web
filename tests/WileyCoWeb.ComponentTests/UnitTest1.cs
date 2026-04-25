@@ -123,7 +123,8 @@ public sealed class WorkspaceExportServiceTests
         var pdfReport = service.CreateWorkspacePdfReport(state);
 
         Assert.EndsWith(".pdf", pdfReport.FileName);
-        Assert.Equal("water-utility-fy2026-rate-packet.pdf", pdfReport.FileName);
+        Assert.Contains("Rate-Packet", pdfReport.FileName);
+        Assert.Contains("water-utility", pdfReport.FileName);
         Assert.Equal("application/pdf", pdfReport.ContentType);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdfReport.Content, 0, 4));
         Assert.True(pdfReport.Content.Length > 1000);

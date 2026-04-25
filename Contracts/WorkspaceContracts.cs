@@ -111,4 +111,13 @@ public sealed record WorkspaceBootstrapData(
     public List<BreakEvenQuadrantData>? BreakEvenQuadrants { get; init; }
     public List<ApartmentUnitTypeData>? ApartmentUnitTypes { get; init; }
     public WorkspaceReserveTrajectoryData? ReserveTrajectory { get; init; }
+    public long? SelectedScenarioSnapshotId { get; init; }
+    public string? ScenarioDescription { get; init; }
+
+    /// <summary>
+    /// ISO-8601 timestamps keyed by export type ("customer-excel", "scenario-excel",
+    /// "workspace-pdf", "reserve-excel", "reserve-pdf").  Persisted so the
+    /// document-center can show when each export was last downloaded.
+    /// </summary>
+    public Dictionary<string, string>? LastExportedTimestamps { get; init; }
 }

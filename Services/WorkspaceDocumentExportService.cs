@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.IO.Compression;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -59,6 +60,29 @@ public sealed class WorkspaceDocumentExportService(
         var document = _pdfBuilder.CreateReserveTrajectoryPdfReport(workspaceState);
         logger?.LogInformation("Reserve trajectory PDF export created: {FileName} ({ByteCount} bytes)", document.FileName, document.Content.LongLength);
         return document;
+    }
+
+    public WorkspaceExportDocument CreateRatePacketZip(WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation("Creating rate packet ZIP for {Enterprise} FY {FiscalYear}.", workspaceState.SelectedEnterprise, workspaceState.SelectedFiscalYear);
+
+        var pdfDoc   = _pdfBuilder.CreateWorkspacePdfReport(workspaceState);
+        var excelDoc = _excelBuilder.CreateRatePacketWorkbook(workspaceState);
+
+        using var zipStream = new MemoryStream();
+        using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var pdfEntry = archive.CreateEntry(pdfDoc.FileName, CompressionLevel.Optimal);
+            using (var s = pdfEntry.Open()) s.Write(pdfDoc.Content);
+
+            var xlsxEntry = archive.CreateEntry(excelDoc.FileName, CompressionLevel.Optimal);
+            using (var s = xlsxEntry.Open()) s.Write(excelDoc.Content);
+        }
+
+        var zipFileName = PdfPacketBuilder.BuildFileName(workspaceState, "Rate-Packet", "zip");
+        logger?.LogInformation("Rate packet ZIP created: {FileName} ({ByteCount} bytes)", zipFileName, zipStream.Length);
+        return new WorkspaceExportDocument(zipFileName, "application/zip", zipStream.ToArray());
     }
 }
 

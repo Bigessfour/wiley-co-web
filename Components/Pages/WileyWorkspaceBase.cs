@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
@@ -44,6 +45,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     [Inject]
     protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
 
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; } = default!;
+
+    private DotNetObjectReference<WileyWorkspaceBase>? _networkStatusRef;
+
     private bool persistenceInitialized;
     private bool isRefreshingScenarioCatalog;
     private DateTimeOffset? lastWorkspaceSyncUtc;
@@ -57,7 +63,20 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsLoadingWorkspace { get; set; }
     protected bool IsExportingDocuments { get; set; }
     protected bool IsSidebarOpen { get; set; } = true;
-    protected bool IsJarvisOpen { get; set; }
+
+    /// <summary>
+    /// <c>true</c> from component creation until the first-render
+    /// persistence initialization cycle completes.  Used to render a
+    /// skeleton scaffold so the workspace never shows a jarring empty state.
+    /// </summary>
+    protected bool IsInitializingWorkspace { get; private set; } = true;
+
+    /// <summary>
+    /// <c>true</c> when the Jarvis chat panel is open.  Reading this goes
+    /// through the layout context so that any component can observe the same
+    /// value without a direct reference to <see cref="WileyWorkspaceBase"/>.
+    /// </summary>
+    protected bool IsJarvisOpen => LayoutContext?.IsJarvisOpen ?? false;
 
     protected string SnapshotSaveStatus { get; set; } = "Ready to save rate snapshot";
     protected string BaselineSaveStatus { get; set; } = "Baseline changes are local until you save them.";
@@ -65,8 +84,18 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected string WorkspaceLoadStatus { get; set; } = "Workspace initialization is pending.";
     protected string DocumentExportStatus { get; set; } = "Excel and PDF exports are ready.";
 
-    protected long? SelectedScenarioSnapshotId { get; set; }
-    protected string ScenarioDescription { get; set; } = string.Empty;
+    protected long? SelectedScenarioSnapshotId
+    {
+        get => WorkspaceState.SelectedScenarioSnapshotId;
+        set => WorkspaceState.SetSelectedScenarioSnapshotId(value);
+    }
+
+    protected string ScenarioDescription
+    {
+        get => WorkspaceState.ScenarioDescription;
+        set => WorkspaceState.SetScenarioDescription(value);
+    }
+
     protected IReadOnlyList<WorkspaceScenarioSummaryResponse> SavedScenarios { get; set; } = [];
 
     protected string SelectedEnterprise
@@ -144,6 +173,24 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected string CurrentStateSourceStatus => WorkspaceState.CurrentStateSourceStatus;
     protected bool IsUsingBrowserRestoredState => WorkspaceState.IsUsingBrowserRestoredState;
 
+    /// <summary>
+    /// <c>true</c> when the browser has reported that network access is lost
+    /// (<c>navigator.onLine == false</c>).  Drives the offline-indicator banner
+    /// in <c>WileyWorkspace.razor</c>.  Updates automatically via JS interop.
+    /// </summary>
+    protected bool IsOffline => WorkspaceState.IsOffline;
+
+    /// <summary>
+    /// Returns a localised, human-readable label for the most recent download
+    /// of the given export type, e.g. "4/25/2026 2:15 PM", or "Never".
+    /// </summary>
+    /// <param name="exportKey">
+    /// One of "customer-excel", "scenario-excel", "workspace-pdf",
+    /// "reserve-excel", or "reserve-pdf".
+    /// </param>
+    protected string GetLastExportedDisplay(string exportKey)
+        => WorkspaceState.GetLastExportedDisplay(exportKey);
+
     protected string CustomerSearchTerm
     {
         get => WorkspaceState.CustomerSearchTerm;
@@ -178,7 +225,15 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         WorkspaceApiHealth.Degraded => "Degraded",
         _ => "Unknown"
     };
+    /// <summary>True when the left navigation rail is in its docked/collapsed state.</summary>
     protected bool IsLeftNavRailCollapsed => LayoutContext?.IsLeftNavCollapsed ?? false;
+
+    /// <summary>True when the workspace context-rail splitter pane (pane 0) is collapsed.</summary>
+    protected bool IsContextRailCollapsed => LayoutContext?.IsContextRailCollapsed ?? false;
+
+    /// <summary>Current viewport layout mode from the resize observer.</summary>
+    protected WorkspaceLayoutMode LayoutMode => LayoutContext?.LayoutMode ?? WorkspaceLayoutMode.Desktop;
+
     protected string NavigationRailToggleText => IsLeftNavRailCollapsed ? "Expand navigation" : "Collapse navigation";
 
     protected IReadOnlyList<WorkspacePanelNavItem> PanelNavItems { get; } =
@@ -240,7 +295,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         _ = TrackNavigationClickAsync(clickTelemetry);
 
-        IsJarvisOpen = false;
+        // Close the Jarvis panel through the layout context so all subscribers
+        // (including the SfSplitter pane binding) react to the change.
+        LayoutContext?.SetJarvisOpen(false);
         NavigationManager.NavigateTo(route);
     }
 
@@ -261,9 +318,33 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         IsSidebarOpen = !IsSidebarOpen;
     }
 
+    /// <summary>
+    /// Toggles the Jarvis chat panel through the layout context so all
+    /// layout subscribers observe the change immediately.
+    /// </summary>
     protected void ToggleJarvis()
     {
-        IsJarvisOpen = !IsJarvisOpen;
+        LayoutContext?.SetJarvisOpen(!IsJarvisOpen);
+    }
+
+    /// <summary>
+    /// Notifies the layout context that the context-rail splitter pane
+    /// collapsed.  Called from the <c>SplitterEvents.Collapsed</c> handler
+    /// in <c>WileyWorkspace.razor</c>.
+    /// </summary>
+    protected void NotifyContextRailCollapsed()
+    {
+        LayoutContext?.SetContextRailCollapsed(true);
+    }
+
+    /// <summary>
+    /// Notifies the layout context that the context-rail splitter pane
+    /// expanded.  Called from the <c>SplitterEvents.Expanded</c> handler
+    /// in <c>WileyWorkspace.razor</c>.
+    /// </summary>
+    protected void NotifyContextRailExpanded()
+    {
+        LayoutContext?.SetContextRailCollapsed(false);
     }
 
     protected Task ToggleLeftNavRailAsync()
@@ -300,7 +381,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         {
             ScenarioDescription = selectedScenario.Description ?? string.Empty;
             ScenarioPersistenceStatus = $"Selected saved scenario '{selectedScenario.ScenarioName}'.";
+            return;
         }
+
+        ScenarioDescription = string.Empty;
+        ScenarioPersistenceStatus = "Saved scenario selection cleared.";
     }
 
     protected async Task SaveScenarioAsync()
@@ -459,35 +544,48 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateCustomerWorkbook(WorkspaceState),
-            "Preparing customer workbook...");
+            "Preparing customer workbook...",
+            "customer-excel");
     }
 
     protected Task ExportScenarioWorkbookAsync()
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateScenarioWorkbook(WorkspaceState),
-            "Preparing scenario workbook...");
+            "Preparing scenario workbook...",
+            "scenario-excel");
     }
 
     protected Task ExportReserveTrajectoryWorkbookAsync()
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateReserveTrajectoryWorkbook(WorkspaceState),
-            "Preparing reserve trajectory workbook...");
+            "Preparing reserve trajectory workbook...",
+            "reserve-excel");
     }
 
     protected Task ExportWorkspacePdfAsync()
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateWorkspacePdfReport(WorkspaceState),
-            "Preparing PDF rate packet...");
+            "Preparing PDF rate packet...",
+            "workspace-pdf");
     }
 
     protected Task ExportReserveTrajectoryPdfAsync()
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateReserveTrajectoryPdfReport(WorkspaceState),
-            "Preparing reserve trajectory PDF...");
+            "Preparing reserve trajectory PDF...",
+            "reserve-pdf");
+    }
+
+    protected Task ExportRatePacketZipAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateRatePacketZip(WorkspaceState),
+            "Building rate packet ZIP (PDF + Excel)...",
+            "rate-packet-zip");
     }
 
     protected void HandleTotalCostsChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
@@ -543,6 +641,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+
+        // Mark initialization complete so the skeleton scaffold is removed.
+        IsInitializingWorkspace = false;
+
+        // Register navigator.onLine bridge so offline banner appears immediately
+        // if the browser has already lost connectivity during startup.
+        await RegisterNetworkStatusAsync();
+
         StateHasChanged();
     }
 
@@ -550,6 +656,24 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     {
         WorkspaceState.Changed -= HandleWorkspaceStateChanged;
         WorkspacePersistenceService.Dispose();
+
+        // Unsubscribe the JS network-status listener and dispose the .NET reference
+        // so the JS callback cannot fire after this component has been torn down.
+        if (_networkStatusRef is not null)
+        {
+            try
+            {
+                _ = JSRuntime.InvokeVoidAsync("wileyNetworkStatus.unsubscribe");
+            }
+            catch
+            {
+                // Best-effort: ignore JS errors during disposal.
+            }
+
+            _networkStatusRef.Dispose();
+            _networkStatusRef = null;
+        }
+
         GC.SuppressFinalize(this);
     }
 
@@ -595,6 +719,42 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         return "Workspace ready.";
+    }
+
+    // ── Network status interop ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Registers a <c>navigator.onLine</c> bridge so the workspace can show an
+    /// offline-indicator banner immediately when the browser loses connectivity.
+    /// </summary>
+    private async Task RegisterNetworkStatusAsync()
+    {
+        try
+        {
+            _networkStatusRef = DotNetObjectReference.Create(this);
+            var isOnline = await JSRuntime.InvokeAsync<bool>("wileyNetworkStatus.isOnline");
+            WorkspaceState.SetOffline(!isOnline);
+            await JSRuntime.InvokeVoidAsync("wileyNetworkStatus.subscribe", _networkStatusRef);
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal: network-status detection is best-effort.  The offline
+            // banner simply will not appear in environments where JS interop is
+            // unavailable (SSR pre-render, unit tests, etc.).
+            WorkspaceLogger.LogDebug(ex, "Network status registration failed; assuming online.");
+        }
+    }
+
+    /// <summary>
+    /// Called by the JS runtime when the browser <c>online</c> or <c>offline</c>
+    /// event fires.  Updates <see cref="WorkspaceState.IsOffline"/> so the
+    /// offline-indicator banner appears or disappears immediately.
+    /// </summary>
+    [JSInvokable]
+    public void HandleOnlineStatusChanged(bool isOnline)
+    {
+        WorkspaceState.SetOffline(!isOnline);
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private static int GetHeroBreakEvenSortKey(BreakEvenQuadrantData quadrant)
@@ -718,7 +878,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         ScenarioPersistenceStatus = status;
     }
 
-    private async Task ExportDocumentAsync(Func<WorkspaceExportDocument> exportFactory, string pendingStatus)
+    private async Task ExportDocumentAsync(Func<WorkspaceExportDocument> exportFactory, string pendingStatus, string exportKey)
     {
         if (IsExportingDocuments)
         {
@@ -734,6 +894,10 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             var document = exportFactory();
             await BrowserDownloadService.DownloadAsync(document);
             DocumentExportStatus = $"Downloaded {document.FileName}";
+
+            // Record when this export type was last downloaded so the document
+            // centre can show an accurate "last exported" timestamp.
+            WorkspaceState.SetLastExported(exportKey, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {

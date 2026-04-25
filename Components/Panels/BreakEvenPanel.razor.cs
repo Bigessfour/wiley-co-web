@@ -62,4 +62,28 @@ public partial class BreakEvenPanel : ComponentBase
             Math.Max(1m, ProjectedVolume),
             seriesPoints);
     }
+
+    protected double GetRateAdequacy(BreakEvenQuadrantData quadrant)
+        => quadrant.BreakEvenRate > 0 && quadrant.CurrentRate > 0
+            ? Math.Min((double)(quadrant.CurrentRate / quadrant.BreakEvenRate * 100m), 150.0)
+            : 0.0;
+
+    protected string GetRateAdequacyCssClass(BreakEvenQuadrantData quadrant)
+        => GetRateAdequacy(quadrant) >= 100 ? "text-emerald-600"
+         : GetRateAdequacy(quadrant) >= 85 ? "text-amber-600"
+         : "text-rose-600";
+
+    protected string GetRateAdequacyLabel(BreakEvenQuadrantData quadrant)
+        => GetRateAdequacy(quadrant) >= 100 ? "Fully self-supporting"
+         : GetRateAdequacy(quadrant) >= 85 ? "Near break-even"
+         : "Below break-even";
+
+    protected static string GetQuadrantGaugeId(BreakEvenQuadrantData quadrant)
+        => $"break-even-gauge-{SanitizeId(quadrant.EnterpriseName)}";
+
+    protected static string GetQuadrantSectionId(BreakEvenQuadrantData quadrant)
+        => $"break-even-quadrant-{SanitizeId(quadrant.EnterpriseName)}";
+
+    private static string SanitizeId(string value)
+        => new string(value.Trim().Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-').ToArray());
 }

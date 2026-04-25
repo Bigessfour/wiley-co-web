@@ -50,13 +50,16 @@
         @if (HasTrajectory)
         {
             <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                @* Theme Fluent2: chart palette aligned with app-wide Syncfusion theme *@
+                @* ChartZoomSettings: reserve trajectory is the most analytical chart in the workspace; scroll zoom allows multi-year drill-down *@
                 <SfChart ID="@ChartId"
                          Title="Reserve forecast"
                          AccessibilityDescription="Area chart showing reserve projection, stress band, and policy minimum over time."
                          EnableAnimation="true"
                          UseGroupingSeparator="true"
                          Width="100%"
-                         Height="320px">
+                         Height="320px"
+                         Theme="Syncfusion.Blazor.Theme.Fluent2">
                     <ChartArea>
                         <ChartAreaBorder Width="0"></ChartAreaBorder>
                     </ChartArea>
@@ -67,6 +70,7 @@
                         <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
                     </ChartPrimaryYAxis>
                     <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top"></ChartLegendSettings>
+                    <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="true" EnablePinchZooming="true" />
                     <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y:C0}" />
                     <ChartCrosshairSettings Enable="true" LineType="LineType.Both">
                         <ChartCrosshairLine Color="#94a3b8" Width="1" />

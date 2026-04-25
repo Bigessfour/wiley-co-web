@@ -2,6 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Syncfusion.Blazor.Grids;
+using Action = System.Action;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -12,6 +14,7 @@ public partial class CustomerViewerPanel : ComponentBase
 {
     [Inject] private UtilityCustomerApiService UtilityCustomerApiService { get; set; } = default!;
     [Inject] private WorkspaceState WorkspaceState { get; set; } = default!;
+    [Inject] private ToastService ToastService { get; set; } = default!;
 
     private readonly List<UtilityCustomerRecord> allCustomers = [];
     private readonly Dictionary<string, string[]> customerValidationErrors = new(StringComparer.OrdinalIgnoreCase);
@@ -23,9 +26,11 @@ public partial class CustomerViewerPanel : ComponentBase
     private bool isLoadingCustomers = true;
     private bool isSavingCustomer;
     private bool isDeletingCustomer;
+    private bool isExportingCustomerGrid;
     private bool isEditorDialogOpen;
     private bool isDeleteDialogOpen;
     private bool isEditingExistingCustomer;
+    private SfGrid<UtilityCustomerRecord> CustomerDirectoryGrid = default!;
 
     protected override Task OnInitializedAsync()
     {
@@ -35,6 +40,36 @@ public partial class CustomerViewerPanel : ComponentBase
     private async Task RefreshCustomerDirectoryAsync()
     {
         await LoadCustomersAsync("Refreshed the live utility-customer directory.");
+    }
+
+    private async Task ExportCustomerDirectoryAsync()
+    {
+        if (isExportingCustomerGrid || isLoadingCustomers)
+        {
+            return;
+        }
+
+        isExportingCustomerGrid = true;
+        customerDirectoryStatus = "Preparing the filtered customer directory Excel export...";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await CustomerDirectoryGrid.ExportToExcelAsync(new ExcelExportProperties());
+            customerDirectoryStatus = "Customer directory Excel export generated.";
+            ToastService.ShowSuccess("Customer export started", "The filtered customer directory is being downloaded as an Excel workbook.");
+        }
+        catch (Exception ex)
+        {
+            customerApiError = $"Unable to export the customer directory: {ex.Message}";
+            customerDirectoryStatus = "Customer directory export failed.";
+            ToastService.ShowError("Customer export failed", customerApiError);
+        }
+        finally
+        {
+            isExportingCustomerGrid = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task ClearFiltersAsync()
@@ -219,10 +254,12 @@ public partial class CustomerViewerPanel : ComponentBase
         if (ex is UtilityCustomerApiException apiException)
         {
             ApplyApiFeedback(apiException.Message, apiException.ValidationErrors);
+            ToastService.ShowWarning("Customer save blocked", apiException.Message);
             return;
         }
 
         customerApiError = $"Unable to save the customer: {ex.Message}";
+        ToastService.ShowError("Customer save failed", customerApiError);
     }
 
     private void EndSavingCustomer()
@@ -256,10 +293,12 @@ public partial class CustomerViewerPanel : ComponentBase
         if (ex is UtilityCustomerApiException apiException)
         {
             ApplyApiFeedback(apiException.Message, apiException.ValidationErrors);
+            ToastService.ShowWarning("Customer delete blocked", apiException.Message);
             return;
         }
 
         customerApiError = $"Unable to delete the customer: {ex.Message}";
+        ToastService.ShowError("Customer delete failed", customerApiError);
     }
 
     private void EndDeletingCustomer()
@@ -285,6 +324,7 @@ public partial class CustomerViewerPanel : ComponentBase
     {
         customerApiError = $"Unable to load the live utility-customer directory: {ex.Message}";
         customerDirectoryStatus = "The live customer directory could not be refreshed.";
+        ToastService.ShowError("Customer directory failed to load", customerApiError);
     }
 
     private void EndLoadingCustomers()

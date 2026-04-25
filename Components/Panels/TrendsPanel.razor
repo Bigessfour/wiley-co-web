@@ -1,29 +1,108 @@
+@using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 
-<div id="trends-panel" class="space-y-4" aria-label="Historical and projected rates trend panel">
-    <div id="trends-chart-region" role="img" aria-label="Projected rate trend chart">
-    <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="560px">
-        <ChartArea>
-            <ChartAreaBorder Width="0"></ChartAreaBorder>
-        </ChartArea>
-        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-            <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-        </ChartPrimaryXAxis>
-        <ChartPrimaryYAxis LabelFormat="C2">
-            <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-        </ChartPrimaryYAxis>
-        <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-        <ChartSeriesCollection>
-            <ChartSeries DataSource="@ProjectionSeries" XName="Year" YName="Rate" Type="ChartSeriesType.Line" Name="Projection" Width="3">
-                <ChartMarker Visible="true" Width="8" Height="8"></ChartMarker>
-            </ChartSeries>
-        </ChartSeriesCollection>
-    </SfChart>
-    </div>
-</div>
+@* Removed: the old plain div wrappers (#trends-panel and #trends-chart-region) and the manual role="img"/aria-label container.
+   Replacement: a full Syncfusion card owns the trends surface, and the chart carries its own AccessibilityDescription so
+   the accessibility metadata lives on the component actually rendering the trend visualization. *@
+<SfCard ID="trends-panel" CssClass="wiley-panel-card">
+    <CardHeader Title="Historical and Projected Rates"
+                SubTitle="WorkspaceState-backed projection rows rendered as a polished council-facing trend surface." />
+    <CardContent>
+        @if (!ProjectionSeries.Any())
+        {
+            @* Removed: the custom CSS empty-state container.
+               Replacement: a Syncfusion card-within-card pattern that stays theme-consistent while still giving a graceful no-data state. *@
+            <SfCard ID="trends-empty-state-card">
+                <CardHeader Title="No projection data"
+                            SubTitle="Trend projections will appear once the workspace loads rate history for the selected enterprise and fiscal year." />
+                <CardContent Content="Try reloading the workspace or changing the enterprise selection to bring projection rows into the chart." />
+            </SfCard>
+        }
+        else
+        {
+            <div class="space-y-4">
+                <SfCard ID="trends-chart-context-card">
+                    <CardHeader Title="Projection Context"
+                                SubTitle="@TrendSummaryTitle" />
+                    <CardContent Content="@TrendSummaryBody" />
+                </SfCard>
+
+                @* Syncfusion chart choices validated through MCP guidance:
+                   - Area + line pairing: the area series adds executive-friendly shape and trend mass, while the line series preserves precise rate trajectory.
+                   - EnableAnimation: keeps WorkspaceState-driven rebinds feeling immediate instead of abrupt.
+                   - Legend + tooltip + markers: improve comprehension during walkthroughs and exports.
+                   - ZoomSettings: appropriate here because multi-year projections benefit from fiscal-band inspection.
+                   - AccessibilityDescription: replaces the former manual aria wrapper with native chart semantics. *@
+                <SfChart ID="trends-projection-chart"
+                         Title="Historical and Projected Rates"
+                         AccessibilityDescription="Trend chart showing projected rate levels by fiscal year for the active workspace selection."
+                         EnableAnimation="true"
+                         UseGroupingSeparator="true"
+                         Width="100%"
+                         Height="560px"
+                         Background="transparent"
+                         Theme="Syncfusion.Blazor.Theme.Fluent2">
+                    <ChartArea>
+                        <ChartAreaBorder Width="0"></ChartAreaBorder>
+                    </ChartArea>
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category"
+                                       LabelIntersectAction="LabelIntersectAction.Rotate45">
+                        <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis LabelFormat="C2">
+                        <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                    </ChartPrimaryYAxis>
+                    <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top" />
+                    <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="true" EnablePinchZooming="true" />
+                    <ChartTooltipSettings Enable="true" Shared="true" Header="<b>${point.x}</b>" Format="${series.name}: <b>${point.y}</b>" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@ProjectionSeries"
+                                     XName="@nameof(ProjectionRow.Year)"
+                                     YName="@nameof(ProjectionRow.Rate)"
+                                     Type="ChartSeriesType.Area"
+                                     Name="Projection Range"
+                                     Fill="#b4d6fa">
+                            <ChartMarker Visible="false"></ChartMarker>
+                        </ChartSeries>
+                        <ChartSeries DataSource="@ProjectionSeries"
+                                     XName="@nameof(ProjectionRow.Year)"
+                                     YName="@nameof(ProjectionRow.Rate)"
+                                     Type="ChartSeriesType.Line"
+                                     Name="Projection"
+                                     Fill="#0f6cbd"
+                                     Width="3">
+                            <ChartMarker Visible="true" Width="8" Height="8" Fill="#0f6cbd"></ChartMarker>
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+
+                @* Footer context: the card closes with a concise reading note so the panel feels complete in exported or walkthrough contexts. *@
+                <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Projection series bind directly to WorkspaceState bootstrap updates. Use zooming to inspect specific fiscal-year bands, and rely on the shared tooltip to compare the filled trend envelope against the exact projected rate line.
+                </div>
+            </div>
+        }
+    </CardContent>
+</SfCard>
 
 @code {
     [Parameter] public IReadOnlyList<ProjectionRow> ProjectionSeries { get; set; } = [];
+
+    private string TrendSummaryTitle
+        => ProjectionSeries.Count switch
+        {
+            0 => "No projection rows are currently available.",
+            1 => $"Single-year projection at {ProjectionSeries[0].Rate:C2}.",
+            _ => $"{ProjectionSeries.Count}-year outlook from {ProjectionSeries.First().Year} through {ProjectionSeries.Last().Year}."
+        };
+
+    private string TrendSummaryBody
+        => ProjectionSeries.Count switch
+        {
+            0 => "Historical and projected rates will appear here once the workspace has projection rows for the selected enterprise.",
+            1 => "Only one projected point is currently available, so the chart is acting as a single outlook marker rather than a multi-year trend.",
+            _ => $"The current forecast moves from {ProjectionSeries.First().Rate:C2} in {ProjectionSeries.First().Year} to {ProjectionSeries.Last().Rate:C2} in {ProjectionSeries.Last().Year}, giving council a quick sense of projected direction before drilling into exact values."
+        };
 }

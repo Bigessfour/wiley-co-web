@@ -81,8 +81,10 @@
             <p class="text-sm text-slate-600">Average monthly bill as a percentage of MHI.</p>
         </div>
         <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
+            @* AnimationDuration: smooth gauge needle animation consistent with DataDashboard gauge baseline *@
             <SfCircularGauge ID="affordability-gauge"
                              AllowMargin="true"
+                             AnimationDuration="700"
                              Width="100%"
                              Height="220px">
                 <CircularGaugeAxes>
@@ -112,13 +114,15 @@
             <p class="text-sm text-slate-600">Stacked monthly bill comparison across the modeled rate scenarios.</p>
         </div>
         <div class="mt-3">
+            @* Theme Fluent2: consistent palette; ZoomSettings: class-impact chart is analytical; selection zoom allows per-class drill-down *@
             <SfChart ID="affordability-class-impact-chart"
                      Title="Monthly bill by class and scenario"
                      AccessibilityDescription="Stacked column chart showing how monthly bill burden changes by customer class across the modeled rate scenarios."
                      EnableAnimation="true"
                      UseGroupingSeparator="true"
                      Width="100%"
-                     Height="360px">
+                     Height="360px"
+                     Theme="Syncfusion.Blazor.Theme.Fluent2">
                 <ChartArea>
                     <ChartAreaBorder Width="0" />
                 </ChartArea>
@@ -129,6 +133,7 @@
                     <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
                 </ChartPrimaryYAxis>
                 <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top" />
+                <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="false" />
                 <ChartTooltipSettings Enable="true" Shared="true" Format="${point.x}: ${point.y}" />
                 <ChartSeriesCollection>
                     @foreach (var classSnapshot in AffordabilitySnapshot.CustomerClasses)

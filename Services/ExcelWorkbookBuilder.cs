@@ -25,6 +25,11 @@ public sealed class ExcelWorkbookBuilder
         return CreateReserveTrajectoryWorkbookCore(workspaceState);
     }
 
+    public WorkspaceExportDocument CreateRatePacketWorkbook(WorkspaceState workspaceState)
+    {
+        return CreateRatePacketWorkbookCore(workspaceState);
+    }
+
     private static ExcelEngine CreateExcelEngine()
     {
         var excelEngine = new ExcelEngine();
@@ -214,6 +219,129 @@ public sealed class ExcelWorkbookBuilder
             cell.CellStyle.Color = Color.FromArgb(14, 116, 144);
             cell.CellStyle.Font.Color = ExcelKnownColors.White;
         }
+    }
+
+    private static WorkspaceExportDocument CreateRatePacketWorkbookCore(WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceState);
+
+        using var excelEngine = CreateExcelEngine();
+        var workbook = excelEngine.Excel.Workbooks.Create(5);
+
+        var coverSheet = workbook.Worksheets[0];
+        coverSheet.Name = "Cover";
+        PopulateRatePacketCoverWorksheet(coverSheet, workspaceState);
+
+        var ratesSheet = workbook.Worksheets[1];
+        ratesSheet.Name = "Rates & Break-Even";
+        PopulateRatePacketBreakEvenWorksheet(ratesSheet, workspaceState);
+
+        var customerSheet = workbook.Worksheets[2];
+        customerSheet.Name = "Customers";
+        PopulateCustomerWorksheet(customerSheet, workspaceState);
+
+        var scenarioSheet = workbook.Worksheets[3];
+        scenarioSheet.Name = "Scenario Items";
+        PopulateScenarioItemsWorksheet(scenarioSheet, workspaceState);
+
+        var projSheet = workbook.Worksheets[4];
+        projSheet.Name = "Projections";
+        PopulateProjectionsWorksheet(projSheet, workspaceState);
+
+        var fileName = BuildRatePacketFileName(workspaceState, "xlsx");
+        return CreateWorkbookExport(workbook, fileName);
+    }
+
+    private static void PopulateRatePacketCoverWorksheet(IWorksheet sheet, WorkspaceState ws)
+    {
+        WriteWorkbookTitle(sheet, "Wiley Co Rate Packet", 1, 2);
+
+        sheet.Range[3, 1].Text   = "Enterprise";
+        sheet.Range[3, 2].Text   = ws.SelectedEnterprise;
+        sheet.Range[4, 1].Text   = "Fiscal Year";
+        sheet.Range[4, 2].Number = ws.SelectedFiscalYear;
+        sheet.Range[5, 1].Text   = "Scenario";
+        sheet.Range[5, 2].Text   = ws.ActiveScenarioName;
+        sheet.Range[6, 1].Text   = "Generated";
+        sheet.Range[6, 2].Text   = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm UTC");
+
+        WriteHeaderRow(sheet, 8, ["Metric", "Value"]);
+
+        var row = 9;
+        WriteRateRow(sheet, row++, "Current Rate",           (double)ws.CurrentRate,              CurrencyNumberFormat);
+        WriteRateRow(sheet, row++, "Break-Even Rate",        (double)ws.RecommendedRate,           CurrencyNumberFormat);
+        WriteRateRow(sheet, row++, "Adjusted Break-Even",    (double)ws.AdjustedRecommendedRate,   CurrencyNumberFormat);
+        WriteRateRow(sheet, row++, "Rate Delta",             (double)ws.RateDelta,                 CurrencyNumberFormat);
+        WriteRateRow(sheet, row++, "Total Costs",            (double)ws.TotalCosts,                "$#,##0");
+        WriteRateRow(sheet, row++, "Projected Volume",       (double)ws.ProjectedVolume,           "#,##0");
+        WriteRateRow(sheet, row++, "Scenario Cost Total",    (double)ws.ScenarioCostTotal,         "$#,##0");
+        WriteRateRow(sheet, row++, "Total Customers",        ws.Customers.Count,                   "#,##0");
+        WriteRateRow(sheet, row,   "Filtered Customers",     ws.FilteredCustomerCount,             "#,##0");
+
+        sheet.UsedRange.AutofitColumns();
+    }
+
+    private static void WriteRateRow(IWorksheet sheet, int row, string label, double value, string format)
+    {
+        sheet.Range[row, 1].Text         = label;
+        sheet.Range[row, 2].Number       = value;
+        sheet.Range[row, 2].NumberFormat = format;
+    }
+
+    private static void PopulateRatePacketBreakEvenWorksheet(IWorksheet sheet, WorkspaceState ws)
+    {
+        WriteWorkbookTitle(sheet, $"{ws.SelectedEnterprise} Break-Even Analysis", 1, 6);
+        WriteHeaderRow(sheet, 3, ["Enterprise", "Type", "Break-Even Rate", "Monthly Balance", "Monthly Expenses", "Eff. Customers"]);
+
+        var row = 4;
+        foreach (var q in ws.BreakEvenQuadrants)
+        {
+            sheet.Range[row, 1].Text         = q.EnterpriseName;
+            sheet.Range[row, 2].Text         = q.EnterpriseType;
+            sheet.Range[row, 3].Number       = (double)q.BreakEvenRate;
+            sheet.Range[row, 3].NumberFormat = CurrencyNumberFormat;
+            sheet.Range[row, 4].Number       = (double)q.MonthlyBalance;
+            sheet.Range[row, 4].NumberFormat = "$#,##0";
+            sheet.Range[row, 5].Number       = (double)q.MonthlyExpenses;
+            sheet.Range[row, 5].NumberFormat = "$#,##0";
+            sheet.Range[row, 6].Number       = (double)q.EffectiveCustomerCount;
+            sheet.Range[row, 6].NumberFormat = "#,##0";
+            row++;
+        }
+
+        if (row > 4)
+            sheet.AutoFilters.FilterRange = sheet.Range[3, 1, row - 1, 6];
+
+        sheet.UsedRange.AutofitColumns();
+    }
+
+    private static void PopulateProjectionsWorksheet(IWorksheet sheet, WorkspaceState ws)
+    {
+        WriteWorkbookTitle(sheet, $"{ws.SelectedEnterprise} Rate Projection Series", 1, 2);
+        WriteHeaderRow(sheet, 3, ["Year", "Rate"]);
+
+        var row = 4;
+        foreach (var point in ws.ProjectionSeries)
+        {
+            sheet.Range[row, 1].Text         = point.Year;
+            sheet.Range[row, 2].Number       = (double)point.Rate;
+            sheet.Range[row, 2].NumberFormat = CurrencyNumberFormat;
+            row++;
+        }
+
+        if (row > 4)
+            sheet.AutoFilters.FilterRange = sheet.Range[3, 1, row - 1, 2];
+
+        sheet.UsedRange.AutofitColumns();
+    }
+
+    private static string BuildRatePacketFileName(WorkspaceState workspaceState, string extension)
+    {
+        var enterprise = SanitizeFileName(workspaceState.SelectedEnterprise);
+        var now        = DateTimeOffset.UtcNow;
+        var quarter    = $"Q{(now.Month - 1) / 3 + 1}";
+        var date       = now.ToString("yyyy-MM-dd");
+        return $"WileyCo-Rate-Packet-{enterprise}-FY{workspaceState.SelectedFiscalYear}-{quarter}-{date}.{extension}";
     }
 
     private static string BuildFileStem(WorkspaceState workspaceState)

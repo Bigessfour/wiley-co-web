@@ -4,71 +4,192 @@
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Navigations
 @using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 
 <div id="customer-viewer-panel" aria-busy="@IsBusy()" class="space-y-4">
     <div id="customer-viewer-dashboard" class="space-y-4">
-        <section id="customer-summary-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Summary</p>
-        <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SfCard>
-                <CardHeader Title="Visible Customers" SubTitle="@GetLiveFilteredCustomerCountDisplay()" />
-                <CardContent Content="Live utility-customer rows matching the active customer filters." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Active Accounts" SubTitle="@GetActiveCustomerCountDisplay()" />
-                <CardContent Content="Accounts currently marked Active in the utility-customer directory." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Customer Type" SubTitle="@GetSelectedCustomerServiceDisplay()" />
-                <CardContent Content="Filter the directory by the persisted customer classification." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="City Limits" SubTitle="@GetSelectedCustomerCityLimitsDisplay()" />
-                <CardContent Content="Review inside-versus-outside city service locations at a glance." />
-            </SfCard>
-        </div>
-    </section>
+        @* Removed: the old Tailwind-only summary section wrapper.
+           Replacement: a full Syncfusion card surface that gives the customer KPIs a clearer hierarchy and theme-native presentation. *@
+        <SfCard ID="customer-summary-panel" CssClass="wiley-panel-card">
+            <CardHeader Title="Customer Summary"
+                        SubTitle="Live customer-directory posture derived from the API-backed directory and current WorkspaceState filters." />
+            <CardContent>
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <SfCard>
+                        <CardHeader Title="Visible Customers" SubTitle="@GetLiveFilteredCustomerCountDisplay()" />
+                        <CardContent Content="Live utility-customer rows matching the active filter toolbar selections." />
+                    </SfCard>
+                    <SfCard>
+                        <CardHeader Title="Active Accounts" SubTitle="@GetActiveCustomerCountDisplay()" />
+                        <CardContent Content="Accounts currently marked Active in the live utility-customer directory." />
+                    </SfCard>
+                    <SfCard>
+                        <CardHeader Title="Customer Type" SubTitle="@GetSelectedCustomerServiceDisplay()" />
+                        <CardContent Content="The persisted service filter currently shaping the visible customer list." />
+                    </SfCard>
+                    <SfCard>
+                        <CardHeader Title="City Limits" SubTitle="@GetSelectedCustomerCityLimitsDisplay()" />
+                        <CardContent Content="Inside-versus-outside city-limits focus for the filtered customer directory." />
+                    </SfCard>
+                </div>
+            </CardContent>
+        </SfCard>
 
-    <section id="customer-filters-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Filters</p>
-        <div class="mt-3 grid gap-3 md:grid-cols-3">
-            <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
-            <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@GetCustomerServiceOptions()" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Customer Type" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-            <SfDropDownList ID="customer-city-limits-filter" TValue="string" TItem="string" DataSource="@GetCustomerCityLimitOptions()" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-        </div>
+        @* Removed: the standalone customer-filters-panel and manual button row.
+           Replacement: the grid now owns a Syncfusion ToolbarTemplate, so search, filters, refresh, export,
+           clear, and add actions live inside a single component-backed workbench instead of a custom filter container. *@
+        <SfCard ID="customer-grid-panel" CssClass="wiley-panel-card">
+            <CardHeader Title="Customer Directory"
+                        SubTitle="Production-ready grid behavior with toolbar-based filters, export, sticky headers, and action templates." />
+            <CardContent>
+                @* Removed: the old plain HTML status strip and bottom prose note.
+                   Replacement: a compact Syncfusion status card that pairs the live directory status with a spinner-driven async indicator. *@
+                <SfCard ID="customer-directory-status-panel">
+                    <CardHeader Title="Directory Status"
+                                SubTitle="Async operations are surfaced here so refresh, export, save, and delete actions feel explicit rather than silent." />
+                    <CardContent>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex items-center gap-2">
+                                <SfSpinner Visible="@IsBusy()" Label="" Size="18" Type="SpinnerType.Material" />
+                                <span id="customer-directory-status" role="status" aria-live="polite" class="text-sm text-slate-600">
+                                    <span class="font-semibold text-slate-700">Directory status:</span> @GetCustomerDirectoryStatus()
+                                </span>
+                            </div>
+                            <span class="e-badge e-badge-info" role="status">@GetLiveFilteredCustomerCountDisplay() visible</span>
+                        </div>
+                    </CardContent>
+                </SfCard>
 
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div id="customer-directory-status" role="status" aria-live="polite" class="text-sm text-slate-600">
-                <span class="font-semibold text-slate-700">Directory status:</span> @GetCustomerDirectoryStatus()
+        @if (isLoadingCustomers)
+        {
+            @* Removed: the bespoke skeleton-row loading block.
+               Replacement: a centered Syncfusion spinner card, which keeps the loading state component-native and easier to maintain. *@
+            <div class="mt-4 flex min-h-[18rem] items-center justify-center" aria-busy="true" aria-label="Loading customer directory">
+                <SfCard ID="customer-loading-card">
+                    <CardHeader Title="Loading customer directory"
+                                SubTitle="Refreshing the live API-backed directory and reapplying WorkspaceState filters." />
+                    <CardContent>
+                        <div class="flex items-center justify-center py-6">
+                    <SfSpinner Visible="true"
+                               Label="Loading customer directory…"
+                               Size="36"
+                               Type="SpinnerType.Material" />
+                        </div>
+                    </CardContent>
+                </SfCard>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <SfButton ID="refresh-customer-directory-button" IconCss="e-icons e-refresh" Disabled="@IsBusy()" OnClick="RefreshCustomerDirectoryAsync">Refresh</SfButton>
-                <SfButton ID="clear-customer-filters-button" Disabled="@IsBusy()" OnClick="ClearFiltersAsync">Clear filters</SfButton>
-                <SfButton ID="add-customer-button" CssClass="e-primary" IconCss="e-icons e-plus" IsPrimary="true" Disabled="@IsBusy()" OnClick="BeginCreateCustomer">Add customer</SfButton>
-            </div>
-        </div>
-    </section>
-
-    <section id="customer-grid-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Directory</p>
-        <div class="mt-3" aria-busy="@IsBusy()">
-            <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
+        }
+        else
+        {
+        <div class="mt-4" aria-busy="@IsBusy()">
+            @* AllowFiltering + FilterType.Menu: keeps per-column analysis available inside the grid.
+               EnableStickyHeader, AllowResizing, and AllowReordering make the directory behave like a production data workbench.
+               The toolbar template replaces the former custom filter container with a true Syncfusion toolbar. *@
+            <SfGrid @ref="CustomerDirectoryGrid" ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" AllowExcelExport="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v2">
+                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+                <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
                 <GridPageSettings PageSize="10" PageCount="5" />
                 <GridTemplates>
+                    <ToolbarTemplate>
+                        <SfToolbar ID="customer-directory-toolbar" OverflowMode="OverflowMode.Scrollable">
+                            <ToolbarItems>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <div class="min-w-[15rem] max-w-full">
+                                            <SfTooltip Content="Search the live customer directory by customer name, account number, city, customer type, or service location."
+                                                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                       OpensOn="Hover Focus"
+                                                       ShowTipPointer="true"
+                                                       CloseDelay="200">
+                                                <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
+                                            </SfTooltip>
+                                        </div>
+                                    </Template>
+                                </ToolbarItem>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <div class="min-w-[13rem] max-w-full">
+                                            <SfTooltip Content="Filter the directory by persisted customer classification."
+                                                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                       OpensOn="Hover Focus"
+                                                       ShowTipPointer="true"
+                                                       CloseDelay="200">
+                                                <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@GetCustomerServiceOptions()" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Customer Type" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                                            </SfTooltip>
+                                        </div>
+                                    </Template>
+                                </ToolbarItem>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <div class="min-w-[13rem] max-w-full">
+                                            <SfTooltip Content="Filter the directory by inside versus outside city-limits service location."
+                                                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                       OpensOn="Hover Focus"
+                                                       ShowTipPointer="true"
+                                                       CloseDelay="200">
+                                                <SfDropDownList ID="customer-city-limits-filter" TValue="string" TItem="string" DataSource="@GetCustomerCityLimitOptions()" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                                            </SfTooltip>
+                                        </div>
+                                    </Template>
+                                </ToolbarItem>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <SfTooltip Content="Reload the live customer directory from the API and reapply the current filters."
+                                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                   OpensOn="Hover Focus"
+                                                   ShowTipPointer="true"
+                                                   CloseDelay="200">
+                                            <SfButton ID="refresh-customer-directory-button" IconCss="e-icons e-refresh" Disabled="@IsBusy()" OnClick="RefreshCustomerDirectoryAsync">Refresh</SfButton>
+                                        </SfTooltip>
+                                    </Template>
+                                </ToolbarItem>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <SfTooltip Content="Clear all WorkspaceState-backed customer filters."
+                                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                   OpensOn="Hover Focus"
+                                                   ShowTipPointer="true"
+                                                   CloseDelay="200">
+                                            <SfButton ID="clear-customer-filters-button" Disabled="@IsBusy()" OnClick="ClearFiltersAsync">Clear filters</SfButton>
+                                        </SfTooltip>
+                                    </Template>
+                                </ToolbarItem>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <SfTooltip Content="Add a new utility customer through the editor dialog."
+                                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                   OpensOn="Hover Focus"
+                                                   ShowTipPointer="true"
+                                                   CloseDelay="200">
+                                            <SfButton ID="add-customer-button" CssClass="e-primary" IconCss="e-icons e-plus" IsPrimary="true" Disabled="@IsBusy()" OnClick="BeginCreateCustomer">Add customer</SfButton>
+                                        </SfTooltip>
+                                    </Template>
+                                </ToolbarItem>
+                                <ToolbarItem Type="ItemType.Input">
+                                    <Template>
+                                        <SfTooltip Content="Export the currently filtered customer directory to Excel."
+                                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                   OpensOn="Hover Focus"
+                                                   ShowTipPointer="true"
+                                                   CloseDelay="200">
+                                            <SfButton ID="export-customer-directory-button" IconCss="e-icons e-export-excel" Disabled="@IsBusy()" OnClick="ExportCustomerDirectoryAsync">Export</SfButton>
+                                        </SfTooltip>
+                                    </Template>
+                                </ToolbarItem>
+                            </ToolbarItems>
+                        </SfToolbar>
+                    </ToolbarTemplate>
                     <EmptyRecordTemplate>
-                        <div class="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-                            <div>
-                                <div class="text-sm font-semibold text-slate-900">No utility customers found</div>
-                                <div class="mt-2 text-sm text-slate-600">Use QuickBooks Import to load live records, or add a customer manually to seed this workspace.</div>
-                            </div>
-                            <div class="flex flex-wrap justify-center gap-2 text-xs text-slate-500">
-                                <span class="rounded-full bg-white px-3 py-1 shadow-sm">QuickBooks Import</span>
-                                <span class="rounded-full bg-white px-3 py-1 shadow-sm">Load sample data</span>
-                                <span class="rounded-full bg-white px-3 py-1 shadow-sm">Add customer</span>
-                            </div>
-                        </div>
+                        @* Removed: the bespoke empty-state block with custom chips.
+                           Replacement: a Syncfusion card inside EmptyRecordTemplate so the no-data state stays inside the grid lifecycle. *@
+                        <SfCard ID="customer-directory-empty-card">
+                            <CardHeader Title="No utility customers found"
+                                        SubTitle="Use QuickBooks Import to load live records, or add a customer manually to seed this workspace." />
+                            <CardContent Content="The customer directory grid is still fully configured for paging, sorting, filtering, and exports; it will populate as soon as customer records are available from the API or the add-customer workflow." />
+                        </SfCard>
                     </EmptyRecordTemplate>
                 </GridTemplates>
                 <GridColumns>
@@ -85,37 +206,58 @@
                                 var customer = (UtilityCustomerRecord)customerContext;
                             }
                             <div class="flex flex-wrap gap-2">
-                                <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
-                                <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
+                                <SfTooltip Content="Edit this utility customer in the maintenance dialog."
+                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                           OpensOn="Hover Focus"
+                                           ShowTipPointer="true"
+                                           CloseDelay="200">
+                                    <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
+                                </SfTooltip>
+                                <SfTooltip Content="Delete this customer from the live utility-customer directory."
+                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                           OpensOn="Hover Focus"
+                                           ShowTipPointer="true"
+                                           CloseDelay="200">
+                                    <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
+                                </SfTooltip>
                             </div>
                         </Template>
                     </GridColumn>
                 </GridColumns>
             </SfGrid>
         </div>
-    </section>
+        } @* end else (not loading) *@
 
     @if (HasApiFeedback())
     {
-        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert" aria-live="polite">
-            <div class="font-semibold">@GetCustomerApiError()</div>
-            @if (GetValidationSummaryItems().Count > 0)
-            {
-                <ul class="mt-2 list-disc space-y-1 pl-5">
-                    @foreach (var validationMessage in GetValidationSummaryItems())
+        <SfCard ID="customer-feedback-panel" CssClass="wiley-panel-card mt-4">
+            <CardHeader Title="Customer API Feedback" SubTitle="The latest API validation or persistence issue for the live customer directory." />
+            <CardContent>
+                <div class="text-sm text-rose-700" role="alert" aria-live="polite">
+                    <div class="font-semibold">@GetCustomerApiError()</div>
+                    @if (GetValidationSummaryItems().Count > 0)
                     {
-                        <li>@validationMessage</li>
+                        <ul class="mt-2 list-disc space-y-1 pl-5">
+                            @foreach (var validationMessage in GetValidationSummaryItems())
+                            {
+                                <li>@validationMessage</li>
+                            }
+                        </ul>
                     }
-                </ul>
-            }
-        </div>
+                </div>
+            </CardContent>
+        </SfCard>
     }
-
-    <p class="text-xs text-slate-500">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
+            </CardContent>
+        </SfCard>
 
     @if (IsEditorDialogOpen())
     {
-        <SfDialog Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true">
+        @* ID: exposes the editor dialog for test targeting *@
+        @* Target: scopes the modal overlay to the panel rather than the full viewport *@
+        @* DialogAnimationSettings SlideTop: enterprise-grade entry animation consistent with Syncfusion Fluent2 patterns *@
+        <SfDialog ID="customer-editor-dialog" Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true" Target="#customer-viewer-panel">
+            <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="200" />
             <DialogTemplates>
                 <Header>@GetEditorDialogTitle()</Header>
                 <Content>
@@ -224,7 +366,11 @@
 
         @if (IsDeleteDialogOpen() && GetPendingDeleteCustomer() is not null)
         {
-            <SfDialog Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true">
+            @* ID: exposes the delete dialog for test targeting *@
+            @* Target: scopes the confirm overlay to the panel *@
+            @* DialogAnimationSettings Zoom: brief zoom is appropriate for a destructive-action confirm *@
+            <SfDialog ID="customer-delete-dialog" Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true" Target="#customer-viewer-panel">
+            <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="150" />
             <DialogTemplates>
                 <Header>Delete Customer</Header>
                 <Content>

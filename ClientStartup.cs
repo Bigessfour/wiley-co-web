@@ -236,6 +236,7 @@ namespace WileyCoWeb.Services
                     Timeout = TimeSpan.FromSeconds(30)
                 }));
             builder.Services.AddSingleton<WorkspaceState>();
+            builder.Services.AddSingleton<ToastService>();
             builder.Services.AddScoped<WorkspaceBootstrapService>();
             builder.Services.AddScoped<WorkspacePersistenceService>();
             builder.Services.AddScoped<WorkspaceSnapshotApiService>();

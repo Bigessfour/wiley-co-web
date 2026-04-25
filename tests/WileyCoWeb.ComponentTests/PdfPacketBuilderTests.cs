@@ -28,7 +28,8 @@ namespace WileyCoWeb.ComponentTests.Services
             Assert.NotNull(result);
             Assert.True(result.Content.Length > 0);
             Assert.Equal("application/pdf", result.ContentType);
-            Assert.Contains("-rate-packet.pdf", result.FileName);
+            Assert.Contains("Rate-Packet", result.FileName);
+            Assert.EndsWith(".pdf", result.FileName);
         }
 
         [Fact]

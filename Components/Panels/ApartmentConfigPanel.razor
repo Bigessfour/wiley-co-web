@@ -25,7 +25,9 @@
     </div>
 
     <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-        <SfGrid TValue="ApartmentUnitTypeData" DataSource="@editableUnitTypes" Toolbar="@ToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420">
+        @* ID: enables test targeting for the apartment unit-type editor grid *@
+        @* EnablePersistence: preserves sort order for the unit-type mix across sessions *@
+        <SfGrid ID="apartment-config-grid" TValue="ApartmentUnitTypeData" DataSource="@editableUnitTypes" Toolbar="@ToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420" EnablePersistence="true" PersistenceKey="wiley.apartment-config-grid.v1">
             <GridEvents TValue="ApartmentUnitTypeData" OnActionComplete="HandleActionComplete" />
             <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
             <GridColumns>

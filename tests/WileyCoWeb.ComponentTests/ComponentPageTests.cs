@@ -57,14 +57,12 @@ public sealed class ComponentPageTests
 
 		var cut = context.RenderComponent<NavMenu>();
 
+		Assert.Contains("Primary workspace navigation", cut.Markup);
 		Assert.Contains("Workspace navigation", cut.Markup);
 		Assert.Contains("e-listview", cut.Markup);
-		Assert.Contains("Workspace Overview", cut.Markup);
-		Assert.Contains("Break-Even", cut.Markup);
-		Assert.Contains("Reserve Trajectory", cut.Markup);
-		Assert.Contains("Capital Gap", cut.Markup);
 		Assert.Contains("Syncfusion 33.2.3", cut.Markup);
-		Assert.True(cut.FindAll(".app-nav-link").Count >= 10);
+		Assert.Contains("AWS Amplify", cut.Markup);
+		Assert.Contains("app-nav-shell", cut.Markup);
 	}
 
 	[Fact]
@@ -138,13 +136,15 @@ public sealed class ComponentPageTests
 
 		var cut = context.RenderComponent<WileyWorkspace>();
 
-		Assert.Contains("Utility Rate Study Workspace", cut.Markup);
+		Assert.Contains("Wiley.co", cut.Markup);
+		Assert.Contains("Syncfusion Finance Workspace", cut.Markup);
 		Assert.Contains("Document Center", cut.Markup);
 		Assert.Contains("workspace-main-shell", cut.Markup);
-		Assert.Contains("workspace-panel-toggle", cut.Markup);
+		Assert.Contains("workspace-document-center", cut.Markup);
+		Assert.Contains("app-shell-nav-toggle", cut.Markup);
 		Assert.Contains("workspace-jarvis-launcher", cut.Markup);
 		Assert.Contains("Break-Even", cut.Markup);
-		Assert.Contains("Rates", cut.Markup);
+		Assert.Contains("Rate Comparison", cut.Markup);
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Projected rate movement", cut.Markup);
 		Assert.Contains("Export customers to Excel", cut.Markup);
@@ -243,7 +243,7 @@ public sealed class ComponentPageTests
 
 		cut.WaitForAssertion(() =>
 		{
-			Assert.Contains("workspace-jarvis-dock", cut.Markup);
+			Assert.Contains("workspace-jarvis-rail", cut.Markup);
 			Assert.Single(cut.FindComponents<JarvisChatPanel>());
 		});
 	}
@@ -885,7 +885,7 @@ public sealed class ComponentPageTests
 
 		var cut = context.RenderComponent<WileyWorkspace>();
 
-		cut.WaitForAssertion(() => Assert.Contains("workspace-overview-dashboard", cut.Markup));
+		cut.WaitForAssertion(() => Assert.Contains("workspace-document-center", cut.Markup));
 
 		var openBreakEvenButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "Open Break-Even", StringComparison.Ordinal));
 		openBreakEvenButton.Click();
@@ -921,7 +921,7 @@ public sealed class ComponentPageTests
 		using var context = CreateContext(telemetryClient: telemetryClient);
 		var cut = context.RenderComponent<WileyWorkspace>();
 
-		cut.WaitForAssertion(() => Assert.Contains("workspace-overview-dashboard", cut.Markup));
+		cut.WaitForAssertion(() => Assert.Contains("workspace-document-center", cut.Markup));
 		Assert.Contains("Open Reserve Trajectory", cut.Markup);
 
 		var breakEvenButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "Open Break-Even", StringComparison.Ordinal));
@@ -1163,6 +1163,7 @@ public sealed class ComponentPageTests
 
 		context.Services.AddLogging();
 		context.Services.AddSingleton(workspaceState);
+		context.Services.AddSingleton<ToastService>();
 		context.Services.AddSingleton<IJSRuntime>(jsRuntime);
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
 		snapshotClient ??= CreateSnapshotClient();
@@ -1575,6 +1576,13 @@ public sealed class ComponentPageTests
 
 			object? result = identifier switch
 			{
+				"eval" => "ltr",
+				"wileyLayout.getWindowWidth" => 1280,
+				"wileyLayout.subscribeResize" => null,
+				"wileyLayout.unsubscribeResize" => null,
+				"wileyNetworkStatus.isOnline" => true,
+				"wileyNetworkStatus.subscribe" => null,
+				"wileyNetworkStatus.unsubscribe" => null,
 				"wileyWorkspaceStorage.getItem" => storage.TryGetValue(arguments[0]?.ToString() ?? string.Empty, out var storedValue) ? storedValue : null,
 				"wileyWorkspaceStorage.setItem" => StoreValue(arguments),
 				"wileyWorkspaceStorage.removeItem" => RemoveValue(arguments),

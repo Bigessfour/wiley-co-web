@@ -1,27 +1,30 @@
 @using System.Globalization
 @using System.Text.Json
-@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.DependencyInjection
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Navigations
-@using Syncfusion.Blazor.Notifications
 @using Syncfusion.Blazor.Popups
 @using Syncfusion.Blazor.ProgressBar
+@using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 @using WileyCoWeb.State
 @using WileyWidget.Models
 
 @inject QuickBooksImportApiService ImportApi
+@inject IServiceProvider ServiceProvider
 
 <SfCard CssClass="h-full">
     <CardHeader Title="QuickBooks Import" SubTitle="Clerk-facing CSV/XLSX intake with preview, duplicate checks, and commit confirmation." />
     <CardContent>
         <div id="quickbooks-import-drop-area" aria-busy="@IsBusy" class="space-y-4">
-            <SfProgressBar Type="ProgressType.Linear"
+            @* ID: allows targeted CSS/JS and automation selectors for the import progress bar *@
+            <SfProgressBar ID="quickbooks-import-progress"
+                           Type="ProgressType.Linear"
                            Value="@ImportProgress"
                            Maximum="100"
                            ShowProgressValue="false"
@@ -29,11 +32,13 @@
                            Height="8px" />
 
             <div class="grid gap-3 md:grid-cols-2">
-                <SfDropDownList TValue="string" TItem="string" DataSource="@WorkspaceState.EnterpriseOptions" @bind-Value="WorkspaceState.SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-                <SfDropDownList TValue="int" TItem="int" DataSource="@WorkspaceState.FiscalYearOptions" @bind-Value="WorkspaceState.SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" ShowClearButton="false" PopupHeight="240px" Width="100%" />
+                @* IDs: match the automation selectors used in QB import E2E specs *@
+                <SfDropDownList ID="qb-enterprise-select" TValue="string" TItem="string" DataSource="@WorkspaceState.EnterpriseOptions" @bind-Value="WorkspaceState.SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                <SfDropDownList ID="qb-fiscal-year-select" TValue="int" TItem="int" DataSource="@WorkspaceState.FiscalYearOptions" @bind-Value="WorkspaceState.SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" ShowClearButton="false" PopupHeight="240px" Width="100%" />
             </div>
 
-            <SfStepper ActiveStep="@ActiveStep" Linear="true" Orientation="StepperOrientation.Horizontal" StepType="StepperType.Indicator" LabelPosition="StepperLabelPosition.Bottom" ShowTooltip="true">
+            @* ID only — NO EnablePersistence: wizard must always start at step 0 for each new file upload session *@
+            <SfStepper ID="quickbooks-import-stepper" ActiveStep="@ActiveStep" Linear="true" Orientation="StepperOrientation.Horizontal" StepType="StepperType.Indicator" LabelPosition="StepperLabelPosition.Bottom" ShowTooltip="true">
                 <StepperSteps>
                     <StepperStep Label="Context" Text="Select the enterprise and fiscal year"></StepperStep>
                     <StepperStep Label="Upload" Text="Choose a QuickBooks export"></StepperStep>
@@ -42,24 +47,45 @@
                 </StepperSteps>
             </SfStepper>
 
-            <div class="grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
-                <div>1. Select the enterprise and fiscal year.</div>
-                <div>2. Upload a QuickBooks Desktop export.</div>
-                <div>3. Review the preview and assistant guidance.</div>
-                <div>4. Commit only if the file is not a duplicate.</div>
-            </div>
+            @* Removed: the manual four-column step summary built from plain divs.
+               Replacement: a Syncfusion card keeps the wizard guidance in the same component system as the stepper,
+               which is more consistent, easier to theme, and clearer during clerk workflows. *@
+            <SfCard ID="quickbooks-wizard-stage-card">
+                <CardHeader Title="Wizard stage" SubTitle="@WizardStageTitle" />
+                <CardContent Content="@WizardStageDescription" />
+            </SfCard>
 
             <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
                 <div class="space-y-4">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <label for="quickbooks-import-uploader" class="e-btn e-control e-lib cursor-pointer">Choose QuickBooks file</label>
-                        <InputFile @key="FileInputRenderKey"
-                                   id="quickbooks-import-uploader"
-                                   class="hidden"
-                                   OnChange="HandleFileSelectedAsync"
-                                   accept=".csv,.xlsx,.xls" />
-                        <span class="text-xs text-slate-500">CSV or Excel, up to 50 MB.</span>
-                    </div>
+                    @* Removed: the hidden InputFile + label-button pairing.
+                       Replacement: SfUploader now owns browse/drop behavior, file-list rendering, multiple-file staging, and the browser input selector.
+                       The input id is preserved through InputAttributes so the existing browser automation surface remains stable. *@
+                    <SfCard ID="quickbooks-import-uploader-card">
+                        <CardHeader Title="Upload QuickBooks exports"
+                                    SubTitle="SfUploader provides the native drag/drop and staged-file workflow that the rebuild plan called for." />
+                        <CardContent>
+                            <div id="quickbooks-import-drop-zone" class="space-y-3">
+                                <SfUploader @ref="QuickBooksUploader"
+                                            ID="quickbooks-import-uploader-host"
+                                            CssClass="w-full"
+                                            AllowedExtensions=".csv,.xlsx,.xls"
+                                            AutoUpload="false"
+                                            AllowMultiple="true"
+                                            SequentialUpload="true"
+                                            ShowProgressBar="false"
+                                            MaxFileSize="@MaxImportFileSize"
+                                            DropArea="#quickbooks-import-drop-zone"
+                                            InputAttributes="@UploaderInputAttributes">
+                                    <UploaderEvents FileSelected="HandleUploaderFileSelectedAsync"
+                                                    ValueChange="HandleUploaderValueChangeAsync" />
+                                </SfUploader>
+
+                                <span id="quickbooks-import-uploader-help" class="text-xs text-slate-500">
+                                    CSV or Excel, up to 50 MB per file. Multiple files can be staged in the uploader list, and the most recently selected file becomes the active preview candidate.
+                                </span>
+                            </div>
+                        </CardContent>
+                    </SfCard>
 
                     <div class="grid gap-3 sm:grid-cols-2">
                         <SfCard>
@@ -72,10 +98,22 @@
                         </SfCard>
                     </div>
 
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite">
-                        <div id="quickbooks-import-status-headline" class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">@StatusHeadline</div>
-                        <div id="quickbooks-import-status-message" class="mt-1 whitespace-pre-line">@StatusMessage</div>
-                    </div>
+                    @* Removed: the ad-hoc bordered status strip.
+                       Replacement: a Syncfusion card plus inline spinner turns import state into a first-class workflow surface instead of a manually styled note. *@
+                    <SfCard ID="quickbooks-import-status-card">
+                        <CardHeader Title="Import status" SubTitle="@StatusHeadline" />
+                        <CardContent>
+                            <div class="flex items-start gap-3" role="status" aria-live="polite" aria-busy="@IsBusy">
+                                <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                    <SfSpinner Visible="@IsBusy" Size="18" Label="" Type="SpinnerType.Material" />
+                                </div>
+                                <div class="space-y-1">
+                                    <div id="quickbooks-import-status-headline" class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">@StatusHeadline</div>
+                                    <div id="quickbooks-import-status-message" class="whitespace-pre-line text-sm text-slate-700">@StatusMessage</div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </SfCard>
 
                     <div class="grid gap-3 sm:grid-cols-3" aria-busy="@IsBusy">
                         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAnalyze)" OnClick="LoadPreviewAsync">Analyze file</SfButton>
@@ -87,21 +125,37 @@
                         <CardHeader Title="Import assistant" SubTitle="Ask semantic questions about this QuickBooks file, preview, or troubleshooting steps." />
                         <CardContent>
                             <div class="space-y-3">
+                                @* MaxLength: cap assistant prompts at 2000 characters to stay within the Jarvis token budget *@
                                 <SfTextBox Placeholder="Ask about duplicate detection, column mapping, dates, or commit errors"
                                            ID="quickbooks-assistant-question"
                                            FloatLabelType="FloatLabelType.Auto"
                                            Multiline="true"
                                            Rows="4"
+                                           MaxLength="2000"
                                            @bind-Value="AssistantQuestion" />
                                 <div class="flex flex-wrap gap-3">
                                     <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskAssistant)" OnClick="AskAssistantAsync">Ask assistant</SfButton>
                                     <SfButton Disabled="@IsAskingAssistant" OnClick="ClearAssistantAsync">Clear answer</SfButton>
                                 </div>
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite" aria-busy="@IsAskingAssistant">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Context</p>
-                                    <p id="quickbooks-assistant-context-summary" class="mt-1 text-slate-900">@AssistantContextSummary</p>
-                                    <p id="quickbooks-assistant-answer" class="mt-3 whitespace-pre-line">@AssistantAnswer</p>
-                                </div>
+
+                                @* Removed: the plain bordered assistant response block.
+                                   Replacement: a nested Syncfusion card keeps assistant context, answer text, and async state in the same design system as the rest of the wizard. *@
+                                <SfCard ID="quickbooks-assistant-status-card">
+                                    <CardHeader Title="Assistant context"
+                                                SubTitle="Preview-aware guidance for duplicates, mapping, dates, and commit issues." />
+                                    <CardContent>
+                                        <div class="flex items-start gap-3" role="status" aria-live="polite" aria-busy="@IsAskingAssistant">
+                                            <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                                <SfSpinner Visible="@IsAskingAssistant" Size="18" Label="" Type="SpinnerType.Material" />
+                                            </div>
+                                            <div class="space-y-3">
+                                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Context</p>
+                                                <p id="quickbooks-assistant-context-summary" class="text-sm text-slate-900">@AssistantContextSummary</p>
+                                                <p id="quickbooks-assistant-answer" class="whitespace-pre-line text-sm text-slate-700">@AssistantAnswer</p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </SfCard>
                             </div>
                         </CardContent>
                     </SfCard>
@@ -123,36 +177,64 @@
                         </SfCard>
                     </div>
 
-                    @if (PreviewRows.Count > 0)
-                    {
-                        <SfGrid TValue="QuickBooksImportPreviewRow" DataSource="@PreviewRows" AllowPaging="true" AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true" EnableHover="true" EnableStickyHeader="true" ClipMode="ClipMode.EllipsisWithTooltip" GridLines="GridLine.Horizontal" Height="320">
-                            <GridPageSettings PageSize="5" PageCount="3" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RowNumber)" HeaderText="Row" Width="70" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.EntryDate)" HeaderText="Date" Width="110" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.EntryType)" HeaderText="Type" Width="110" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.Name)" HeaderText="Name" Width="140" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.AccountName)" HeaderText="Account" Width="160" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RoutedEnterprise)" HeaderText="Routed Enterprise" Width="160" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RoutingRuleName)" HeaderText="Rule" Width="150" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.AllocationSummary)" HeaderText="Allocation" Width="190" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.SourceAmount)" HeaderText="Source Amount" Format="C2" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
-                                <GridColumn Field="@nameof(QuickBooksImportPreviewRow.IsDuplicate)" HeaderText="Duplicate" Width="100" Type="Syncfusion.Blazor.Grids.ColumnType.Boolean" />
-                            </GridColumns>
-                        </SfGrid>
-                    }
-                    else
-                    {
-                        <SfCard>
-                            <CardHeader Title="Preview" SubTitle="Nothing loaded yet" />
-                            <CardContent Content="Choose a QuickBooks CSV or Excel export, then analyze it to load the preview grid." />
-                        </SfCard>
-                    }
+                    <SfCard ID="quickbooks-preview-card">
+                        <CardHeader Title="Preview grid"
+                                    SubTitle="Parsed rows, routed enterprises, and duplicate flags before commit." />
+                        <CardContent>
+                            @if (PreviewRows.Count > 0)
+                            {
+                                @* Grid hardening based on Syncfusion import-workbench guidance:
+                                   - Menu filtering keeps column-specific diagnostics accessible.
+                                   - Row selection gives clerks a stable inspection target during large previews.
+                                   - Virtualization reduces DOM growth when large QuickBooks exports are staged.
+                                   - The existing test anchor (#quickbooks-preview-grid) is preserved. *@
+                                <SfGrid ID="quickbooks-preview-grid"
+                                        TValue="QuickBooksImportPreviewRow"
+                                        DataSource="@PreviewRows"
+                                        AllowPaging="true"
+                                        AllowSorting="true"
+                                        AllowFiltering="true"
+                                        AllowTextWrap="true"
+                                        AllowResizing="true"
+                                        AllowReordering="true"
+                                        EnableHover="true"
+                                        EnableStickyHeader="true"
+                                        EnableVirtualization="true"
+                                        ClipMode="ClipMode.EllipsisWithTooltip"
+                                        GridLines="GridLine.Horizontal"
+                                        Height="420">
+                                    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+                                    <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
+                                    <GridPageSettings PageSize="8" PageCount="4" />
+                                    <GridColumns>
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RowNumber)" HeaderText="Row" Width="70" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.EntryDate)" HeaderText="Date" Width="110" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.EntryType)" HeaderText="Type" Width="110" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.Name)" HeaderText="Name" Width="140" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.AccountName)" HeaderText="Account" Width="160" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RoutedEnterprise)" HeaderText="Routed Enterprise" Width="160" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RoutingRuleName)" HeaderText="Rule" Width="150" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.AllocationSummary)" HeaderText="Allocation" Width="190" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.SourceAmount)" HeaderText="Source Amount" Format="C2" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.Amount)" HeaderText="Amount" Format="C2" Width="110" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                                        <GridColumn Field="@nameof(QuickBooksImportPreviewRow.IsDuplicate)" HeaderText="Duplicate" Width="100" Type="Syncfusion.Blazor.Grids.ColumnType.Boolean" />
+                                    </GridColumns>
+                                </SfGrid>
+                            }
+                            else
+                            {
+                                <SfCard>
+                                    <CardHeader Title="Nothing loaded yet" SubTitle="Analyze a staged QuickBooks export to populate the preview grid." />
+                                    <CardContent Content="The preview grid stays empty until the panel reads a selected CSV or Excel file and asks the API to parse the rows." />
+                                </SfCard>
+                            }
+                        </CardContent>
+                    </SfCard>
                 </div>
             </div>
 
-            <SfTab OverflowMode="OverflowMode.Scrollable">
+            @* EnablePersistence: preserves the active tab (Routing Rules / Allocation Profiles / Import History) across page reloads *@
+            <SfTab ID="quickbooks-import-tab" OverflowMode="OverflowMode.Scrollable" EnablePersistence="true" PersistenceKey="wiley.qb-import-tab.v1">
                 <TabItems>
                     <TabItem>
                         <ChildContent>
@@ -166,10 +248,19 @@
                                     <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsRoutingBusy" OnClick="SaveRoutingConfigurationAsync">Save routing</SfButton>
                                 </div>
 
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite" aria-busy="@IsRoutingBusy">
-                                    <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Routing status</div>
-                                    <div class="mt-1 whitespace-pre-line">@RoutingStatusMessage</div>
-                                </div>
+                                @* Removed: the hand-styled routing status strip.
+                                   Replacement: a Syncfusion card keeps routing feedback visually aligned with the rest of the import workflow. *@
+                                <SfCard ID="quickbooks-routing-status-card">
+                                    <CardHeader Title="Routing status" SubTitle="Rule and allocation configuration for imported source files." />
+                                    <CardContent>
+                                        <div class="flex items-start gap-3" role="status" aria-live="polite" aria-busy="@IsRoutingBusy">
+                                            <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                                <SfSpinner Visible="@IsRoutingBusy" Size="18" Label="" Type="SpinnerType.Material" />
+                                            </div>
+                                            <div class="whitespace-pre-line text-sm text-slate-700">@RoutingStatusMessage</div>
+                                        </div>
+                                    </CardContent>
+                                </SfCard>
 
                                 @if (RoutingRules.Count == 0)
                                 {
@@ -300,10 +391,19 @@
                                     <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsRoutingBusy" OnClick="LoadImportHistoryAsync">Refresh history</SfButton>
                                 </div>
 
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status" aria-live="polite">
-                                    <div class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">History status</div>
-                                    <div class="mt-1 whitespace-pre-line">@ImportHistoryStatusMessage</div>
-                                </div>
+                                @* Removed: the manual history status block.
+                                   Replacement: the import-history tab now uses the same card/spinner status pattern as the main wizard and routing editor. *@
+                                <SfCard ID="quickbooks-history-status-card">
+                                    <CardHeader Title="History status" SubTitle="Previously committed QuickBooks source files and reroute actions." />
+                                    <CardContent>
+                                        <div class="flex items-start gap-3" role="status" aria-live="polite" aria-busy="@IsRoutingBusy">
+                                            <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                                <SfSpinner Visible="@IsRoutingBusy" Size="18" Label="" Type="SpinnerType.Material" />
+                                            </div>
+                                            <div class="whitespace-pre-line text-sm text-slate-700">@ImportHistoryStatusMessage</div>
+                                        </div>
+                                    </CardContent>
+                                </SfCard>
 
                                 @if (ImportHistoryItems.Count == 0)
                                 {
@@ -340,12 +440,16 @@
     </CardContent>
 </SfCard>
 
-<SfDialog @bind-Visible="ShowCommitDialog"
+@* ID + Target + animation: scoped to the import drop-area so the confirm dialog is positioned relative to the import panel *@
+<SfDialog ID="quickbooks-commit-dialog"
+          @bind-Visible="ShowCommitDialog"
           Header="Confirm QuickBooks import"
           Width="540px"
           IsModal="true"
           CloseOnEscape="true"
-          ShowCloseIcon="true">
+          ShowCloseIcon="true"
+          Target="#quickbooks-import-drop-area">
+    <DialogAnimationSettings Effect="DialogEffect.Zoom" Duration="200" />
     <DialogTemplates>
         <Content>
             <div class="space-y-3">
@@ -360,11 +464,12 @@
     </DialogButtons>
 </SfDialog>
 
-<SfToast @ref="ToastRef" Title="QuickBooks import" Timeout="4000" ShowCloseButton="true" ShowProgressBar="true" NewestOnTop="true" Width="360px" ProgressDirection="ProgressDirection.LTR">
-    <ToastPosition X="Right" Y="Top" />
-</SfToast>
+
 
 @code {
+    private const string DefaultAssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
+    private const string DefaultAssistantContext = "No QuickBooks preview has been loaded yet.";
+
     private static readonly HashSet<string> SupportedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".csv",
@@ -377,22 +482,31 @@
     [Parameter]
     public WorkspaceState WorkspaceState { get; set; } = default!;
 
+    private ToastService? ToastService => ServiceProvider.GetService<ToastService>();
+
+    private readonly Dictionary<string, object> UploaderInputAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["id"] = "quickbooks-import-uploader",
+        ["aria-label"] = "Choose QuickBooks files",
+        ["aria-describedby"] = "quickbooks-import-uploader-help"
+    };
+
     private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly List<QuickBooksImportPreviewRow> PreviewRows = [];
-    private SfToast? ToastRef;
+    private SfUploader? QuickBooksUploader;
     private byte[]? SelectedFileBytes;
     private string SelectedFileName = string.Empty;
-    private string FileInputRenderKey = Guid.NewGuid().ToString("N");
     private QuickBooksImportPreviewResponse? PreviewResponse;
     private string AssistantQuestion = string.Empty;
-    private string AssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
-    private string AssistantContextSummary = "No QuickBooks preview has been loaded yet.";
+    private string AssistantAnswer = DefaultAssistantAnswer;
+    private string AssistantContextSummary = DefaultAssistantContext;
     private bool ShowCommitDialog;
     private bool IsBusy;
     private bool IsAskingAssistant;
     private bool IsRoutingBusy;
     private int ActiveStep;
     private int ImportProgress;
+    private int StagedFileCount;
     private string StatusHeadline = "Ready";
     private string StatusMessage = "Choose a QuickBooks export to begin.";
     private string RoutingStatusMessage = "Routing rules and allocation profiles can be managed from this panel.";
@@ -402,11 +516,34 @@
     private List<QuickBooksAllocationProfileDefinition> AllocationProfiles { get; } = [];
     private List<QuickBooksImportHistoryItem> ImportHistoryItems { get; } = [];
 
-    private string SelectedFileLabel => string.IsNullOrWhiteSpace(SelectedFileName) ? "No file selected" : SelectedFileName;
+    private string SelectedFileLabel
+        => string.IsNullOrWhiteSpace(SelectedFileName)
+            ? (StagedFileCount > 0 ? $"{StagedFileCount} file(s) staged" : "No file selected")
+            : (StagedFileCount > 1 ? $"{SelectedFileName} ({StagedFileCount} staged)" : SelectedFileName);
 
     private string RowCountDisplay => PreviewResponse?.TotalRows.ToString(CultureInfo.InvariantCulture) ?? "0";
 
     private string DuplicateCountDisplay => PreviewResponse?.DuplicateRows.ToString(CultureInfo.InvariantCulture) ?? "0";
+
+    private string WizardStageTitle
+        => ActiveStep switch
+        {
+            0 when SelectedFileBytes is { Length: > 0 } => "Upload staged",
+            1 => "Preview loaded",
+            2 => "Assistant guidance ready",
+            3 => "Ready to close out",
+            _ => "Choose scope and stage files"
+        };
+
+    private string WizardStageDescription
+        => ActiveStep switch
+        {
+            0 when SelectedFileBytes is { Length: > 0 } => "The selected QuickBooks export is staged in SfUploader and ready for the Analyze action. The panel keeps preview and assistant state clear until parsing succeeds.",
+            1 => "The preview grid is populated with parsed rows, routed enterprises, and duplicate flags so the clerk can inspect the file before commit.",
+            2 => "The assistant is working from the current preview payload, which keeps duplicate explanations and troubleshooting grounded in the same rows the clerk sees.",
+            3 => "The import has completed or is blocked as a duplicate. Review the final status and reset the panel before starting the next source file.",
+            _ => "Set the enterprise and fiscal year, then browse or drop one or more QuickBooks exports into the Syncfusion uploader."
+        };
 
     private bool CanAnalyze => SelectedFileBytes is { Length: > 0 } && !IsBusy;
 
@@ -433,11 +570,18 @@
         }
     }
 
-    private async Task HandleFileSelectedAsync(InputFileChangeEventArgs args)
+    private Task HandleUploaderFileSelectedAsync(SelectedEventArgs args)
     {
-        var browserFile = args.FileCount > 0 ? args.File : null;
+        _ = args;
+        StatusHeadline = "File selection started";
+        StatusMessage = "Validating the selected QuickBooks export and staging it for preview.";
+        ImportProgress = Math.Max(ImportProgress, 10);
+        return InvokeAsync(StateHasChanged);
+    }
 
-        if (browserFile is null)
+    private async Task HandleUploaderValueChangeAsync(UploadChangeEventArgs args)
+    {
+        if (args.Files is null || args.Files.Count == 0)
         {
             await ClearSelectionAsync().ConfigureAwait(false);
             return;
@@ -445,34 +589,54 @@
 
         try
         {
-            await using var fileStream = browserFile.OpenReadStream(MaxImportFileSize);
-            await using var memoryStream = new MemoryStream();
-            await fileStream.CopyToAsync(memoryStream).ConfigureAwait(false);
+            IsBusy = true;
+            ImportProgress = 15;
+            await InvokeAsync(StateHasChanged);
 
-            SelectedFileBytes = memoryStream.ToArray();
-            SelectedFileName = browserFile.Name;
+            byte[]? activeFileBytes = null;
+            string activeFileName = string.Empty;
+
+            foreach (var file in args.Files)
+            {
+                await using var memoryStream = new MemoryStream();
+                await using var fileStream = file.File.OpenReadStream(MaxImportFileSize);
+                await fileStream.CopyToAsync(memoryStream).ConfigureAwait(false);
+
+                activeFileBytes = memoryStream.ToArray();
+                activeFileName = file.File.Name;
+            }
+
+            SelectedFileBytes = activeFileBytes;
+            SelectedFileName = activeFileName;
+            StagedFileCount = args.Files.Count;
         }
         catch (Exception ex)
         {
             SelectedFileBytes = null;
             SelectedFileName = string.Empty;
+            StagedFileCount = 0;
             StatusHeadline = "File selection failed";
             StatusMessage = ex.Message;
             ShowCommitDialog = false;
-            await ShowToastAsync("QuickBooks import", StatusMessage).ConfigureAwait(false);
-            await InvokeAsync(StateHasChanged);
-            return;
+            ToastService?.ShowError(StatusHeadline, StatusMessage);
+        }
+        finally
+        {
+            IsBusy = false;
         }
 
         PreviewResponse = null;
         PreviewRows.Clear();
         AssistantQuestion = string.Empty;
-        AssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
-        AssistantContextSummary = "No QuickBooks preview has been loaded yet.";
+        AssistantAnswer = DefaultAssistantAnswer;
+        AssistantContextSummary = DefaultAssistantContext;
         StatusHeadline = "File selected";
-        StatusMessage = string.IsNullOrWhiteSpace(SelectedFileName)
-            ? "Select a QuickBooks export to continue."
-            : $"{SelectedFileName} is ready for preview.";
+        StatusMessage = StagedFileCount switch
+        {
+            0 => "Select a QuickBooks export to continue.",
+            1 => $"{SelectedFileName} is ready for preview.",
+            _ => $"{SelectedFileName} is the active file for preview. {StagedFileCount} file(s) are staged in the uploader list."
+        };
         ActiveStep = 0;
         ImportProgress = 20;
         ShowCommitDialog = false;
@@ -485,7 +649,7 @@
         {
             StatusHeadline = "Nothing to commit";
             StatusMessage = "Analyze a valid, non-duplicate QuickBooks export before committing it.";
-            await ShowToastAsync("QuickBooks import", StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowWarning(StatusHeadline, StatusMessage);
             return;
         }
 
@@ -530,20 +694,28 @@
                 previewRowsSnapshot);
 
             SelectedFileBytes = null;
-            FileInputRenderKey = Guid.NewGuid().ToString("N");
+            SelectedFileName = result.FileName;
+            StagedFileCount = 0;
             AssistantContextSummary = BuildAssistantContextSummary(PreviewResponse);
             StatusHeadline = result.IsDuplicate ? "Duplicate blocked" : "Import complete";
             StatusMessage = result.StatusMessage;
             ActiveStep = 3;
             ImportProgress = 100;
             ShowCommitDialog = false;
-            await ShowToastAsync(StatusHeadline, StatusMessage).ConfigureAwait(false);
+            if (QuickBooksUploader is not null)
+            {
+                await QuickBooksUploader.ClearAllAsync().ConfigureAwait(false);
+            }
+            if (result.IsDuplicate)
+                ToastService?.ShowWarning(StatusHeadline, StatusMessage);
+            else
+                ToastService?.ShowSuccess(StatusHeadline, StatusMessage);
         }
         catch (Exception ex)
         {
             StatusHeadline = "Commit failed";
             StatusMessage = ex.Message;
-            await ShowToastAsync(StatusHeadline, StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowError(StatusHeadline, StatusMessage);
         }
         finally
         {
@@ -579,41 +751,24 @@
 
             if (preview.IsDuplicate)
             {
-                await ShowToastAsync("Duplicate QuickBooks file", preview.StatusMessage).ConfigureAwait(false);
+                ToastService?.ShowWarning("Duplicate QuickBooks file", preview.StatusMessage);
             }
             else
             {
-                await ShowToastAsync("Preview loaded", preview.StatusMessage).ConfigureAwait(false);
+                ToastService?.ShowSuccess("Preview loaded", preview.StatusMessage);
             }
         }
         catch (Exception ex)
         {
             StatusHeadline = "Preview failed";
             StatusMessage = ex.Message;
-            await ShowToastAsync(StatusHeadline, StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowError(StatusHeadline, StatusMessage);
         }
         finally
         {
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
         }
-    }
-
-    private async Task ShowToastAsync(string title, string content)
-    {
-        if (ToastRef is null)
-        {
-            return;
-        }
-
-        await ToastRef.ShowAsync(new ToastModel
-        {
-            Title = title,
-            Content = content,
-            ShowCloseButton = true,
-            Timeout = 4000,
-            CssClass = "e-toast-info"
-        }).ConfigureAwait(false);
     }
 
     private async Task<bool> EnsureSelectedFileIsValidAsync(string operation)
@@ -627,7 +782,7 @@
             StatusHeadline = "Missing file";
             StatusMessage = $"Select a QuickBooks export before {actionPhrase}.";
             ShowCommitDialog = false;
-            await ShowToastAsync("QuickBooks import", StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowWarning(StatusHeadline, StatusMessage);
             await InvokeAsync(StateHasChanged);
             return false;
         }
@@ -638,12 +793,12 @@
             StatusMessage = "QuickBooks imports support CSV or Excel files only.";
             PreviewRows.Clear();
             PreviewResponse = null;
-            AssistantContextSummary = "No QuickBooks preview has been loaded yet.";
-            AssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
+            AssistantContextSummary = DefaultAssistantContext;
+            AssistantAnswer = DefaultAssistantAnswer;
             ActiveStep = 0;
             ImportProgress = 0;
             ShowCommitDialog = false;
-            await ShowToastAsync("QuickBooks import", StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowWarning(StatusHeadline, StatusMessage);
             await InvokeAsync(StateHasChanged);
             return false;
         }
@@ -655,17 +810,22 @@
     {
         SelectedFileBytes = null;
         SelectedFileName = string.Empty;
-        FileInputRenderKey = Guid.NewGuid().ToString("N");
+        StagedFileCount = 0;
         PreviewRows.Clear();
         PreviewResponse = null;
         AssistantQuestion = string.Empty;
-        AssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
-        AssistantContextSummary = "No QuickBooks preview has been loaded yet.";
+        AssistantAnswer = DefaultAssistantAnswer;
+        AssistantContextSummary = DefaultAssistantContext;
         StatusHeadline = "Ready";
         StatusMessage = "Choose a QuickBooks export to begin.";
         ActiveStep = 0;
         ImportProgress = 0;
         ShowCommitDialog = false;
+
+        if (QuickBooksUploader is not null)
+        {
+            await QuickBooksUploader.ClearAllAsync().ConfigureAwait(false);
+        }
 
         await InvokeAsync(StateHasChanged);
     }
@@ -675,14 +835,14 @@
         if (PreviewResponse is null)
         {
             AssistantAnswer = "Load a QuickBooks preview before asking the assistant a question.";
-            await ShowToastAsync("QuickBooks import assistant", AssistantAnswer).ConfigureAwait(false);
+            ToastService?.ShowWarning("QuickBooks import assistant", AssistantAnswer);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(AssistantQuestion))
         {
             AssistantAnswer = "Enter a question about the import, such as duplicate blocking, column mapping, or date parsing.";
-            await ShowToastAsync("QuickBooks import assistant", AssistantAnswer).ConfigureAwait(false);
+            ToastService?.ShowWarning("QuickBooks import assistant", AssistantAnswer);
             return;
         }
 
@@ -696,12 +856,15 @@
             AssistantAnswer = response.Answer;
             AssistantContextSummary = response.ContextSummary;
             ActiveStep = Math.Max(ActiveStep, 2);
-            await ShowToastAsync(response.UsedFallback ? "QuickBooks guidance" : "QuickBooks assistant", response.Answer).ConfigureAwait(false);
+            if (response.UsedFallback)
+                ToastService?.ShowInfo("QuickBooks guidance", response.Answer);
+            else
+                ToastService?.ShowSuccess("QuickBooks assistant", response.Answer);
         }
         catch (Exception ex)
         {
             AssistantAnswer = ex.Message;
-            await ShowToastAsync("QuickBooks import assistant", AssistantAnswer).ConfigureAwait(false);
+            ToastService?.ShowError("QuickBooks import assistant", AssistantAnswer);
         }
         finally
         {
@@ -714,7 +877,7 @@
     {
         AssistantQuestion = string.Empty;
         AssistantAnswer = PreviewResponse is null
-            ? "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps."
+            ? DefaultAssistantAnswer
             : "Ask a question about duplicate detection, column mapping, dates, or commit errors.";
         AssistantContextSummary = BuildAssistantContextSummary(PreviewResponse);
         return InvokeAsync(StateHasChanged);
@@ -724,7 +887,7 @@
     {
         if (preview is null)
         {
-            return "No QuickBooks preview has been loaded yet.";
+            return DefaultAssistantContext;
         }
 
         return $"{preview.FileName} for {preview.SelectedEnterprise} FY {preview.SelectedFiscalYear}: {preview.TotalRows} rows parsed, {preview.DuplicateRows} duplicates flagged, file duplicate = {preview.IsDuplicate}.";
@@ -762,7 +925,7 @@
         {
             RoutingStatusMessage = ex.Message;
             ImportHistoryStatusMessage = ex.Message;
-            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+            ToastService?.ShowError("QuickBooks routing", ex.Message);
         }
         finally
         {
@@ -786,7 +949,7 @@
         catch (Exception ex)
         {
             ImportHistoryStatusMessage = ex.Message;
-            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+            ToastService?.ShowError("QuickBooks routing", ex.Message);
         }
         finally
         {
@@ -868,12 +1031,12 @@
 
             ReplaceRoutingConfiguration(response);
             RoutingStatusMessage = response.StatusMessage;
-            await ShowToastAsync("QuickBooks routing", response.StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowSuccess("QuickBooks routing", response.StatusMessage);
         }
         catch (Exception ex)
         {
             RoutingStatusMessage = ex.Message;
-            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+            ToastService?.ShowError("QuickBooks routing", ex.Message);
         }
         finally
         {
@@ -898,12 +1061,12 @@
 
             ImportHistoryStatusMessage = response.StatusMessage;
             await LoadImportHistoryAsync().ConfigureAwait(false);
-            await ShowToastAsync("QuickBooks routing", response.StatusMessage).ConfigureAwait(false);
+            ToastService?.ShowSuccess("QuickBooks routing", response.StatusMessage);
         }
         catch (Exception ex)
         {
             ImportHistoryStatusMessage = ex.Message;
-            await ShowToastAsync("QuickBooks routing", ex.Message).ConfigureAwait(false);
+            ToastService?.ShowError("QuickBooks routing", ex.Message);
         }
         finally
         {

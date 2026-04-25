@@ -493,6 +493,8 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     {
         IsChatBusy = true;
         ChatQuestion = question;
+        ChatRuntimeStatusTitle = "Awaiting Jarvis response";
+        ChatRuntimeStatusDetail = "Checking the live workspace context and streaming the reply into the assist rail.";
     }
 
     private async Task SubmitPromptCoreAsync(string question, AssistViewPromptRequestedEventArgs? args)
@@ -545,6 +547,44 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     private void EndChatSubmission()
     {
         IsChatBusy = false;
+    }
+
+    private async Task OnAssistToolbarItemClicked(AssistViewToolbarItemClickedEventArgs args)
+    {
+        var action = args.Item?.Text;
+
+        if (string.Equals(action, "Refresh Guidance", StringComparison.Ordinal))
+        {
+            await RefreshKnowledgeAsync(force: true);
+            return;
+        }
+
+        if (string.Equals(action, "Reload History", StringComparison.Ordinal))
+        {
+            await LoadRecommendationHistoryAsync(force: true);
+        }
+    }
+
+    private async Task OnAssistFooterToolbarItemClicked(AssistViewToolbarItemClickedEventArgs args)
+    {
+        var action = args.Item?.Text;
+
+        if (string.Equals(action, "Ask Jarvis", StringComparison.Ordinal))
+        {
+            await SubmitFooterPromptAsync();
+            return;
+        }
+
+        if (string.Equals(action, "Reset Thread", StringComparison.Ordinal))
+        {
+            await ResetChatAsync();
+            return;
+        }
+
+        if (string.Equals(action, "Refresh Context", StringComparison.Ordinal))
+        {
+            await RefreshKnowledgeAsync(force: true);
+        }
     }
 
     private void BeginKnowledgeRefresh()
@@ -665,6 +705,11 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         }
     }
 
+    private static string FormatRecommendationTimestamp(string createdAtUtc)
+    {
+        return DateTimeOffset.Parse(createdAtUtc, CultureInfo.InvariantCulture).ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+    }
+
     private decimal GetFirstProjectionRateValue()
     {
         return WorkspaceState.ProjectionSeries.FirstOrDefault()?.Rate ?? WorkspaceState.CurrentRate;
@@ -698,6 +743,8 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     private void BeginChatReset()
     {
         IsChatBusy = true;
+        ChatRuntimeStatusTitle = "Resetting Jarvis thread";
+        ChatRuntimeStatusDetail = "Clearing the current conversation and rehydrating the rail for the active workspace scope.";
     }
 
     private async Task ResetChatCoreAsync()

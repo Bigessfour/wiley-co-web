@@ -3,10 +3,12 @@
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 
 @inject DebtCoverageApiService DebtCoverageApiService
+@inject ToastService ToastService
 
 <section id="debt-coverage-panel" class="space-y-4" aria-live="polite">
     <section class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-sm">
@@ -60,8 +62,23 @@
 
     @if (IsLoading)
     {
-        <section class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-            Loading debt coverage snapshot...
+        @* Professional loading state: SfSpinner with skeleton rows replaces the
+           plain text fallback. min-height prevents layout shift when data arrives. *@
+        <section class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 shadow-sm"
+                 style="min-height: 13rem;"
+                 aria-busy="true"
+                 aria-label="Loading debt coverage data">
+            <div class="wiley-panel-spinner-host">
+                <SfSpinner Visible="true"
+                           Label="Loading debt coverage data…"
+                           Size="36"
+                           Type="SpinnerType.Material" />
+            </div>
+            <div class="px-6 pb-6 space-y-3">
+                <div class="wiley-skeleton-row"></div>
+                <div class="wiley-skeleton-row"></div>
+                <div class="wiley-skeleton-row"></div>
+            </div>
         </section>
     }
     else if (!string.IsNullOrWhiteSpace(ErrorMessage))
@@ -94,8 +111,10 @@
                     <p class="text-sm text-slate-600">The headline DSCR compared against the selected covenant threshold.</p>
                 </div>
                 <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" role="img" aria-label="Gauge showing annual debt service coverage ratio">
+                    @* AnimationDuration: smooth gauge needle transition matches the DataDashboard gauge animation baseline *@
                     <SfCircularGauge ID="debt-coverage-dscr-gauge"
                                      AllowMargin="true"
+                                     AnimationDuration="700"
                                      Width="100%"
                                      Height="240px">
                         <CircularGaugeAxes>
@@ -123,17 +142,20 @@
                     <p class="text-sm text-slate-600">Revenue less debt service, with the residual headroom carried as the total bar.</p>
                 </div>
                 <div class="mt-3">
+                    @* Theme Fluent2: chart palette aligned with app-wide Syncfusion theme *@
                     <SfChart ID="debt-coverage-waterfall-chart"
                              AccessibilityDescription="Waterfall chart showing annual revenue, debt service, and residual reserve headroom."
                              Width="100%"
                              Height="320px"
-                             Background="transparent">
+                             Background="transparent"
+                             Theme="Syncfusion.Blazor.Theme.Fluent2">
                         <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
                             <ChartAxisMajorGridLines Width="0" />
                         </ChartPrimaryXAxis>
                         <ChartPrimaryYAxis LabelFormat="C0">
                             <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
                         </ChartPrimaryYAxis>
+                        <ChartZoomSettings EnableSelectionZooming="false" />
                         <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" />
                         <ChartLegendSettings Visible="false" />
                         <ChartSeriesCollection>
@@ -188,6 +210,7 @@
         if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
         {
             ErrorMessage = "A workspace enterprise and fiscal year are required to load debt coverage.";
+            ToastService.ShowWarning("Debt Coverage", ErrorMessage);
             Snapshot = null;
             IsLoading = false;
             return;
@@ -213,6 +236,7 @@
         {
             ErrorMessage = ex.Message;
             Snapshot = null;
+            ToastService.ShowError("Debt Coverage failed to load", ex.Message);
         }
         finally
         {
