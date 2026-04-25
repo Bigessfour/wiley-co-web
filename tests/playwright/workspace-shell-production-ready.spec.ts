@@ -29,7 +29,7 @@ test.describe("Workspace Shell", () => {
     const primaryNavigation = page.locator("#workspace-navigation-list");
 
     await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
-    await expect(page.locator("#break-even-summary-panel")).toBeAttached();
+    await expect(page.locator("#break-even-summary-panel")).toBeAttached();`r`n    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();`r`n    await expect(page.locator("#break-even-quadrant-grid > section")).toHaveCount(4);
     await expect(
       page
         .locator("#break-even-summary-panel")
@@ -209,3 +209,4 @@ test.describe("Workspace Shell", () => {
     }
   });
 });
+
