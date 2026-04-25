@@ -8,7 +8,7 @@
     "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
   },
   "terminal.integrated.profiles.osx": {
-    "PowerShell 7.6": {
+    "PowerShell 7.6.1": {
       "path": "/opt/homebrew/bin/pwsh",
       "args": ["-NoLogo"]
     },
@@ -16,14 +16,20 @@
       "path": "/bin/zsh"
     }
   },
-  "terminal.integrated.defaultProfile.osx": "PowerShell 7.6",
-  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.osx": "PowerShell 7.6.1",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell 7.6.1": {
+      "path": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "args": ["-NoLogo"]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell 7.6.1",
   "terminal.integrated.automationProfile.osx": {
     "path": "/opt/homebrew/bin/pwsh",
     "args": ["-NoLogo"]
   },
   "terminal.integrated.automationProfile.windows": {
-    "source": "PowerShell",
+    "source": "PowerShell 7.6.1",
     "args": ["-NoLogo"]
   },
   "chat.mcp.autostart": "newAndOutdated",
