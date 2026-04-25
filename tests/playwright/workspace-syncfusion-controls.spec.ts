@@ -373,12 +373,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       await route.continue();
     });
 
-    await page.goto("/wiley-workspace");
-    await waitForWorkspaceShell(page);
-    await page
-      .locator("#workspace-navigation-card")
-      .getByRole("link", { name: "Customer Viewer" })
-      .click();
+    await gotoWorkspacePanel(page, "/wiley-workspace/customers");
 
     const panel = page.locator("#customer-viewer-panel");
     const directoryStatus = page.locator("#customer-directory-status");
@@ -415,6 +410,16 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await expect(directoryStatus).toBeVisible();
     await expect(dashboard).toBeAttached();
     await expect(customerGrid).toBeVisible();
+    await expect(
+      page
+        .locator("#customer-summary-panel")
+        .getByText("Customer Summary", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("#customer-filters-panel")
+        .getByText("Customer Filters", { exact: true }),
+    ).toBeVisible();
   });
 
   test("customer editor dialog renders Syncfusion form controls", async ({
@@ -525,14 +530,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
   test("data dashboard and trends render Syncfusion charts and gauges", async ({
     page,
   }) => {
-    await page.goto("/wiley-workspace");
-
-    await waitForWorkspaceShell(page);
-
-    await page
-      .locator("#workspace-navigation-card")
-      .getByRole("link", { name: "Data Dashboard" })
-      .click();
+    await gotoWorkspacePanel(page, "/wiley-workspace/data-dashboard");
 
     await expect(page.locator("#data-dashboard-panel")).toBeVisible();
     await expect(page.locator("#kpi-net-position")).toBeVisible();
@@ -592,13 +590,10 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     }
   });
 
-  test("data dashboard panel remains structurally stable", async ({ page }) => {
-    await gotoWorkspacePanel(page, "/wiley-workspace");
-
-    await page
-      .locator("#workspace-navigation-card")
-      .getByRole("link", { name: "Data Dashboard" })
-      .click();
+  test("visual regression: data dashboard panel remains stable", async ({
+    page,
+  }) => {
+    await gotoWorkspacePanel(page, "/wiley-workspace/data-dashboard");
 
     const dataDashboardPanel = page.locator("#data-dashboard-panel");
 

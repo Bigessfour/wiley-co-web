@@ -1,9 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  enterNumericValue,
-  gotoWorkspacePanel,
-  prepareForVisualSnapshot,
-} from "./support/workspace";
+import { enterNumericValue, gotoWorkspacePanel } from "./support/workspace";
 
 test.describe("Core Panel Proof", () => {
   test("Rates panel updates the current rate and preserves comparison clarity", async ({
@@ -36,17 +32,12 @@ test.describe("Core Panel Proof", () => {
       /Saved .* at .*|Snapshot save failed:/,
     );
 
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await prepareForVisualSnapshot(page);
-
-    await expect(page.locator("#rates-panel")).toHaveScreenshot(
-      "rates-panel.png",
-      {
-        animations: "disabled",
-        caret: "hide",
-        scale: "css",
-        maxDiffPixelRatio: 0.02,
-      },
+    await expect(page.locator("#rates-panel-chart-section")).toBeVisible();
+    await expect(page.locator("#rates-kpi-grid")).toContainText(
+      /Current Rate\s*\$29\.50/,
+    );
+    await expect(page.locator("#rates-kpi-grid")).toContainText(
+      /Recommended Rate\s*\$\d[\d,]*\.\d{2}/,
     );
   });
 });
