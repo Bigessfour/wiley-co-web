@@ -36,31 +36,31 @@ This repo is also my strongest example of working across product design, fronten
 
 ### Prerequisites
 
-- .NET SDK `9.0.313` (pinned in `/home/runner/work/wiley-co-web/wiley-co-web/global.json`)
+- .NET SDK `9.0.313` (pinned in `global.json`)
 - Node.js 18+
 - A valid `SYNCFUSION_LICENSE_KEY`
 
 ### Frontend
 
 ```bash
-dotnet run --project /home/runner/work/wiley-co-web/wiley-co-web/WileyCoWeb.csproj --launch-profile http --urls http://localhost:5230
+dotnet run --project WileyCoWeb.csproj --launch-profile http --urls http://localhost:5230
 ```
 
 ### API
 
 ```bash
-dotnet run --project /home/runner/work/wiley-co-web/wiley-co-web/WileyCoWeb.Api/WileyCoWeb.Api.csproj --launch-profile WileyCoWeb.Api --urls http://127.0.0.1:5231
+dotnet run --project WileyCoWeb.Api/WileyCoWeb.Api.csproj --launch-profile WileyCoWeb.Api --urls http://127.0.0.1:5231
 ```
 
 ### Optional local config
 
-Create an ignored file at `/home/runner/work/wiley-co-web/wiley-co-web/appsettings.Syncfusion.local.json`:
+Create an ignored file at `appsettings.Syncfusion.local.json`:
 
 ```json
 { "SyncfusionLicenseKey": "<your-license-key>" }
 ```
 
-Create an ignored file at `/home/runner/work/wiley-co-web/wiley-co-web/appsettings.Workspace.local.json` if you want the client to point at a separate local API host:
+Create an ignored file at `appsettings.Workspace.local.json` if you want the client to point at a separate local API host:
 
 ```json
 { "WorkspaceApiBaseAddress": "http://localhost:5231" }
@@ -69,10 +69,10 @@ Create an ignored file at `/home/runner/work/wiley-co-web/wiley-co-web/appsettin
 ## Testing
 
 ```bash
-dotnet test /home/runner/work/wiley-co-web/wiley-co-web/tests/WileyWidget.Tests/WileyWidget.Tests.csproj
-dotnet test /home/runner/work/wiley-co-web/wiley-co-web/tests/WileyCoWeb.ComponentTests/WileyCoWeb.ComponentTests.csproj
-cd /home/runner/work/wiley-co-web/wiley-co-web && npm install
-cd /home/runner/work/wiley-co-web/wiley-co-web && npm run playwright:test:progress
+dotnet test tests/WileyWidget.Tests/WileyWidget.Tests.csproj
+dotnet test tests/WileyCoWeb.ComponentTests/WileyCoWeb.ComponentTests.csproj
+npm install
+npm run playwright:test:progress
 ```
 
 When `WILEYCO_E2E_BASE_URL` is not set, Playwright uses the local default app at `http://localhost:5230` and API at `http://127.0.0.1:5231`.
@@ -95,11 +95,11 @@ This project is active and already demonstrates:
 
 ## Project docs
 
-- UI rebuild roadmap: [/home/runner/work/wiley-co-web/wiley-co-web/docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md)
-- AWS server-side closure plan: [/home/runner/work/wiley-co-web/wiley-co-web/docs/aws-server-side-closure-plan.md](docs/aws-server-side-closure-plan.md)
-- QuickBooks import guide: [/home/runner/work/wiley-co-web/wiley-co-web/docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md)
-- Aurora layout: [/home/runner/work/wiley-co-web/wiley-co-web/docs/aws-aurora-private-layout.md](docs/aws-aurora-private-layout.md)
-- Aurora reset runbook: [/home/runner/work/wiley-co-web/wiley-co-web/docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md)
+- UI rebuild roadmap: [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md)
+- AWS server-side closure plan: [docs/aws-server-side-closure-plan.md](docs/aws-server-side-closure-plan.md)
+- QuickBooks import guide: [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md)
+- Aurora layout: [docs/aws-aurora-private-layout.md](docs/aws-aurora-private-layout.md)
+- Aurora reset runbook: [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md)
 
 ## Notes
 
