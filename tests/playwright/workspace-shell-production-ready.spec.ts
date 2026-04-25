@@ -8,7 +8,7 @@ test.describe("Workspace Shell", () => {
   test("Workspace shell and navigation stay usable on a fresh load", async ({
     page,
   }) => {
-    test.setTimeout(180000);
+    test.setTimeout(150000);
 
     // 1. Open /wiley-workspace in a fresh browser session.
     await page.goto("/wiley-workspace");
@@ -178,7 +178,7 @@ test.describe("Workspace Shell", () => {
 
     for (const routeCheck of routeChecks) {
       await page.goto(routeCheck.route);
-      await waitForWorkspaceShell(page, 45_000);
+      await waitForWorkspaceShell(page, 30_000);
 
       const sidebarToggle = page.locator("#app-shell-nav-toggle");
       await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();

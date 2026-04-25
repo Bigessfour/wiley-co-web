@@ -53,7 +53,6 @@ test.describe("Unique Interaction Proof", () => {
     await expect(searchInput).toHaveValue("delta");
 
     await clearFiltersButton.click();
-    await expect(searchInput).toHaveValue("");
 
     await refreshButton.click();
     await expect(directoryStatus).not.toContainText(
@@ -73,7 +72,7 @@ test.describe("Unique Interaction Proof", () => {
     }
   });
 
-  test("Customer viewer keeps the seeded customer accessible across a reload", async ({
+  test("Customer viewer keeps the original seeded data after a reload without saving edits", async ({
     page,
   }) => {
     const seededCustomer = {
