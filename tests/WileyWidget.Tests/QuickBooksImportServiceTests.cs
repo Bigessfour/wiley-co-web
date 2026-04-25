@@ -1,7 +1,9 @@
 using System.IO.Compression;
+using System.Reflection;
 using System.Security;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Services;
 
@@ -214,6 +216,70 @@ public sealed class QuickBooksImportServiceTests
     }
 
     [Fact]
+    public async Task PreviewAsync_WithUnsupportedFileExtension_ThrowsReadableInvalidOperationException()
+    {
+        var service = CreateService();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.PreviewAsync(
+            Encoding.UTF8.GetBytes("not-a-quickbooks-export"),
+            "quickbooks-ledger.txt",
+            "Water Utility",
+            2026));
+
+        Assert.Contains("Unsupported QuickBooks export format: .txt", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NormalizeSignatureDate_WhenValueIsWhitespace_ReturnsEmptyString()
+    {
+        var result = InvokePrivateStatic<string>(nameof(QuickBooksImportService), "NormalizeSignatureDate", "   ");
+
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
+    public async Task AnalyzeRoutedDuplicatesAsync_WhenNoRows_ReturnsEmptyResult()
+    {
+        var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
+        var service = CreateService(contextFactory);
+        await using var context = await contextFactory.CreateDbContextAsync();
+
+        var result = await InvokeAnalyzeRoutedDuplicatesAsync(service, context, []);
+
+        Assert.Equal(0, result.DuplicateRows);
+        Assert.Empty(result.Rows);
+    }
+
+    [Fact]
+    public async Task AnalyzeRoutedDuplicatesAsync_WhenRowsHaveNoScopes_ReturnsOriginalRows()
+    {
+        var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
+        var service = CreateService(contextFactory);
+        await using var context = await contextFactory.CreateDbContextAsync();
+        var rows = new[]
+        {
+            new QuickBooksImportPreviewRow(
+                1,
+                "2026-01-02",
+                "Deposit",
+                null,
+                "WATER PAYMENTS",
+                "VIA CREDIT CARD",
+                "105 · ACCOUNTS RECEIVABLE",
+                "101 · CASH IN BANK - UTILITY",
+                -362.90m,
+                0m,
+                null,
+                false)
+        };
+
+        var result = await InvokeAnalyzeRoutedDuplicatesAsync(service, context, rows);
+
+        Assert.Equal(0, result.DuplicateRows);
+        Assert.Equal(rows, result.Rows);
+    }
+
+    [Fact]
     public async Task PreviewAsync_WhenCsvContainsBadData_ThrowsReadableInvalidOperationException()
     {
         var service = CreateService();
@@ -230,9 +296,14 @@ public sealed class QuickBooksImportServiceTests
 
     private QuickBooksImportService CreateService()
     {
+        var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
+        return CreateService(contextFactory);
+    }
+
+    private QuickBooksImportService CreateService(IDbContextFactory<AppDbContext> contextFactory)
+    {
         var csvParser = new QuickBooksCsvParser();
         var excelParser = new QuickBooksExcelParser();
-        var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");
         var routingService = new QuickBooksRoutingService(contextFactory);
         return new QuickBooksImportService(
             _loggerFactory.CreateLogger<QuickBooksImportService>(),
@@ -250,6 +321,36 @@ public sealed class QuickBooksImportServiceTests
             .Options;
 
         return new AppDbContextFactory(options);
+    }
+
+    private static T InvokePrivateStatic<T>(string declaringTypeName, string methodName, params object?[] args)
+    {
+        var type = typeof(QuickBooksImportService);
+        Assert.Equal(declaringTypeName, type.Name);
+
+        var method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        return Assert.IsType<T>(method!.Invoke(null, args));
+    }
+
+    private static async Task<(int DuplicateRows, IReadOnlyList<QuickBooksImportPreviewRow> Rows)> InvokeAnalyzeRoutedDuplicatesAsync(
+        QuickBooksImportService service,
+        AppDbContext context,
+        IReadOnlyList<QuickBooksImportPreviewRow> rows)
+    {
+        var method = typeof(QuickBooksImportService).GetMethod("AnalyzeRoutedDuplicatesAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+
+        var task = Assert.IsAssignableFrom<Task>(method!.Invoke(service, [context, rows, CancellationToken.None]));
+        await task.ConfigureAwait(false);
+
+        var result = task.GetType().GetProperty("Result")?.GetValue(task);
+        Assert.NotNull(result);
+
+        var duplicateRows = Assert.IsType<int>(result!.GetType().GetProperty("DuplicateRows")?.GetValue(result));
+        var analyzedRows = Assert.IsAssignableFrom<IReadOnlyList<QuickBooksImportPreviewRow>>(result.GetType().GetProperty("Rows")?.GetValue(result));
+        return (duplicateRows, analyzedRows);
     }
 
     private static string CreateSparseTransactionListCsv()

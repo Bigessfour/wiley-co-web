@@ -310,7 +310,8 @@ internal sealed partial class WorkspaceReferenceDataImportService
 
     private static bool LooksLikeGeneralLedgerFile(string? fileName)
         => !string.IsNullOrWhiteSpace(fileName)
-            && fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase);
+            && (fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase)
+                || fileName.Contains("general-ledger", StringComparison.OrdinalIgnoreCase));
 
     private static int GetSampleLedgerFilePreference(string filePath)
         => Path.GetExtension(filePath).ToLowerInvariant() switch
@@ -750,7 +751,13 @@ internal sealed partial class WorkspaceReferenceDataImportService
     private static bool IsCustomerWorkbook(string fileName)
         => fileName.Contains("Customer", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsSampleLedgerFile(string filePath) { var fileName = Path.GetFileName(filePath); return IsSupportedSampleLedgerExtension(fileName) && !IsCustomerWorkbook(fileName) && fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase); }
+    private static bool IsSampleLedgerFile(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        return IsSupportedSampleLedgerExtension(fileName)
+            && !IsCustomerWorkbook(fileName)
+            && LooksLikeGeneralLedgerFile(fileName);
+    }
 
     private static bool IsSupportedSampleLedgerExtension(string fileName) { var extension = Path.GetExtension(fileName); return extension.Equals(".csv", StringComparison.OrdinalIgnoreCase) || extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) || extension.Equals(".xls", StringComparison.OrdinalIgnoreCase); }
 
