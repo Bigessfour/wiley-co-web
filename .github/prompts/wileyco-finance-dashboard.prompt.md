@@ -7,7 +7,7 @@ model: "GPT-5 (copilot)"
 
 <!-- trunk-ignore(markdownlint/MD041) -->
 
-#sf_blazor_ui_builder Create a responsive Wiley.co finance operations dashboard page for the current Blazor Web App using Syncfusion Essential Studio 33.1.44. Match the existing dark slate and sky-accent visual style used in the app, and preserve the panel-based workflow.
+#sf_blazor_ui_builder Create a responsive Wiley.co finance operations dashboard page for the current Blazor Web App using Syncfusion Essential Studio 33.2.3. Match the existing dark slate and sky-accent visual style used in the app, and preserve the panel-based workflow.
 
 Use SfDashboardLayout as the page shell, with these sections:
 

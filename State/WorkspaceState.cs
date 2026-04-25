@@ -20,6 +20,9 @@ public sealed class WorkspaceState
     private readonly List<ScenarioItem> scenarioItems = [];
     private readonly List<CustomerRow> customerRows = [];
     private readonly List<ProjectionRow> projectionRows = [];
+    private readonly List<BreakEvenQuadrantData> breakEvenQuadrants = [];
+    private readonly List<ApartmentUnitTypeData> apartmentUnitTypes = [];
+    private WorkspaceReserveTrajectoryData? reserveTrajectory;
     private readonly List<string> enterpriseOptions = [];
     private readonly List<int> fiscalYearOptions = [];
     private readonly List<string> customerServiceOptions = [AllServicesOption];
@@ -337,6 +340,30 @@ public sealed class WorkspaceState
         }
     }
 
+    public IReadOnlyList<BreakEvenQuadrantData> BreakEvenQuadrants
+    {
+        get
+        {
+            return breakEvenQuadrants;
+        }
+    }
+
+    public IReadOnlyList<ApartmentUnitTypeData> ApartmentUnitTypes
+    {
+        get
+        {
+            return apartmentUnitTypes;
+        }
+    }
+
+    public WorkspaceReserveTrajectoryData? ReserveTrajectory
+    {
+        get
+        {
+            return reserveTrajectory;
+        }
+    }
+
     public void ApplyBootstrap(WorkspaceBootstrapData bootstrapData)
     {
         ArgumentNullException.ThrowIfNull(bootstrapData);
@@ -370,7 +397,10 @@ public sealed class WorkspaceState
             CustomerServiceOptions = [.. customerServiceOptions],
             CustomerCityLimitOptions = [.. customerCityLimitOptions],
             CustomerRows = [.. customerRows],
-            ProjectionRows = [.. projectionRows]
+            ProjectionRows = [.. projectionRows],
+            BreakEvenQuadrants = [.. breakEvenQuadrants],
+            ApartmentUnitTypes = [.. apartmentUnitTypes],
+            ReserveTrajectory = CloneReserveTrajectory(reserveTrajectory)
         };
     }
 
@@ -397,6 +427,25 @@ public sealed class WorkspaceState
     public void SetProjectedVolume(decimal volume)
     {
         if (SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume)) NotifyChanged();
+    }
+
+    public void SetBreakEvenQuadrants(IReadOnlyList<BreakEvenQuadrantData> quadrants)
+    {
+        ArgumentNullException.ThrowIfNull(quadrants);
+
+        if (SetBreakEvenQuadrantsWithoutNotify(quadrants)) NotifyChanged();
+    }
+
+    public void SetApartmentUnitTypes(IReadOnlyList<ApartmentUnitTypeData> unitTypes)
+    {
+        ArgumentNullException.ThrowIfNull(unitTypes);
+
+        if (SetApartmentUnitTypesWithoutNotify(unitTypes)) NotifyChanged();
+    }
+
+    public void SetReserveTrajectory(WorkspaceReserveTrajectoryData? trajectory)
+    {
+        if (SetReserveTrajectoryWithoutNotify(trajectory)) NotifyChanged();
     }
 
     public void SetCustomerSearchTerm(string? searchTerm)
@@ -499,9 +548,68 @@ public sealed class WorkspaceState
     private bool SetProjectionRowsWithoutNotify(IReadOnlyList<ProjectionRow>? rows)
         => SetRowsWithoutNotify(projectionRows, NormalizeProjectionRows(rows));
 
+    private bool SetBreakEvenQuadrantsWithoutNotify(IReadOnlyList<BreakEvenQuadrantData>? rows)
+        => SetRowsWithoutNotify(breakEvenQuadrants, NormalizeBreakEvenQuadrants(rows));
+
+    private bool SetApartmentUnitTypesWithoutNotify(IReadOnlyList<ApartmentUnitTypeData>? rows)
+        => SetRowsWithoutNotify(apartmentUnitTypes, NormalizeApartmentUnitTypes(rows));
+
+    private bool SetReserveTrajectoryWithoutNotify(WorkspaceReserveTrajectoryData? trajectory)
+    {
+        var normalizedTrajectory = NormalizeReserveTrajectory(trajectory);
+        var hasChanged = !ReserveTrajectoryEquals(reserveTrajectory, normalizedTrajectory);
+        reserveTrajectory = normalizedTrajectory;
+        return hasChanged;
+    }
+
     private static List<CustomerRow> NormalizeCustomerRows(IReadOnlyList<CustomerRow>? rows) => rows?.Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits)).ToList() ?? [];
 
     private static List<ProjectionRow> NormalizeProjectionRows(IReadOnlyList<ProjectionRow>? rows) => rows?.Select(row => new ProjectionRow(row.Year, row.Rate)).ToList() ?? [];
+
+    private static List<BreakEvenQuadrantData> NormalizeBreakEvenQuadrants(IReadOnlyList<BreakEvenQuadrantData>? rows)
+        => rows?.Select(row => new BreakEvenQuadrantData(
+            row.EnterpriseName,
+            row.EnterpriseType,
+            row.CurrentRate,
+            row.MonthlyExpenses,
+            row.MonthlyRevenue,
+            row.MonthlyBalance,
+            row.BreakEvenRate,
+            row.EffectiveCustomerCount,
+            row.SeriesPoints.Select(point => new BreakEvenSeriesPoint(point.PeriodLabel, point.RevenuePerCustomer, point.ExpensesPerCustomer, point.BreakEvenPerCustomer)).ToList())).ToList() ?? [];
+
+    private static List<ApartmentUnitTypeData> NormalizeApartmentUnitTypes(IReadOnlyList<ApartmentUnitTypeData>? rows)
+        => rows?.Select(row => new ApartmentUnitTypeData(row.Id, row.Name, row.BedroomCount, row.UnitCount, row.MonthlyRent)).ToList() ?? [];
+
+    private static WorkspaceReserveTrajectoryData? NormalizeReserveTrajectory(WorkspaceReserveTrajectoryData? trajectory)
+    {
+        if (trajectory is null)
+        {
+            return null;
+        }
+
+        return new WorkspaceReserveTrajectoryData(
+            trajectory.CurrentReserves,
+            trajectory.RecommendedReserveLevel,
+            NormalizeStringValue(trajectory.RiskAssessment, string.Empty),
+            trajectory.ForecastPoints?.Select(point => new WorkspaceReserveTrajectoryPointData(point.DateUtc, point.PredictedReserves, point.ConfidenceInterval)).ToList() ?? []);
+    }
+
+    private static WorkspaceReserveTrajectoryData? CloneReserveTrajectory(WorkspaceReserveTrajectoryData? trajectory)
+        => NormalizeReserveTrajectory(trajectory);
+
+    private static bool ReserveTrajectoryEquals(WorkspaceReserveTrajectoryData? left, WorkspaceReserveTrajectoryData? right)
+    {
+        if (left is null || right is null)
+        {
+            return left is null && right is null;
+        }
+
+        return left.CurrentReserves == right.CurrentReserves
+            && left.RecommendedReserveLevel == right.RecommendedReserveLevel
+            && string.Equals(left.RiskAssessment, right.RiskAssessment, StringComparison.Ordinal)
+            && left.ForecastPoints.SequenceEqual(right.ForecastPoints);
+    }
 
     private static IReadOnlyList<string> NormalizeStringList(IReadOnlyList<string>? source, IReadOnlyList<string> fallback) => (source is { Count: > 0 } ? source : fallback).Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).Distinct(StringComparer.Ordinal).ToList();
 
@@ -580,7 +688,10 @@ public sealed class WorkspaceState
     private bool ApplyBootstrapCollections(WorkspaceBootstrapData bootstrapData)
         => SetScenarioItemsWithoutNotify(bootstrapData.ScenarioItems)
             | SetCustomerRowsWithoutNotify(bootstrapData.CustomerRows)
-            | SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows);
+            | SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows)
+            | SetBreakEvenQuadrantsWithoutNotify(bootstrapData.BreakEvenQuadrants)
+            | SetApartmentUnitTypesWithoutNotify(bootstrapData.ApartmentUnitTypes)
+            | SetReserveTrajectoryWithoutNotify(bootstrapData.ReserveTrajectory);
 
     private bool ApplyBootstrapLastUpdated(WorkspaceBootstrapData bootstrapData)
         => SetStringWithoutNotify(ref lastUpdatedUtc, bootstrapData.LastUpdatedUtc, lastUpdatedUtc);

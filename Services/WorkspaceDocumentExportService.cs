@@ -31,6 +31,16 @@ public sealed class WorkspaceDocumentExportService(
         return document;
     }
 
+    public WorkspaceExportDocument CreateReserveTrajectoryWorkbook(WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation("Creating reserve trajectory workbook export for {Enterprise} FY {FiscalYear} with {ForecastPointCount} forecast points.", workspaceState.SelectedEnterprise, workspaceState.SelectedFiscalYear, workspaceState.ReserveTrajectory?.ForecastPoints.Count ?? 0);
+
+        var document = _excelBuilder.CreateReserveTrajectoryWorkbook(workspaceState);
+        logger?.LogInformation("Reserve trajectory workbook export created: {FileName} ({ByteCount} bytes)", document.FileName, document.Content.LongLength);
+        return document;
+    }
+
     public WorkspaceExportDocument CreateWorkspacePdfReport(WorkspaceState workspaceState)
     {
         ArgumentNullException.ThrowIfNull(workspaceState);
@@ -38,6 +48,16 @@ public sealed class WorkspaceDocumentExportService(
 
         var document = _pdfBuilder.CreateWorkspacePdfReport(workspaceState);
         logger?.LogInformation("PDF rate packet created: {FileName} ({ByteCount} bytes)", document.FileName, document.Content.LongLength);
+        return document;
+    }
+
+    public WorkspaceExportDocument CreateReserveTrajectoryPdfReport(WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation("Creating reserve trajectory PDF export for {Enterprise} FY {FiscalYear} with {ForecastPointCount} forecast points.", workspaceState.SelectedEnterprise, workspaceState.SelectedFiscalYear, workspaceState.ReserveTrajectory?.ForecastPoints.Count ?? 0);
+
+        var document = _pdfBuilder.CreateReserveTrajectoryPdfReport(workspaceState);
+        logger?.LogInformation("Reserve trajectory PDF export created: {FileName} ({ByteCount} bytes)", document.FileName, document.Content.LongLength);
         return document;
     }
 }

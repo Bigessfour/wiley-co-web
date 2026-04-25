@@ -40,13 +40,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="src\WileyWidget.Models\WileyWidget.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Exclude the standalone class library sources under src/ so the Blazor app does not compile
     them directly. -->
     <Compile Remove="src/**/*.cs" />
+    <Compile Remove="Models/**/*.cs" />
     <Compile Remove="WileyCoWeb.Api/**/*.cs" />
     <Compile Remove="tests/**/*.cs" />
     <Compile Remove="__remote_check__/**/*.cs" />
     <Content Remove="src/**" />
+    <Content Remove="Models/**" />
     <Content Remove="tests/**" />
     <Content Remove="WileyCoWeb.Api/**" />
     <Content Remove="__remote_check__/**" />
@@ -54,6 +60,7 @@
     <Content Remove="bin/**" />
     <Content Remove="obj/**" />
     <None Remove="src/**" />
+    <None Remove="Models/**" />
     <None Remove="tests/**" />
     <None Remove="WileyCoWeb.Api/**" />
     <None Remove="__remote_check__/**" />

@@ -29,12 +29,12 @@ test.describe("Workspace Shell", () => {
     const primaryNavigation = page.locator("#workspace-navigation-list");
 
     await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
-    await expect(page.locator("#break-even-summary-panel")).toBeAttached();`r`n    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();`r`n    await expect(page.locator("#break-even-quadrant-grid > section")).toHaveCount(4);
-    await expect(
-      page
-        .locator("#break-even-summary-panel")
-        .getByText("Break-Even Summary", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator("#break-even-panel")).toBeVisible();
+    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
+    await expect(page.locator("#apartment-config-panel")).toBeVisible();
+    await expect(page.locator("#break-even-panel")).toContainText(
+      "Break-Even Quadrants",
+    );
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Break-Even",
     );
@@ -56,12 +56,9 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("link", { name: "Scenario Planner" })
       .click();
-    await expect(page.locator("#scenario-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#scenario-summary-panel")
-        .getByText("Scenario Summary", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator("#scenario-panel")).toBeVisible();
+    await expect(page.locator("#scenario-grid")).toBeVisible();
+    await expect(page.locator("#scenario-edit-status")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Scenario Planner",
     );
@@ -69,12 +66,9 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("link", { name: "Customer Viewer" })
       .click();
-    await expect(page.locator("#customer-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#customer-summary-panel")
-        .getByText("Customer Summary", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator("#customer-viewer-panel")).toBeVisible();
+    await expect(page.locator("#customer-viewer-dashboard")).toBeVisible();
+    await expect(page.locator("#customer-directory-grid")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Customer Viewer",
     );
@@ -157,12 +151,12 @@ test.describe("Workspace Shell", () => {
     const routeChecks = [
       {
         route: "/wiley-workspace/break-even",
-        visibleSelector: "#break-even-summary-panel",
+        visibleSelector: "#break-even-panel",
       },
       { route: "/wiley-workspace/rates", visibleSelector: "#rates-panel" },
       {
         route: "/wiley-workspace/scenario",
-        visibleSelector: "#scenario-panel",
+        visibleSelector: "#scenario-summary-panel",
       },
       {
         route: "/wiley-workspace/customers",
@@ -186,9 +180,7 @@ test.describe("Workspace Shell", () => {
       await sidebarToggle.evaluate((button) => {
         (button as HTMLButtonElement).click();
       });
-      await expect(sidebarToggle).toContainText(
-        "Expand navigation rail",
-      );
+      await expect(sidebarToggle).toContainText("Expand navigation rail");
       await expect(page.locator("#workspace-navigation-list")).toBeVisible();
       await expect(
         page
@@ -198,7 +190,9 @@ test.describe("Workspace Shell", () => {
       await expect
         .poll(() =>
           page.evaluate(() =>
-            window.localStorage.getItem("wiley.workspace.left-nav-collapsed.v2"),
+            window.localStorage.getItem(
+              "wiley.workspace.left-nav-collapsed.v2",
+            ),
           ),
         )
         .toBe("True");
@@ -209,4 +203,3 @@ test.describe("Workspace Shell", () => {
     }
   });
 });
-

@@ -1,0 +1,69 @@
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Grids
+@using WileyCoWeb.Contracts
+
+<section id="apartment-config-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex flex-col gap-2">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Apartment Configuration</p>
+        <p class="text-sm text-slate-600">Edit unit types, monthly rents, and bedroom weighting for the Apartments enterprise.</p>
+    </div>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
+        <SfCard>
+            <CardHeader Title="Total Units" SubTitle="@TotalUnits.ToString("N0")" />
+            <CardContent Content="Total apartment units represented in the current mix." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Monthly Revenue" SubTitle="@TotalMonthlyRevenue.ToString("C0")" />
+            <CardContent Content="Roll-up of all apartment unit-type rents." />
+        </SfCard>
+        <SfCard>
+            <CardHeader Title="Effective $/Customer" SubTitle="@EffectiveRevenuePerCustomer.ToString("C2")" />
+            <CardContent Content="Revenue normalized by bedroom-weighted effective customers." />
+        </SfCard>
+    </div>
+
+    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <SfGrid TValue="ApartmentUnitTypeData" DataSource="@editableUnitTypes" Toolbar="@ToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420">
+            <GridEvents TValue="ApartmentUnitTypeData" OnActionComplete="HandleActionComplete" />
+            <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
+            <GridColumns>
+                <GridColumn Field="@nameof(ApartmentUnitTypeData.Id)" IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
+                <GridColumn Field="@nameof(ApartmentUnitTypeData.Name)" HeaderText="Unit Type" Width="180" />
+                <GridColumn Field="@nameof(ApartmentUnitTypeData.BedroomCount)" HeaderText="Bedrooms" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                <GridColumn Field="@nameof(ApartmentUnitTypeData.UnitCount)" HeaderText="Units" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+                <GridColumn Field="@nameof(ApartmentUnitTypeData.MonthlyRent)" HeaderText="Monthly Rent" Format="C2" Width="140" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
+            </GridColumns>
+        </SfGrid>
+    </div>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<ApartmentUnitTypeData> UnitTypes { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<ApartmentUnitTypeData>> OnUnitTypesChanged { get; set; }
+
+    private static IReadOnlyList<string> ToolbarItems { get; } = ["Add", "Edit", "Delete", "Update", "Cancel"];
+    private List<ApartmentUnitTypeData> editableUnitTypes = [];
+
+    protected override void OnParametersSet()
+    {
+        editableUnitTypes = UnitTypes
+            .Select(unitType => new ApartmentUnitTypeData(unitType.Id, unitType.Name, unitType.BedroomCount, unitType.UnitCount, unitType.MonthlyRent))
+            .ToList();
+    }
+
+    private decimal TotalUnits => editableUnitTypes.Sum(unitType => unitType.UnitCount);
+
+    private decimal TotalMonthlyRevenue => editableUnitTypes.Sum(unitType => unitType.UnitCount * unitType.MonthlyRent);
+
+    private decimal EffectiveCustomerCount => editableUnitTypes.Sum(unitType => unitType.UnitCount * unitType.BedroomCount);
+
+    private decimal EffectiveRevenuePerCustomer => EffectiveCustomerCount > 0 ? TotalMonthlyRevenue / EffectiveCustomerCount : 0m;
+
+    private async Task HandleActionComplete(ActionEventArgs<ApartmentUnitTypeData> args)
+    {
+        await OnUnitTypesChanged.InvokeAsync(editableUnitTypes.ToList());
+        await InvokeAsync(StateHasChanged);
+    }
+}

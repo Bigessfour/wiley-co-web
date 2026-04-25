@@ -1,0 +1,235 @@
+@namespace WileyCoWeb.Components.Panels
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.Inputs
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.Services
+
+@inject DebtCoverageApiService DebtCoverageApiService
+
+<section id="debt-coverage-panel" class="space-y-4" aria-live="polite">
+    <section class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-300">Debt Coverage</p>
+                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Debt service coverage ratio and covenant check</h2>
+                <p class="mt-2 max-w-3xl text-sm text-slate-300">Compare annual revenue against debt service, inspect covenant headroom, and tune the threshold used for the dashboard proof.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
+                <div>
+                    <div class="text-slate-400">Enterprise</div>
+                    <div class="font-semibold text-white">@SelectedEnterprise</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">Fiscal Year</div>
+                    <div class="font-semibold text-white">@SelectedFiscalYear</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">Threshold</div>
+                    <div class="font-semibold text-white">@CoverageThreshold.ToString("0.00x")</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">Status</div>
+                    <div class="font-semibold text-emerald-300">@CoverageStatus</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Scenario Input</p>
+        <div class="mt-3 grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <SfNumericTextBox TValue="decimal"
+                              ID="debt-coverage-threshold-input"
+                              Value="@CoverageThreshold"
+                              Placeholder="Covenant threshold"
+                              FloatLabelType="FloatLabelType.Auto"
+                              Min="0.5m"
+                              Step="0.05m"
+                              Width="100%"
+                              Format="N2">
+                <NumericTextBoxEvents TValue="decimal" ValueChange="HandleThresholdChanged" />
+            </SfNumericTextBox>
+            <SfCard ID="debt-coverage-summary-card">
+                <CardHeader Title="Coverage summary" SubTitle="@SummarySubtitle" />
+                <CardContent Content="@SummaryContent" />
+            </SfCard>
+        </div>
+    </section>
+
+    @if (IsLoading)
+    {
+        <section class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+            Loading debt coverage snapshot...
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <section class="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-900">
+            @ErrorMessage
+        </section>
+    }
+    else if (Snapshot is not null)
+    {
+        <section class="grid gap-4 md:grid-cols-3">
+            <SfCard ID="debt-coverage-kpi-revenue">
+                <CardHeader Title="Annual Revenue" SubTitle="Live revenue aggregate" />
+                <CardContent Content="@Snapshot.AnnualRevenue.ToString("C0")" />
+            </SfCard>
+            <SfCard ID="debt-coverage-kpi-debt-service">
+                <CardHeader Title="Annual Debt Service" SubTitle="Budget entries classified as debt" />
+                <CardContent Content="@Snapshot.AnnualDebtService.ToString("C0")" />
+            </SfCard>
+            <SfCard ID="debt-coverage-kpi-dscr">
+                <CardHeader Title="Debt Service Coverage" SubTitle="Annual revenue divided by debt service" />
+                <CardContent Content="@Snapshot.DebtServiceCoverageRatio.ToString("0.00x")" />
+            </SfCard>
+        </section>
+
+        <section class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_1.1fr]">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="flex flex-col gap-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Coverage Gauge</p>
+                    <p class="text-sm text-slate-600">The headline DSCR compared against the selected covenant threshold.</p>
+                </div>
+                <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" role="img" aria-label="Gauge showing annual debt service coverage ratio">
+                    <SfCircularGauge ID="debt-coverage-dscr-gauge"
+                                     AllowMargin="true"
+                                     Width="100%"
+                                     Height="240px">
+                        <CircularGaugeAxes>
+                            <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="82%">
+                                <CircularGaugeAxisLineStyle Width="10" Color="#cbd5e1" />
+                                <CircularGaugeAxisLabelStyle Format="{value}x">
+                                    <CircularGaugeAxisLabelFont Size="10px" />
+                                </CircularGaugeAxisLabelStyle>
+                                <CircularGaugeRanges>
+                                    <CircularGaugeRange Start="0" End="@((double)CoverageThreshold)" Color="#fca5a5" StartWidth="10" EndWidth="10" />
+                                    <CircularGaugeRange Start="@((double)CoverageThreshold)" End="@GaugeMaximum" Color="#86efac" StartWidth="10" EndWidth="10" />
+                                </CircularGaugeRanges>
+                                <CircularGaugePointers>
+                                    <CircularGaugePointer Value="@((double)Snapshot.DebtServiceCoverageRatio)" Radius="72%" Color="#0f172a" />
+                                </CircularGaugePointers>
+                            </CircularGaugeAxis>
+                        </CircularGaugeAxes>
+                    </SfCircularGauge>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div class="flex flex-col gap-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Coverage Waterfall</p>
+                    <p class="text-sm text-slate-600">Revenue less debt service, with the residual headroom carried as the total bar.</p>
+                </div>
+                <div class="mt-3">
+                    <SfChart ID="debt-coverage-waterfall-chart"
+                             AccessibilityDescription="Waterfall chart showing annual revenue, debt service, and residual reserve headroom."
+                             Width="100%"
+                             Height="320px"
+                             Background="transparent">
+                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                            <ChartAxisMajorGridLines Width="0" />
+                        </ChartPrimaryXAxis>
+                        <ChartPrimaryYAxis LabelFormat="C0">
+                            <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
+                        </ChartPrimaryYAxis>
+                        <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" />
+                        <ChartLegendSettings Visible="false" />
+                        <ChartSeriesCollection>
+                            <ChartSeries DataSource="@Snapshot.WaterfallPoints"
+                                         XName="@nameof(DebtCoverageWaterfallPoint.Label)"
+                                         YName="@nameof(DebtCoverageWaterfallPoint.Value)"
+                                         Name="Coverage"
+                                         Type="ChartSeriesType.Waterfall"
+                                         SumIndexes="@WaterfallSumIndexes"
+                                         NegativeFillColor="#fca5a5"
+                                         SummaryFillColor="#475569"
+                                         Fill="#93c5fd">
+                                <ChartMarker>
+                                    <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Top" Format="C0">
+                                        <ChartDataLabelFont Size="10px" />
+                                    </ChartDataLabel>
+                                </ChartMarker>
+                            </ChartSeries>
+                        </ChartSeriesCollection>
+                    </SfChart>
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+            Debt coverage data is not available yet.
+        </section>
+    }
+</section>
+
+@code {
+    [Parameter] public string SelectedEnterprise { get; set; } = string.Empty;
+    [Parameter] public int SelectedFiscalYear { get; set; }
+
+    private DebtCoverageResponse? Snapshot { get; set; }
+    private bool IsLoading { get; set; } = true;
+    private string? ErrorMessage { get; set; }
+    private decimal CoverageThreshold { get; set; }
+    private string? loadedEnterprise;
+    private int loadedFiscalYear;
+
+    private string SummarySubtitle => Snapshot is null ? "Awaiting live debt coverage data" : $"{Snapshot.SelectedEnterprise} FY {Snapshot.SelectedFiscalYear}";
+    private string SummaryContent => Snapshot is null ? "The panel will populate after the workspace loads live revenue and debt-service aggregates." : Snapshot.ExecutiveSummary;
+    private string CoverageStatus => Snapshot is null ? "Loading" : EvaluateCoverageStatus(Snapshot.DebtServiceCoverageRatio, CoverageThreshold);
+    private double GaugeMaximum => Snapshot is null ? 3.0d : (double)Math.Max(3m, Math.Max(Snapshot.DebtServiceCoverageRatio, CoverageThreshold) + 0.5m);
+    private double[] WaterfallSumIndexes => Snapshot is null ? [] : [Snapshot.WaterfallPoints.Count - 1d];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
+        {
+            ErrorMessage = "A workspace enterprise and fiscal year are required to load debt coverage.";
+            Snapshot = null;
+            IsLoading = false;
+            return;
+        }
+
+        if (string.Equals(loadedEnterprise, SelectedEnterprise, StringComparison.OrdinalIgnoreCase) && loadedFiscalYear == SelectedFiscalYear && Snapshot is not null)
+        {
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var response = await DebtCoverageApiService.GetAsync(new DebtCoverageRequest(SelectedEnterprise, SelectedFiscalYear));
+            Snapshot = response;
+            CoverageThreshold = response.CovenantThreshold;
+            loadedEnterprise = response.SelectedEnterprise;
+            loadedFiscalYear = response.SelectedFiscalYear;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Snapshot = null;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private Task HandleThresholdChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
+    {
+        CoverageThreshold = Math.Max(args.Value, 0.5m);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private static string EvaluateCoverageStatus(decimal ratio, decimal threshold)
+        => ratio >= threshold
+            ? "Compliant"
+            : ratio >= threshold * 0.9m
+                ? "Watchlist"
+                : "At Risk";
+}

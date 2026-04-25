@@ -14,6 +14,7 @@ export default defineConfig({
   expect: {
     timeout: 15_000,
   },
+  globalSetup: "./tests/playwright/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -35,7 +36,7 @@ export default defineConfig({
           command:
             "dotnet run --project WileyCoWeb.Api/WileyCoWeb.Api.csproj --launch-profile WileyCoWeb.Api --urls http://127.0.0.1:5231",
           url: `${defaultLocalApiURL}/health`,
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer: false,
           timeout: 180_000,
           env: {
             ASPNETCORE_ENVIRONMENT: "Development",
@@ -43,9 +44,9 @@ export default defineConfig({
         },
         {
           command:
-            "dotnet run --project WileyCoWeb.csproj --launch-profile http --urls http://localhost:5230",
+            "dotnet run --project WileyCoWeb.csproj --launch-profile http --urls http://localhost:5230 -p:DebugType=none -p:DebugSymbols=false",
           url: defaultLocalBaseURL,
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer: false,
           timeout: 180_000,
           env: {
             ASPNETCORE_ENVIRONMENT: "Development",

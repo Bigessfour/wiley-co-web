@@ -240,6 +240,9 @@ namespace WileyCoWeb.Services
             builder.Services.AddScoped<WorkspacePersistenceService>();
             builder.Services.AddScoped<WorkspaceSnapshotApiService>();
             builder.Services.AddScoped<UtilityCustomerApiService>();
+            builder.Services.AddScoped<AffordabilityAnalysisService>();
+            builder.Services.AddScoped<DebtCoverageApiService>();
+            builder.Services.AddScoped<CapitalGapApiService>();
             builder.Services.AddScoped<WorkspaceKnowledgeApiService>();
             builder.Services.AddScoped<QuickBooksImportApiService>();
             builder.Services.AddScoped<WorkspaceAiApiService>();

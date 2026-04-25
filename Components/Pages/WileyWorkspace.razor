@@ -28,7 +28,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
                     <div>
-                        <div class="text-slate-400">Enterprise</div>
+                        <div class="text-slate-400">Selected enterprise</div>
                         <div class="font-semibold text-white">@SelectedEnterprise</div>
                     </div>
                     <div>
@@ -42,6 +42,19 @@
                     <div>
                         <div class="text-slate-400">Break-Even</div>
                         <div class="font-semibold text-emerald-300">@BreakEvenRateDisplay</div>
+                    </div>
+                    <div class="col-span-2 sm:col-span-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left">
+                        <div class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-sky-200">Four-enterprise break-even points</div>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            @foreach (var quadrant in HeroBreakEvenQuadrants)
+                            {
+                                <div class="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2">
+                                    <div class="text-sm font-semibold text-white">@GetHeroBreakEvenLabel(quadrant)</div>
+                                    <div class="mt-1 text-xs text-slate-300">Break-even</div>
+                                    <div class="text-lg font-semibold text-emerald-300">@quadrant.BreakEvenRate.ToString("C2")</div>
+                                </div>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
@@ -184,6 +197,19 @@
                                     <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("break-even")'>Open Break-Even</button>
                                 </article>
 
+                                <article id="overview-apartment-config" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Apartment Config</p>
+                                        <h3>Apartment unit mix</h3>
+                                        <p>Edit unit counts, rent assumptions, and bedroom weighting for the Apartments enterprise without leaving the workspace shell.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Units @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount).ToString("N0")</span>
+                                            <span>Revenue @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount * unitType.MonthlyRent).ToString("C0")</span>
+                                        </div>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("apartment-config")'>Open Apartment Config</button>
+                                </article>
+
                                 <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Rates</p>
@@ -222,6 +248,46 @@
                                         <p>@FilteredCustomerCountDisplay customers currently match the active filters for export and operational review.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("customers")'>Open Customer Viewer</button>
+                                </article>
+
+                                <article id="overview-affordability" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Affordability</p>
+                                        <h3>Bill burden versus MHI</h3>
+                                        <p>See how modeled monthly bills compare to median household income across customer classes and rate scenarios.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("affordability")'>Open Affordability</button>
+                                </article>
+
+                                <article id="overview-debt-coverage" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Debt Coverage</p>
+                                        <h3>DSCR and covenant headroom</h3>
+                                        <p>Check annual revenue against debt service, compare the ratio to a covenant floor, and inspect residual headroom.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("debt-coverage")'>Open Debt Coverage</button>
+                                </article>
+
+                                <article id="overview-capital-gap" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Capital Gap</p>
+                                        <h3>Capital needs versus rate revenue</h3>
+                                        <p>Track capital-tagged budget items against rate revenue and watch the cumulative headroom line move as items accumulate.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("capital-gap")'>Open Capital Gap</button>
+                                </article>
+
+                                <article id="overview-reserve-trajectory" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Reserve Trajectory</p>
+                                        <h3>Forecast reserve runway</h3>
+                                        <p>Review current reserves, the recommended reserve floor, and the forecast outlook before opening the trajectory panel.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Current @(ReserveTrajectory is null ? "Unavailable" : ReserveTrajectory.CurrentReserves.ToString("C0"))</span>
+                                            <span>Policy minimum @(ReserveTrajectory is null ? "Unavailable" : ReserveTrajectory.RecommendedReserveLevel.ToString("C0"))</span>
+                                        </div>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("reserve-trajectory")'>Open Reserve Trajectory</button>
                                 </article>
 
                                 <article id="overview-trends" class="workspace-overview-card">
@@ -272,12 +338,17 @@
                                                         BreakEvenRateDisplay="@BreakEvenRateDisplay"
                                                         IsSavingBaseline="@IsSavingBaseline"
                                                         BaselineSaveStatus="@BaselineSaveStatus"
-                                                        GaugeMaximum="@GaugeMaximum"
-                                                        GaugeCurrentRateValue="@GaugeCurrentRateValue"
-                                                        RateComparison="@RateComparison"
+                                                        Quadrants="@BreakEvenQuadrants"
+                                                        ApartmentUnitTypes="@ApartmentUnitTypes"
                                                         OnTotalCostsChanged="HandleTotalCostsChanged"
                                                         OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
-                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync" />
+                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync"
+                                                        OnApartmentUnitTypesChanged="HandleApartmentUnitTypesChanged" />
+                                        break;
+                                    case "apartment-config":
+                                        <ApartmentConfigPanel @key="ActivePanelKey"
+                                                              UnitTypes="@ApartmentUnitTypes"
+                                                              OnUnitTypesChanged="HandleApartmentUnitTypesChanged" />
                                         break;
                                     case "rates":
                                         <RatesPanel @key="ActivePanelKey"
@@ -310,8 +381,30 @@
                                     case "customers":
                                         <CustomerViewerPanel @key="ActivePanelKey" />
                                         break;
+                                    case "affordability":
+                                        <AffordabilityDashboardPanel @key="ActivePanelKey"
+                                                                     Customers="@Customers"
+                                                                     SelectedEnterprise="@SelectedEnterprise"
+                                                                     SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
                                     case "trends":
                                         <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
+                                        break;
+                                    case "reserve-trajectory":
+                                        <ReserveTrajectoryPanel @key="ActivePanelKey"
+                                                               Trajectory="@ReserveTrajectory"
+                                                               OnExportPdf="ExportReserveTrajectoryPdfAsync"
+                                                               OnExportExcel="ExportReserveTrajectoryWorkbookAsync" />
+                                        break;
+                                    case "debt-coverage":
+                                        <DebtCoveragePanel @key="ActivePanelKey"
+                                                           SelectedEnterprise="@SelectedEnterprise"
+                                                           SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
+                                    case "capital-gap":
+                                        <CapitalGapPanel @key="ActivePanelKey"
+                                                         SelectedEnterprise="@SelectedEnterprise"
+                                                         SelectedFiscalYear="@SelectedFiscalYear" />
                                         break;
                                     case "decision-support":
                                         <DecisionSupportPanel @key="ActivePanelKey" />

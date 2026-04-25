@@ -8,7 +8,7 @@
     "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
   },
   "terminal.integrated.profiles.osx": {
-    "PowerShell 7.6": {
+    "PowerShell 7.6.1": {
       "path": "/opt/homebrew/bin/pwsh",
       "args": ["-NoLogo"]
     },
@@ -16,14 +16,20 @@
       "path": "/bin/zsh"
     }
   },
-  "terminal.integrated.defaultProfile.osx": "PowerShell 7.6",
-  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.osx": "PowerShell 7.6.1",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell 7.6.1": {
+      "path": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "args": ["-NoLogo"]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell 7.6.1",
   "terminal.integrated.automationProfile.osx": {
     "path": "/opt/homebrew/bin/pwsh",
     "args": ["-NoLogo"]
   },
   "terminal.integrated.automationProfile.windows": {
-    "source": "PowerShell",
+    "source": "PowerShell 7.6.1",
     "args": ["-NoLogo"]
   },
   "chat.mcp.autostart": "newAndOutdated",
@@ -56,6 +62,10 @@
   "csharp-dev-tools.roslyn.projectOrSolutionFiles": [
     "c:\\Users\\biges\\Desktop\\WW AWS\\WileyCoWeb.slnx"
   ],
+  "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "none",
+  "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
+  "dotnet.server.suppressLspErrorToasts": true,
+  "dotnet.server.suppressMiscellaneousFilesToasts": true,
   "chat.tools.terminal.autoApprove": {
     "rg": true,
     "rg --files": true,
@@ -65,24 +75,27 @@
   "FSharp.suggestGitignore": false,
   "workbench.settings.alwaysShowAdvancedSettings": true,
 
-  // Complete AWS Toolkit Extension Configuration for this Wiley.co Amplify + Aurora project
-  "aws.profile": "default",
-  "aws.region": "us-east-2",
-  "aws.explorer.enabled": true,
-  "aws.resources.enabled": true,
-  "aws.explorer.showRegion": true,
-  "aws.lambda.enableCodeLenses": true,
+  "aws.cwl.limit": 10000,
+  "aws.telemetry": false,
   "aws.suppressPrompts": {
     "createCredentialsProfile": true,
-    "showRegionPrompt": true
+    "regionAddAutomatically": true,
+    "apprunnerNotifyPricing": true,
+    "apprunnerNotifyPause": true
   },
-  "aws.amplify.showAmplifyView": true,
-  "aws.resources.filterByTag": {
-    "awsApplication": "arn:aws:resource-groups:us-east-2:570912405222:group/Wiley-Widget/08d8t52ldwuciha57h7wqvq8cb"
+  "aws.cloudformation.telemetry.enabled": false,
+  "aws.cloudformation.hover.enabled": true,
+  "aws.cloudformation.completion.enabled": true,
+  "aws.cloudformation.diagnostics.cfnLint.enabled": true,
+  "aws.cloudformation.diagnostics.cfnLint.lintOnChange": true,
+  "aws.cloudformation.diagnostics.cfnGuard.enabled": true,
+  "aws.cloudformation.s3": "alwaysAsk",
+  "aws.cloudformation.diagnostics.cfnLint.customization": {
+    "regions": [
+      "us-east-2",
+      "us-east-1"
+    ]
   },
-  "aws.aurora.showInExplorer": true,
-
-  // Enhanced Debug Settings for Runtime Exception Capture
   "debug.javascript.breakOnConditionalError": true,
   "debug.allowBreakpointsEverywhere": true,
   "debug.inlineValues": "on",

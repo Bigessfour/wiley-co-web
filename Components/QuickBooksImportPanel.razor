@@ -13,6 +13,7 @@
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 @using WileyCoWeb.State
+@using WileyWidget.Models
 
 @inject QuickBooksImportApiService ImportApi
 
@@ -986,7 +987,7 @@
             return WorkspaceState.SelectedEnterprise;
         }
 
-        return RoutingEnterpriseOptions.FirstOrDefault() ?? "Water Utility";
+        return RoutingEnterpriseOptions.FirstOrDefault() ?? WorkspaceEnterpriseCatalog.WaterUtility;
     }
 
     private static string GetRuleTitle(QuickBooksRoutingRuleDefinition rule)

@@ -36,6 +36,10 @@ public sealed class PanelSmokeTests : IClassFixture<ApiApplicationFactory>
         Assert.True(payload.TotalCosts > 0, "TotalCosts must be positive.");
         Assert.NotNull(payload.ProjectedVolume);
         Assert.True(payload.ProjectedVolume > 0, "ProjectedVolume must be positive.");
+        Assert.NotNull(payload.BreakEvenQuadrants);
+        Assert.Equal(4, payload.BreakEvenQuadrants.Count);
+        Assert.NotNull(payload.ApartmentUnitTypes);
+        Assert.Equal(2, payload.ApartmentUnitTypes.Count);
     }
 
     [Fact]

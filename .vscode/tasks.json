@@ -1,6 +1,60 @@
 {
 	"version": "2.0.0",
+	"inputs": [
+		{
+			"id": "awsProfile",
+			"type": "promptString",
+			"description": "AWS profile name",
+			"default": "wiley-dev"
+		}
+	],
 	"tasks": [
+		{
+			"label": "shell: AWS configure SSO profile",
+			"type": "shell",
+			"command": "aws",
+			"args": [
+				"configure",
+				"sso",
+				"--profile",
+				"${input:awsProfile}"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "shell: AWS SSO login",
+			"type": "shell",
+			"command": "aws",
+			"args": [
+				"sso",
+				"login",
+				"--profile",
+				"${input:awsProfile}"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "shell: AWS whoami",
+			"type": "shell",
+			"command": "aws",
+			"args": [
+				"sts",
+				"get-caller-identity",
+				"--profile",
+				"${input:awsProfile}"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "shell: AWS list profiles",
+			"type": "shell",
+			"command": "aws",
+			"args": [
+				"configure",
+				"list-profiles"
+			],
+			"problemMatcher": []
+		},
 		{
 			"label": "build",
 			"command": "dotnet build WileyCoWeb.slnx -m:2",

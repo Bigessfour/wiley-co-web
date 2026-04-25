@@ -619,13 +619,13 @@
       },
       "Syncfusion.Compression.Net.Core": {
         "type": "Transitive",
-        "resolved": "33.1.44",
-        "contentHash": "HNV1O7bxOhxnQBya+FWH6J2ADAAX8ycmDH7caJQqKtaZF5dT/Tm4aIQ9XlHAnnmfrRI4OdhMXTB6C1kLyFI69Q=="
+        "resolved": "33.2.3",
+        "contentHash": "FnKplgMKoaKFvy8eJf5UK/aVh/r13CXv3efnr+MeauN4lp9sF8FfMsuHwIHxwoC7O2K0lPP1ajfWBGBJwuI5jg=="
       },
       "Syncfusion.Licensing": {
         "type": "Transitive",
-        "resolved": "33.1.44",
-        "contentHash": "6KMmTr6rvaLUsB57s5l2xoXpLVvwovbLQFIlgJOLx0ewllV7j0vPTwOWYdQSCl6+KeGZ9rff20JewhmPChVa7w=="
+        "resolved": "33.2.3",
+        "contentHash": "kkCbHXRZvUbsGUnraJN8RsiwFI116RcmoJtRoJhcjEOt3PKbUW/pvJgtN2JD6O7PTSVDvQE2qtCkrBUP5F1hzA=="
       },
       "System.ClientModel": {
         "type": "Transitive",
@@ -894,8 +894,8 @@
           "Serilog": "[4.3.1, )",
           "Serilog.Sinks.Async": "[2.1.0, )",
           "Serilog.Sinks.File": "[7.0.0, )",
-          "Syncfusion.Pdf.Net.Core": "[33.1.44, )",
-          "Syncfusion.XlsIO.Net.Core": "[33.1.44, )",
+          "Syncfusion.Pdf.Net.Core": "[33.2.3, )",
+          "Syncfusion.XlsIO.Net.Core": "[33.2.3, )",
           "WileyWidget.Abstractions": "[1.0.0, )",
           "WileyWidget.Business": "[1.0.0, )",
           "WileyWidget.Data": "[1.0.0, )",
@@ -1292,23 +1292,23 @@
       },
       "Syncfusion.Pdf.Net.Core": {
         "type": "CentralTransitive",
-        "requested": "[33.1.44, )",
-        "resolved": "33.1.44",
-        "contentHash": "uBUUwcVMtbEgWaODKqqrHxuuTZTsV1qD8zJ27a+qAZEq3q2hZZUncbBMoo0XmMHXjvcdliH4OqUI01gXRFNDeg==",
+        "requested": "[33.2.3, )",
+        "resolved": "33.2.3",
+        "contentHash": "5latD3ifKe8i7fGE7iDlXZKW6IOOEMPajQSaqYxiILYXM/WmFRkIPy3wd8AhCUxF0Afx87j14WARUg9i+pP0Og==",
         "dependencies": {
-          "Syncfusion.Compression.Net.Core": "33.1.44",
-          "Syncfusion.Licensing": "33.1.44",
+          "Syncfusion.Compression.Net.Core": "33.2.3",
+          "Syncfusion.Licensing": "33.2.3",
           "System.Text.Encoding.CodePages": "4.4.0"
         }
       },
       "Syncfusion.XlsIO.Net.Core": {
         "type": "CentralTransitive",
-        "requested": "[33.1.44, )",
-        "resolved": "33.1.44",
-        "contentHash": "K8ZLvCqNmZC/yOcAselKy6Tj3VbdBVkhEoHWt3T9A4NsuirLFzFzd60NiH536/clgbFvRyub9r45hVdf1GcogQ==",
+        "requested": "[33.2.3, )",
+        "resolved": "33.2.3",
+        "contentHash": "oFcpr3Fi7myBa49KHDpKM+72moi2NmJNWSSWVJpBb7wne9hF8mOOCCWtjGWwwijzLHwsY2DjnURFO5XfRl8aiw==",
         "dependencies": {
-          "Syncfusion.Compression.Net.Core": "33.1.44",
-          "Syncfusion.Licensing": "33.1.44"
+          "Syncfusion.Compression.Net.Core": "33.2.3",
+          "Syncfusion.Licensing": "33.2.3"
         }
       },
       "System.Numerics.Tensors": {

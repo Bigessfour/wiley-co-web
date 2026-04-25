@@ -5,6 +5,7 @@ using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
+using WileyWidget.Models;
 
 namespace WileyCoWeb.Components.Pages;
 
@@ -118,12 +119,16 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected string TotalCostsDisplay => TotalCosts.ToString("C0");
     protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0");
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
+    protected WorkspaceReserveTrajectoryData? ReserveTrajectory => WorkspaceState.ReserveTrajectory;
     protected double GaugeCurrentRateValue => (double)CurrentRate;
 
     protected IEnumerable<string> EnterpriseOptions => WorkspaceState.EnterpriseOptions;
     protected IEnumerable<int> FiscalYearOptions => WorkspaceState.FiscalYearOptions;
     protected IReadOnlyList<string> CustomerServiceOptions => WorkspaceState.CustomerServiceOptions;
     protected IReadOnlyList<string> CustomerCityLimitOptions => WorkspaceState.CustomerCityLimitOptions;
+    protected IReadOnlyList<BreakEvenQuadrantData> HeroBreakEvenQuadrants => BreakEvenQuadrants
+        .OrderBy(quadrant => GetHeroBreakEvenSortKey(quadrant))
+        .ToArray();
 
     protected IReadOnlyList<RateComparisonPoint> RateComparison => WorkspaceState.RateComparison;
     protected IReadOnlyList<ScenarioItem> ScenarioItems => WorkspaceState.ScenarioItems;
@@ -131,6 +136,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected int FilteredCustomerCount => WorkspaceState.FilteredCustomerCount;
     protected string FilteredCustomerCountDisplay => FilteredCustomerCount.ToString();
     protected IReadOnlyList<ProjectionRow> ProjectionSeries => WorkspaceState.ProjectionSeries;
+    protected IReadOnlyList<BreakEvenQuadrantData> BreakEvenQuadrants => WorkspaceState.BreakEvenQuadrants;
+    protected IReadOnlyList<ApartmentUnitTypeData> ApartmentUnitTypes => WorkspaceState.ApartmentUnitTypes;
     protected bool CanApplySelectedScenario => SelectedScenarioSnapshotId is > 0;
     protected string StartupSourceStatus => WorkspaceState.StartupSourceStatus;
     protected bool IsUsingStartupFallback => WorkspaceState.IsUsingStartupFallback;
@@ -178,10 +185,15 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     [
         new("overview", "Overview"),
         new("break-even", "Break-Even"),
+        new("apartment-config", "Apartment Config"),
         new("rates", "Rates"),
         new("quickbooks-import", "QuickBooks Import"),
         new("scenario", "Scenario Planner"),
         new("customers", "Customer Viewer"),
+        new("affordability", "Affordability"),
+        new("reserve-trajectory", "Reserve Trajectory"),
+        new("debt-coverage", "Debt Coverage"),
+        new("capital-gap", "Capital Gap"),
         new("trends", "Trends"),
         new("decision-support", "Decision Support"),
         new("data-dashboard", "Data Dashboard")
@@ -272,6 +284,12 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     }
 
     protected Task RefreshWorkspaceAsync() => ReloadWorkspaceAsync(SelectedEnterprise, SelectedFiscalYear);
+
+    protected Task HandleApartmentUnitTypesChanged(IReadOnlyList<ApartmentUnitTypeData> unitTypes)
+    {
+        WorkspaceState.SetApartmentUnitTypes(unitTypes);
+        return Task.CompletedTask;
+    }
 
     protected void HandleSavedScenarioChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<long?, WorkspaceScenarioSummaryResponse> args)
     {
@@ -451,11 +469,25 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "Preparing scenario workbook...");
     }
 
+    protected Task ExportReserveTrajectoryWorkbookAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateReserveTrajectoryWorkbook(WorkspaceState),
+            "Preparing reserve trajectory workbook...");
+    }
+
     protected Task ExportWorkspacePdfAsync()
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateWorkspacePdfReport(WorkspaceState),
             "Preparing PDF rate packet...");
+    }
+
+    protected Task ExportReserveTrajectoryPdfAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateReserveTrajectoryPdfReport(WorkspaceState),
+            "Preparing reserve trajectory PDF...");
     }
 
     protected void HandleTotalCostsChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
@@ -563,6 +595,18 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         return "Workspace ready.";
+    }
+
+    private static int GetHeroBreakEvenSortKey(BreakEvenQuadrantData quadrant)
+    {
+        return WorkspaceEnterpriseCatalog.GetSortOrder(quadrant.EnterpriseName);
+    }
+
+    protected static string GetHeroBreakEvenLabel(BreakEvenQuadrantData quadrant)
+    {
+        return string.IsNullOrWhiteSpace(quadrant.EnterpriseName)
+            ? quadrant.EnterpriseType
+            : quadrant.EnterpriseName;
     }
 
     private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)
@@ -724,7 +768,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "quickbooks-import" => "quickbooks-import",
             "scenario" => "scenario",
             "customers" => "customers",
+            "affordability" => "affordability",
             "trends" => "trends",
+            "reserve-trajectory" => "reserve-trajectory",
+            "debt-coverage" => "debt-coverage",
+            "capital-gap" => "capital-gap",
             "decision-support" => "decision-support",
             "data-dashboard" => "data-dashboard",
             _ => "overview"
