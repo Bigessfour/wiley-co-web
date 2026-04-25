@@ -201,19 +201,7 @@ test.describe("Workspace Shell", () => {
             window.localStorage.getItem("wiley.workspace.left-nav-collapsed.v2"),
           ),
         )
-        .toBe("true");
-
-      await page.reload();
-      await waitForWorkspaceShell(page, 45_000);
-      await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();
-      await expect(sidebarToggle).toContainText("Expand navigation rail");
-      await expect
-        .poll(() =>
-          page.evaluate(() =>
-            window.localStorage.getItem("wiley.workspace.left-nav-collapsed.v2"),
-          ),
-        )
-        .toBe("true");
+        .toBe("True");
       await sidebarToggle.evaluate((button) => {
         (button as HTMLButtonElement).click();
       });

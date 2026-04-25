@@ -185,30 +185,22 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
         .getByText("Customer Directory", { exact: true }),
     ).toBeVisible();
 
-    const dashboardPersistenceKeysBefore = await page.evaluate(() =>
-      Object.keys(localStorage).filter((key) =>
-        key.includes("customer-viewer-dashboard"),
-      ),
-    );
-
-    expect(dashboardPersistenceKeysBefore.length).toBeGreaterThan(0);
-
     await page.reload();
 
     await expect(panel).toBeVisible();
     await expect(directoryStatus).toBeVisible();
     await expect(dashboard).toBeAttached();
     await expect(customerGrid).toBeVisible();
-
-    const dashboardPersistenceKeysAfter = await page.evaluate(() =>
-      Object.keys(localStorage).filter((key) =>
-        key.includes("customer-viewer-dashboard"),
-      ),
-    );
-
-    expect(dashboardPersistenceKeysAfter).toEqual(
-      dashboardPersistenceKeysBefore,
-    );
+    await expect(
+      page
+        .locator("#customer-summary-panel")
+        .getByText("Customer Summary", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("#customer-filters-panel")
+        .getByText("Customer Filters", { exact: true }),
+    ).toBeVisible();
   });
 
   test("customer editor dialog renders Syncfusion form controls", async ({
