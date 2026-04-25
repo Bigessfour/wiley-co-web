@@ -37,6 +37,55 @@ create index if not exists ix_source_files_batch_id on source_files(batch_id);
 create index if not exists ix_source_files_canonical_entity on source_files(canonical_entity);
 create index if not exists ix_source_files_file_hash on source_files(file_hash);
 
+create table if not exists import_column_mappings (
+    id bigint generated always as identity primary key,
+    import_batch_id bigint not null references import_batches(id) on delete cascade,
+    source_file_id bigint null references source_files(id) on delete cascade,
+    source_column_name text not null,
+    target_table_name text not null,
+    target_column_name text not null,
+    transform_rule text null,
+    is_required boolean not null default false,
+    notes text null,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists ix_import_column_mappings_import_batch_id on import_column_mappings(import_batch_id);
+create index if not exists ix_import_column_mappings_source_file_id on import_column_mappings(source_file_id);
+
+create table if not exists staging_records (
+    id bigint generated always as identity primary key,
+    import_batch_id bigint not null references import_batches(id) on delete cascade,
+    source_file_id bigint not null references source_files(id) on delete cascade,
+    source_row_number integer not null,
+    record_kind text not null,
+    raw_payload jsonb not null,
+    normalized_payload jsonb null,
+    validation_status text not null default 'pending',
+    validation_notes text null,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists ix_staging_records_import_batch_id on staging_records(import_batch_id);
+create index if not exists ix_staging_records_source_file_id on staging_records(source_file_id);
+create index if not exists ix_staging_records_validation_status on staging_records(validation_status);
+
+create table if not exists import_row_errors (
+    id bigint generated always as identity primary key,
+    import_batch_id bigint not null references import_batches(id) on delete cascade,
+    source_file_id bigint not null references source_files(id) on delete cascade,
+    source_row_number integer not null,
+    column_name text null,
+    error_code text not null,
+    error_message text not null,
+    raw_value text null,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists ix_import_row_errors_import_batch_id on import_row_errors(import_batch_id);
+create index if not exists ix_import_row_errors_source_file_id on import_row_errors(source_file_id);
+create index if not exists ix_import_row_errors_error_code on import_row_errors(error_code);
+
 create table if not exists chart_of_accounts (
     id bigint generated always as identity primary key,
     source_file_id bigint not null references source_files(id) on delete cascade,

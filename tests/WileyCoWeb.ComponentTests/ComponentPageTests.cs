@@ -61,6 +61,7 @@ public sealed class ComponentPageTests
 		Assert.Contains("e-listview", cut.Markup);
 		Assert.Contains("Workspace Overview", cut.Markup);
 		Assert.Contains("Break-Even", cut.Markup);
+		Assert.Contains("Reserve Trajectory", cut.Markup);
 		Assert.Contains("Capital Gap", cut.Markup);
 		Assert.Contains("Syncfusion 33.2.3", cut.Markup);
 		Assert.True(cut.FindAll(".app-nav-link").Count >= 10);
@@ -895,6 +896,7 @@ public sealed class ComponentPageTests
 		var cut = context.RenderComponent<WileyWorkspace>();
 
 		cut.WaitForAssertion(() => Assert.Contains("workspace-overview-dashboard", cut.Markup));
+		Assert.Contains("Open Reserve Trajectory", cut.Markup);
 
 		var breakEvenButton = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "Open Break-Even", StringComparison.Ordinal));
 		breakEvenButton.Click();

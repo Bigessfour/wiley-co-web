@@ -13,6 +13,12 @@ test.describe("Wiley workspace proof matrix", () => {
         breadcrumb: "Affordability",
       },
       {
+        buttonName: "Open Reserve Trajectory",
+        route: "/wiley-workspace/reserve-trajectory",
+        panelSelector: "#reserve-trajectory-panel",
+        breadcrumb: "Reserve Trajectory",
+      },
+      {
         buttonName: "Open Debt Coverage",
         route: "/wiley-workspace/debt-coverage",
         panelSelector: "#debt-coverage-panel",
@@ -47,6 +53,7 @@ test.describe("Wiley workspace proof matrix", () => {
     for (const overviewCase of overviewCases) {
       await page.goto("/wiley-workspace");
       await waitForWorkspaceShell(page);
+      await expect(page.locator("#workspace-overview-dashboard")).toBeVisible();
 
       const overviewButton = page
         .locator("#workspace-overview-dashboard")
@@ -96,6 +103,7 @@ test.describe("Wiley workspace proof matrix", () => {
         .locator("#workspace-navigation-list")
         .getByRole("link", { name: sidebarCase.linkName });
 
+      await expect(sidebarLink).toBeVisible();
       await sidebarLink.dispatchEvent("click");
 
       await expect(page).toHaveURL(

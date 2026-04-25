@@ -181,6 +181,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     [
         new("overview", "Overview"),
         new("break-even", "Break-Even"),
+        new("apartment-config", "Apartment Config"),
         new("rates", "Rates"),
         new("quickbooks-import", "QuickBooks Import"),
         new("scenario", "Scenario Planner"),

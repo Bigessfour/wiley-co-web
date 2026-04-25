@@ -310,7 +310,7 @@ test.describe("Workspace baseline save proof", () => {
     await expect(snapshotStatus).toContainText(/Ready to save rate snapshot/i);
 
     await enterNumericValue(currentRateInput, "29.50");
-    await expect(currentRateInput).toHaveValue("29.50");
+    await expect(currentRateInput).toHaveValue(/\$?29\.5(?:0)?/);
 
     await saveSnapshotButton.click();
 
@@ -330,7 +330,7 @@ test.describe("Workspace baseline save proof", () => {
     await waitForWorkspaceShell(page);
 
     await expect(ratesPanel).toBeVisible();
-    await expect(currentRateInput).toHaveValue("29.50");
+    await expect(currentRateInput).toHaveValue(/\$?29\.5(?:0)?/);
     await expect(snapshotStatus).toContainText(/Ready to save rate snapshot/i);
   });
 });

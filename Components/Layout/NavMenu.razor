@@ -28,16 +28,18 @@
     [
         new("01", "Workspace Overview", "/wiley-workspace", NavLinkMatch.All, "Open the workspace overview"),
         new("02", "Break-Even", "/wiley-workspace/break-even", NavLinkMatch.Prefix, "Inspect rate balance and gauge inputs"),
-        new("03", "Rates", "/wiley-workspace/rates", NavLinkMatch.Prefix, "Adjust the live rate controls"),
-        new("04", "QuickBooks Import", "/wiley-workspace/quickbooks-import", NavLinkMatch.Prefix, "Stage and validate QuickBooks exports"),
-        new("05", "Scenario Planner", "/wiley-workspace/scenario", NavLinkMatch.Prefix, "Model what-if scenarios and saved snapshots"),
-        new("06", "Customer Viewer", "/wiley-workspace/customers", NavLinkMatch.Prefix, "Review customer impacts and exports"),
-        new("07", "Affordability", "/wiley-workspace/affordability", NavLinkMatch.Prefix, "Inspect bill burden versus MHI"),
-        new("08", "Debt Coverage", "/wiley-workspace/debt-coverage", NavLinkMatch.Prefix, "Inspect DSCR and covenant headroom"),
-        new("09", "Capital Gap", "/wiley-workspace/capital-gap", NavLinkMatch.Prefix, "Inspect capital needs against rate revenue"),
-        new("10", "Trends", "/wiley-workspace/trends", NavLinkMatch.Prefix, "Inspect projected rate movement"),
-        new("11", "Decision Support", "/wiley-workspace/decision-support", NavLinkMatch.Prefix, "Open Jarvis decision support"),
-        new("12", "Data Dashboard", "/wiley-workspace/data-dashboard", NavLinkMatch.Prefix, "Open the executive dashboard")
+        new("03", "Apartment Config", "/wiley-workspace/apartment-config", NavLinkMatch.Prefix, "Jump to the apartment configuration section"),
+        new("04", "Rates", "/wiley-workspace/rates", NavLinkMatch.Prefix, "Adjust the live rate controls"),
+        new("05", "QuickBooks Import", "/wiley-workspace/quickbooks-import", NavLinkMatch.Prefix, "Stage and validate QuickBooks exports"),
+        new("06", "Scenario Planner", "/wiley-workspace/scenario", NavLinkMatch.Prefix, "Model what-if scenarios and saved snapshots"),
+        new("07", "Customer Viewer", "/wiley-workspace/customers", NavLinkMatch.Prefix, "Review customer impacts and exports"),
+        new("08", "Affordability", "/wiley-workspace/affordability", NavLinkMatch.Prefix, "Inspect bill burden versus MHI"),
+        new("09", "Debt Coverage", "/wiley-workspace/debt-coverage", NavLinkMatch.Prefix, "Inspect DSCR and covenant headroom"),
+        new("10", "Capital Gap", "/wiley-workspace/capital-gap", NavLinkMatch.Prefix, "Inspect capital needs against rate revenue"),
+        new("11", "Reserve Trajectory", "/wiley-workspace/reserve-trajectory", NavLinkMatch.Prefix, "Inspect reserve forecast and policy floor"),
+        new("12", "Trends", "/wiley-workspace/trends", NavLinkMatch.Prefix, "Inspect projected rate movement"),
+        new("13", "Decision Support", "/wiley-workspace/decision-support", NavLinkMatch.Prefix, "Open Jarvis decision support"),
+        new("14", "Data Dashboard", "/wiley-workspace/data-dashboard", NavLinkMatch.Prefix, "Open the executive dashboard")
     ];
 
     private sealed record WorkspaceNavItem(string Index, string Label, string Href, NavLinkMatch Match, string Tooltip);

@@ -44,6 +44,7 @@ public sealed class WorkspaceAiAssistantService
     private readonly string legacyXaiModel;
     private readonly double legacyXaiTemperature;
     private readonly int legacyXaiMaxTokens;
+    private readonly int semanticKernelTimeoutSeconds;
     private readonly int legacyXaiTimeoutSeconds;
     private bool semanticKernelAvailable;
     private bool apiKeyVisibleToProcess;
@@ -82,6 +83,7 @@ public sealed class WorkspaceAiAssistantService
         legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
         legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
         legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
+        semanticKernelTimeoutSeconds = GetConfiguredInt(30, "SemanticKernelTimeoutSeconds", "XAI:SemanticKernelTimeoutSeconds", "XAI:TimeoutSeconds");
         legacyXaiTimeoutSeconds = GetConfiguredInt(30, "XaiTimeoutSeconds", "XAI:TimeoutSeconds");
         kernelContext = new Lazy<KernelContext?>(InitializeKernelContext);
     }
@@ -197,6 +199,21 @@ public sealed class WorkspaceAiAssistantService
                     return liveResponse;
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                fallbackDiagnosticCode = "semantic_kernel_timeout";
+                fallbackDiagnosticMessage = $"{ex.GetType().Name}: {ex.Message}";
+                logger.LogWarning(
+                    ex,
+                    "Workspace AI semantic kernel request timed out for {Enterprise} FY {FiscalYear} after {TimeoutSeconds} seconds",
+                    request.SelectedEnterprise,
+                    request.SelectedFiscalYear,
+                    semanticKernelTimeoutSeconds);
+            }
             catch (Exception ex)
             {
                 fallbackDiagnosticCode = TryClassifySemanticKernelFailure(ex);
@@ -230,6 +247,10 @@ public sealed class WorkspaceAiAssistantService
                         return directResponse;
                     }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception directEx)
             {
@@ -365,20 +386,38 @@ public sealed class WorkspaceAiAssistantService
         chatHistory.AddUserMessage(BuildUserPrompt(question, request, conversationHistory));
 
         var executionSettings = CreateSemanticKernelExecutionSettings();
+        using var timeoutCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellationSource.CancelAfter(TimeSpan.FromSeconds(semanticKernelTimeoutSeconds));
 
-        var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, cancellationToken).ConfigureAwait(false);
-        var answer = response.Content?.Trim();
-        if (string.IsNullOrWhiteSpace(answer))
+        try
         {
-            return null;
+            var response = await assistant.ChatService.GetChatMessageContentAsync(chatHistory, executionSettings, assistant.Kernel, timeoutCancellationSource.Token).ConfigureAwait(false);
+            var answer = response.Content?.Trim();
+            if (string.IsNullOrWhiteSpace(answer))
+            {
+                return null;
+            }
+
+            var updatedConversationHistory = AppendTurn(conversationHistory, question, answer);
+            _ = PersistLiveConversationAsync(conversationId, activeUser, request, question, answer, updatedConversationHistory);
+
+            var chatResponse = new WorkspaceChatResponse(question, answer, false, BuildContextSummary(request));
+            logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, updatedConversationHistory.Count);
+            return ApplyUserMetadata(chatResponse, activeUser, conversationId, updatedConversationHistory.Count);
         }
-
-        var updatedConversationHistory = AppendTurn(conversationHistory, question, answer);
-        _ = PersistLiveConversationAsync(conversationId, activeUser, request, question, answer, updatedConversationHistory);
-
-        var chatResponse = new WorkspaceChatResponse(question, answer, false, BuildContextSummary(request));
-        logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, updatedConversationHistory.Count);
-        return ApplyUserMetadata(chatResponse, activeUser, conversationId, updatedConversationHistory.Count);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Workspace AI semantic kernel execution timed out after {TimeoutSeconds} seconds for conversation {ConversationId}",
+                semanticKernelTimeoutSeconds,
+                conversationId);
+            throw;
+        }
     }
 
     private KernelContext? InitializeKernelContext()
@@ -1068,6 +1107,7 @@ public sealed class WorkspaceAiAssistantService
             "transport_tls_failed" => $"Runtime diagnostics: the live xAI endpoint failed the TLS handshake and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "transport_proxy_failed" => $"Runtime diagnostics: the configured xAI proxy timed out or returned a gateway error before Jarvis could finish the live request ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "kernel_initialization_failed" => $"Runtime diagnostics: Semantic Kernel initialization failed before live chat became available ({SanitizeDiagnosticMessage(effectiveMessage)}).",
+            "semantic_kernel_timeout" => $"Runtime diagnostics: live Semantic Kernel execution timed out before Jarvis could finish the request ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "semantic_kernel_request_failed" => $"Runtime diagnostics: live Semantic Kernel execution failed and Jarvis reverted to deterministic guidance ({SanitizeDiagnosticMessage(effectiveMessage)}).",
             "legacy_disabled" => "Runtime diagnostics: the legacy xAI fallback path is disabled, so Jarvis remained on deterministic guidance after live initialization failed.",
             "legacy_request_failed" or "legacy_request_exception" or "legacy_empty_response" => $"Runtime diagnostics: the live xAI fallback path failed after the Semantic Kernel attempt ({SanitizeDiagnosticMessage(effectiveMessage)}).",

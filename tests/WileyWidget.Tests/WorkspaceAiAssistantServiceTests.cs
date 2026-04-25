@@ -1,7 +1,10 @@
 using System.Text.Json;
 using System.Text;
 using System.Net;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.Extensions.Configuration;
+using Moq;
 using WileyCoWeb.Contracts;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
@@ -646,6 +649,118 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Contains("Injected provider failure", response.Answer, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("Water Utility")]
+    [InlineData("Wiley Sanitation District")]
+    public async Task AskAsync_WhenLiveKernelReturnsAnswer_UsesSnapshotContextAndKeepsUsedFallbackFalse(string enterprise)
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository, enterprise);
+
+        ChatHistory? capturedHistory = null;
+        var chatService = new Mock<IChatCompletionService>(MockBehavior.Strict);
+        chatService
+            .Setup(service => service.GetChatMessageContentsAsync(
+                It.IsAny<ChatHistory>(),
+                It.IsAny<PromptExecutionSettings?>(),
+                It.IsAny<Kernel?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((ChatHistory chatHistory, PromptExecutionSettings? _, Kernel? _, CancellationToken _) =>
+            {
+                capturedHistory = chatHistory;
+                IReadOnlyList<ChatMessageContent> result =
+                [
+                    new ChatMessageContent(
+                        AuthorRole.Assistant,
+                        $"{enterprise} FY 2026 snapshot-grounded answer.",
+                        "Jarvis",
+                        null,
+                        null,
+                        null)
+                ];
+
+                return Task.FromResult(result);
+            });
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"),
+            kernelProvider: new TestWorkspaceAiKernelProvider(
+                new WorkspaceAiKernelInitializationResult(
+                    new WorkspaceAiKernelContext(Kernel.CreateBuilder().Build(), chatService.Object),
+                    true,
+                    true,
+                    "provider:test",
+                    "available",
+                    "Semantic Kernel initialized successfully.")));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            enterprise,
+            2026));
+
+        Assert.False(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Equal("jarvis:user-123:" + enterprise.ToLowerInvariant().Replace(' ', '-') + ":2026", response.ConversationId);
+        Assert.Contains(enterprise, response.Answer, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(capturedHistory);
+        Assert.Contains(capturedHistory!, message =>
+            message.Content?.Contains(enterprise, StringComparison.OrdinalIgnoreCase) == true
+            && message.Content.Contains("Current workspace context", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenLiveKernelStalls_UsesTimeoutFallbackInsteadOfHanging()
+    {
+        var repository = new RecordingConversationRepository();
+        SeedPersistedConversation(repository);
+
+        var chatService = new Mock<IChatCompletionService>(MockBehavior.Strict);
+        chatService
+            .Setup(service => service.GetChatMessageContentsAsync(
+                It.IsAny<ChatHistory>(),
+                It.IsAny<PromptExecutionSettings?>(),
+                It.IsAny<Kernel?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((ChatHistory _, PromptExecutionSettings? _, Kernel? _, CancellationToken cancellationToken) => WaitForKernelTimeoutAsync(cancellationToken));
+
+        var service = CreateService(
+            new TestUserContext("user/123", "Alex Morgan", "alex@example.com"),
+            repository,
+            settings: new Dictionary<string, string?>
+            {
+                ["XAI:TimeoutSeconds"] = "1"
+            },
+            apiKeyProvider: new TestGrokApiKeyProvider("test-key"),
+            kernelProvider: new TestWorkspaceAiKernelProvider(
+                new WorkspaceAiKernelInitializationResult(
+                    new WorkspaceAiKernelContext(Kernel.CreateBuilder().Build(), chatService.Object),
+                    true,
+                    true,
+                    "provider:test",
+                    "available",
+                    "Semantic Kernel initialized successfully.")));
+
+        var response = await service.AskAsync(new WorkspaceChatRequest(
+            "How should we close the gap?",
+            "Current workspace context",
+            "Water Utility",
+            2026));
+
+        Assert.True(response.UsedFallback);
+        Assert.False(response.IsFirstConversation);
+        Assert.Contains("timed out", response.Answer, StringComparison.OrdinalIgnoreCase);
+        chatService.Verify(
+            service => service.GetChatMessageContentsAsync(
+                It.IsAny<ChatHistory>(),
+                It.IsAny<PromptExecutionSettings?>(),
+                It.IsAny<Kernel?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     [Fact]
     public async Task AskAsync_WhenInjectedKernelProviderReportsTransportFailure_AndDirectRetryEnabled_RetriesDirectSemanticKernelChat()
     {
@@ -731,11 +846,12 @@ public sealed class WorkspaceAiAssistantServiceTests
         return new WorkspaceAiAssistantService(configuration, logger, userContext, repository, contextService, knowledgeService ?? new TestWorkspaceKnowledgeService(), httpClientFactory, apiKeyProvider, kernelProvider);
     }
 
-    private static void SeedPersistedConversation(RecordingConversationRepository repository)
+    private static void SeedPersistedConversation(RecordingConversationRepository repository, string enterprise = "Water Utility")
     {
-        repository.StoredConversations["jarvis:user-123:water-utility:2026"] = new ConversationHistory
+        var enterpriseSlug = enterprise.ToLowerInvariant().Replace(' ', '-');
+        repository.StoredConversations[$"jarvis:user-123:{enterpriseSlug}:2026"] = new ConversationHistory
         {
-            ConversationId = "jarvis:user-123:water-utility:2026",
+            ConversationId = $"jarvis:user-123:{enterpriseSlug}:2026",
             MessagesJson = JsonSerializer.Serialize(new List<WorkspaceChatMessage>
             {
                 new("user", "Earlier question"),
@@ -762,6 +878,13 @@ public sealed class WorkspaceAiAssistantServiceTests
         }
 
         Assert.True(condition(), "Condition was not satisfied before timeout.");
+    }
+
+    private static Task<IReadOnlyList<ChatMessageContent>> WaitForKernelTimeoutAsync(CancellationToken cancellationToken)
+    {
+        var completionSource = new TaskCompletionSource<IReadOnlyList<ChatMessageContent>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        cancellationToken.Register(() => completionSource.TrySetCanceled(cancellationToken));
+        return completionSource.Task;
     }
 
     private sealed class TestWorkspaceKnowledgeService : IWorkspaceKnowledgeService

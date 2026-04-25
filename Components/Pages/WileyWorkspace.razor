@@ -184,6 +184,19 @@
                                     <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("break-even")'>Open Break-Even</button>
                                 </article>
 
+                                <article id="overview-apartment-config" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Apartment Config</p>
+                                        <h3>Apartment unit mix</h3>
+                                        <p>Edit unit counts, rent assumptions, and bedroom weighting for the Apartments enterprise without leaving the workspace shell.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Units @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount).ToString("N0")</span>
+                                            <span>Revenue @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount * unitType.MonthlyRent).ToString("C0")</span>
+                                        </div>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("apartment-config")'>Open Apartment Config</button>
+                                </article>
+
                                 <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Rates</p>
@@ -251,6 +264,19 @@
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("capital-gap")'>Open Capital Gap</button>
                                 </article>
 
+                                <article id="overview-reserve-trajectory" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Reserve Trajectory</p>
+                                        <h3>Forecast reserve runway</h3>
+                                        <p>Review current reserves, the recommended reserve floor, and the forecast outlook before opening the trajectory panel.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Current @(ReserveTrajectory is null ? "Unavailable" : ReserveTrajectory.CurrentReserves.ToString("C0"))</span>
+                                            <span>Policy minimum @(ReserveTrajectory is null ? "Unavailable" : ReserveTrajectory.RecommendedReserveLevel.ToString("C0"))</span>
+                                        </div>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("reserve-trajectory")'>Open Reserve Trajectory</button>
+                                </article>
+
                                 <article id="overview-trends" class="workspace-overview-card">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Trends</p>
@@ -305,6 +331,11 @@
                                                         OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
                                                         OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync"
                                                         OnApartmentUnitTypesChanged="HandleApartmentUnitTypesChanged" />
+                                        break;
+                                    case "apartment-config":
+                                        <ApartmentConfigPanel @key="ActivePanelKey"
+                                                              UnitTypes="@ApartmentUnitTypes"
+                                                              OnUnitTypesChanged="HandleApartmentUnitTypesChanged" />
                                         break;
                                     case "rates":
                                         <RatesPanel @key="ActivePanelKey"

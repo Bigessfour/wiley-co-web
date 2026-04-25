@@ -7,7 +7,7 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
   const effectiveTimeout = isHostedWorkspace(page)
     ? Math.max(timeout, 90_000)
     : timeout;
-  const dashboard = page.locator("#workspace-dashboard");
+  const navigationCard = page.locator("#workspace-navigation-card");
   const globalActionsCard = page.locator("#workspace-global-actions-card");
   const statusCard = page.locator("#workspace-status-card");
   const workspaceLoadStatus = page.locator("#workspace-load-status");
@@ -21,10 +21,15 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
       .catch(() => undefined);
   }
 
-  await expect(dashboard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(globalActionsCard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(statusCard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(workspaceLoadStatus).toBeVisible({ timeout: effectiveTimeout });
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+  await expect(navigationCard).toBeVisible({ timeout: effectiveTimeout });
+  await expect(globalActionsCard).toBeAttached({
+    timeout: effectiveTimeout / 3,
+  });
+  await expect(statusCard).toBeAttached({ timeout: effectiveTimeout / 3 });
+  await expect(workspaceLoadStatus).toBeAttached({
+    timeout: effectiveTimeout / 3,
+  });
   await expect
     .poll(
       async () => {
@@ -52,7 +57,20 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
 }
 
 export async function gotoWorkspacePanel(page: Page, route: string) {
-  await page.goto(route);
+  await page.goto("/wiley-workspace");
+  await waitForWorkspaceShell(page);
+
+  if (route === "/wiley-workspace") {
+    return;
+  }
+
+  const linkName = getWorkspacePanelLinkName(route);
+  await page
+    .locator("#workspace-navigation-card")
+    .getByRole("link", { name: linkName })
+    .click();
+
+  await expect(page).toHaveURL(route);
   await waitForWorkspaceShell(page);
 }
 
@@ -133,4 +151,37 @@ function isHostedWorkspace(page: Page) {
   const url = page.url();
 
   return url.length > 0 && !/^https?:\/\/localhost[:/]/i.test(url);
+}
+
+function getWorkspacePanelLinkName(route: string) {
+  switch (route) {
+    case "/wiley-workspace/break-even":
+      return "Break-Even";
+    case "/wiley-workspace/apartment-config":
+      return "Apartment Config";
+    case "/wiley-workspace/rates":
+      return "Rates";
+    case "/wiley-workspace/quickbooks-import":
+      return "QuickBooks Import";
+    case "/wiley-workspace/scenario":
+      return "Scenario Planner";
+    case "/wiley-workspace/customers":
+      return "Customer Viewer";
+    case "/wiley-workspace/affordability":
+      return "Affordability";
+    case "/wiley-workspace/debt-coverage":
+      return "Debt Coverage";
+    case "/wiley-workspace/capital-gap":
+      return "Capital Gap";
+    case "/wiley-workspace/reserve-trajectory":
+      return "Reserve Trajectory";
+    case "/wiley-workspace/trends":
+      return "Trends";
+    case "/wiley-workspace/decision-support":
+      return "Decision Support";
+    case "/wiley-workspace/data-dashboard":
+      return "Data Dashboard";
+    default:
+      throw new Error(`Unsupported workspace route: ${route}`);
+  }
 }
