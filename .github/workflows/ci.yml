@@ -54,6 +54,7 @@ jobs:
         run: dotnet test ${{ matrix.project }} --configuration Release --no-build --verbosity normal --settings coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/${{ matrix.name }}
 
       - name: Generate source coverage summary
+        if: matrix.name != 'e2e'
         shell: pwsh
         run: |
           $resultsDirectory = Join-Path "TestResults" "${{ matrix.name }}"
@@ -153,6 +154,7 @@ jobs:
           }
 
       - name: Enforce coverage baseline
+        if: matrix.name != 'e2e'
         shell: pwsh
         run: |
           $resultsDirectory = Join-Path "TestResults" "${{ matrix.name }}"

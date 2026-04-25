@@ -20,6 +20,11 @@
 - build-and-publish
 - playwright-ui
 
+## Workflow mapping
+
+- The checks above map to `.github/workflows/ci.yml`.
+- `deployment-guard` runs only on pushes to `main` and is a post-merge safety check, not a pull-request gate.
+
 ## Note
 
 Apply these settings manually in GitHub repository settings.

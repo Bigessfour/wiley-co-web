@@ -40,6 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="src\WileyWidget.Models\WileyWidget.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Exclude the standalone class library sources under src/ so the Blazor app does not compile
     them directly. -->
     <Compile Remove="src/**/*.cs" />

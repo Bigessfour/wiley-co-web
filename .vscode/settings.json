@@ -56,6 +56,10 @@
   "csharp-dev-tools.roslyn.projectOrSolutionFiles": [
     "c:\\Users\\biges\\Desktop\\WW AWS\\WileyCoWeb.slnx"
   ],
+  "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "none",
+  "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
+  "dotnet.server.suppressLspErrorToasts": true,
+  "dotnet.server.suppressMiscellaneousFilesToasts": true,
   "chat.tools.terminal.autoApprove": {
     "rg": true,
     "rg --files": true,

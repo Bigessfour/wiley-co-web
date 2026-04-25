@@ -153,6 +153,32 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void WileyWorkspace_OverviewHero_RendersExpandedEnterpriseBreakEvenPoints()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume));
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		cut.WaitForAssertion(() =>
+		{
+			var hero = cut.Find("#workspace-overview-hero");
+
+			Assert.Contains("Selected enterprise", hero.TextContent);
+			Assert.Contains("Break-Even", hero.TextContent);
+			Assert.Contains("Four-enterprise break-even points", hero.TextContent);
+			Assert.Contains("Wiley Sanitation District", hero.TextContent);
+			Assert.Contains("Trash", hero.TextContent);
+			Assert.Contains("Apartments", hero.TextContent);
+		});
+	}
+
+	[Fact]
 	public void WileyWorkspace_DebtCoverageRoute_RendersGaugeWaterfallAndThresholdEditing()
 	{
 		using var context = CreateContext(configureServices: services => services.AddScoped(_ => new DebtCoverageApiService(new HttpClient(new DebtCoverageHttpMessageHandler())
@@ -1316,21 +1342,19 @@ public sealed class ComponentPageTests
 
 			if (request.Method == HttpMethod.Get && request.RequestUri?.AbsolutePath.EndsWith("/api/workspace/snapshot", StringComparison.OrdinalIgnoreCase) == true)
 			{
+				var snapshot = WorkspaceTestData.CreateWaterUtilityBootstrap(
+					WorkspaceTestData.WaterPlanningSnapshot,
+					WorkspaceTestData.ApiCurrentRate,
+					WorkspaceTestData.ApiTotalCosts,
+					WorkspaceTestData.ApiProjectedVolume,
+					"2026-04-05T12:00:00Z",
+					scenarioItems: [new WorkspaceScenarioItemData(Guid.NewGuid(), "Operations reserve", 1500m)],
+					customerRows: [.. utilityCustomers.Select(customer => new CustomerRow(customer.DisplayName, customer.CustomerType, customer.ServiceLocation == "Inside City Limits" ? "Yes" : "No"))],
+					projectionRows: [new ProjectionRow("FY25", 29.10m), new ProjectionRow("FY26", WorkspaceTestData.ApiCurrentRate)]);
+
 				return new HttpResponseMessage(HttpStatusCode.OK)
 				{
-					Content = new StringContent(JsonSerializer.Serialize(new WorkspaceBootstrapData(
-						WorkspaceTestData.WaterUtility,
-						WorkspaceTestData.WaterFiscalYear,
-						WorkspaceTestData.WaterPlanningSnapshot,
-						WorkspaceTestData.ApiCurrentRate,
-						WorkspaceTestData.ApiTotalCosts,
-						WorkspaceTestData.ApiProjectedVolume,
-						"2026-04-05T12:00:00Z")
-					{
-						ScenarioItems = [new WorkspaceScenarioItemData(Guid.NewGuid(), "Operations reserve", 1500m)],
-						CustomerRows = [.. utilityCustomers.Select(customer => new CustomerRow(customer.DisplayName, customer.CustomerType, customer.ServiceLocation == "Inside City Limits" ? "Yes" : "No"))],
-						ProjectionRows = [new ProjectionRow("FY25", 29.10m), new ProjectionRow("FY26", WorkspaceTestData.ApiCurrentRate)]
-					}, JsonOptions), Encoding.UTF8, "application/json")
+					Content = new StringContent(JsonSerializer.Serialize(snapshot, JsonOptions), Encoding.UTF8, "application/json")
 				};
 			}
 

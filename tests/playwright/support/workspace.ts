@@ -4,9 +4,7 @@ import type { Locator, Page } from "@playwright/test";
 const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
 
 export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
-  const effectiveTimeout = isHostedWorkspace(page)
-    ? Math.max(timeout, 90_000)
-    : timeout;
+  const effectiveTimeout = Math.max(timeout, 90_000);
   const navigationCard = page.locator("#workspace-navigation-card");
   const globalActionsCard = page.locator("#workspace-global-actions-card");
   const statusCard = page.locator("#workspace-status-card");

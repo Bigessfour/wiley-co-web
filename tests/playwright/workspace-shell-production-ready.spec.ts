@@ -28,9 +28,7 @@ test.describe("Workspace Shell", () => {
     // 2. Use the left navigation to visit every panel route once, then return to the overview.
     const primaryNavigation = page.locator("#workspace-navigation-list");
 
-    await primaryNavigation
-      .getByRole("link", { name: "Break-Even" })
-      .dispatchEvent("click");
+    await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
     await expect(page.locator("#break-even-panel")).toBeVisible();
     await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
@@ -41,15 +39,13 @@ test.describe("Workspace Shell", () => {
       "Break-Even",
     );
 
-    await primaryNavigation
-      .getByRole("link", { name: "Rates" })
-      .dispatchEvent("click");
+    await primaryNavigation.getByRole("link", { name: "Rates" }).click();
     await expect(page.locator("#rates-panel")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText("Rates");
 
     await primaryNavigation
       .getByRole("link", { name: "QuickBooks Import" })
-      .dispatchEvent("click");
+      .click();
     await expect(
       page.locator("#quickbooks-import-status-headline"),
     ).toBeVisible();
@@ -59,7 +55,7 @@ test.describe("Workspace Shell", () => {
 
     await primaryNavigation
       .getByRole("link", { name: "Scenario Planner" })
-      .dispatchEvent("click");
+      .click();
     await expect(page.locator("#scenario-panel")).toBeVisible();
     await expect(page.locator("#scenario-grid")).toBeVisible();
     await expect(page.locator("#scenario-edit-status")).toBeVisible();
@@ -69,7 +65,7 @@ test.describe("Workspace Shell", () => {
 
     await primaryNavigation
       .getByRole("link", { name: "Customer Viewer" })
-      .dispatchEvent("click");
+      .click();
     await expect(page.locator("#customer-viewer-panel")).toBeVisible();
     await expect(page.locator("#customer-viewer-dashboard")).toBeVisible();
     await expect(page.locator("#customer-directory-grid")).toBeVisible();
@@ -77,15 +73,13 @@ test.describe("Workspace Shell", () => {
       "Customer Viewer",
     );
 
-    await primaryNavigation
-      .getByRole("link", { name: "Trends" })
-      .dispatchEvent("click");
+    await primaryNavigation.getByRole("link", { name: "Trends" }).click();
     await expect(page.locator("#trends-panel")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText("Trends");
 
     await primaryNavigation
       .getByRole("link", { name: "Decision Support" })
-      .dispatchEvent("click");
+      .click();
     await expect(page.locator("#decision-support-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Decision Support",
@@ -93,7 +87,7 @@ test.describe("Workspace Shell", () => {
 
     await primaryNavigation
       .getByRole("link", { name: "Data Dashboard" })
-      .dispatchEvent("click");
+      .click();
     await expect(page.locator("#data-dashboard-panel")).toBeAttached();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Data Dashboard",
@@ -157,7 +151,7 @@ test.describe("Workspace Shell", () => {
     const routeChecks = [
       {
         route: "/wiley-workspace/break-even",
-        visibleSelector: "#break-even-summary-panel",
+        visibleSelector: "#break-even-panel",
       },
       { route: "/wiley-workspace/rates", visibleSelector: "#rates-panel" },
       {

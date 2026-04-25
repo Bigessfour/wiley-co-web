@@ -5,6 +5,7 @@ using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
+using WileyWidget.Models;
 
 namespace WileyCoWeb.Components.Pages;
 
@@ -125,6 +126,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected IEnumerable<int> FiscalYearOptions => WorkspaceState.FiscalYearOptions;
     protected IReadOnlyList<string> CustomerServiceOptions => WorkspaceState.CustomerServiceOptions;
     protected IReadOnlyList<string> CustomerCityLimitOptions => WorkspaceState.CustomerCityLimitOptions;
+    protected IReadOnlyList<BreakEvenQuadrantData> HeroBreakEvenQuadrants => BreakEvenQuadrants
+        .OrderBy(quadrant => GetHeroBreakEvenSortKey(quadrant))
+        .ToArray();
 
     protected IReadOnlyList<RateComparisonPoint> RateComparison => WorkspaceState.RateComparison;
     protected IReadOnlyList<ScenarioItem> ScenarioItems => WorkspaceState.ScenarioItems;
@@ -591,6 +595,18 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         return "Workspace ready.";
+    }
+
+    private static int GetHeroBreakEvenSortKey(BreakEvenQuadrantData quadrant)
+    {
+        return WorkspaceEnterpriseCatalog.GetSortOrder(quadrant.EnterpriseName);
+    }
+
+    protected static string GetHeroBreakEvenLabel(BreakEvenQuadrantData quadrant)
+    {
+        return string.IsNullOrWhiteSpace(quadrant.EnterpriseName)
+            ? quadrant.EnterpriseType
+            : quadrant.EnterpriseName;
     }
 
     private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)

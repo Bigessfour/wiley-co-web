@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using WileyCoWeb.Contracts;
+using WileyWidget.Models;
 
 namespace WileyCoWeb.Components.Panels;
 
@@ -36,10 +37,10 @@ public partial class BreakEvenPanel : ComponentBase
 
         return new[]
         {
-            BuildFallbackQuadrant("Water Utility", "Water", labels, breakEvenRate, expensesPerCustomer),
-            BuildFallbackQuadrant("Wiley Sanitation District", "Sewer", labels, breakEvenRate, expensesPerCustomer),
-            BuildFallbackQuadrant("Trash", "Trash", labels, breakEvenRate, expensesPerCustomer),
-            BuildFallbackQuadrant("Apartments", "Apartments", labels, breakEvenRate, expensesPerCustomer)
+            BuildFallbackQuadrant(WorkspaceEnterpriseCatalog.WaterUtility, "Water", labels, breakEvenRate, expensesPerCustomer),
+            BuildFallbackQuadrant(WorkspaceEnterpriseCatalog.WileySanitationDistrict, "Sewer", labels, breakEvenRate, expensesPerCustomer),
+            BuildFallbackQuadrant(WorkspaceEnterpriseCatalog.Trash, "Trash", labels, breakEvenRate, expensesPerCustomer),
+            BuildFallbackQuadrant(WorkspaceEnterpriseCatalog.Apartments, "Apartments", labels, breakEvenRate, expensesPerCustomer)
         };
     }
 

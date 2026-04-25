@@ -4,7 +4,7 @@
 
 - The App Runner cutover is already complete.
 - The remaining release blocker is Jarvis live-chat reliability on non-onboarding turns.
-- The feature branch still has uncommitted local changes that need to be finalized.
+- The feature branch has been pushed cleanly and is now waiting on CI and GitHub-side branch protection follow-up.
 
 ## Immediate Actions
 
@@ -15,7 +15,7 @@
 
 ## Repo Hygiene
 
-1. Land the current working-tree changes on `feature/break-even-4-enterprises-dataviz` and push the branch to trigger CI.
+1. Watch the `feature/break-even-4-enterprises-dataviz` CI run and fix any follow-up issue it exposes.
 2. Merge the branch into `main` and confirm the Amplify rebuild.
 3. Apply the documented branch protections in GitHub.
 
@@ -42,9 +42,9 @@
 - Immediate action 2: **Done in repo/tests**. The Semantic Kernel path now has a bounded timeout guard and a timeout regression so stalled second turns fall back deterministically instead of hanging.
 - Immediate action 3: **Done locally, manual-input scope confirmed**. The `Import Data/` folder now uses normalized filenames, the confusing CSV/archive duplicates were removed, and the import schema now includes support tables for lineage and validation; the customer-enrichment fields that are not present in the source exports will be entered manually in the workspace UI rather than imported from a backup source.
 - Immediate action 4: **Blocked externally**. The production snapshot spot-check cannot be completed from the current local-only workspace state.
-- Repo hygiene 1: **In progress**. The local working tree is ready to be finalized and pushed on `feature/break-even-4-enterprises-dataviz` for CI.
+- Repo hygiene 1: **Done locally**. The feature branch was pushed cleanly and is waiting on CI results.
 - Repo hygiene 2: **Not fully done**. The feature branch has not been merged into `main` from this local workspace state.
-- Repo hygiene 3: **Not started externally**. The documented GitHub branch protections are still only recorded in the repo note.
+- Repo hygiene 3: **Still external**. The documented GitHub branch protections are still only recorded in the repo note.
 - Operational hardening 1: **Blocked externally**. The App Runner alarm review and autoscaling tuning require live AWS access.
 - Operational hardening 2: **Blocked externally**. The next immutable image tag and digest record require the release pipeline.
 - Operational hardening 3: **Blocked externally**. The release record still needs live deployment metadata.
@@ -53,4 +53,4 @@
 
 ## Next Blocker
 
-- Repo hygiene 1 is now the next actionable blocker in the local workspace: finalize the intended changes, push `feature/break-even-4-enterprises-dataviz`, and use the CI result to decide whether any follow-up fix is needed.
+- Repo hygiene 3 is now the next actionable blocker outside the local tree: apply the documented GitHub branch protections, then use CI results to decide whether any follow-up fix is needed.

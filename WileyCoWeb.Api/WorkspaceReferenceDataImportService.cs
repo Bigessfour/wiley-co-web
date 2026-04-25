@@ -121,7 +121,7 @@ internal sealed partial class WorkspaceReferenceDataImportService
     private void ProcessCustomerWorkbookRows(string filePath, WorkbookMetadata workbookMetadata, IReadOnlyList<CustomerWorkbookRow> workbookRows, DateTime importedAtUtc, AppDbContext context, IDictionary<string, UtilityCustomer> customersByAccountNumber, HashSet<string> synchronizedAccountNumbers, UtilityCustomerImportStats stats) => ProcessCustomerRows(filePath, ResolveEnterpriseNameOrDefault(workbookMetadata.CompanyFileName, Path.GetFileName(filePath)), workbookRows, importedAtUtc, context, customersByAccountNumber, synchronizedAccountNumbers, stats);
 
     private static string ResolveEnterpriseNameOrDefault(string? companyFileName, string fileName)
-        => ResolveEnterpriseName(companyFileName, fileName) ?? "Water Utility";
+        => ResolveEnterpriseName(companyFileName, fileName) ?? WorkspaceEnterpriseCatalog.WaterUtility;
 
     private void ProcessCustomerRows(string filePath, string enterpriseName, IReadOnlyList<CustomerWorkbookRow> workbookRows, DateTime importedAtUtc, AppDbContext context, IDictionary<string, UtilityCustomer> customersByAccountNumber, HashSet<string> synchronizedAccountNumbers, UtilityCustomerImportStats stats) { foreach (var row in workbookRows) { ProcessCustomerRow(filePath, enterpriseName, row, importedAtUtc, context, customersByAccountNumber, synchronizedAccountNumbers, stats); } }
 
@@ -709,7 +709,7 @@ internal sealed partial class WorkspaceReferenceDataImportService
         yield return seed.Name;
         yield return seed.DepartmentName;
 
-        if (string.Equals(seed.Name, "Water Utility", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(seed.Name, WorkspaceEnterpriseCatalog.WaterUtility, StringComparison.OrdinalIgnoreCase))
         {
             yield return "Water";
             yield break;

@@ -748,7 +748,7 @@ internal sealed class WorkspaceSnapshotComposer
         var inferredEnterpriseName = InferCustomerEnterpriseName(customer);
         if (string.IsNullOrWhiteSpace(inferredEnterpriseName))
         {
-            return string.Equals(selectedEnterpriseName, "Water Utility", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(selectedEnterpriseName, WorkspaceEnterpriseCatalog.WaterUtility, StringComparison.OrdinalIgnoreCase);
         }
 
         return string.Equals(inferredEnterpriseName, selectedEnterpriseName, StringComparison.OrdinalIgnoreCase);
@@ -790,7 +790,7 @@ internal sealed class WorkspaceSnapshotComposer
         yield return seed.Name;
         yield return seed.DepartmentName;
 
-        if (string.Equals(seed.Name, "Water Utility", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(seed.Name, WorkspaceEnterpriseCatalog.WaterUtility, StringComparison.OrdinalIgnoreCase))
         {
             yield return "Water";
             yield break;
