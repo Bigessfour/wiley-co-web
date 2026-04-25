@@ -25,12 +25,17 @@
           var theme = mq && mq.matches ? "dark" : "light";
           document.documentElement.setAttribute("data-wiley-theme", theme);
           document.documentElement.setAttribute("data-bs-theme", theme);
+          var handleThemeChange = function (e) {
+            var t = e.matches ? "dark" : "light";
+            document.documentElement.setAttribute("data-wiley-theme", t);
+            document.documentElement.setAttribute("data-bs-theme", t);
+          };
           if (mq) {
-            mq.addEventListener("change", function (e) {
-              var t = e.matches ? "dark" : "light";
-              document.documentElement.setAttribute("data-wiley-theme", t);
-              document.documentElement.setAttribute("data-bs-theme", t);
-            });
+            if (typeof mq.addEventListener === "function") {
+              mq.addEventListener("change", handleThemeChange);
+            } else if (typeof mq.addListener === "function") {
+              mq.addListener(handleThemeChange);
+            }
           }
         } catch (ex) {
           /* Non-fatal: theme defaults to light if matchMedia is unavailable */

@@ -156,7 +156,7 @@ test.describe("Workspace Shell", () => {
       { route: "/wiley-workspace/rates", visibleSelector: "#rates-panel" },
       {
         route: "/wiley-workspace/scenario",
-        visibleSelector: "#scenario-summary-panel",
+        visibleSelector: "#scenario-panel",
       },
       {
         route: "/wiley-workspace/customers",
