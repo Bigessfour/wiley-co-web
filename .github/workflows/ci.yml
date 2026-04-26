@@ -265,10 +265,10 @@ jobs:
       - name: Build .NET projects (pre-build for --no-build server startup)
         run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Restore Node dependencies
