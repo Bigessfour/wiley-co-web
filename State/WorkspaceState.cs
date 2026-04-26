@@ -10,6 +10,8 @@ public sealed class WorkspaceState
     private string selectedEnterprise = WorkspaceDefaults.SelectedEnterprise;
     private int selectedFiscalYear = WorkspaceDefaults.SelectedFiscalYear;
     private string activeScenarioName = WorkspaceDefaults.ActiveScenarioName;
+    private long? selectedScenarioSnapshotId;
+    private string scenarioDescription = string.Empty;
     private string customerSearchTerm = string.Empty;
     private string selectedCustomerService = AllServicesOption;
     private string selectedCustomerCityLimits = AllCityLimitsOption;
@@ -20,6 +22,9 @@ public sealed class WorkspaceState
     private readonly List<ScenarioItem> scenarioItems = [];
     private readonly List<CustomerRow> customerRows = [];
     private readonly List<ProjectionRow> projectionRows = [];
+    private readonly List<BreakEvenQuadrantData> breakEvenQuadrants = [];
+    private readonly List<ApartmentUnitTypeData> apartmentUnitTypes = [];
+    private WorkspaceReserveTrajectoryData? reserveTrajectory;
     private readonly List<string> enterpriseOptions = [];
     private readonly List<int> fiscalYearOptions = [];
     private readonly List<string> customerServiceOptions = [AllServicesOption];
@@ -28,6 +33,16 @@ public sealed class WorkspaceState
     private string startupSourceStatus = "Workspace startup is pending.";
     private WorkspaceStartupSource currentStateSource;
     private string currentStateSourceStatus = "Current workspace state is pending initialization.";
+
+    // ── Export timestamp tracking ─────────────────────────────────────────────
+    // Keyed by export-type constants defined in WorkspaceExportKeys.
+    // Values are ISO-8601 UTC strings so they survive JSON serialisation cleanly.
+    private readonly Dictionary<string, string> lastExportedTimestamps = [];
+
+    // ── Offline status (ephemeral — not persisted) ────────────────────────────
+    // Set by WileyWorkspaceBase when navigator.onLine changes.  Drives the
+    // offline-indicator banner in WileyWorkspace.razor.
+    private bool isOffline;
 
     private Action? changed;
 
@@ -108,6 +123,82 @@ public sealed class WorkspaceState
         }
     }
 
+    // ── Export timestamps ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Snapshot of last-exported timestamps.  A copy is returned so callers
+    /// cannot mutate the internal dictionary.  Use <see cref="SetLastExported"/>
+    /// to record a new download and <see cref="GetLastExportedDisplay"/> for a
+    /// localised human-readable label.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> LastExportedTimestamps => lastExportedTimestamps;
+
+    /// <summary>
+    /// Returns a localised, human-readable label for the last time the given
+    /// <paramref name="exportKey"/> was downloaded (e.g. "4/25/2026 2:15 PM"),
+    /// or "Never" when no timestamp has been recorded.
+    /// </summary>
+    /// <param name="exportKey">
+    /// One of the constants defined in <see cref="WorkspaceExportKeys"/>.
+    /// </param>
+    public string GetLastExportedDisplay(string exportKey)
+    {
+        if (!lastExportedTimestamps.TryGetValue(exportKey, out var iso)
+            || string.IsNullOrWhiteSpace(iso))
+        {
+            return "Never";
+        }
+
+        return DateTimeOffset.TryParse(iso, out var dto)
+            ? dto.ToLocalTime().ToString("g")
+            : "Never";
+    }
+
+    /// <summary>
+    /// Records the UTC timestamp for the given export type so the document
+    /// centre can display when each file was last downloaded.  The timestamp
+    /// is persisted to localStorage via <see cref="Services.WorkspacePersistenceService"/>
+    /// on the next changed-event cycle.
+    /// </summary>
+    /// <param name="exportKey">
+    /// One of the constants defined in <see cref="WorkspaceExportKeys"/>.
+    /// </param>
+    /// <param name="timestamp">
+    /// The moment the download was initiated (should be
+    /// <see cref="DateTimeOffset.UtcNow"/>).
+    /// </param>
+    public void SetLastExported(string exportKey, DateTimeOffset timestamp)
+    {
+        if (string.IsNullOrWhiteSpace(exportKey)) return;
+
+        var iso = timestamp.UtcDateTime.ToString("O");
+        if (lastExportedTimestamps.TryGetValue(exportKey, out var existing) && existing == iso) return;
+
+        lastExportedTimestamps[exportKey] = iso;
+        NotifyChanged();
+    }
+
+    // ── Offline status ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>true</c> when the browser reported that it has lost network access
+    /// (<c>navigator.onLine == false</c>).  Set by WileyWorkspaceBase via
+    /// <see cref="SetOffline"/> after the JS online/offline events fire.
+    /// Not persisted — the real-time browser state is always authoritative.
+    /// </summary>
+    public bool IsOffline => isOffline;
+
+    /// <summary>
+    /// Updates the offline flag and notifies all state subscribers so the
+    /// offline-indicator banner can appear or disappear immediately.
+    /// </summary>
+    public void SetOffline(bool offline)
+    {
+        if (isOffline == offline) return;
+        isOffline = offline;
+        NotifyChanged();
+    }
+
     public string SelectedEnterprise
     {
         get
@@ -133,6 +224,24 @@ public sealed class WorkspaceState
             return activeScenarioName;
         }
         set => SetActiveScenarioName(value);
+    }
+
+    public long? SelectedScenarioSnapshotId
+    {
+        get
+        {
+            return selectedScenarioSnapshotId;
+        }
+        set => SetSelectedScenarioSnapshotId(value);
+    }
+
+    public string ScenarioDescription
+    {
+        get
+        {
+            return scenarioDescription;
+        }
+        set => SetScenarioDescription(value);
     }
 
     public decimal CurrentRate
@@ -337,15 +446,43 @@ public sealed class WorkspaceState
         }
     }
 
+    public IReadOnlyList<BreakEvenQuadrantData> BreakEvenQuadrants
+    {
+        get
+        {
+            return breakEvenQuadrants;
+        }
+    }
+
+    public IReadOnlyList<ApartmentUnitTypeData> ApartmentUnitTypes
+    {
+        get
+        {
+            return apartmentUnitTypes;
+        }
+    }
+
+    public WorkspaceReserveTrajectoryData? ReserveTrajectory
+    {
+        get
+        {
+            return reserveTrajectory;
+        }
+    }
+
     public void ApplyBootstrap(WorkspaceBootstrapData bootstrapData)
     {
         ArgumentNullException.ThrowIfNull(bootstrapData);
 
         var hasChanged = ApplyBootstrapSelection(bootstrapData)
             | ApplyBootstrapScalars(bootstrapData)
+            | ApplyBootstrapScenarioMetadata(bootstrapData)
             | ApplyBootstrapOptions(bootstrapData)
             | ApplyBootstrapCollections(bootstrapData)
-            | ApplyBootstrapLastUpdated(bootstrapData);
+            | ApplyBootstrapLastUpdated(bootstrapData)
+            // Restore last-exported timestamps so the document center shows
+            // when each file was last downloaded, even after a page refresh.
+            | ApplyBootstrapExportTimestamps(bootstrapData);
 
         if (hasChanged)
         {
@@ -370,7 +507,17 @@ public sealed class WorkspaceState
             CustomerServiceOptions = [.. customerServiceOptions],
             CustomerCityLimitOptions = [.. customerCityLimitOptions],
             CustomerRows = [.. customerRows],
-            ProjectionRows = [.. projectionRows]
+            ProjectionRows = [.. projectionRows],
+            BreakEvenQuadrants = [.. breakEvenQuadrants],
+            ApartmentUnitTypes = [.. apartmentUnitTypes],
+            ReserveTrajectory = CloneReserveTrajectory(reserveTrajectory),
+            SelectedScenarioSnapshotId = selectedScenarioSnapshotId,
+            ScenarioDescription = string.IsNullOrWhiteSpace(scenarioDescription) ? null : scenarioDescription,
+            // Persist export timestamps so the document center can show when each
+            // file was last downloaded even after a full page refresh.
+            LastExportedTimestamps = lastExportedTimestamps.Count > 0
+                ? new Dictionary<string, string>(lastExportedTimestamps)
+                : null
         };
     }
 
@@ -384,19 +531,63 @@ public sealed class WorkspaceState
         if (SetStringWithoutNotify(ref activeScenarioName, scenarioName, activeScenarioName)) NotifyChanged();
     }
 
+    public void SetSelectedScenarioSnapshotId(long? snapshotId)
+    {
+        if (SetNullableLongField(ref selectedScenarioSnapshotId, snapshotId)) NotifyChanged();
+    }
+
+    public void SetScenarioDescription(string? description)
+    {
+        if (SetStringWithoutNotify(ref scenarioDescription, description, string.Empty)) NotifyChanged();
+    }
+
     public void SetCurrentRate(decimal rate)
     {
-        if (SetDecimalWithoutNotify(ref currentRate, rate, currentRate)) NotifyChanged();
+        var hasChanged = SetDecimalWithoutNotify(ref currentRate, rate, currentRate);
+        if (hasChanged)
+        {
+            hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("current-rate");
+            NotifyChanged();
+        }
     }
 
     public void SetTotalCosts(decimal costs)
     {
-        if (SetDecimalWithoutNotify(ref totalCosts, costs, totalCosts)) NotifyChanged();
+        var hasChanged = SetDecimalWithoutNotify(ref totalCosts, costs, totalCosts);
+        if (hasChanged)
+        {
+            hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("total-costs");
+            NotifyChanged();
+        }
     }
 
     public void SetProjectedVolume(decimal volume)
     {
-        if (SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume)) NotifyChanged();
+        var hasChanged = SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume);
+        if (hasChanged)
+        {
+            hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("projected-volume");
+            NotifyChanged();
+        }
+    }
+
+    public void SetBreakEvenQuadrants(IReadOnlyList<BreakEvenQuadrantData> quadrants)
+    {
+        ArgumentNullException.ThrowIfNull(quadrants);
+
+        if (SetBreakEvenQuadrantsWithoutNotify(quadrants)) NotifyChanged();
+    }
+
+    public void SetApartmentUnitTypes(IReadOnlyList<ApartmentUnitTypeData> unitTypes)
+    {
+        ArgumentNullException.ThrowIfNull(unitTypes);
+
+        if (SetApartmentUnitTypesWithoutNotify(unitTypes)) NotifyChanged();
+    }
+
+    public void SetReserveTrajectory(WorkspaceReserveTrajectoryData? trajectory)
+    {
+        if (SetReserveTrajectoryWithoutNotify(trajectory)) NotifyChanged();
     }
 
     public void SetCustomerSearchTerm(string? searchTerm)
@@ -499,9 +690,137 @@ public sealed class WorkspaceState
     private bool SetProjectionRowsWithoutNotify(IReadOnlyList<ProjectionRow>? rows)
         => SetRowsWithoutNotify(projectionRows, NormalizeProjectionRows(rows));
 
+    private bool SetBreakEvenQuadrantsWithoutNotify(IReadOnlyList<BreakEvenQuadrantData>? rows)
+        => SetRowsWithoutNotify(breakEvenQuadrants, NormalizeBreakEvenQuadrants(rows));
+
+    private bool SetApartmentUnitTypesWithoutNotify(IReadOnlyList<ApartmentUnitTypeData>? rows)
+        => SetRowsWithoutNotify(apartmentUnitTypes, NormalizeApartmentUnitTypes(rows));
+
+    private bool SetReserveTrajectoryWithoutNotify(WorkspaceReserveTrajectoryData? trajectory)
+    {
+        var normalizedTrajectory = NormalizeReserveTrajectory(trajectory);
+        var hasChanged = !ReserveTrajectoryEquals(reserveTrajectory, normalizedTrajectory);
+        reserveTrajectory = normalizedTrajectory;
+        return hasChanged;
+    }
+
+    private bool RecalculateBreakEvenQuadrantsWithoutNotify(string reason)
+    {
+        if (breakEvenQuadrants.Count == 0)
+        {
+            Console.WriteLine($"[workspace-state] Break-even quadrant recompute skipped ({reason}) because no quadrants are loaded.");
+            return false;
+        }
+
+        var updatedQuadrants = breakEvenQuadrants
+            .Select(RecalculateBreakEvenQuadrant)
+            .ToList();
+
+        var hasChanged = !breakEvenQuadrants.SequenceEqual(updatedQuadrants);
+        if (!hasChanged)
+        {
+            Console.WriteLine($"[workspace-state] Break-even quadrant recompute ({reason}) produced no changes.");
+            return false;
+        }
+
+        breakEvenQuadrants.Clear();
+        breakEvenQuadrants.AddRange(updatedQuadrants);
+
+        Console.WriteLine(
+            $"[workspace-state] Recomputed break-even quadrants ({reason}) | quadrants={breakEvenQuadrants.Count} | currentRate={CurrentRate:F2} | totalCosts={TotalCosts:F2} | projectedVolume={ProjectedVolume:F2} | recommendedRate={RecommendedRate:F2}");
+
+        return true;
+    }
+
+    private BreakEvenQuadrantData RecalculateBreakEvenQuadrant(BreakEvenQuadrantData quadrant)
+    {
+        var effectiveCustomerCount = Math.Max(1m, ProjectedVolume);
+        var breakEvenRate = Math.Round(RateCalculator.CalculateRecommendedRate(TotalCosts, ProjectedVolume), 2, MidpointRounding.AwayFromZero);
+        var monthlyRevenue = Math.Round(quadrant.CurrentRate * effectiveCustomerCount, 2, MidpointRounding.AwayFromZero);
+        var monthlyBalance = Math.Round(monthlyRevenue - TotalCosts, 2, MidpointRounding.AwayFromZero);
+        var seriesPoints = RecalculateBreakEvenSeriesPoints(quadrant.SeriesPoints, quadrant.CurrentRate, breakEvenRate);
+
+        return new BreakEvenQuadrantData(
+            quadrant.EnterpriseName,
+            quadrant.EnterpriseType,
+            quadrant.CurrentRate,
+            TotalCosts,
+            monthlyRevenue,
+            monthlyBalance,
+            breakEvenRate,
+            effectiveCustomerCount,
+            seriesPoints);
+    }
+
+    private static List<BreakEvenSeriesPoint> RecalculateBreakEvenSeriesPoints(
+        IReadOnlyList<BreakEvenSeriesPoint> existingSeriesPoints,
+        decimal currentRate,
+        decimal breakEvenRate)
+    {
+        var labels = existingSeriesPoints.Count > 0
+            ? existingSeriesPoints.Select(point => point.PeriodLabel).ToList()
+            : ["Current", "Break-Even"];
+
+        var divisor = Math.Max(1, labels.Count - 1);
+
+        return labels
+            .Select((label, index) =>
+            {
+                var progress = (decimal)index / divisor;
+                var revenue = Math.Round(currentRate + ((breakEvenRate - currentRate) * progress), 2, MidpointRounding.AwayFromZero);
+                return new BreakEvenSeriesPoint(label, revenue, breakEvenRate, breakEvenRate);
+            })
+            .ToList();
+    }
+
     private static List<CustomerRow> NormalizeCustomerRows(IReadOnlyList<CustomerRow>? rows) => rows?.Select(row => new CustomerRow(row.Name, row.Service, row.CityLimits)).ToList() ?? [];
 
     private static List<ProjectionRow> NormalizeProjectionRows(IReadOnlyList<ProjectionRow>? rows) => rows?.Select(row => new ProjectionRow(row.Year, row.Rate)).ToList() ?? [];
+
+    private static List<BreakEvenQuadrantData> NormalizeBreakEvenQuadrants(IReadOnlyList<BreakEvenQuadrantData>? rows)
+        => rows?.Select(row => new BreakEvenQuadrantData(
+            row.EnterpriseName,
+            row.EnterpriseType,
+            row.CurrentRate,
+            row.MonthlyExpenses,
+            row.MonthlyRevenue,
+            row.MonthlyBalance,
+            row.BreakEvenRate,
+            row.EffectiveCustomerCount,
+            row.SeriesPoints.Select(point => new BreakEvenSeriesPoint(point.PeriodLabel, point.RevenuePerCustomer, point.ExpensesPerCustomer, point.BreakEvenPerCustomer)).ToList())).ToList() ?? [];
+
+    private static List<ApartmentUnitTypeData> NormalizeApartmentUnitTypes(IReadOnlyList<ApartmentUnitTypeData>? rows)
+        => rows?.Select(row => new ApartmentUnitTypeData(row.Id, row.Name, row.BedroomCount, row.UnitCount, row.MonthlyRent)).ToList() ?? [];
+
+    private static WorkspaceReserveTrajectoryData? NormalizeReserveTrajectory(WorkspaceReserveTrajectoryData? trajectory)
+    {
+        if (trajectory is null)
+        {
+            return null;
+        }
+
+        return new WorkspaceReserveTrajectoryData(
+            trajectory.CurrentReserves,
+            trajectory.RecommendedReserveLevel,
+            NormalizeStringValue(trajectory.RiskAssessment, string.Empty),
+            trajectory.ForecastPoints?.Select(point => new WorkspaceReserveTrajectoryPointData(point.DateUtc, point.PredictedReserves, point.ConfidenceInterval)).ToList() ?? []);
+    }
+
+    private static WorkspaceReserveTrajectoryData? CloneReserveTrajectory(WorkspaceReserveTrajectoryData? trajectory)
+        => NormalizeReserveTrajectory(trajectory);
+
+    private static bool ReserveTrajectoryEquals(WorkspaceReserveTrajectoryData? left, WorkspaceReserveTrajectoryData? right)
+    {
+        if (left is null || right is null)
+        {
+            return left is null && right is null;
+        }
+
+        return left.CurrentReserves == right.CurrentReserves
+            && left.RecommendedReserveLevel == right.RecommendedReserveLevel
+            && string.Equals(left.RiskAssessment, right.RiskAssessment, StringComparison.Ordinal)
+            && left.ForecastPoints.SequenceEqual(right.ForecastPoints);
+    }
 
     private static IReadOnlyList<string> NormalizeStringList(IReadOnlyList<string>? source, IReadOnlyList<string> fallback) => (source is { Count: > 0 } ? source : fallback).Where(item => !string.IsNullOrWhiteSpace(item)).Select(item => item.Trim()).Distinct(StringComparer.Ordinal).ToList();
 
@@ -533,6 +852,13 @@ public sealed class WorkspaceState
     }
 
     private static bool SetIntField(ref int field, int value)
+    {
+        var hasChanged = field != value;
+        field = value;
+        return hasChanged;
+    }
+
+    private static bool SetNullableLongField(ref long? field, long? value)
     {
         var hasChanged = field != value;
         field = value;
@@ -571,6 +897,10 @@ public sealed class WorkspaceState
             | SetDecimalWithoutNotify(ref totalCosts, bootstrapData.TotalCosts, WorkspaceDefaults.TotalCosts)
             | SetDecimalWithoutNotify(ref projectedVolume, bootstrapData.ProjectedVolume, WorkspaceDefaults.ProjectedVolume);
 
+    private bool ApplyBootstrapScenarioMetadata(WorkspaceBootstrapData bootstrapData)
+        => SetNullableLongField(ref selectedScenarioSnapshotId, bootstrapData.SelectedScenarioSnapshotId)
+            | SetStringWithoutNotify(ref scenarioDescription, bootstrapData.ScenarioDescription, string.Empty);
+
     private bool ApplyBootstrapOptions(WorkspaceBootstrapData bootstrapData)
         => SetStringListWithoutNotify(enterpriseOptions, bootstrapData.EnterpriseOptions, WorkspaceDefaults.EnterpriseOptions)
             | SetIntListWithoutNotify(fiscalYearOptions, bootstrapData.FiscalYearOptions, WorkspaceDefaults.FiscalYearOptions)
@@ -580,10 +910,43 @@ public sealed class WorkspaceState
     private bool ApplyBootstrapCollections(WorkspaceBootstrapData bootstrapData)
         => SetScenarioItemsWithoutNotify(bootstrapData.ScenarioItems)
             | SetCustomerRowsWithoutNotify(bootstrapData.CustomerRows)
-            | SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows);
+            | SetProjectionRowsWithoutNotify(bootstrapData.ProjectionRows)
+            | SetBreakEvenQuadrantsWithoutNotify(bootstrapData.BreakEvenQuadrants)
+            | SetApartmentUnitTypesWithoutNotify(bootstrapData.ApartmentUnitTypes)
+            | SetReserveTrajectoryWithoutNotify(bootstrapData.ReserveTrajectory);
 
     private bool ApplyBootstrapLastUpdated(WorkspaceBootstrapData bootstrapData)
         => SetStringWithoutNotify(ref lastUpdatedUtc, bootstrapData.LastUpdatedUtc, lastUpdatedUtc);
+
+    /// <summary>
+    /// Merges persisted last-exported timestamps from <paramref name="bootstrapData"/>
+    /// into the live dictionary.  Existing entries are only replaced when the
+    /// persisted timestamp is newer than the in-memory one.  This ensures that
+    /// a fresh export performed before a reload is never clobbered by a stale
+    /// stored value.
+    /// </summary>
+    private bool ApplyBootstrapExportTimestamps(WorkspaceBootstrapData bootstrapData)
+    {
+        if (bootstrapData.LastExportedTimestamps is not { Count: > 0 }) return false;
+
+        var hasChanged = false;
+        foreach (var kvp in bootstrapData.LastExportedTimestamps)
+        {
+            if (string.IsNullOrWhiteSpace(kvp.Key) || string.IsNullOrWhiteSpace(kvp.Value)) continue;
+
+            // Only update if the entry is new or the stored timestamp is newer.
+            if (!lastExportedTimestamps.TryGetValue(kvp.Key, out var existing)
+                || (DateTimeOffset.TryParse(kvp.Value, out var incoming)
+                    && DateTimeOffset.TryParse(existing, out var current)
+                    && incoming > current))
+            {
+                lastExportedTimestamps[kvp.Key] = kvp.Value;
+                hasChanged = true;
+            }
+        }
+
+        return hasChanged;
+    }
 
     private static List<CustomerRow> NormalizeCustomerDirectory(IReadOnlyList<CustomerRow> rows) => rows.Where(row => !string.IsNullOrWhiteSpace(row.Name)).Select(row => new CustomerRow(row.Name.Trim(), string.IsNullOrWhiteSpace(row.Service) ? "Unknown" : row.Service.Trim(), string.IsNullOrWhiteSpace(row.CityLimits) ? "No" : row.CityLimits.Trim())).ToList();
 

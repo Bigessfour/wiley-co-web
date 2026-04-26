@@ -236,10 +236,14 @@ namespace WileyCoWeb.Services
                     Timeout = TimeSpan.FromSeconds(30)
                 }));
             builder.Services.AddSingleton<WorkspaceState>();
+            builder.Services.AddSingleton<ToastService>();
             builder.Services.AddScoped<WorkspaceBootstrapService>();
             builder.Services.AddScoped<WorkspacePersistenceService>();
             builder.Services.AddScoped<WorkspaceSnapshotApiService>();
             builder.Services.AddScoped<UtilityCustomerApiService>();
+            builder.Services.AddScoped<AffordabilityAnalysisService>();
+            builder.Services.AddScoped<DebtCoverageApiService>();
+            builder.Services.AddScoped<CapitalGapApiService>();
             builder.Services.AddScoped<WorkspaceKnowledgeApiService>();
             builder.Services.AddScoped<QuickBooksImportApiService>();
             builder.Services.AddScoped<WorkspaceAiApiService>();

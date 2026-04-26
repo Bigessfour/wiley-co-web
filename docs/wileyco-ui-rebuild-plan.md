@@ -138,7 +138,7 @@ Status: Repo-level web rebuild and the AI centerpiece are functionally far along
 ## Baseline
 
 - [x] App targets `.NET 9` Blazor WebAssembly.
-- [x] Syncfusion Blazor `33.1.44` is the UI stack.
+- [x] Syncfusion Blazor `33.2.3` is the UI stack.
 - [x] AWS Amplify is the host.
 - [x] Aurora PostgreSQL Serverless v2 is the data store.
 - [x] API Gateway REST API (WileyJarvisApi) configured for Jarvis xAI functions and Wiley Widget backend.
@@ -637,6 +637,6 @@ This closes the static evaluation loop. Next: clean build/test, git push for CI/
 
 ## Notes
 
-- The current workspace already has Syncfusion `33.1.44` packages and a working dashboard seed.
+- The current workspace already has Syncfusion `33.2.3` packages and a working dashboard seed.
 - The hard-copy Blazor docs are available locally in `Blazor Documentation/` and should be treated as the reference source.
 - This plan is ready to feed into Syncfusion AI UI Builder or similar tooling, but those tools are not directly available in this chat environment.

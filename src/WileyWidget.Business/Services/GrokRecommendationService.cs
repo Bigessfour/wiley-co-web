@@ -53,12 +53,12 @@ public sealed class GrokRecommendationService : IGrokRecommendationService, IHea
 
         _apiKey = aiConfiguration.ApiKeyResolution.ApiKey;
         _enabled = aiConfiguration.Enabled;
-        _model = aiConfiguration.ResolveModelOrDefault("grok-4.1");
+        _model = aiConfiguration.ResolveModelOrDefault(WorkspaceAiKernelFactory.DefaultSemanticKernelModel);
         _endpoint = aiConfiguration.ChatCompletionEndpoint;
 
         if (_enabled && !string.IsNullOrWhiteSpace(_apiKey))
         {
-            var kernelContext = WorkspaceAiKernelFactory.CreateKernelContext(aiConfiguration, "grok-4.1", httpClientFactory);
+            var kernelContext = WorkspaceAiKernelFactory.CreateKernelContext(aiConfiguration, WorkspaceAiKernelFactory.DefaultSemanticKernelModel, httpClientFactory);
             _chatService = kernelContext.ChatService;
 
             _logger.LogInformation(

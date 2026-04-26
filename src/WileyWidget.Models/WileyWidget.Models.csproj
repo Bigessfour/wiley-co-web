@@ -45,6 +45,12 @@
     <ProjectReference Include="..\WileyWidget.Abstractions\WileyWidget.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\..\Models\Enterprise.cs" Link="Models\Enterprise.cs" />
+    <Compile Include="..\..\Models\ApartmentUnitType.cs" Link="Models\ApartmentUnitType.cs" />
+    <Compile Include="..\..\Models\EnterpriseTypeItem.cs" Link="Models\EnterpriseTypeItem.cs" />
+  </ItemGroup>
+
   <!-- Configuration files removed - they belong in the main WileyWidget project to avoid circular
   dependencies -->
   <!-- The Models project should only contain domain models and not have dependencies on

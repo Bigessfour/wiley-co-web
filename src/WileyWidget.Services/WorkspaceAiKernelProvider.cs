@@ -86,13 +86,13 @@ public sealed class WorkspaceAiKernelProvider : IWorkspaceAiKernelProvider
         {
             var context = WorkspaceAiKernelFactory.CreateKernelContext(
                 serviceConfiguration,
-                WorkspaceAiAssistantService.GetDefaultSemanticKernelModel(),
+                WorkspaceAiKernelFactory.DefaultSemanticKernelModel,
                 httpClientFactory,
                 ConfigureBuilder);
 
             logger.LogInformation(
                 "Workspace AI kernel provider initialized Semantic Kernel (model: {Model}, apiKeySource: {ApiKeySource}, chatEndpoint: {ChatEndpoint}, legacyEndpoint: {LegacyEndpoint}).",
-                serviceConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()),
+                serviceConfiguration.ResolveModelOrDefault(WorkspaceAiKernelFactory.DefaultSemanticKernelModel),
                 apiKeyResolution.ApiKeySource,
                 serviceConfiguration.ChatCompletionEndpoint,
                 serviceConfiguration.LegacyResponsesEndpoint);

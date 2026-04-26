@@ -1,215 +1,319 @@
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.InteractiveChat
+@using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.Spinner
 
 <div class="jarvis-chat-panel">
-    <SfCard>
-        <CardHeader Title="Decision Support" SubTitle="Live workspace guidance" />
+    <SfCard ID="decision-support-panel" CssClass="h-full">
+        <CardHeader Title="Decision Support" SubTitle="Live workspace guidance with a premium Jarvis AI rail." />
         <CardContent>
-            <div class="flex flex-col gap-4">
-                <div class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    <div class="font-semibold text-slate-700">Operational status</div>
-                    <div>@StatusText</div>
+            <div class="space-y-4">
+                @* Removed: the flat operational-status pill and plain brief container.
+                   Replacement: Syncfusion cards turn the executive state and workspace brief into first-class rail surfaces that resize cleanly inside the parent splitter. *@
+                <div class="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                    <SfCard ID="jarvis-operational-status-card">
+                        <CardHeader Title="Operational status" SubTitle="@StatusText" />
+                        <CardContent>
+                            <div class="text-sm text-slate-600">Workspace metrics, recommendations, and Jarvis chat all update from the same current snapshot.</div>
+                        </CardContent>
+                    </SfCard>
+
+                    <SfCard ID="jarvis-primary-brief-card">
+                        <CardHeader Title="Current brief" SubTitle="Live workspace summary" />
+                        <CardContent>
+                            <div class="text-sm leading-6 text-slate-700">@PrimaryBrief</div>
+                        </CardContent>
+                    </SfCard>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Current brief</div>
-                    <div class="mt-2 text-sm leading-6 text-slate-700">@PrimaryBrief</div>
-                </div>
-
-                <div class="grid gap-3">
+                @* Removed: ad-hoc insight div tiles.
+                   Replacement: every insight now renders as a nested Syncfusion card so the rail keeps a consistent visual language with the rest of the workspace shell. *@
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     @foreach (var insight in Insights)
                     {
-                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">@insight.Label</div>
-                            <div class="mt-2 text-xl font-semibold text-slate-900">@insight.Value</div>
-                            <div class="mt-1 text-sm leading-5 text-slate-600">@insight.Description</div>
-                        </div>
+                        <SfCard>
+                            <CardHeader Title="@insight.Label" SubTitle="Decision-support metric" />
+                            <CardContent>
+                                <div class="text-2xl font-semibold text-slate-900">@insight.Value</div>
+                                <div class="mt-2 text-sm leading-5 text-slate-600">@insight.Description</div>
+                            </CardContent>
+                        </SfCard>
                     }
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Recommended actions</div>
-                            <div class="mt-1 text-sm text-slate-600">@KnowledgeStatus</div>
-                        </div>
-                        <SfButton CssClass="e-flat" Disabled="@IsKnowledgeBusy" OnClick="RefreshKnowledgeFromButtonAsync">Refresh</SfButton>
-                    </div>
-                    <div class="mt-3 space-y-3">
-                        @foreach (var action in RecommendedActions)
-                        {
-                            <div class="rounded-xl bg-slate-50 px-3 py-3">
-                                <div class="text-sm font-semibold text-slate-900">@action.Title</div>
-                                <div class="mt-1 text-sm leading-5 text-slate-600">@action.Description</div>
+                @* Removed: custom recommendation shells.
+                   Replacement: a Syncfusion recommendation workbench card keeps live-refresh actions, status, and action items in one component-native section. *@
+                <SfCard ID="jarvis-recommended-actions-card">
+                    <CardHeader Title="Recommended actions" SubTitle="@KnowledgeStatus" />
+                    <CardContent>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                        <SfSpinner Visible="@IsKnowledgeBusy" Size="18" Label="" Type="SpinnerType.Material" />
+                                    </div>
+                                    <div class="text-sm text-slate-600">Refresh live workspace knowledge and recommendation cards without leaving the rail.</div>
+                                </div>
+
+                                <SfTooltip Content="Refresh the live knowledge response that drives the executive brief, insights, and action recommendations."
+                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                           OpensOn="Hover Focus"
+                                           ShowTipPointer="true"
+                                           CloseDelay="200">
+                                    <SfButton CssClass="e-flat"
+                                              Disabled="@IsKnowledgeBusy"
+                                              OnClick="RefreshKnowledgeFromButtonAsync">Refresh</SfButton>
+                                </SfTooltip>
                             </div>
-                        }
-                    </div>
-                </div>
+
+                            @foreach (var action in RecommendedActions)
+                            {
+                                <SfCard>
+                                    <CardHeader Title="@action.Title" SubTitle="Recommended next step" />
+                                    <CardContent>
+                                        <div class="text-sm leading-5 text-slate-600">@action.Description</div>
+                                    </CardContent>
+                                </SfCard>
+                            }
+                        </div>
+                    </CardContent>
+                </SfCard>
 
                 @if (IsSecureJarvisEnabled)
                 {
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Jarvis chat</div>
-                                <div class="mt-1 text-sm text-slate-600">Secure API-backed chat using the same workspace snapshot as the rest of the shell.</div>
-                            </div>
-                            <div class="rounded-full bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                                <span class="font-semibold text-slate-700">Signed in as:</span> @CurrentUserLabel
-                            </div>
-                        </div>
-
-                        <div id="jarvis-runtime-status"
-                             role="status"
-                             aria-live="polite"
-                             aria-busy="@IsChatBusy"
-                             class="mt-3 rounded-xl border px-3 py-3 text-sm @(IsChatFallbackActive ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-900")">
-                            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] @(IsChatFallbackActive ? "text-amber-700" : "text-emerald-700")">Jarvis runtime</div>
-                            <div class="mt-1 font-semibold">@ChatRuntimeStatusTitle</div>
-                            <div class="mt-1 text-xs leading-5 @(IsChatFallbackActive ? "text-amber-800" : "text-emerald-800")">@ChatRuntimeStatusDetail</div>
-                        </div>
-
-                        <div class="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-2">
-                            <div id="jarvis-chat-ui" class="relative h-[19rem] overflow-hidden rounded-xl border border-slate-200 bg-white sm:h-[24rem]" aria-busy="@IsChatBusy">
-                                <SfAIAssistView ID="jarvis-chat-surface"
-                                                @ref="JarvisAssistView"
-                                                Height="100%"
-                                                Width="100%"
-                                                @bind-Prompt="ChatQuestion"
-                                                PromptPlaceholder="Ask about the workspace, codebase, or AI tools"
-                                                PromptRequested="OnPromptRequestedAsync"
-                                                Prompts="ChatPrompts"
-                                                PromptSuggestions="PromptSuggestions"
-                                                PromptSuggestionsHeader="Suggested prompts">
-                                    <ChildContent>
-                                        <AssistViews>
-                                            <AssistView Header="JARVIS" IconCss="e-icons e-ai-chat" ShowClearButton="true">
-                                                <BannerTemplate>
-                                                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                                                        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Current workspace</div>
-                                                        <div class="mt-2 text-sm text-slate-700">@ChatContextSummary</div>
-                                                    </div>
-                                                </BannerTemplate>
-                                                <PromptItemTemplate>
-                                                    <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-                                                        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">You</div>
-                                                        <div class="mt-1 whitespace-pre-line text-slate-700">@context.Prompt</div>
-                                                    </div>
-                                                </PromptItemTemplate>
-                                                <ResponseItemTemplate>
-                                                    <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm shadow-sm">
-                                                        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">Jarvis</div>
-                                                        <div class="mt-1 whitespace-pre-line text-slate-700">@context.Response</div>
-                                                    </div>
-                                                </ResponseItemTemplate>
-                                                <FooterTemplate>
-                                                    <div class="flex flex-col gap-3 border-t border-slate-200 bg-white px-3 py-3">
-                                                        <SfTextBox ID="jarvis-question-input"
-                                                                   Placeholder="Ask about the workspace, codebase, or AI tools"
-                                                                   FloatLabelType="FloatLabelType.Auto"
-                                                                   Multiline="true"
-                                                                   Rows="3"
-                                                                   ShowClearButton="true"
-                                                                   Width="100%"
-                                                                   @bind-Value="ChatQuestion" />
-                                                        <div class="flex flex-wrap gap-3">
-                                                            <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskChat)" OnClick="SubmitFooterPromptAsync">Ask Jarvis</SfButton>
-                                                            <SfButton Disabled="@IsChatBusy" OnClick="ResetChatAsync">Reset Thread</SfButton>
-                                                        </div>
-                                                    </div>
-                                                </FooterTemplate>
-                                            </AssistView>
-                                        </AssistViews>
-                                    </ChildContent>
-                                </SfAIAssistView>
-                                @if (IsChatBusy)
-                                {
-                                    <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
-                                        <div class="w-full max-w-sm rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-lg">
-                                            <div class="flex items-center gap-3">
-                                                <div class="h-4 w-4 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
-                                                <div>
-                                                    <div class="text-sm font-semibold text-slate-900">Awaiting Jarvis response</div>
-                                                    <div class="text-xs text-slate-500">Checking the live workspace context and streaming the reply.</div>
+                    <SfCard ID="jarvis-ai-rail-card">
+                        <CardHeader Title="Jarvis chat" SubTitle="Secure API-backed assistant using the same workspace snapshot as the rest of the shell." />
+                        <CardContent>
+                            <div class="space-y-4">
+                                @* Removed: the manual runtime banner div and CSS-only busy treatment.
+                                   Replacement: a Syncfusion status card pairs runtime state, signed-in identity, scope, and a component-native spinner. *@
+                                <SfCard ID="jarvis-runtime-status">
+                                    <CardHeader Title="@ChatRuntimeStatusTitle"
+                                                SubTitle="Jarvis runtime" />
+                                    <CardContent>
+                                        <div class="flex flex-wrap items-start justify-between gap-4" role="status" aria-live="polite" aria-busy="@IsChatBusy">
+                                            <div class="flex items-start gap-3">
+                                                <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                                    <SfSpinner Visible="@IsChatBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                                 </div>
+                                                <div class="space-y-2">
+                                                    <div class="text-sm leading-5 text-slate-700">@ChatRuntimeStatusDetail</div>
+                                                    <div class="text-xs text-slate-500">Turn count: @ChatTranscript.Count</div>
+                                                    <div class="text-xs text-slate-500">Profile summary: @CurrentProfileSummary</div>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex flex-wrap gap-2">
+                                                <SfTooltip Content="Current signed-in identity resolved by the Jarvis user-context plugin."
+                                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                           OpensOn="Hover Focus"
+                                                           ShowTipPointer="true"
+                                                           CloseDelay="200">
+                                                    <span class="e-badge e-badge-info">Signed in as: @CurrentUserLabel</span>
+                                                </SfTooltip>
+
+                                                <SfTooltip Content="Conversation scope combines the user identity, selected enterprise, and fiscal-year workspace context."
+                                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                           OpensOn="Hover Focus"
+                                                           ShowTipPointer="true"
+                                                           CloseDelay="200">
+                                                    <span class="e-badge e-badge-light">@CurrentConversationLabel</span>
+                                                </SfTooltip>
                                             </div>
                                         </div>
-                                    </div>
-                                }
-                            </div>
-                        </div>
+                                    </CardContent>
+                                </SfCard>
 
-                        <div class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                            <span class="font-semibold text-slate-700">Scope:</span> @CurrentConversationLabel
-                            <span class="ml-3 font-semibold text-slate-700">Profile summary:</span> @CurrentProfileSummary
-                        </div>
+                                @* Removed: extra custom chat shell blocks that duplicated the assist surface.
+                                   Replacement: the assist rail now owns the premium conversation experience, while surrounding cards focus on runtime and audit context. *@
+                                <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-busy="@IsChatBusy">
+                                    <SfAIAssistView ID="jarvis-chat-surface"
+                                                    @ref="JarvisAssistView"
+                                                    Height="100%"
+                                                    Width="100%"
+                                                    @bind-Prompt="ChatQuestion"
+                                                    PromptPlaceholder="Ask about the workspace, codebase, or AI tools"
+                                                    PromptRequested="OnPromptRequestedAsync"
+                                                    Prompts="ChatPrompts"
+                                                    PromptSuggestions="PromptSuggestions"
+                                                    PromptSuggestionsHeader="Workspace prompts">
+                                        <ChildContent>
+                                            <AssistViewToolbar ItemClicked="OnAssistToolbarItemClicked">
+                                                <AssistViewToolbarItem Text="Refresh Guidance"
+                                                                       IconCss="e-icons e-refresh"
+                                                                       Tooltip="Refresh the live workspace knowledge response without leaving the Jarvis rail." />
+                                                <AssistViewToolbarItem Text="Reload History"
+                                                                       IconCss="e-icons e-clock"
+                                                                       Tooltip="Reload recommendation history for the current workspace scope." />
+                                            </AssistViewToolbar>
+                                            <AssistViews>
+                                                <AssistView Header="JARVIS" IconCss="e-icons e-ai-chat" ShowClearButton="true">
+                                                    <BannerTemplate>
+                                                        <div class="grid gap-3 lg:grid-cols-2">
+                                                            <SfCard>
+                                                                <CardHeader Title="Workspace context" SubTitle="Live scope shared with the rest of the shell" />
+                                                                <CardContent>
+                                                                    <div class="text-sm leading-6 text-slate-700">@ChatContextSummary</div>
+                                                                </CardContent>
+                                                            </SfCard>
 
-                        <div class="mt-3 space-y-3">
-                            <div id="jarvis-conversation-history" role="status" aria-live="polite" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Conversation history</div>
-                                @if (ChatTranscript.Count == 0)
-                                {
-                                    <div class="mt-2 text-sm text-slate-500">No prior Jarvis turns yet.</div>
-                                }
-                                else
-                                {
-                                    <div class="mt-3 space-y-3">
-                                        @foreach (var message in ChatTranscript)
-                                        {
-                                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-                                                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] @(IsAssistantMessage(message.Role) ? "text-sky-600" : "text-slate-500")">@(IsAssistantMessage(message.Role) ? "Jarvis" : "You")</div>
-                                                <div class="mt-1 whitespace-pre-line text-slate-700">@message.Content</div>
-                                            </div>
-                                        }
-                                    </div>
-                                }
-                            </div>
+                                                            <SfCard>
+                                                                <CardHeader Title="Operator profile" SubTitle="User-context plugin summary" />
+                                                                <CardContent>
+                                                                    <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Profile summary</div>
+                                                                    <div class="text-sm leading-6 text-slate-700">@CurrentProfileSummary</div>
+                                                                </CardContent>
+                                                            </SfCard>
+                                                        </div>
+                                                    </BannerTemplate>
 
-                            <div id="jarvis-recommendation-history" role="status" aria-live="polite" class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Recommendation history</div>
-                                <div class="mt-1 text-xs text-slate-500">@RecommendationHistoryStatus</div>
-                                @if (RecommendationHistory.Count == 0)
-                                {
-                                    <div class="mt-2 text-sm text-slate-500">No saved recommendations yet for this workspace scope.</div>
-                                }
-                                else
-                                {
-                                    <div class="mt-3 space-y-2">
-                                        @foreach (var entry in RecommendationHistory)
-                                        {
-                                            <div class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-                                                <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                                                    <span>@entry.UserDisplayName</span>
-                                                    <span>@DateTimeOffset.Parse(entry.CreatedAtUtc).ToLocalTime().ToString("g")</span>
+                                                    <PromptItemTemplate>
+                                                        <SfCard>
+                                                            <CardHeader Title="You" SubTitle="@($"Prompt {context.Index + 1}")" />
+                                                            <CardContent>
+                                                                <div class="whitespace-pre-line text-sm text-slate-700">@context.Prompt</div>
+                                                            </CardContent>
+                                                        </SfCard>
+                                                    </PromptItemTemplate>
+
+                                                    <ResponseItemTemplate>
+                                                        <SfCard>
+                                                            <CardHeader Title="Jarvis" SubTitle="@($"Response {context.Index + 1}")" />
+                                                            <CardContent>
+                                                                <div class="space-y-2">
+                                                                    <div class="text-xs text-slate-500">Premium assist output grounded in the current workspace snapshot and conversation scope.</div>
+                                                                    <div class="whitespace-pre-line text-sm leading-6 text-slate-700">@context.Response</div>
+                                                                </div>
+                                                            </CardContent>
+                                                        </SfCard>
+                                                    </ResponseItemTemplate>
+
+                                                    <FooterTemplate>
+                                                        @* Removed: manual footer action row with plain button placement logic.
+                                                           Replacement: the prompt editor stays inside the assist surface, while native assist footer-toolbar items now own the primary actions. *@
+                                                        <SfCard>
+                                                            <CardHeader Title="Compose prompt" SubTitle="Ask Jarvis about the workspace, codebase, or AI tooling." />
+                                                            <CardContent>
+                                                                @* MaxLength: caps prompt length at 4000 chars to stay within the Jarvis API token budget. *@
+                                                                <SfTextBox ID="jarvis-question-input"
+                                                                           Placeholder="Ask about the workspace, codebase, or AI tools"
+                                                                           FloatLabelType="FloatLabelType.Auto"
+                                                                           Multiline="true"
+                                                                           Rows="3"
+                                                                           ShowClearButton="true"
+                                                                           MaxLength="4000"
+                                                                           Width="100%"
+                                                                           @bind-Value="ChatQuestion" />
+
+                                                                <div class="mt-3 flex flex-wrap gap-3">
+                                                                    <SfButton CssClass="e-primary"
+                                                                              IsPrimary="true"
+                                                                              Disabled="@(!CanAskChat)"
+                                                                              OnClick="SubmitFooterPromptAsync">Ask Jarvis</SfButton>
+                                                                    <SfButton Disabled="@IsChatBusy"
+                                                                              OnClick="ResetChatAsync">Reset Thread</SfButton>
+                                                                    <SfButton CssClass="e-flat"
+                                                                              Disabled="@IsKnowledgeBusy"
+                                                                              OnClick="RefreshKnowledgeFromButtonAsync">Refresh Context</SfButton>
+                                                                </div>
+                                                            </CardContent>
+                                                        </SfCard>
+                                                    </FooterTemplate>
+                                                </AssistView>
+                                            </AssistViews>
+                                        </ChildContent>
+                                    </SfAIAssistView>
+                                </div>
+
+                                <div class="grid gap-4 xl:grid-cols-2">
+                                    @* Removed: custom transcript div stack.
+                                       Replacement: conversation turns still render from the same state, but now live in a Syncfusion audit card instead of ad-hoc message wrappers. *@
+                                    <SfCard ID="jarvis-conversation-history">
+                                        <CardHeader Title="Conversation history"
+                                                    SubTitle="@CurrentConversationLabel" />
+                                        <CardContent>
+                                            @if (ChatTranscript.Count == 0)
+                                            {
+                                                <div class="text-sm text-slate-500">No prior Jarvis turns yet.</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="space-y-3">
+                                                    @foreach (var message in ChatTranscript)
+                                                    {
+                                                        <SfCard>
+                                                            <CardHeader Title="@(IsAssistantMessage(message.Role) ? "Jarvis" : "You")"
+                                                                        SubTitle="Conversation history" />
+                                                            <CardContent>
+                                                                <div class="whitespace-pre-line text-sm text-slate-700">@message.Content</div>
+                                                            </CardContent>
+                                                        </SfCard>
+                                                    }
                                                 </div>
-                                                <div class="mt-2 text-xs text-slate-500">Q: @entry.Question</div>
-                                                <div class="mt-1 whitespace-pre-line text-slate-700">@entry.Recommendation</div>
+                                            }
+                                        </CardContent>
+                                    </SfCard>
+
+                                    @* Removed: custom recommendation-history message divs.
+                                       Replacement: a Syncfusion history card keeps recommendation audit entries readable and aligned with the broader decision-support rail. *@
+                                    <SfCard ID="jarvis-recommendation-history">
+                                        <CardHeader Title="Recommendation history"
+                                                    SubTitle="@RecommendationHistoryStatus" />
+                                        <CardContent>
+                                            @if (RecommendationHistory.Count == 0)
+                                            {
+                                                <div class="text-sm text-slate-500">No saved recommendations yet for this workspace scope.</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="space-y-3">
+                                                    @foreach (var entry in RecommendationHistory)
+                                                    {
+                                                        <SfCard>
+                                                            <CardHeader Title="@entry.UserDisplayName"
+                                                                        SubTitle="@FormatRecommendationTimestamp(entry.CreatedAtUtc)" />
+                                                            <CardContent>
+                                                                <div class="space-y-2">
+                                                                    <div class="text-xs text-slate-500">Q: @entry.Question</div>
+                                                                    <div class="whitespace-pre-line text-sm text-slate-700">@entry.Recommendation</div>
+                                                                </div>
+                                                            </CardContent>
+                                                        </SfCard>
+                                                    }
+                                                </div>
+                                            }
+                                        </CardContent>
+                                    </SfCard>
+                                </div>
+
+                                @* Removed: the plain latest-answer strip.
+                                   Replacement: a dedicated Syncfusion answer card separates current context from the latest AI response while preserving the existing automation anchor. *@
+                                <SfCard ID="jarvis-chat-answer">
+                                    <CardHeader Title="Latest answer" SubTitle="Current workspace context and most recent Jarvis response" />
+                                    <CardContent>
+                                        <div class="space-y-3" role="status" aria-live="polite" aria-busy="@IsChatBusy">
+                                            <div>
+                                                <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Context</div>
+                                                <div class="mt-1 text-sm leading-6 text-slate-700">@ChatContextSummary</div>
                                             </div>
-                                        }
-                                    </div>
-                                }
+                                            <div class="whitespace-pre-line text-sm leading-6 text-slate-700">@ChatAnswer</div>
+                                        </div>
+                                    </CardContent>
+                                </SfCard>
                             </div>
-
-                            <div id="jarvis-chat-answer" role="status" aria-live="polite" aria-busy="@IsChatBusy" class="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-                                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Context</div>
-                                <div class="mt-1">@ChatContextSummary</div>
-                                <div class="mt-3 whitespace-pre-line">@ChatAnswer</div>
-                            </div>
-
-                            <div class="grid gap-2 text-xs text-slate-500 sm:grid-cols-2">
-                                <div>Conversation scope: @CurrentConversationLabel</div>
-                                <div>Turn count: @ChatTranscript.Count</div>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </SfCard>
                 }
                 else
                 {
-                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                        <div class="font-semibold text-slate-700">Delivery note</div>
-                        <div class="mt-1">This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.</div>
-                    </div>
+                    <SfCard>
+                        <CardHeader Title="Delivery note" SubTitle="Secure Jarvis is disabled for this host." />
+                        <CardContent>
+                            <div class="text-sm text-slate-600">This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.</div>
+                        </CardContent>
+                    </SfCard>
                 }
             </div>
         </CardContent>

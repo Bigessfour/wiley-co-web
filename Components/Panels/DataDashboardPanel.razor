@@ -101,17 +101,20 @@
     {
         <div id="rate-comparison-section" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="mb-3 text-sm font-semibold text-slate-700">Rate Comparison</p>
+            @* Theme Fluent2: consistent with app-wide Syncfusion theme; ZoomSettings disabled — this is a KPI comparison chart not an analysis surface *@
             <SfChart ID="budget-variance-chart"
                      AccessibilityDescription="Bar chart showing the rate comparison values used in the executive dashboard."
                      Width="100%"
                      Height="300px"
-                     Background="transparent">
+                     Background="transparent"
+                     Theme="Syncfusion.Blazor.Theme.Fluent2">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
                     <ChartAxisMajorGridLines Width="0" />
                 </ChartPrimaryXAxis>
                 <ChartPrimaryYAxis LabelFormat="C2">
                     <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
                 </ChartPrimaryYAxis>
+                <ChartZoomSettings EnableSelectionZooming="false" />
                 <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" Format="${point.x}: <b>${point.y}</b>" />
                 <ChartLegendSettings Visible="false" />
                 <ChartSeriesCollection>
@@ -138,17 +141,20 @@
     {
         <div id="waterfall-section" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="mb-3 text-sm font-semibold text-slate-700">Scenario Cost Waterfall</p>
+            @* Theme Fluent2: aligns waterfall colours with Fluent2 palette *@
             <SfChart ID="scenario-waterfall-chart"
                      AccessibilityDescription="Waterfall chart showing how scenario costs build toward the final rate impact."
                      Width="100%"
                      Height="300px"
-                     Background="transparent">
+                     Background="transparent"
+                     Theme="Syncfusion.Blazor.Theme.Fluent2">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
                     <ChartAxisMajorGridLines Width="0" />
                 </ChartPrimaryXAxis>
                 <ChartPrimaryYAxis LabelFormat="C0">
                     <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
                 </ChartPrimaryYAxis>
+                <ChartZoomSettings EnableSelectionZooming="false" />
                 <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" />
                 <ChartLegendSettings Visible="false" />
                 <ChartSeriesCollection>
@@ -177,17 +183,20 @@
     {
         <div id="rate-trend-section" class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p class="mb-3 text-sm font-semibold text-slate-700">Rate Trend &amp; Projection</p>
+            @* Theme Fluent2 + ZoomSettings: trend chart is analytical; selection zoom allows rate-period drill-down *@
             <SfChart ID="rate-trend-chart"
                      AccessibilityDescription="Line chart showing the historical and projected rate trend."
                      Width="100%"
                      Height="300px"
-                     Background="transparent">
+                     Background="transparent"
+                     Theme="Syncfusion.Blazor.Theme.Fluent2">
                 <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
                     <ChartAxisMajorGridLines Width="0" />
                 </ChartPrimaryXAxis>
                 <ChartPrimaryYAxis LabelFormat="C2">
                     <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
                 </ChartPrimaryYAxis>
+                <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="true" />
                 <ChartTooltipSettings Enable="true" Header="<b>Year ${point.x}</b>" />
                 <ChartCrosshairSettings Enable="true" LineType="LineType.Both">
                     <ChartCrosshairLine Color="#94a3b8" Width="1" />

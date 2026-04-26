@@ -5,6 +5,7 @@
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Popups
+@using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 
 <div id="customer-viewer-panel" aria-busy="@IsBusy()" class="space-y-4">
@@ -53,8 +54,36 @@
 
     <section id="customer-grid-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Directory</p>
+        @if (isLoadingCustomers)
+        {
+            @* Loading skeleton: shows while the API call resolves on first mount
+               or after a manual refresh.  Prevents a blank grid appearing momentarily. *@
+            <div class="mt-3" aria-busy="true" aria-label="Loading customer directory" style="min-height: 16rem;">
+                <div class="wiley-panel-spinner-host">
+                    <SfSpinner Visible="true"
+                               Label="Loading customer directory…"
+                               Size="36"
+                               Type="SpinnerType.Material" />
+                </div>
+                <div class="mt-2 px-2 space-y-2">
+                    <div class="wiley-skeleton-row"></div>
+                    <div class="wiley-skeleton-row"></div>
+                    <div class="wiley-skeleton-row"></div>
+                    <div class="wiley-skeleton-row"></div>
+                    <div class="wiley-skeleton-row"></div>
+                </div>
+            </div>
+        }
+        else
+        {
         <div class="mt-3" aria-busy="@IsBusy()">
-            <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560">
+            @* EnablePersistence: restores sort order, page number, and column widths across browser sessions *@
+            @* AllowFiltering with FilterType.Menu: provides per-column filter menus for council-grade data interrogation *@
+            <SfGrid @ref="CustomerDirectoryGrid" ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" AllowExcelExport="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v1" Toolbar="@CustomerDirectoryToolbarItems">
+                @* ExcelExport toolbar: OnToolbarClick fires with id="customer-directory-grid_excelexport" *@
+                <GridEvents OnToolbarClick="HandleToolbarClickAsync" TValue="UtilityCustomerRecord" />
+                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+                <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
                 <GridPageSettings PageSize="10" PageCount="5" />
                 <GridTemplates>
                     <EmptyRecordTemplate>
@@ -93,6 +122,7 @@
                 </GridColumns>
             </SfGrid>
         </div>
+        } @* end else (not loading) *@
     </section>
 
     @if (HasApiFeedback())
@@ -115,7 +145,11 @@
 
     @if (IsEditorDialogOpen())
     {
-        <SfDialog Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true">
+        @* ID: exposes the editor dialog for test targeting *@
+        @* Target: scopes the modal overlay to the panel rather than the full viewport *@
+        @* DialogAnimationSettings SlideTop: enterprise-grade entry animation consistent with Syncfusion Fluent2 patterns *@
+        <SfDialog ID="customer-editor-dialog" Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true" Target="#customer-viewer-panel">
+            <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="200" />
             <DialogTemplates>
                 <Header>@GetEditorDialogTitle()</Header>
                 <Content>
@@ -224,7 +258,11 @@
 
         @if (IsDeleteDialogOpen() && GetPendingDeleteCustomer() is not null)
         {
-            <SfDialog Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true">
+            @* ID: exposes the delete dialog for test targeting *@
+            @* Target: scopes the confirm overlay to the panel *@
+            @* DialogAnimationSettings Zoom: brief zoom is appropriate for a destructive-action confirm *@
+            <SfDialog ID="customer-delete-dialog" Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true" Target="#customer-viewer-panel">
+            <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="150" />
             <DialogTemplates>
                 <Header>Delete Customer</Header>
                 <Content>

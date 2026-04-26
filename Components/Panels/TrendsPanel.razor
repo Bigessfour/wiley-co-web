@@ -3,8 +3,27 @@
 @using WileyCoWeb.State
 
 <div id="trends-panel" class="space-y-4" aria-label="Historical and projected rates trend panel">
+    @if (!ProjectionSeries.Any())
+    {
+        @* Graceful empty state: renders when no projection data is available yet
+           (workspace not yet loaded, or this enterprise has no projection history). *@
+        <div class="wiley-empty-state" role="img" aria-label="No projection data available">
+            <span class="wiley-empty-state__icon e-icons e-chart" aria-hidden="true"></span>
+            <p class="wiley-empty-state__title">No projection data</p>
+            <p class="wiley-empty-state__body">
+                Trend projections will appear here once the workspace has loaded rate history
+                for the selected enterprise and fiscal year. Try reloading the workspace or
+                changing the enterprise selection.
+            </p>
+        </div>
+    }
+    else
+    {
     <div id="trends-chart-region" role="img" aria-label="Projected rate trend chart">
-    <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="560px">
+    @* Theme: Fluent2 aligns the chart palette with the Syncfusion theme loaded app-wide *@
+    @* ChartLegendSettings: required when the panel is printed or exported as PDF so series are identifiable *@
+    @* ChartZoomSettings: allows council users to zoom into specific fiscal-year bands for detailed analysis *@
+    <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="560px" Theme="Syncfusion.Blazor.Theme.Fluent2">
         <ChartArea>
             <ChartAreaBorder Width="0"></ChartAreaBorder>
         </ChartArea>
@@ -14,6 +33,8 @@
         <ChartPrimaryYAxis LabelFormat="C2">
             <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
         </ChartPrimaryYAxis>
+        <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top" />
+        <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="true" EnablePinchZooming="true" />
         <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
         <ChartSeriesCollection>
             <ChartSeries DataSource="@ProjectionSeries" XName="Year" YName="Rate" Type="ChartSeriesType.Line" Name="Projection" Width="3">
@@ -22,6 +43,7 @@
         </ChartSeriesCollection>
     </SfChart>
     </div>
+    }
 </div>
 
 @code {

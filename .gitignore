@@ -111,3 +111,4 @@ terraform.tfstate.backup
 .vscode/settings.json
 .vscode/launch.json
 .vscode/tasks.json
+temp/

@@ -49,24 +49,27 @@ public sealed class QuickBooksImportService
 		var fileHash = ComputeFileHash(fileBytes);
 
 		await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
-		var isDuplicate = await context.SourceFiles.AsNoTracking().AnyAsync(sourceFile => sourceFile.CanonicalEntity == CanonicalEntity && sourceFile.FileHash == fileHash, cancellationToken).ConfigureAwait(false);
+		var fileHashDuplicate = await context.SourceFiles.AsNoTracking().AnyAsync(sourceFile => sourceFile.CanonicalEntity == CanonicalEntity && sourceFile.FileHash == fileHash, cancellationToken).ConfigureAwait(false);
+		var overlapAnalysis = await AnalyzeRoutedDuplicatesAsync(context, routedPreview, cancellationToken).ConfigureAwait(false);
+		var duplicateRows = fileHashDuplicate ? routedPreview.Count : overlapAnalysis.DuplicateRows;
+		var isDuplicate = fileHashDuplicate || duplicateRows > 0;
+		var previewRows = fileHashDuplicate
+			? routedPreview.Select(row => row with { IsDuplicate = true }).ToList()
+			: overlapAnalysis.Rows;
+		var statusMessage = BuildPreviewStatusMessage(preview.Count, duplicateRows, fileHashDuplicate);
 
-		var statusMessage = isDuplicate
-			? "This QuickBooks export is already imported. The commit step will be blocked."
-			: $"Preview loaded for {preview.Count} rows.";
-
-		logger.LogInformation("QuickBooks preview completed for {FileName}: rows={RowCount}, duplicate={IsDuplicate}", Path.GetFileName(fileName), preview.Count, isDuplicate);
+		logger.LogInformation("QuickBooks preview completed for {FileName}: rows={RowCount}, duplicate={IsDuplicate}, duplicateRows={DuplicateRows}, fileHashDuplicate={FileHashDuplicate}", Path.GetFileName(fileName), preview.Count, isDuplicate, duplicateRows, fileHashDuplicate);
 
 		return new QuickBooksImportPreviewResponse(
 			Path.GetFileName(fileName),
 			fileHash,
 			selectedEnterprise,
 			selectedFiscalYear,
-			routedPreview.Count,
-			isDuplicate ? routedPreview.Count : 0,
+			previewRows.Count,
+			duplicateRows,
 			isDuplicate,
 			statusMessage,
-			routedPreview.Select(row => row with { IsDuplicate = isDuplicate }).ToList());
+			previewRows);
 	}
 
 	public async Task<QuickBooksImportCommitResponse> CommitAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
@@ -92,6 +95,22 @@ public sealed class QuickBooksImportService
 				true,
 				"Duplicate QuickBooks import blocked. The file was already imported.",
 				["The selected file was already imported. No changes were made."]);
+		}
+
+		var overlapAnalysis = await AnalyzeRoutedDuplicatesAsync(context, routedRows, cancellationToken).ConfigureAwait(false);
+		if (overlapAnalysis.DuplicateRows > 0)
+		{
+			logger.LogWarning("Blocked overlapping QuickBooks import for {FileName}: duplicateRows={DuplicateRows}", fileName, overlapAnalysis.DuplicateRows);
+			return new QuickBooksImportCommitResponse(
+				Path.GetFileName(fileName),
+				fileHash,
+				selectedEnterprise,
+				selectedFiscalYear,
+				0,
+				0,
+				true,
+				BuildOverlapBlockedStatusMessage(overlapAnalysis.DuplicateRows),
+				[$"{overlapAnalysis.DuplicateRows} routed row(s) already exist in the target enterprise scope(s). No changes were made."]);
 		}
 
 		var now = DateTimeOffset.UtcNow;
@@ -152,7 +171,104 @@ public sealed class QuickBooksImportService
 		};
 	}
 
+	private static string BuildPreviewStatusMessage(int rowCount, int duplicateRows, bool fileHashDuplicate)
+		=> fileHashDuplicate
+			? "This QuickBooks export is already imported. The commit step will be blocked."
+			: duplicateRows > 0
+				? BuildOverlapBlockedStatusMessage(duplicateRows)
+				: $"Preview loaded for {rowCount} rows.";
+
+	private static string BuildOverlapBlockedStatusMessage(int duplicateRows)
+		=> $"{duplicateRows} routed row(s) already exist in the target enterprise scope(s). The commit step will be blocked to prevent duplicate ledger postings.";
+
+	private static string NormalizeSignatureText(string? value)
+		=> string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToUpperInvariant();
+
+	private static string NormalizeSignatureDate(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+			? parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+			: NormalizeSignatureText(value);
+	}
+
+	private static string BuildLedgerSignature(QuickBooksImportPreviewRow row)
+		=> string.Join("|",
+			NormalizeSignatureText(row.RoutedEnterprise),
+			NormalizeSignatureDate(row.EntryDate),
+			NormalizeSignatureText(row.EntryType),
+			NormalizeSignatureText(row.TransactionNumber),
+			NormalizeSignatureText(row.Name),
+			NormalizeSignatureText(row.Memo),
+			NormalizeSignatureText(row.AccountName),
+			NormalizeSignatureText(row.SplitAccount),
+			row.Amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
+			NormalizeSignatureText(row.ClearedFlag));
+
+	private static string BuildLedgerSignature(LedgerEntry entry)
+		=> string.Join("|",
+			NormalizeSignatureText(entry.EntryScope),
+			entry.EntryDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
+			NormalizeSignatureText(entry.EntryType),
+			NormalizeSignatureText(entry.TransactionNumber),
+			NormalizeSignatureText(entry.Name),
+			NormalizeSignatureText(entry.Memo),
+			NormalizeSignatureText(entry.AccountName),
+			NormalizeSignatureText(entry.SplitAccount),
+			entry.Amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
+			NormalizeSignatureText(entry.ClearedFlag));
+
+	private async Task<DuplicateRowAnalysis> AnalyzeRoutedDuplicatesAsync(AppDbContext context, IReadOnlyList<QuickBooksImportPreviewRow> routedRows, CancellationToken cancellationToken)
+	{
+		if (routedRows.Count == 0)
+		{
+			return new DuplicateRowAnalysis(0, []);
+		}
+
+		var scopes = routedRows
+			.Select(row => row.RoutedEnterprise)
+			.Where(scope => !string.IsNullOrWhiteSpace(scope))
+			.Select(scope => scope!.Trim())
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
+		if (scopes.Count == 0)
+		{
+			return new DuplicateRowAnalysis(0, routedRows.ToList());
+		}
+
+		var existingSignatures = (await context.LedgerEntries
+			.AsNoTracking()
+			.Where(entry => scopes.Contains(entry.EntryScope))
+			.ToListAsync(cancellationToken)
+			.ConfigureAwait(false))
+			.Select(BuildLedgerSignature)
+			.ToHashSet(StringComparer.Ordinal);
+
+		var duplicateRows = 0;
+		var analyzedRows = new List<QuickBooksImportPreviewRow>(routedRows.Count);
+
+		foreach (var row in routedRows)
+		{
+			var isDuplicate = existingSignatures.Contains(BuildLedgerSignature(row));
+			if (isDuplicate)
+			{
+				duplicateRows++;
+			}
+
+			analyzedRows.Add(row with { IsDuplicate = isDuplicate });
+		}
+
+		return new DuplicateRowAnalysis(duplicateRows, analyzedRows);
+	}
+
 	private static string ComputeFileHash(byte[] fileBytes)
 		=> Convert.ToHexString(SHA256.HashData(fileBytes));
+
+	private sealed record DuplicateRowAnalysis(int DuplicateRows, IReadOnlyList<QuickBooksImportPreviewRow> Rows);
 
 }

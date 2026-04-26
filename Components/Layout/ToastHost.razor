@@ -1,0 +1,76 @@
+@* ─────────────────────────────────────────────────────────────────────────
+   ToastHost — shell-level global notification host
+   ─────────────────────────────────────────────────────────────────────────
+   Placed once inside MainLayout.razor so a single SfToast instance serves
+   the entire workspace.  Any injectable component calls ToastService.Show*()
+   and this host renders the result at the viewport's bottom-right corner.
+
+   THREADING / ASYNC
+     OnShow is an Action<ToastRequest> (sync invocation from any component).
+     The handler wraps the SfToast.ShowAsync call in InvokeAsync so the
+     Blazor rendering thread processes it correctly even if the caller is
+     running inside a background continuation.
+
+   SEVERITY MAPPING
+     Success  → e-toast-success  (green)
+     Error    → e-toast-danger   (red)
+     Warning  → e-toast-warning  (amber)
+     Info     → e-toast-info     (blue)
+   ─────────────────────────────────────────────────────────────────────────
+*@
+@using Syncfusion.Blazor.Notifications
+@using WileyCoWeb.Services
+@inject ToastService ToastService
+@implements IDisposable
+
+@* ID exposed for CSS targeting; no Target set so the container renders
+   relative to the document body (viewport-level positioning). *@
+<SfToast @ref="_toast"
+         ID="wiley-global-toast"
+         NewestOnTop="true"
+         ShowCloseButton="true"
+         ShowProgressBar="true"
+         ProgressDirection="ProgressDirection.LTR"
+         Width="390">
+    @* Bottom-right is the standard UX convention for transient notifications
+       that do not interrupt workflow; it avoids the top-right AppBar area. *@
+    <ToastPosition X="Right" Y="Bottom" />
+</SfToast>
+
+@code {
+    private SfToast? _toast;
+
+    protected override void OnInitialized()
+        => ToastService.OnShow += HandleShow;
+
+    /// <summary>
+    /// Invoked synchronously on the Blazor rendering thread by ToastService.
+    /// Wraps the async SfToast call in InvokeAsync so it is always dispatched
+    /// on the correct synchronization context regardless of caller origin.
+    /// </summary>
+    private void HandleShow(ToastRequest req)
+        => _ = InvokeAsync(async () =>
+        {
+            if (_toast is null) return;
+
+            var cssClass = req.Level switch
+            {
+                ToastLevel.Success => "e-toast-success wiley-toast-success",
+                ToastLevel.Error   => "e-toast-danger  wiley-toast-error",
+                ToastLevel.Warning => "e-toast-warning wiley-toast-warning",
+                _                  => "e-toast-info    wiley-toast-info"
+            };
+
+            await _toast.ShowAsync(new ToastModel
+            {
+                Title          = req.Title,
+                Content        = req.Content,
+                CssClass       = cssClass,
+                Timeout        = req.TimeoutMs,
+                ShowCloseButton = true
+            });
+        });
+
+    public void Dispose()
+        => ToastService.OnShow -= HandleShow;
+}

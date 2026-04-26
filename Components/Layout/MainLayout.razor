@@ -1,46 +1,118 @@
-﻿@inherits LayoutComponentBase
+﻿@* ─────────────────────────────────────────────────────────────────────────
+   MainLayout — Wiley workspace app shell
+   ─────────────────────────────────────────────────────────────────────────
+   LAYOUT CONTEXT
+     WorkspaceLayoutContext is created here and cascaded to every child
+     component via <CascadingValue>.  All layout state mutations go through
+     the context's Set* methods so any subscriber can react instantly via
+     the OnChange event without prop-drilling.
+
+   PERSISTENCE
+     All layout state is persisted to and restored from localStorage under
+     the consolidated key "wiley.workspace.layout.v2" (JSON object).  The
+     old left-nav key "wiley.workspace.left-nav-collapsed.v2" is read once
+     for backward-compatibility and then migrated into the new key.
+
+   VIEWPORT OBSERVER
+     A JS resize listener (wileyLayout.subscribeResize) reports window width
+     changes.  The LayoutJsBridge inner class receives JS→.NET callbacks and
+     updates LayoutMode on the context so every panel can adapt without
+     polling.
+
+   DISPOSAL
+     IAsyncDisposable is implemented to release the DotNetObjectReference and
+     to clear the context's OnChange subscriber list when the layout tears
+     down (rare in WASM, important in Blazor Server).
+   ───────────────────────────────────────────────────────────────────────── *@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 
+@* CascadingValue IsFixed=false (default) so children re-render when context
+   properties change and StateHasChanged is called on this component. *@
 <CascadingValue Value="_layoutContext">
-    <div class="app-shell @(IsLeftNavCollapsed ? "app-shell-nav-collapsed" : string.Empty)">
+    @* AppShellCssClass includes "app-shell-nav-collapsed" when the rail is
+       docked so CSS rules can collapse rail label text without JS class
+       toggling — the single source of truth lives in the context. *@
+    <div class="@_layoutContext.AppShellCssClass @LayoutModeCssClass">
+        @* EnableRtl: mirrors AppBar chrome (close button, icon placement) for RTL
+           locales.  Driven by WorkspaceLayoutContext.EnableRtl which is set once
+           during startup from document.documentElement.dir via JS interop. *@
         <SfAppBar ID="app-shell-appbar"
                   CssClass="app-shell-appbar"
                   ColorMode="AppBarColor.Primary"
                   Mode="AppBarMode.Dense"
                   IsSticky="true"
-                  Position="AppBarPosition.Top">
+                  Position="AppBarPosition.Top"
+                  EnableRtl="@_layoutContext.EnableRtl">
+            @* Toggle button uses the context's ToggleLeftNavAsync delegate so
+               any component can programmatically trigger the same toggle. *@
             <button id="app-shell-nav-toggle"
                     type="button"
                     class="e-control e-btn e-lib e-inherit app-shell-nav-toggle"
+                    aria-label="@NavigationRailToggleAriaLabel"
+                    aria-expanded="@(!_layoutContext.IsLeftNavCollapsed ? "true" : "false")"
                     @onclick="ToggleLeftNavAsync">
                 <span class="e-btn-icon e-icons e-menu" aria-hidden="true"></span>
-                <span>@NavigationRailToggleText</span>
+                @* app-shell-nav-toggle-label is hidden via CSS on mobile (< 640 px)
+                   so the button shows only the hamburger icon and stays compact. *@
+                <span class="app-shell-nav-toggle-label">@NavigationRailToggleText</span>
             </button>
             <div class="app-shell-brand" aria-label="Wiley.co workspace shell">
                 <span class="app-eyebrow">Wiley.co</span>
                 <span class="app-title">Syncfusion Finance Workspace</span>
             </div>
             <AppBarSpacer />
+            @* Layout-mode badge visible in development; harmless in production. *@
             <span class="app-shell-appbar-copy">Production workspace shell</span>
         </SfAppBar>
 
         <div class="app-shell-body">
+            @* SfSidebar
+               EnableDock    — collapses to a 5 rem icon rail instead of hiding.
+               EnablePersistence — Syncfusion's own session storage for IsOpen;
+                 works alongside our JS localStorage restore for the collapsed
+                 CSS class.  Both are complementary; ours is the authoritative
+                 state source for WorkspaceLayoutContext.
+               IsOpen        — driven by !IsLeftNavCollapsed from the context so
+                 the sidebar and the CSS class stay in sync automatically.
+
+               Responsive sidebar behaviour (driven by LayoutMode from the JS
+               resize observer):
+                 Desktop (≥1024px): Type=Push, no backdrop — sidebar pushes
+                   the content area; rail is always visible docked.
+                 Tablet (640–1023px): Type=Push, no backdrop — same push
+                   behaviour but nav starts collapsed and touch gestures are
+                   enabled so swipe-right reveals the full rail.
+                 Mobile (<640px): Type=Over, ShowBackdrop=true — sidebar slides
+                   over content as a drawer; tap outside to dismiss.  The dock
+                   is still available when the drawer is closed.
+               *@
+            @* EnableRtl: mirrors the sidebar placement and expand direction for RTL
+               locales.  Position stays Left in LTR; Syncfusion flips it to Right
+               automatically when EnableRtl is true. *@
             <SfSidebar ID="app-shell-sidebar"
                        EnableDock="true"
                        DockSize="5rem"
                        Width="19rem"
-                       Type="SidebarType.Push"
+                       Type="@CurrentSidebarType"
                        Position="SidebarPosition.Left"
                        Target=".app-shell-body"
-                       ShowBackdrop="false"
-                       CloseOnDocumentClick="false"
-                       EnableGestures="false"
-                       IsOpen="@(!IsLeftNavCollapsed)"
-                       IsOpenChanged="HandleLeftNavOpenChangedAsync">
+                       ShowBackdrop="@CurrentSidebarShowBackdrop"
+                       CloseOnDocumentClick="@CurrentSidebarCloseOnDocumentClick"
+                       EnableGestures="@CurrentSidebarEnableGestures"
+                       IsOpen="@(!_layoutContext.IsLeftNavCollapsed)"
+                       IsOpenChanged="HandleLeftNavOpenChangedAsync"
+                       EnablePersistence="true"
+                       PersistenceKey="wiley.sidebar.v1"
+                       EnableRtl="@_layoutContext.EnableRtl">
                 <NavMenu />
             </SfSidebar>
 
-            <section id="app-shell-content" class="e-main-content app-shell-content">
+            <section id="app-shell-content"
+                     class="e-main-content app-shell-content"
+                     aria-label="Main workspace content"
+                     role="main">
                 <main class="app-content">
                     @Body
                 </main>
@@ -49,6 +121,11 @@
     </div>
 </CascadingValue>
 
+@* Single global SfToast instance served by ToastService.  Placed outside the
+   CascadingValue tree so it renders above every panel and is never re-mounted
+   when workspace routes change. *@
+<ToastHost />
+
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
@@ -56,79 +133,454 @@
 </div>
 
 @code {
-    private const string LeftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
+    // ── Storage keys ──────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Consolidated localStorage key for all layout state (JSON object).
+    /// Version-suffixed so a schema change can start fresh without stale reads.
+    /// </summary>
+    private const string LayoutStorageKey = "wiley.workspace.layout.v2";
+
+    /// <summary>
+    /// Legacy key kept for one-time backward-compatible migration.
+    /// After the first restore the new consolidated key takes over.
+    /// </summary>
+    private const string LegacyLeftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
+
+    // ── Breakpoints (must match CSS / Tailwind breakpoints) ───────────────────
+
+    /// <summary>Viewport widths below this value → Tablet mode.</summary>
+    private const int TabletBreakpointPx = 1024;
+
+    /// <summary>Viewport widths below this value → Mobile mode.</summary>
+    private const int MobileBreakpointPx = 640;
+
+    // ── Context and bridge ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Single context instance owned by this layout component.
+    /// Cascaded to all children; mutations always flow through here.
+    /// </summary>
     private readonly WorkspaceLayoutContext _layoutContext = new();
-    private bool leftNavCollapsed = true;
-    private bool leftNavStateRestored;
 
-    protected bool IsLeftNavCollapsed => leftNavCollapsed;
+    /// <summary>
+    /// Receives JS→.NET resize callbacks.  Wrapped in a DotNetObjectReference
+    /// so the GC does not collect it while the JS listener is active.
+    /// </summary>
+    private LayoutJsBridge? _jsBridge;
+    private DotNetObjectReference<LayoutJsBridge>? _jsBridgeRef;
 
-    private string NavigationRailToggleText => IsLeftNavCollapsed ? "Expand navigation rail" : "Collapse navigation rail";
+    // ── Init guards ───────────────────────────────────────────────────────────
+
+    /// <summary>Prevents double-restore if OnAfterRenderAsync fires multiple times.</summary>
+    private bool _layoutStateRestored;
+
+    // ── Computed display strings ──────────────────────────────────────────────
+
+    private string NavigationRailToggleText =>
+        _layoutContext.IsLeftNavCollapsed ? "Expand navigation rail" : "Collapse navigation rail";
+
+    private string NavigationRailToggleAriaLabel =>
+        _layoutContext.IsLeftNavCollapsed
+            ? "Expand the navigation rail"
+            : "Collapse the navigation rail";
+
+    // ── Responsive sidebar configuration ──────────────────────────────────────
+    // Derived from LayoutMode so the SfSidebar adapts automatically when the JS
+    // resize observer reports a viewport-width change.
+
+    /// <summary>
+    /// On mobile: Over (slides above content as a drawer).
+    /// On tablet/desktop: Push (sidebar shifts the content area).
+    /// </summary>
+    private SidebarType CurrentSidebarType =>
+        _layoutContext.LayoutMode == WorkspaceLayoutMode.Mobile
+            ? SidebarType.Over
+            : SidebarType.Push;
+
+    /// <summary>
+    /// Show a dark backdrop behind the sidebar on mobile so tapping outside
+    /// the drawer dismisses it naturally.
+    /// </summary>
+    private bool CurrentSidebarShowBackdrop =>
+        _layoutContext.LayoutMode == WorkspaceLayoutMode.Mobile;
+
+    /// <summary>
+    /// On mobile the backdrop tap should close the drawer.
+    /// On tablet/desktop document clicks should not close the docked rail.
+    /// </summary>
+    private bool CurrentSidebarCloseOnDocumentClick =>
+        _layoutContext.LayoutMode == WorkspaceLayoutMode.Mobile;
+
+    /// <summary>
+    /// Enable swipe-to-open/close gestures on tablet and mobile touch screens.
+    /// Disabled on desktop to prevent accidental drag conflicts with chart UIs.
+    /// </summary>
+    private bool CurrentSidebarEnableGestures =>
+        _layoutContext.LayoutMode != WorkspaceLayoutMode.Desktop;
+
+    /// <summary>
+    /// CSS class added to the app-shell root for the current layout mode.
+    /// Used by scoped CSS rules that need to target mobile or tablet states
+    /// without relying solely on viewport media queries.
+    /// </summary>
+    private string LayoutModeCssClass => _layoutContext.LayoutMode switch
+    {
+        WorkspaceLayoutMode.Mobile => "app-shell-mobile",
+        WorkspaceLayoutMode.Tablet => "app-shell-tablet",
+        _                          => string.Empty
+    };
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override void OnInitialized()
     {
+        // Wire the context delegate so any child can call ToggleLeftNavAsync
+        // through the context without needing a direct reference to MainLayout.
         _layoutContext.ToggleLeftNavAsync = ToggleLeftNavAsync;
-        SyncLayoutContext();
+
+        // Set an initial conservative state; localStorage restore follows in
+        // OnAfterRenderAsync once JS interop becomes available.
+        _layoutContext.SetLeftNavCollapsed(true);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || leftNavStateRestored)
+        if (!firstRender || _layoutStateRestored)
         {
             return;
         }
 
-        leftNavStateRestored = true;
+        _layoutStateRestored = true;
 
+        // ── 1. Restore persisted layout state from localStorage ───────────────
+        await RestoreLayoutStateAsync();
+
+        // ── 2. Detect document text direction (RTL languages) ─────────────────
+        await DetectDocumentDirectionAsync();
+
+        // ── 3. Subscribe to viewport resize so LayoutMode stays current ───────
+        await SubscribeViewportResizeAsync();
+    }
+
+    // ── RTL detection ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Reads <c>document.documentElement.dir</c> once on startup and sets
+    /// <see cref="WorkspaceLayoutContext.EnableRtl"/> so every Syncfusion
+    /// component that accepts <c>EnableRtl</c> can mirror its chrome for
+    /// Arabic, Hebrew, Farsi, and other RTL locales without per-component
+    /// configuration spread across the codebase.
+    /// </summary>
+    private async Task DetectDocumentDirectionAsync()
+    {
         try
         {
-            var storedValue = await JSRuntime.InvokeAsync<string?>("wileyWorkspaceStorage.getItem", LeftNavStorageKey);
+            var dir = await JSRuntime.InvokeAsync<string?>(
+                "eval", "document.documentElement.dir");
 
-            if (bool.TryParse(storedValue, out var restoredCollapsedState) && restoredCollapsedState != leftNavCollapsed)
+            if (string.Equals(dir, "rtl", StringComparison.OrdinalIgnoreCase))
             {
-                leftNavCollapsed = restoredCollapsedState;
-                SyncLayoutContext();
+                _layoutContext.SetEnableRtl(true);
                 StateHasChanged();
             }
         }
         catch
         {
+            // Non-fatal: direction defaults to LTR if JS interop is unavailable.
         }
     }
 
-    private Task ToggleLeftNavAsync()
+    // ── localStorage persist / restore ────────────────────────────────────────
+
+    /// <summary>
+    /// Reads the consolidated layout JSON from localStorage and applies it to
+    /// the context.  Falls back to the legacy left-nav key for backward compat.
+    /// If neither key exists the defaults set in OnInitialized remain.
+    /// </summary>
+    private async Task RestoreLayoutStateAsync()
     {
-        return SetLeftNavCollapsedAsync(!leftNavCollapsed);
+        PersistedLayoutState? restored = null;
+
+        try
+        {
+            // Try the consolidated key first.
+            var json = await JSRuntime.InvokeAsync<string?>(
+                "wileyWorkspaceStorage.getItem", LayoutStorageKey);
+
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                restored = System.Text.Json.JsonSerializer.Deserialize<PersistedLayoutState>(json);
+            }
+        }
+        catch
+        {
+            // JS interop or JSON parse error — keep defaults.
+        }
+
+        if (restored is null)
+        {
+            // ── Backward-compatibility migration from the legacy key ───────────
+            restored = await ReadLegacyLayoutStateAsync();
+        }
+
+        if (restored is null)
+        {
+            // Nothing to restore; defaults from OnInitialized are already set.
+            return;
+        }
+
+        // Apply restored state.  Each setter is a no-op if value matches the
+        // current default, which avoids a spurious OnChange notification.
+        _layoutContext.SetLeftNavCollapsed(restored.LeftNavCollapsed);
+        _layoutContext.SetContextRailCollapsed(restored.ContextRailCollapsed);
+        _layoutContext.SetJarvisOpen(restored.JarvisOpen);
+
+        // Re-render so the sidebar IsOpen binding and CSS classes reflect the
+        // restored state immediately on first paint.
+        StateHasChanged();
+
+        // If we read from the legacy key, write the consolidated key now so the
+        // next load uses the new format.
+        if (restored.IsLegacyMigration)
+        {
+            await PersistLayoutStateAsync();
+        }
     }
 
-    private Task HandleLeftNavOpenChangedAsync(bool isOpen)
+    /// <summary>
+    /// Reads the legacy "wiley.workspace.left-nav-collapsed.v2" key written by
+    /// older versions of this component and maps it to a <see cref="PersistedLayoutState"/>.
+    /// Returns <c>null</c> when the key is absent or unreadable.
+    /// </summary>
+    private async Task<PersistedLayoutState?> ReadLegacyLayoutStateAsync()
     {
-        return SetLeftNavCollapsedAsync(!isOpen);
+        try
+        {
+            var legacyValue = await JSRuntime.InvokeAsync<string?>(
+                "wileyWorkspaceStorage.getItem", LegacyLeftNavStorageKey);
+
+            if (bool.TryParse(legacyValue, out var legacyCollapsed))
+            {
+                return new PersistedLayoutState
+                {
+                    LeftNavCollapsed = legacyCollapsed,
+                    IsLegacyMigration = true
+                };
+            }
+        }
+        catch
+        {
+            // Ignore; caller handles null as "use defaults".
+        }
+
+        return null;
     }
 
+    /// <summary>
+    /// Serializes the current layout context state to localStorage under
+    /// <see cref="LayoutStorageKey"/>.  Called after every mutation so the
+    /// next page load can restore the exact shell configuration.
+    /// </summary>
+    private async Task PersistLayoutStateAsync()
+    {
+        try
+        {
+            var state = new PersistedLayoutState
+            {
+                LeftNavCollapsed     = _layoutContext.IsLeftNavCollapsed,
+                ContextRailCollapsed = _layoutContext.IsContextRailCollapsed,
+                JarvisOpen           = _layoutContext.IsJarvisOpen
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(state);
+            await JSRuntime.InvokeVoidAsync(
+                "wileyWorkspaceStorage.setItem", LayoutStorageKey, json);
+        }
+        catch
+        {
+            // Storage errors (private browsing, quota) are non-fatal.
+        }
+    }
+
+    // ── Viewport resize observer ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates the JS bridge object, wraps it in a DotNetObjectReference, and
+    /// registers a debounced JS resize listener.  Also reads the current window
+    /// width immediately so LayoutMode is correct before any resize event fires.
+    /// </summary>
+    private async Task SubscribeViewportResizeAsync()
+    {
+        try
+        {
+            // Read current viewport width synchronously with the subscribe call.
+            var currentWidth = await JSRuntime.InvokeAsync<int>(
+                "wileyLayout.getWindowWidth");
+
+            ApplyLayoutMode(currentWidth);
+
+            // Create the bridge that JS will call back into.
+            _jsBridge = new LayoutJsBridge(OnWindowResized);
+            _jsBridgeRef = DotNetObjectReference.Create(_jsBridge);
+
+            // Register the debounced resize listener in JS.
+            await JSRuntime.InvokeVoidAsync(
+                "wileyLayout.subscribeResize", _jsBridgeRef);
+        }
+        catch
+        {
+            // If JS interop fails (e.g. pre-render), LayoutMode stays Desktop.
+        }
+    }
+
+    /// <summary>
+    /// Called by the JS resize observer (via <see cref="LayoutJsBridge"/>) on
+    /// the Blazor synchronization context.
+    /// </summary>
+    private void OnWindowResized(int windowWidth)
+    {
+        ApplyLayoutMode(windowWidth);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Converts a raw pixel width to a <see cref="WorkspaceLayoutMode"/> and
+    /// applies it to the context.  The context no-ops if the mode is unchanged.
+    /// </summary>
+    private void ApplyLayoutMode(int windowWidth)
+    {
+        var mode = windowWidth < MobileBreakpointPx
+            ? WorkspaceLayoutMode.Mobile
+            : windowWidth < TabletBreakpointPx
+                ? WorkspaceLayoutMode.Tablet
+                : WorkspaceLayoutMode.Desktop;
+
+        _layoutContext.SetLayoutMode(mode);
+
+        // Auto-collapse the left nav when the viewport shrinks to mobile.
+        // This prevents the Push-mode sidebar from squishing content off-screen
+        // before the SfSidebar can switch to Over mode (which happens on the
+        // next Blazor render cycle after SetLayoutMode fires OnChange).
+        if (mode == WorkspaceLayoutMode.Mobile && !_layoutContext.IsLeftNavCollapsed)
+        {
+            _layoutContext.SetLeftNavCollapsed(true);
+        }
+    }
+
+    // ── Left navigation rail mutations ────────────────────────────────────────
+
+    /// <summary>
+    /// Toggles the left navigation rail and persists the new state.
+    /// Exposed via <see cref="WorkspaceLayoutContext.ToggleLeftNavAsync"/>
+    /// so any child component can trigger the toggle through the context.
+    /// </summary>
+    private Task ToggleLeftNavAsync() =>
+        SetLeftNavCollapsedAsync(!_layoutContext.IsLeftNavCollapsed);
+
+    /// <summary>
+    /// Called by the SfSidebar <c>IsOpenChanged</c> event when the sidebar
+    /// opens or closes (e.g. gesture, programmatic collapse).
+    /// </summary>
+    private Task HandleLeftNavOpenChangedAsync(bool isOpen) =>
+        SetLeftNavCollapsedAsync(!isOpen);
+
+    /// <summary>
+    /// Applies a new collapsed state to the context, triggers re-render, and
+    /// persists the full layout state to localStorage.
+    /// </summary>
     private async Task SetLeftNavCollapsedAsync(bool collapsed)
     {
-        if (leftNavCollapsed == collapsed)
+        // SetLeftNavCollapsed is a no-op when value unchanged, but we still need
+        // to avoid the JS persist call if nothing actually changed.
+        if (_layoutContext.IsLeftNavCollapsed == collapsed)
         {
             return;
         }
 
-        leftNavCollapsed = collapsed;
-        SyncLayoutContext();
+        _layoutContext.SetLeftNavCollapsed(collapsed);
         StateHasChanged();
 
+        // Persist the full layout snapshot so every state dimension is saved.
+        await PersistLayoutStateAsync();
+    }
+
+    // ── IAsyncDisposable ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Releases the DotNetObjectReference used by the JS resize observer and
+    /// disposes the context (clears OnChange subscribers).
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        // Ask JS to remove the resize listener before releasing the .NET ref.
         try
         {
-            await JSRuntime.InvokeVoidAsync("wileyWorkspaceStorage.setItem", LeftNavStorageKey, leftNavCollapsed.ToString());
+            if (_jsBridgeRef is not null)
+            {
+                await JSRuntime.InvokeVoidAsync("wileyLayout.unsubscribeResize");
+            }
         }
         catch
         {
+            // JS interop may be unavailable during circuit close — swallow.
         }
+
+        _jsBridgeRef?.Dispose();
+        _jsBridge    = null;
+        _jsBridgeRef = null;
+
+        // Dispose the context to clear subscriber list and prevent leaks.
+        _layoutContext.Dispose();
     }
 
-    private void SyncLayoutContext()
+    // ── Inner types ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Thin bridge class whose single <c>[JSInvokable]</c> method receives the
+    /// viewport width from the debounced JS resize listener and forwards it to
+    /// <c>MainLayout</c> via a stored delegate.
+    ///
+    /// Keeping this as a separate class (rather than <c>[JSInvokable]</c> on
+    /// MainLayout directly) avoids exposing the layout component to JS and
+    /// keeps the DotNetObjectReference lifetime explicit.
+    /// </summary>
+    private sealed class LayoutJsBridge
     {
-        _layoutContext.IsLeftNavCollapsed = leftNavCollapsed;
+        private readonly Action<int> _onWidthChanged;
+
+        internal LayoutJsBridge(Action<int> onWidthChanged)
+        {
+            _onWidthChanged = onWidthChanged;
+        }
+
+        /// <summary>
+        /// Called by JS: <c>dotNetRef.invokeMethodAsync('OnWindowResized', width)</c>.
+        /// Executes on the Blazor synchronization context (WASM: JS thread;
+        /// Server: SignalR dispatch thread).
+        /// </summary>
+        [Microsoft.JSInterop.JSInvokable]
+        public void OnWindowResized(int windowWidth) =>
+            _onWidthChanged(windowWidth);
+    }
+
+    /// <summary>
+    /// DTO used to serialize / deserialize layout state in localStorage.
+    /// Properties match the camelCase JSON emitted by
+    /// <c>System.Text.Json.JsonSerializer</c> with default options.
+    /// </summary>
+    private sealed class PersistedLayoutState
+    {
+        public bool LeftNavCollapsed     { get; set; } = true;
+        public bool ContextRailCollapsed { get; set; }
+        public bool JarvisOpen           { get; set; }
+
+        /// <summary>
+        /// Internal flag: <c>true</c> when this state was read from the legacy
+        /// key and needs to be rewritten into the consolidated key on next save.
+        /// Not serialized to JSON because it is never written to storage.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool IsLegacyMigration { get; set; }
     }
 }

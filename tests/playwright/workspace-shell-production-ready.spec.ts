@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
   seedLeftNavCollapsed,
+  waitForWorkspacePanel,
+  waitForWorkspaceShellRender,
   waitForWorkspaceShell,
 } from "./support/workspace";
 
@@ -29,12 +31,12 @@ test.describe("Workspace Shell", () => {
     const primaryNavigation = page.locator("#workspace-navigation-list");
 
     await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
-    await expect(page.locator("#break-even-summary-panel")).toBeAttached();`r`n    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();`r`n    await expect(page.locator("#break-even-quadrant-grid > section")).toHaveCount(4);
-    await expect(
-      page
-        .locator("#break-even-summary-panel")
-        .getByText("Break-Even Summary", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator("#break-even-panel")).toBeVisible();
+    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
+    await expect(page.locator("#apartment-config-panel")).toBeVisible();
+    await expect(page.locator("#break-even-panel")).toContainText(
+      "Break-Even Quadrants",
+    );
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Break-Even",
     );
@@ -56,12 +58,9 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("link", { name: "Scenario Planner" })
       .click();
-    await expect(page.locator("#scenario-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#scenario-summary-panel")
-        .getByText("Scenario Summary", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator("#scenario-panel")).toBeVisible();
+    await expect(page.locator("#scenario-grid")).toBeVisible();
+    await expect(page.locator("#scenario-edit-status")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Scenario Planner",
     );
@@ -69,12 +68,9 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation
       .getByRole("link", { name: "Customer Viewer" })
       .click();
-    await expect(page.locator("#customer-summary-panel")).toBeAttached();
-    await expect(
-      page
-        .locator("#customer-summary-panel")
-        .getByText("Customer Summary", { exact: true }),
-    ).toBeVisible();
+    await expect(page.locator("#customer-viewer-panel")).toBeVisible();
+    await expect(page.locator("#customer-viewer-dashboard")).toBeVisible();
+    await expect(page.locator("#customer-directory-grid")).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Customer Viewer",
     );
@@ -117,7 +113,7 @@ test.describe("Workspace Shell", () => {
     await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
     await page.setViewportSize({ width: 1279, height: 900 });
 
     const sidebarToggle = page.locator("#app-shell-nav-toggle");
@@ -157,28 +153,43 @@ test.describe("Workspace Shell", () => {
     const routeChecks = [
       {
         route: "/wiley-workspace/break-even",
-        visibleSelector: "#break-even-summary-panel",
+        linkName: "Break-Even",
+        visibleSelector: "#break-even-panel",
       },
-      { route: "/wiley-workspace/rates", visibleSelector: "#rates-panel" },
+      {
+        route: "/wiley-workspace/rates",
+        linkName: "Rates",
+        visibleSelector: "#rates-panel",
+      },
       {
         route: "/wiley-workspace/scenario",
+        linkName: "Scenario Planner",
         visibleSelector: "#scenario-panel",
       },
       {
         route: "/wiley-workspace/customers",
+        linkName: "Customer Viewer",
         visibleSelector: "#customer-viewer-panel",
       },
       {
         route: "/wiley-workspace/data-dashboard",
+        linkName: "Data Dashboard",
         visibleSelector: "#data-dashboard-panel",
       },
     ];
 
     await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto("/wiley-workspace");
+    await waitForWorkspaceShellRender(page);
+
+    const primaryNavigation = page.locator("#workspace-navigation-list");
 
     for (const routeCheck of routeChecks) {
-      await page.goto(routeCheck.route);
-      await waitForWorkspaceShell(page, 30_000);
+      await primaryNavigation
+        .getByRole("link", { name: routeCheck.linkName })
+        .click();
+      await expect(page).toHaveURL(routeCheck.route);
+      await waitForWorkspacePanel(page, routeCheck.visibleSelector, 30_000);
 
       const sidebarToggle = page.locator("#app-shell-nav-toggle");
       await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();
@@ -186,9 +197,7 @@ test.describe("Workspace Shell", () => {
       await sidebarToggle.evaluate((button) => {
         (button as HTMLButtonElement).click();
       });
-      await expect(sidebarToggle).toContainText(
-        "Expand navigation rail",
-      );
+      await expect(sidebarToggle).toContainText("Expand navigation rail");
       await expect(page.locator("#workspace-navigation-list")).toBeVisible();
       await expect(
         page
@@ -197,11 +206,17 @@ test.describe("Workspace Shell", () => {
       ).toBeVisible();
       await expect
         .poll(() =>
-          page.evaluate(() =>
-            window.localStorage.getItem("wiley.workspace.left-nav-collapsed.v2"),
-          ),
+          page.evaluate(() => {
+            const storedState = window.localStorage.getItem(
+              "wiley.workspace.layout.v2",
+            );
+
+            return storedState
+              ? JSON.parse(storedState).LeftNavCollapsed
+              : null;
+          }),
         )
-        .toBe("True");
+        .toBe(true);
       await sidebarToggle.evaluate((button) => {
         (button as HTMLButtonElement).click();
       });
@@ -209,4 +224,3 @@ test.describe("Workspace Shell", () => {
     }
   });
 });
-

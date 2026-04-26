@@ -5,6 +5,8 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Layouts
+@using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Components.Panels
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
@@ -28,7 +30,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
                     <div>
-                        <div class="text-slate-400">Enterprise</div>
+                        <div class="text-slate-400">Selected enterprise</div>
                         <div class="font-semibold text-white">@SelectedEnterprise</div>
                     </div>
                     <div>
@@ -43,6 +45,19 @@
                         <div class="text-slate-400">Break-Even</div>
                         <div class="font-semibold text-emerald-300">@BreakEvenRateDisplay</div>
                     </div>
+                    <div class="col-span-2 sm:col-span-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left">
+                        <div class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-sky-200">Four-enterprise break-even points</div>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            @foreach (var quadrant in HeroBreakEvenQuadrants)
+                            {
+                                <div class="rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2">
+                                    <div class="text-sm font-semibold text-white">@GetHeroBreakEvenLabel(quadrant)</div>
+                                    <div class="mt-1 text-xs text-slate-300">Break-even</div>
+                                    <div class="text-lg font-semibold text-emerald-300">@quadrant.BreakEvenRate.ToString("C2")</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -56,43 +71,77 @@
                 </div>
                 <div class="flex flex-col gap-3 xl:min-w-[38rem]">
                     <div class="grid gap-3 md:grid-cols-3">
-                        <SfButton id="export-customers-excel-button" CssClass="e-primary" IsPrimary="true" Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers to Excel</SfButton>
-                        <SfButton id="export-scenario-excel-button" Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario to Excel</SfButton>
-                        <SfButton id="export-workspace-pdf-button" Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">Download PDF rate packet</SfButton>
+                        @* Export buttons disable during any export operation so concurrent file-writes are prevented *@
+                        <SfButton id="export-customers-excel-button"
+                                  CssClass="e-primary"
+                                  IsPrimary="true"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
+                                  OnClick="ExportCustomerWorkbookAsync">
+                            @(IsExportingDocuments ? "Exporting…" : "Export customers to Excel")
+                        </SfButton>
+                        <SfButton id="export-scenario-excel-button"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
+                                  OnClick="ExportScenarioWorkbookAsync">
+                            @(IsExportingDocuments ? "Exporting…" : "Export scenario to Excel")
+                        </SfButton>
+                        <SfButton id="export-workspace-pdf-button"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
+                                  OnClick="ExportWorkspacePdfAsync">
+                            @(IsExportingDocuments ? "Building PDF…" : "Download PDF rate packet")
+                        </SfButton>
                     </div>
+                    @* Export status row: shows inline spinner dot while export is in-flight *@
                     <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        <span class="font-semibold text-slate-700">Export status:</span> @DocumentExportStatus
+                        @if (IsExportingDocuments)
+                        {
+                            <span class="wiley-export-spinner-inline">
+                                <span class="wiley-pulse-dot" aria-hidden="true"></span>
+                                <span role="status" aria-live="polite"><span class="font-semibold text-slate-700">Export status:</span> @DocumentExportStatus</span>
+                            </span>
+                        }
+                        else
+                        {
+                            <span role="status"><span class="font-semibold text-slate-700">Export status:</span> @DocumentExportStatus</span>
+                        }
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Workspace controls</p>
-                <p class="mt-1 text-sm text-slate-600">Collapse the workspace panel to give charts, grids, and gauges more room.</p>
-            </div>
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <SfButton id="workspace-panel-toggle" CssClass="e-outline" OnClick="ToggleSidebar">@(IsSidebarOpen ? "Collapse workspace panel" : "Open workspace panel")</SfButton>
-            </div>
-        </div>
-
-        <div class="flex flex-col gap-4 lg:flex-row">
-            <aside class="workspace-sidebar transition-all duration-300 @(IsSidebarOpen ? "block w-full lg:w-[22rem] lg:shrink-0" : "hidden lg:block lg:w-16 lg:shrink-0")">
-                <div id="workspace-sidebar-shell" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <SfSplitter @ref="_workspaceSplitter"
+                    ID="workspace-main-splitter"
+                    Height="calc(100vh - 20rem)"
+                    Width="100%"
+                    EnablePersistence="true"
+                    CssClass="workspace-splitter">
+            <SplitterEvents Collapsed="HandleSplitterCollapsed" Expanded="HandleSplitterExpanded" />
+            <SplitterPanes>
+                @* Context Rail – pane 0: enterprise context, navigation, actions *@
+                <SplitterPane Size="280px" Min="48px" Max="420px" Resizable="true" Collapsible="true">
+                    <ContentTemplate>
+                        <div id="workspace-sidebar-shell" class="workspace-pane-context-rail h-full overflow-y-auto overflow-x-hidden space-y-4 p-4">
                     <SfCard ID="workspace-enterprise-context-card">
                             <CardHeader Title="Enterprise Context" SubTitle="Select the active service and fiscal year" />
                             <CardContent>
                                 <div class="space-y-4">
-                                    <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%">
+                                    @* EnablePersistence: restores the selected enterprise across page refreshes so users return to their active workspace context *@
+                                    <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" FilterBarPlaceholder="Search enterprises..." EnablePersistence="true" PersistenceKey="wiley.workspace.enterprise.v1">
                                         <DropDownListEvents TValue="string" TItem="string" ValueChange="HandleEnterpriseChanged" />
                                     </SfDropDownList>
-                                    <SfDropDownList ID="fiscal-year-select" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%">
+                                    @* EnablePersistence: preserves the selected fiscal year as part of the user's active workspace context *@
+                                    <SfDropDownList ID="fiscal-year-select" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" EnablePersistence="true" PersistenceKey="wiley.workspace.fiscal-year.v1">
                                         <DropDownListEvents TValue="int" TItem="int" ValueChange="HandleFiscalYearChanged" />
                                     </SfDropDownList>
-                                    <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" />
-                                    <SfTextBox ID="scenario-description-input" Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" />
-                                    <SfDropDownList ID="saved-scenarios-dropdown" TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%">
+                                    @* MaxLength: prevents runaway scenario names from exceeding the Aurora column width *@
+                                    <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" MaxLength="128" />
+                                    @* MaxLength: caps description length in line with Aurora varchar column size *@
+                                    <SfTextBox ID="scenario-description-input" Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" MaxLength="512" />
+                                    @* EnableVirtualization: scenarios grow unbounded; virtualization keeps the popup responsive at scale *@
+                                    @* EnablePersistence: restores the last-applied scenario selection across page refreshes *@
+                                    <SfDropDownList ID="saved-scenarios-dropdown" TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%" EnableVirtualization="true" FilterBarPlaceholder="Search scenarios..." EnablePersistence="true" PersistenceKey="wiley.workspace.scenario.v1">
                                         <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
                                         <DropDownListEvents TValue="long?" TItem="WorkspaceScenarioSummaryResponse" ValueChange="HandleSavedScenarioChanged" />
                                     </SfDropDownList>
@@ -153,12 +202,16 @@
                                 <span class="@(IsUsingBrowserRestoredState ? "text-sky-700" : "text-emerald-700")"> @CurrentStateSourceStatus</span>
                             </div>
                         </div>
-                    </div>
-                </aside>
+                        </div>
+                    </ContentTemplate>
+                </SplitterPane>
 
-            <main id="workspace-main-content" class="min-w-0 flex-1">
-                <div id="workspace-dashboard" class="w-full flex-1 overflow-auto pr-1">
-                    <div class="workspace-main-shell flex min-h-[calc(100vh-18rem)] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+                @* Main Content – pane 1: active panel router *@
+                <SplitterPane Min="420px" Resizable="true" Collapsible="false">
+                    <ContentTemplate>
+                        <div id="workspace-main-content" class="workspace-pane-main h-full overflow-y-auto overflow-x-hidden">
+                        <div id="workspace-dashboard" class="w-full">
+                    <div class="workspace-main-shell flex flex-col gap-4 p-4 md:p-5">
                         <div id="workspace-breadcrumb" class="border-b border-slate-200 pb-3">
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">@BreadcrumbSection</p>
                             <div class="mt-1 flex items-center gap-2 text-sm text-slate-500">
@@ -168,7 +221,83 @@
                             </div>
                         </div>
 
-                        @if (IsOverviewMode)
+                        @* ── Workspace initialization skeleton ──────────────────────────────
+                           Renders while the first-render persistence cycle is in-flight so the
+                           user never sees a jarring blank canvas.  Replaced by real content as
+                           soon as IsInitializingWorkspace flips false in OnAfterRenderAsync.
+                           ──────────────────────────────────────────────────────────────────── *@
+                        @if (IsInitializingWorkspace)
+                        {
+                            <div id="workspace-init-skeleton" aria-busy="true" aria-label="Workspace initializing" class="space-y-4">
+                                @* Spinner row with descriptive label *@
+                                <div class="flex items-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-5">
+                                    <div class="wiley-panel-spinner-host" style="min-height:3.5rem; width:3.5rem;">
+                                        <SfSpinner Visible="true" Size="32" Type="SpinnerType.Material" />
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-700">Initializing workspace…</p>
+                                        <p class="mt-0.5 text-xs text-slate-500">Restoring saved selections and connecting to live data.</p>
+                                    </div>
+                                </div>
+                                @* Skeleton overview card grid *@
+                                <div class="wiley-overview-skeleton-grid">
+                                    @for (int i = 0; i < 8; i++)
+                                    {
+                                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                                            <div class="wiley-skeleton h-3 w-1/3 rounded"></div>
+                                            <div class="wiley-skeleton h-5 w-2/3 rounded"></div>
+                                            <div class="wiley-skeleton h-3 w-full rounded"></div>
+                                            <div class="wiley-skeleton h-3 w-5/6 rounded"></div>
+                                            <div class="mt-4 wiley-skeleton h-8 w-1/2 rounded-lg"></div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        @* ── Workspace reload overlay ──────────────────────────────────────
+                           A non-blocking spinner banner shown while ReloadWorkspaceAsync runs
+                           (enterprise/year change, manual refresh).  The existing content stays
+                           rendered beneath it so the user sees familiar context while the API
+                           round-trip completes.
+                           ──────────────────────────────────────────────────────────────────── *@
+                        else if (IsLoadingWorkspace)
+                        {
+                            <div id="workspace-reload-skeleton" aria-busy="true" aria-label="Workspace reloading" class="space-y-4">
+                                <div class="flex items-center gap-4 rounded-2xl border border-sky-200 bg-sky-50 px-6 py-4">
+                                    <div class="wiley-panel-spinner-host" style="min-height:3rem; width:3rem;">
+                                        <SfSpinner Visible="true" Size="28" Type="SpinnerType.Material" />
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-sky-900">Loading workspace…</p>
+                                        <p class="mt-0.5 text-xs text-sky-700">@WorkspaceLoadStatus</p>
+                                    </div>
+                                </div>
+                                @* Skeleton rows matching the active mode *@
+                                @if (IsOverviewMode)
+                                {
+                                    <div class="wiley-overview-skeleton-grid">
+                                        @for (int i = 0; i < 6; i++)
+                                        {
+                                            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                                                <div class="wiley-skeleton h-3 w-1/3 rounded"></div>
+                                                <div class="wiley-skeleton h-5 w-2/3 rounded"></div>
+                                                <div class="wiley-skeleton h-3 w-full rounded"></div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                                        <div class="wiley-skeleton h-6 w-1/2 rounded"></div>
+                                        <div class="wiley-skeleton h-4 w-3/4 rounded"></div>
+                                        <div class="wiley-skeleton h-4 w-2/3 rounded"></div>
+                                        <div class="mt-4 wiley-skeleton h-48 w-full rounded-xl"></div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (IsOverviewMode)
                         {
                             <section id="workspace-overview-dashboard" class="workspace-overview-grid flex-1" aria-label="Workspace overview panels">
                                 <article id="overview-break-even" class="workspace-overview-card workspace-overview-card-featured">
@@ -182,6 +311,19 @@
                                         </div>
                                     </div>
                                     <button type='button' class='workspace-card-link workspace-card-link-primary' @onclick='() => OpenPanel("break-even")'>Open Break-Even</button>
+                                </article>
+
+                                <article id="overview-apartment-config" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Apartment Config</p>
+                                        <h3>Apartment unit mix</h3>
+                                        <p>Edit unit counts, rent assumptions, and bedroom weighting for the Apartments enterprise without leaving the workspace shell.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Units @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount).ToString("N0")</span>
+                                            <span>Revenue @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount * unitType.MonthlyRent).ToString("C0")</span>
+                                        </div>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("apartment-config")'>Open Apartment Config</button>
                                 </article>
 
                                 <article id="overview-rates" class="workspace-overview-card workspace-overview-card-featured">
@@ -222,6 +364,46 @@
                                         <p>@FilteredCustomerCountDisplay customers currently match the active filters for export and operational review.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("customers")'>Open Customer Viewer</button>
+                                </article>
+
+                                <article id="overview-affordability" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Affordability</p>
+                                        <h3>Bill burden versus MHI</h3>
+                                        <p>See how modeled monthly bills compare to median household income across customer classes and rate scenarios.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("affordability")'>Open Affordability</button>
+                                </article>
+
+                                <article id="overview-debt-coverage" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Debt Coverage</p>
+                                        <h3>DSCR and covenant headroom</h3>
+                                        <p>Check annual revenue against debt service, compare the ratio to a covenant floor, and inspect residual headroom.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("debt-coverage")'>Open Debt Coverage</button>
+                                </article>
+
+                                <article id="overview-capital-gap" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Capital Gap</p>
+                                        <h3>Capital needs versus rate revenue</h3>
+                                        <p>Track capital-tagged budget items against rate revenue and watch the cumulative headroom line move as items accumulate.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("capital-gap")'>Open Capital Gap</button>
+                                </article>
+
+                                <article id="overview-reserve-trajectory" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Reserve Trajectory</p>
+                                        <h3>Forecast reserve runway</h3>
+                                        <p>Review current reserves, the recommended reserve floor, and the forecast outlook before opening the trajectory panel.</p>
+                                        <div class="workspace-overview-card-metrics">
+                                            <span>Current @(ReserveTrajectory is null ? "Unavailable" : ReserveTrajectory.CurrentReserves.ToString("C0"))</span>
+                                            <span>Policy minimum @(ReserveTrajectory is null ? "Unavailable" : ReserveTrajectory.RecommendedReserveLevel.ToString("C0"))</span>
+                                        </div>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("reserve-trajectory")'>Open Reserve Trajectory</button>
                                 </article>
 
                                 <article id="overview-trends" class="workspace-overview-card">
@@ -272,12 +454,17 @@
                                                         BreakEvenRateDisplay="@BreakEvenRateDisplay"
                                                         IsSavingBaseline="@IsSavingBaseline"
                                                         BaselineSaveStatus="@BaselineSaveStatus"
-                                                        GaugeMaximum="@GaugeMaximum"
-                                                        GaugeCurrentRateValue="@GaugeCurrentRateValue"
-                                                        RateComparison="@RateComparison"
+                                                        Quadrants="@BreakEvenQuadrants"
+                                                        ApartmentUnitTypes="@ApartmentUnitTypes"
                                                         OnTotalCostsChanged="HandleTotalCostsChanged"
                                                         OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
-                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync" />
+                                                        OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync"
+                                                        OnApartmentUnitTypesChanged="HandleApartmentUnitTypesChanged" />
+                                        break;
+                                    case "apartment-config":
+                                        <ApartmentConfigPanel @key="ActivePanelKey"
+                                                              UnitTypes="@ApartmentUnitTypes"
+                                                              OnUnitTypesChanged="HandleApartmentUnitTypesChanged" />
                                         break;
                                     case "rates":
                                         <RatesPanel @key="ActivePanelKey"
@@ -310,8 +497,30 @@
                                     case "customers":
                                         <CustomerViewerPanel @key="ActivePanelKey" />
                                         break;
+                                    case "affordability":
+                                        <AffordabilityDashboardPanel @key="ActivePanelKey"
+                                                                     Customers="@Customers"
+                                                                     SelectedEnterprise="@SelectedEnterprise"
+                                                                     SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
                                     case "trends":
                                         <TrendsPanel @key="ActivePanelKey" ProjectionSeries="@ProjectionSeries" />
+                                        break;
+                                    case "reserve-trajectory":
+                                        <ReserveTrajectoryPanel @key="ActivePanelKey"
+                                                               Trajectory="@ReserveTrajectory"
+                                                               OnExportPdf="ExportReserveTrajectoryPdfAsync"
+                                                               OnExportExcel="ExportReserveTrajectoryWorkbookAsync" />
+                                        break;
+                                    case "debt-coverage":
+                                        <DebtCoveragePanel @key="ActivePanelKey"
+                                                           SelectedEnterprise="@SelectedEnterprise"
+                                                           SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
+                                    case "capital-gap":
+                                        <CapitalGapPanel @key="ActivePanelKey"
+                                                         SelectedEnterprise="@SelectedEnterprise"
+                                                         SelectedFiscalYear="@SelectedFiscalYear" />
                                         break;
                                     case "decision-support":
                                         <DecisionSupportPanel @key="ActivePanelKey" />
@@ -338,32 +547,41 @@
                             </div>
                         }
                     </div>
-                </div>
-            </main>
-        </div>
+                        </div>
+                        </div>
+                    </ContentTemplate>
+                </SplitterPane>
+
+                @* Jarvis Rail – pane 2: AI chat, starts collapsed *@
+                <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true" Collapsed="true">
+                    <ContentTemplate>
+                        <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
+                            <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b border-slate-200 px-4 py-3 flex-shrink-0">
+                                <span class="e-icons e-ai-chat text-sky-600 text-base flex-shrink-0" aria-hidden="true"></span>
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Jarvis</p>
+                                    <p class="mt-0.5 text-[0.7rem] text-slate-400 leading-tight">AI workspace guidance</p>
+                                </div>
+                            </div>
+                            <div class="min-h-0 flex-1 overflow-auto p-3">
+                                <JarvisChatPanel />
+                            </div>
+                        </div>
+                    </ContentTemplate>
+                </SplitterPane>
+            </SplitterPanes>
+        </SfSplitter>
 
         @if (!string.Equals(ActivePanelKey, "decision-support", StringComparison.Ordinal) && !IsJarvisOpen)
         {
-            <SfButton id="workspace-jarvis-launcher" CssClass="e-primary fixed bottom-6 right-6 z-40 shadow-xl" IsPrimary="true" OnClick="ToggleJarvis">
-                <span class="e-icons e-ai-chat"></span>
+            <SfButton id="workspace-jarvis-launcher"
+                      CssClass="e-primary fixed bottom-6 right-6 z-40 shadow-xl"
+                      IsPrimary="true"
+                      OnClick="ToggleJarvisAsync"
+                      title="Open Jarvis AI guidance rail">
+                <span class="e-icons e-ai-chat" aria-hidden="true"></span>
                 Jarvis
             </SfButton>
-        }
-
-        @if (!string.Equals(ActivePanelKey, "decision-support", StringComparison.Ordinal) && IsJarvisOpen)
-        {
-            <div id="workspace-jarvis-dock" class="fixed bottom-6 right-6 z-50 flex h-[34rem] w-[min(30rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-                <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Jarvis</p>
-                        <p class="mt-1 text-sm text-slate-600">Always-available workspace guidance.</p>
-                    </div>
-                    <SfButton CssClass="e-flat" OnClick="ToggleJarvis">Close</SfButton>
-                </div>
-                <div class="min-h-0 flex-1 overflow-auto p-3">
-                    <JarvisChatPanel />
-                </div>
-            </div>
         }
     </div>
 </div>
@@ -384,9 +602,68 @@
 </LoggingErrorBoundary>
 
 <style>
-    .wiley-workspace .workspace-sidebar {
-        max-height: calc(100vh - 14rem);
-        overflow: auto;
+    /* ── SfSplitter rail layout ─────────────────────────────────────────── */
+
+    .workspace-splitter.e-splitter {
+        border-radius: 0.75rem;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+
+    /* Pane backgrounds */
+    .workspace-splitter .e-pane {
+        background: #ffffff;
+    }
+
+    /* Split-bar styling */
+    .workspace-splitter .e-split-bar {
+        background: rgba(226, 232, 240, 0.65);
+        border: none;
+        transition: background 120ms ease;
+    }
+
+    .workspace-splitter .e-split-bar:hover,
+    .workspace-splitter .e-split-bar.e-split-bar-hover {
+        background: rgba(14, 165, 233, 0.2);
+    }
+
+    .workspace-splitter .e-navigate-arrow {
+        color: #64748b;
+    }
+
+    /* Context rail – pane 0 */
+    .workspace-pane-context-rail {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Main content – pane 1 */
+    .workspace-pane-main {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 1.25rem;
+    }
+
+    .workspace-main-shell {
+        min-height: 100%;
+        background: #ffffff;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    /* Jarvis rail – pane 2 */
+    .workspace-pane-jarvis {
+        height: 100%;
+        border-left: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    .workspace-jarvis-rail-header {
+        background: linear-gradient(180deg, #f8fafc, #ffffff);
+        flex-shrink: 0;
     }
 
     .wiley-workspace .e-card {
@@ -518,10 +795,6 @@
     }
 
     @@media (max-width: 1024px) {
-        .wiley-workspace .workspace-sidebar {
-            max-height: none;
-        }
-
         .wiley-workspace .workspace-overview-card,
         .wiley-workspace .workspace-overview-card-featured,
         .wiley-workspace .workspace-overview-card-wide {
@@ -536,3 +809,67 @@
         }
     }
 </style>
+
+@code {
+    private SfSplitter? _workspaceSplitter;
+
+    /// <summary>
+    /// Expands or collapses the Jarvis AI chat pane (pane 2) in the SfSplitter
+    /// and keeps <see cref="WorkspaceLayoutContext.IsJarvisOpen"/> in sync via
+    /// the layout context so every subscriber observes the change.
+    /// </summary>
+    private async Task ToggleJarvisAsync()
+    {
+        // ToggleJarvis() calls LayoutContext.SetJarvisOpen(!current) which fires
+        // OnChange — any subscriber (e.g. a decision-support badge) re-renders.
+        ToggleJarvis();
+
+        if (IsJarvisOpen)
+            await (_workspaceSplitter?.ExpandAsync(2) ?? Task.CompletedTask);
+        else
+            await (_workspaceSplitter?.CollapseAsync(2) ?? Task.CompletedTask);
+    }
+
+    /// <summary>
+    /// Called by <c>SplitterEvents.Collapsed</c>. Notifies the layout context
+    /// so <see cref="WorkspaceLayoutContext.IsJarvisOpen"/> and
+    /// <see cref="WorkspaceLayoutContext.IsContextRailCollapsed"/> stay in sync
+    /// with the actual splitter state.
+    /// </summary>
+    private void HandleSplitterCollapsed(Syncfusion.Blazor.Layouts.ExpandedEventArgs args)
+    {
+        if (args.Index.Contains(2) && IsJarvisOpen)
+        {
+            // Jarvis pane was closed externally (drag handle) — sync the context.
+            LayoutContext?.SetJarvisOpen(false);
+            StateHasChanged();
+        }
+
+        if (args.Index.Contains(0) && !IsContextRailCollapsed)
+        {
+            // Context rail pane was collapsed — notify the context so panels can
+            // adapt their widths (e.g. chart containers relayout).
+            NotifyContextRailCollapsed();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Called by <c>SplitterEvents.Expanded</c>. Mirrors the splitter state
+    /// back into the layout context.
+    /// </summary>
+    private void HandleSplitterExpanded(Syncfusion.Blazor.Layouts.ExpandedEventArgs args)
+    {
+        if (args.Index.Contains(2) && !IsJarvisOpen)
+        {
+            LayoutContext?.SetJarvisOpen(true);
+            StateHasChanged();
+        }
+
+        if (args.Index.Contains(0) && IsContextRailCollapsed)
+        {
+            NotifyContextRailExpanded();
+            StateHasChanged();
+        }
+    }
+}
