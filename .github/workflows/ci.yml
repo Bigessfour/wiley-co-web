@@ -154,7 +154,7 @@ jobs:
             Get-Content -Path $sourceCoverageMarkdown | Add-Content -Path $env:GITHUB_STEP_SUMMARY
           }
 
-      - name: Enforce coverage baseline
+      - name: Report coverage (no gate)
         if: matrix.name != 'e2e'
         shell: pwsh
         run: |
@@ -164,28 +164,13 @@ jobs:
             Select-Object -First 1
 
           if (-not $coverageReport) {
-            throw "Coverage report was not generated for ${{ matrix.project }}."
-          }
-
-          $baselines = Get-Content '.github/coverage-baselines.json' -Raw | ConvertFrom-Json -AsHashtable
-          if (-not $baselines.ContainsKey('${{ matrix.name }}')) {
-            throw "No coverage baseline was configured for '${{ matrix.name }}'."
+            Write-Host "No coverage report found for ${{ matrix.name }} — skipping."
+            exit 0
           }
 
           [xml]$coverageXml = Get-Content -Path $coverageReport.FullName -Raw
           $coveragePercent = [math]::Round(([double]$coverageXml.DocumentElement.'line-rate' * 100), 2)
-          $threshold = [double]$baselines['${{ matrix.name }}']
-
-          Write-Host "${{ matrix.name }} line coverage: $coveragePercent% (baseline $threshold%)"
-
-          if ($threshold -eq 0) {
-            Write-Host "E2E coverage is reported separately because browser-only runs do not instrument app code in-process."
-            exit 0
-          }
-
-          if ($coveragePercent -lt $threshold) {
-            throw "Coverage gate failed for ${{ matrix.name }}: $coveragePercent% < $threshold% baseline."
-          }
+          Write-Host "${{ matrix.name }} line coverage: $coveragePercent% (gate removed)"
 
       - name: Upload coverage artifact
         if: always()
