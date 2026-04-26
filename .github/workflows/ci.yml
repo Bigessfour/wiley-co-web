@@ -45,6 +45,14 @@ jobs:
         with:
           dotnet-version: 9.0.313
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.lock.json', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Restore dependencies
         run: dotnet restore ${{ matrix.project }} --locked-mode
 
@@ -201,6 +209,14 @@ jobs:
         with:
           dotnet-version: 9.0.313
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.lock.json', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Restore dependencies
         run: dotnet restore WileyCoWeb.slnx --locked-mode
 
@@ -235,6 +251,20 @@ jobs:
         with:
           dotnet-version: 9.0.313
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.lock.json', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore .NET dependencies
+        run: dotnet restore WileyCoWeb.slnx --locked-mode
+
+      - name: Build .NET projects (pre-build for --no-build server startup)
+        run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
       - name: Setup Node.js 20
         uses: actions/setup-node@v5
         with:
@@ -244,7 +274,17 @@ jobs:
       - name: Restore Node dependencies
         run: npm ci
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ${{ env.LOCALAPPDATA }}\ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npm run playwright:install
 
       - name: Run Node Playwright UI suite

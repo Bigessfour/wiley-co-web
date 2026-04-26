@@ -34,7 +34,7 @@ export default defineConfig({
     ? [
         {
           command:
-            "dotnet run --project WileyCoWeb.Api/WileyCoWeb.Api.csproj --launch-profile WileyCoWeb.Api --urls http://127.0.0.1:5231",
+            "dotnet run --project WileyCoWeb.Api/WileyCoWeb.Api.csproj --no-build --launch-profile WileyCoWeb.Api --urls http://127.0.0.1:5231",
           url: `${defaultLocalApiURL}/health`,
           reuseExistingServer: false,
           timeout: 180_000,
@@ -44,7 +44,7 @@ export default defineConfig({
         },
         {
           command:
-            "dotnet run --project WileyCoWeb.csproj --launch-profile http --urls http://localhost:5230 -p:DebugType=none -p:DebugSymbols=false",
+            "dotnet run --project WileyCoWeb.csproj --no-build --launch-profile http --urls http://localhost:5230 -p:DebugType=none -p:DebugSymbols=false",
           url: defaultLocalBaseURL,
           reuseExistingServer: false,
           timeout: 180_000,
