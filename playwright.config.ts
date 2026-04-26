@@ -3,34 +3,35 @@ import { defineConfig, devices } from "@playwright/test";
 const defaultLocalBaseURL = "http://localhost:5230";
 const defaultLocalApiURL = "http://127.0.0.1:5231";
 const normalizeBaseURL = (value: string) => value.replace(/\/$/, "");
-const baseURL = normalizeBaseURL(
-  process.env.WILEYCO_E2E_BASE_URL ?? defaultLocalBaseURL,
-);
-const useManagedWebServer = baseURL === defaultLocalBaseURL;
+const isCI = process.env.CI === "true";
+const ciWwwroot = "./publish_output/wwwroot";
+const ciApiDll = "./api_output/WileyCoWeb.Api.dll";
 
-export default defineConfig({
-  testDir: "./tests/playwright",
-  timeout: 60_000,
-  expect: {
-    timeout: 15_000,
-  },
-  globalSetup: "./tests/playwright/global-setup.ts",
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI || useManagedWebServer ? 1 : undefined,
-  reporter: [
-    ["list"],
-    ["html", { open: "never", outputFolder: "playwright-report" }],
-    ["json", { outputFile: "playwright-report/results.json" }],
-  ],
-  use: {
-    baseURL,
-    trace: "on-first-retry",
-    screenshot: "only-on-failure",
-    video: "retain-on-failure",
-  },
-  webServer: useManagedWebServer
+const finalBaseURL = isCI
+  ? normalizeBaseURL(process.env.WILEYCO_E2E_BASE_URL ?? defaultLocalBaseURL)
+  : normalizeBaseURL(process.env.WILEYCO_E2E_BASE_URL ?? defaultLocalBaseURL);
+
+const useManagedWebServer = !isCI && finalBaseURL === defaultLocalBaseURL;
+const finalWebServer = isCI
+  ? [
+      {
+        command:
+          'bash -lc "cd ./api_output && dotnet ./WileyCoWeb.Api.dll --urls http://127.0.0.1:5231"',
+        url: `${defaultLocalApiURL}/health`,
+        reuseExistingServer: true,
+        timeout: 120_000,
+        env: {
+          ASPNETCORE_ENVIRONMENT: "Development",
+        },
+      },
+      {
+        command: `node ./Scripts/serve-wwwroot.mjs --root ${ciWwwroot} --port 5230`,
+        url: defaultLocalBaseURL,
+        reuseExistingServer: true,
+        timeout: 60_000,
+      },
+    ]
+  : useManagedWebServer
     ? [
         {
           command:
@@ -54,7 +55,31 @@ export default defineConfig({
           },
         },
       ]
-    : undefined,
+    : undefined;
+
+export default defineConfig({
+  testDir: "./tests/playwright",
+  timeout: 60_000,
+  expect: {
+    timeout: 15_000,
+  },
+  globalSetup: "./tests/playwright/global-setup.ts",
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI || useManagedWebServer ? 1 : undefined,
+  reporter: [
+    ["list"],
+    ["html", { open: "never", outputFolder: "playwright-report" }],
+    ["json", { outputFile: "playwright-report/results.json" }],
+  ],
+  use: {
+    baseURL: finalBaseURL,
+    trace: isCI ? "on" : "on-first-retry",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
+  },
+  webServer: finalWebServer,
   projects: [
     {
       name: "chromium",

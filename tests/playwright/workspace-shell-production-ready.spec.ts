@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
   seedLeftNavCollapsed,
+  waitForWorkspacePanel,
+  waitForWorkspaceShellRender,
   waitForWorkspaceShell,
 } from "./support/workspace";
 
@@ -111,7 +113,7 @@ test.describe("Workspace Shell", () => {
     await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
     await page.setViewportSize({ width: 1279, height: 900 });
 
     const sidebarToggle = page.locator("#app-shell-nav-toggle");
@@ -151,28 +153,43 @@ test.describe("Workspace Shell", () => {
     const routeChecks = [
       {
         route: "/wiley-workspace/break-even",
+        linkName: "Break-Even",
         visibleSelector: "#break-even-panel",
       },
-      { route: "/wiley-workspace/rates", visibleSelector: "#rates-panel" },
+      {
+        route: "/wiley-workspace/rates",
+        linkName: "Rates",
+        visibleSelector: "#rates-panel",
+      },
       {
         route: "/wiley-workspace/scenario",
+        linkName: "Scenario Planner",
         visibleSelector: "#scenario-panel",
       },
       {
         route: "/wiley-workspace/customers",
+        linkName: "Customer Viewer",
         visibleSelector: "#customer-viewer-panel",
       },
       {
         route: "/wiley-workspace/data-dashboard",
+        linkName: "Data Dashboard",
         visibleSelector: "#data-dashboard-panel",
       },
     ];
 
     await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto("/wiley-workspace");
+    await waitForWorkspaceShellRender(page);
+
+    const primaryNavigation = page.locator("#workspace-navigation-list");
 
     for (const routeCheck of routeChecks) {
-      await page.goto(routeCheck.route);
-      await waitForWorkspaceShell(page, 30_000);
+      await primaryNavigation
+        .getByRole("link", { name: routeCheck.linkName })
+        .click();
+      await expect(page).toHaveURL(routeCheck.route);
+      await waitForWorkspacePanel(page, routeCheck.visibleSelector, 30_000);
 
       const sidebarToggle = page.locator("#app-shell-nav-toggle");
       await expect(page.locator(routeCheck.visibleSelector)).toBeVisible();

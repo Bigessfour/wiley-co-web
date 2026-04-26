@@ -356,11 +356,21 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected async Task HandleEnterpriseChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args)
     {
+        if (string.Equals(args.Value, SelectedEnterprise, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         await ReloadWorkspaceAsync(args.Value, SelectedFiscalYear);
     }
 
     protected async Task HandleFiscalYearChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<int, int> args)
     {
+        if (args.Value == SelectedFiscalYear)
+        {
+            return;
+        }
+
         await ReloadWorkspaceAsync(SelectedEnterprise, args.Value);
     }
 

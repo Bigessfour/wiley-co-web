@@ -20,6 +20,7 @@
     "playwright:test:update-snapshots": "playwright test --project=chromium --update-snapshots",
     "playwright:codegen": "playwright codegen http://localhost:5230/wiley-workspace",
     "playwright:report": "playwright show-report",
+    "playwright:test:docker-proof": "pwsh -NoLogo -NoProfile -File ./Scripts/run-playwright-docker-proof.ps1",
     "playwright:agent": "npx playwright-cli",
     "playwright:agent:help": "npx playwright-cli --help",
     "playwright:agent:run": "npx playwright-cli run",

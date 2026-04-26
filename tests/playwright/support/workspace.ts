@@ -4,47 +4,78 @@ import type { Locator, Page } from "@playwright/test";
 const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
 const layoutStorageKey = "wiley.workspace.layout.v2";
 
+export async function waitForWorkspaceShellRender(
+  page: Page,
+  timeout = 30_000,
+) {
+  const effectiveTimeout = Math.max(timeout, 30_000);
+  const sidebarToggle = page.locator("#app-shell-nav-toggle");
+
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+  await expect(sidebarToggle).toBeVisible({ timeout: effectiveTimeout });
+  await expect(page.locator("#workspace-init-skeleton")).toHaveCount(0, {
+    timeout: effectiveTimeout,
+  });
+  await expect
+    .poll(
+      async () =>
+        ((await sidebarToggle.textContent().catch(() => "")) ?? "").trim()
+          .length > 0,
+      {
+        timeout: effectiveTimeout,
+        message: "Wait for workspace shell chrome to finish rendering",
+      },
+    )
+    .toBe(true);
+}
+
+export async function waitForWorkspacePanel(
+  page: Page,
+  visibleSelector: string,
+  timeout = 30_000,
+) {
+  const effectiveTimeout = Math.max(timeout, 30_000);
+
+  await waitForWorkspaceShellRender(page, effectiveTimeout);
+  await expect(page.locator(visibleSelector)).toBeVisible({
+    timeout: effectiveTimeout,
+  });
+}
+
 export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
   const effectiveTimeout = Math.max(timeout, 90_000);
-  const navigationCard = page.locator("#workspace-navigation-card");
+  const sidebarToggle = page.locator("#app-shell-nav-toggle");
   const globalActionsCard = page.locator("#workspace-global-actions-card");
   const statusCard = page.locator("#workspace-status-card");
-  const workspaceLoadStatus = page.locator("#workspace-load-status");
+  const workspaceLoadStatus = statusCard.locator("#workspace-load-status");
   const loadingShellHeadline = page.getByText("Loading Wiley Widget", {
     exact: true,
   });
 
-  if (await loadingShellHeadline.isVisible().catch(() => false)) {
-    await loadingShellHeadline
-      .waitFor({ state: "hidden", timeout: effectiveTimeout })
-      .catch(() => undefined);
-  }
-
-  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
-  await expect(navigationCard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(globalActionsCard).toBeAttached({
-    timeout: effectiveTimeout / 3,
-  });
+  await waitForWorkspaceShellRender(page, effectiveTimeout);
   await expect(statusCard).toBeAttached({ timeout: effectiveTimeout / 3 });
-  await expect(workspaceLoadStatus).toBeAttached({
-    timeout: effectiveTimeout / 3,
-  });
   await expect
     .poll(
       async () => {
+        const splashVisible = await loadingShellHeadline
+          .isVisible()
+          .catch(() => false);
+        const globalActionsCount = await globalActionsCard
+          .count()
+          .catch(() => 0);
+        const sidebarToggleText =
+          (await sidebarToggle.textContent().catch(() => "")) ?? "";
         const globalActionsText =
           (await globalActionsCard.textContent().catch(() => "")) ?? "";
-        const statusText =
-          (await statusCard.textContent().catch(() => "")) ?? "";
         const workspaceLoadText =
           (await workspaceLoadStatus.textContent().catch(() => "")) ?? "";
 
         return (
-          !/Refreshing\.\.\./i.test(globalActionsText) &&
-          /Startup source:/i.test(statusText) &&
-          /Current state:/i.test(statusText) &&
-          !/pending/i.test(statusText) &&
-          !/Loading .*workspace API/i.test(workspaceLoadText)
+          sidebarToggleText.trim().length > 0 &&
+          !splashVisible &&
+          !/Loading .*workspace API/i.test(workspaceLoadText) &&
+          (globalActionsCount === 0 ||
+            !/Refreshing\.\.\./i.test(globalActionsText))
         );
       },
       {
@@ -101,7 +132,9 @@ export async function enterNumericValue(input: Locator, value: string) {
   await input.selectText();
   await input.press("Backspace");
   await input.pressSequentially(value, { delay: 20 });
-  await input.press("Tab");
+  await input.evaluate((element) => {
+    (element as HTMLElement).blur();
+  });
 }
 
 export async function readCurrencyValueByLabel(

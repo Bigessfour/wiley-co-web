@@ -243,6 +243,7 @@ This workspace now carries a separate Node-based Playwright setup for the VS Cod
 - `playwright.config.ts` defines Chromium and WebKit projects, HTML plus JSON reporters, retry-time tracing, and a managed local `dotnet run` web server whenever the effective base URL is the local default `http://localhost:5230`.
 - `npm run playwright:test:hosted` runs the Node Playwright suite against the three verified live hosts: `https://main.d2ellat1y3ljd9.amplifyapp.com`, `https://wileywidget.townofwiley.gov`, and `https://www.wileywidget.townofwiley.gov`.
 - `npm run playwright:test:ci` runs the full local Node Playwright suite with `--project=chromium --project=webkit` so CI covers both engines.
+- `npm run playwright:test:docker-proof` builds the Ubuntu 24.04 Playwright container and runs the same CI path inside Docker Desktop before you push.
 - `.vscode/tasks.json` exposes the same workflow as the `playwright: test hosted` task and writes per-host JSON artifacts under `TestResults/playwright-hosted`.
 - `tests/playwright/workspace-smoke.spec.ts` gives the official Playwright extension and the Playwright Test Runner extension a concrete spec to discover, run, debug, record against, and inspect.
 - `tests/playwright/support/workspace.ts` centralizes shell waits, panel navigation, numeric editing, and visual-snapshot prep so panel specs share the same lifecycle rules.
@@ -250,7 +251,9 @@ This workspace now carries a separate Node-based Playwright setup for the VS Cod
 - `.vscode/mcp.json` registers the `playwright` MCP server with the standard `npx @playwright/mcp@latest` wiring so Copilot and other MCP-capable clients can drive a browser through Playwright tools.
 - `package.json` adds `playwright:*` scripts for browser install, test runs, UI mode, codegen, reports, and agent CLI helpers.
 
-Use the Node-based setup for VS Code testing UI and agent automation. Keep the existing .NET Playwright xUnit suite for the current hosted-site regression coverage.
+Use the Node-based setup for VS Code testing UI and agent automation, but use the Docker proof as the pre-push validation path. The container mirrors the Ubuntu 24.04 GitHub Actions environment, publishes the app, serves `publish_output/wwwroot`, and runs the Chromium + WebKit Playwright pass in one shot.
+
+The managed local `dotnet run` path in `playwright.config.ts` remains available for interactive debugging in the editor, but it is no longer the recommended proof before pushing.
 
 If you want the Node Playwright setup to target a non-local site instead, set `WILEYCO_E2E_BASE_URL` to that host before running Playwright. The config skips the managed `dotnet run` server whenever the effective base URL is not the local default.
 

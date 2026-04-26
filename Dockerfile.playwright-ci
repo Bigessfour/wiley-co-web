@@ -1,0 +1,58 @@
+FROM mcr.microsoft.com/playwright:v1.59.1-noble
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    DOTNET_ROOT=/root/.dotnet
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 9.0.313 --channel 9.0 \
+    && ln -sf /root/.dotnet/dotnet /usr/local/bin/dotnet
+
+RUN dotnet workload install wasm-tools --skip-manifest-update
+
+WORKDIR /workspace
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+RUN dotnet restore WileyCoWeb.csproj --locked-mode
+
+RUN dotnet restore WileyCoWeb.Api/WileyCoWeb.Api.csproj --locked-mode
+
+RUN dotnet publish WileyCoWeb.csproj \
+    -c Release \
+    -o publish_output \
+    --no-restore \
+    -p:PublishTrimmed=false \
+    -p:BlazorWebAssemblyEnableLinking=false \
+    -p:DebuggerSupport=false \
+    -p:RunAnalyzers=false \
+    -p:RunAnalyzersDuringBuild=false \
+    -p:EnforceCodeStyleInBuild=false \
+    -p:DebugType=none \
+    -p:DebugSymbols=false \
+    -p:ContinuousIntegrationBuild=true
+
+RUN dotnet publish WileyCoWeb.Api/WileyCoWeb.Api.csproj \
+    -c Release \
+    -o api_output \
+    --no-restore \
+    -p:PublishTrimmed=false \
+    -p:RunAnalyzers=false \
+    -p:RunAnalyzersDuringBuild=false \
+    -p:EnforceCodeStyleInBuild=false \
+    -p:DebugType=none \
+    -p:DebugSymbols=false \
+    -p:UseAppHost=false \
+    -p:ContinuousIntegrationBuild=true
+
+CMD ["bash"]

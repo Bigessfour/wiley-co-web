@@ -4,6 +4,7 @@ import {
   enterNumericValue,
   gotoWorkspacePanel,
   seedLeftNavCollapsed,
+  waitForWorkspacePanel,
   waitForWorkspaceShell,
 } from "./support/workspace";
 import {
@@ -240,7 +241,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
   }) => {
     await page.goto("/wiley-workspace");
 
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
 
     const documentCenter = page.locator("#workspace-document-center");
     const exportStatus = documentCenter.locator("div.rounded-xl.bg-slate-50");
@@ -297,7 +298,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
     await page.setViewportSize({ width: 1279, height: 900 });
 
     const sidebarToggle = page.locator("#app-shell-nav-toggle");
@@ -327,7 +328,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await seedLeftNavCollapsed(page, false);
     await page.goto("/wiley-workspace");
 
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
     await page.setViewportSize({ width: 1279, height: 900 });
 
     const sidebarToggle = page.locator("#app-shell-nav-toggle");
@@ -404,7 +405,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     ).toBeVisible();
 
     await page.reload();
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#customer-viewer-panel");
 
     await expect(panel).toBeVisible();
     await expect(directoryStatus).toBeVisible();
@@ -474,9 +475,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       });
     });
 
-    await page.goto("/wiley-workspace/quickbooks-import");
-
-    await waitForWorkspaceShell(page);
+    await gotoWorkspacePanel(page, "/wiley-workspace/quickbooks-import");
 
     const statusHeadline = page.locator("#quickbooks-import-status-headline");
     const statusMessage = page.locator("#quickbooks-import-status-message");
@@ -548,9 +547,12 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       await expect(page.locator("#customer-citylimits-chart")).toBeVisible();
     }
 
-    await page.goto("/wiley-workspace/trends");
-
-    await waitForWorkspaceShell(page);
+    await page
+      .locator("#workspace-navigation-list")
+      .getByRole("link", { name: "Trends" })
+      .click();
+    await expect(page).toHaveURL("/wiley-workspace/trends");
+    await waitForWorkspacePanel(page, "#trends-panel");
 
     await expect(page.locator("#trends-panel")).toBeVisible();
     await expect(page.locator("#trends-chart-region")).toBeVisible();
