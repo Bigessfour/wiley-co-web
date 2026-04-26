@@ -189,13 +189,17 @@ test.describe("Workspace Shell", () => {
       ).toBeVisible();
       await expect
         .poll(() =>
-          page.evaluate(() =>
-            window.localStorage.getItem(
-              "wiley.workspace.left-nav-collapsed.v2",
-            ),
-          ),
+          page.evaluate(() => {
+            const storedState = window.localStorage.getItem(
+              "wiley.workspace.layout.v2",
+            );
+
+            return storedState
+              ? JSON.parse(storedState).LeftNavCollapsed
+              : null;
+          }),
         )
-        .toBe("True");
+        .toBe(true);
       await sidebarToggle.evaluate((button) => {
         (button as HTMLButtonElement).click();
       });

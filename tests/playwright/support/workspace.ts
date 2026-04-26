@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
 const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
+const layoutStorageKey = "wiley.workspace.layout.v2";
 
 export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
   const effectiveTimeout = Math.max(timeout, 90_000);
@@ -73,17 +74,24 @@ export async function gotoWorkspacePanel(page: Page, route: string) {
 }
 
 export async function seedLeftNavCollapsed(page: Page, collapsed: boolean) {
-  const storedValue = collapsed.toString();
+  const storedValue = JSON.stringify({
+    LeftNavCollapsed: collapsed,
+    ContextRailCollapsed: false,
+    JarvisOpen: false,
+  });
 
   await page.addInitScript(
-    ({ storageKey, initialValue }) => {
+    ({ currentStorageKey, legacyStorageKey, initialValue, legacyValue }) => {
       try {
-        window.localStorage.setItem(storageKey, initialValue);
+        window.localStorage.setItem(currentStorageKey, initialValue);
+        window.localStorage.setItem(legacyStorageKey, legacyValue);
       } catch {}
     },
     {
-      storageKey: leftNavStorageKey,
+      currentStorageKey: layoutStorageKey,
+      legacyStorageKey: leftNavStorageKey,
       initialValue: storedValue,
+      legacyValue: collapsed.toString(),
     },
   );
 }
