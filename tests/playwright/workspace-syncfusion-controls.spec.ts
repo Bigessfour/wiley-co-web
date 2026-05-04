@@ -86,18 +86,15 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await expect(page.locator("#workspace-document-center")).toBeVisible();
     await expect(sidebarToggle).toBeVisible();
     await expect(panelToggle).toBeVisible();
-    await expect(page.locator("#workspace-jarvis-launcher")).toBeVisible();
 
     await sidebarToggle.evaluate((button) => {
       (button as HTMLButtonElement).click();
     });
     await expect(sidebarToggle).toContainText("Expand navigation rail");
 
+    await expect(panelToggle).toContainText("Collapse workspace panel");
     await panelToggle.click();
     await expect(panelToggle).toContainText("Open workspace panel");
-
-    await page.locator("#workspace-jarvis-launcher").click();
-    await expect(page.locator("#workspace-jarvis-dock")).toBeVisible();
   });
 
   test("workspace shell collapses the sidebar and opens and closes the Jarvis dock", async ({
@@ -123,6 +120,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     });
     await expect(sidebarToggle).toContainText("Expand navigation rail");
 
+    await expect(panelToggle).toContainText("Collapse workspace panel");
     await panelToggle.click();
     await expect(panelToggle).toContainText("Open workspace panel");
     await expect(sidebarRail).toHaveClass(/hidden lg:block lg:w-16/);
