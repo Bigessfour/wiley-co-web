@@ -30,9 +30,19 @@ const playwrightCliPath = join(
 function runHostedTarget(target) {
   return new Promise((resolve) => {
     const outputDir = join(artifactsDir, target.name);
+    const traceArg = process.env.WILEYCO_PLAYWRIGHT_TRACE ?? "on";
+
     const child = spawn(
       process.execPath,
-      [playwrightCliPath, "test", "--reporter=json", "--output", outputDir],
+      [
+        playwrightCliPath,
+        "test",
+        "--trace",
+        traceArg,
+        "--reporter=json",
+        "--output",
+        outputDir,
+      ],
       {
         env: {
           ...process.env,

@@ -1,7 +1,6 @@
 import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
   gotoWorkspacePanel,
   prepareForVisualSnapshot,
   seedLeftNavCollapsed,
@@ -237,8 +236,27 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await dialog.locator("#customer-editor-account-number").fill("PW-1001");
     await dialog.locator("#customer-editor-first-name").fill("Playwright");
     await dialog.locator("#customer-editor-last-name").fill("Customer");
-    await enterNumericValue(dialogSpinbuttons.first(), "12.34");
-    await expect(dialogSpinbuttons.first()).toHaveValue(/12\.34|\$12\.34/);
+    const balanceInput = dialog
+      .locator("#customer-editor-current-balance")
+      .locator("input")
+      .first();
+    await balanceInput.click();
+    await balanceInput.press("Control+a");
+    await balanceInput.press("Backspace");
+    await balanceInput.fill("12.34");
+    await balanceInput.press("Tab");
+    await expect
+      .poll(
+        async () => {
+          const raw = (await balanceInput.inputValue()).trim();
+          return /^12[.,]34$|^\$12[.,]34$/.test(raw);
+        },
+        {
+          timeout: 20_000,
+          message: "Current balance field should accept 12.34",
+        },
+      )
+      .toBe(true);
 
     await dialog.locator("#customer-editor-cancel-button").click();
     await expect(dialog).toBeHidden();

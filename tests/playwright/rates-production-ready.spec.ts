@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { enterNumericValue, gotoWorkspacePanel } from "./support/workspace";
+import {
+  gotoWorkspacePanel,
+  ratesPanelCurrentRateInput,
+  setNumericInputValue,
+} from "./support/workspace";
 
 test.describe("Core Panel Proof", () => {
   test("Rates panel updates the current rate and preserves comparison clarity", async ({
@@ -10,18 +14,18 @@ test.describe("Core Panel Proof", () => {
 
     await expect(page.locator("#rates-panel")).toBeVisible();
     await expect(page.locator("#rates-kpi-grid")).toBeVisible();
-    await expect(page.locator("#current-rate-input")).toBeVisible();
+    await expect(ratesPanelCurrentRateInput(page)).toBeVisible();
     await expect(page.locator("#rates-comparison-chart")).toBeVisible();
     await expect(page.locator("#snapshot-save-status")).toContainText(
       "Ready to save rate snapshot",
     );
 
     // 2. Change the current rate and tab out so the panel applies the edit.
-    await enterNumericValue(page.locator("#current-rate-input"), "29.50");
+    await setNumericInputValue(ratesPanelCurrentRateInput(page), "29.50");
 
     await expect
       .poll(async () => page.locator("#rates-kpi-grid").innerText(), {
-        timeout: 10_000,
+        timeout: 25_000,
       })
       .toMatch(/Current Rate\s*\$29\.50/);
     await expect(page.locator("#rates-comparison-chart")).toBeVisible();

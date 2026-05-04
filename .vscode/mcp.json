@@ -30,12 +30,8 @@
     },
     "sf-blazor-mcp": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@syncfusion/blazor-assistant@latest"],
-      "env": {
-        "Syncfusion_API_Key": "${env:SYNCFUSION_API_KEY}",
-        "Syncfusion_API_Key_Path": "${env:SYNCFUSION_API_KEY_PATH}"
-      }
+      "command": "/bin/bash",
+      "args": ["${workspaceFolder}/Scripts/mcp-sf-blazor-assistant.sh"]
     },
     "playwright-test": {
       "type": "stdio",

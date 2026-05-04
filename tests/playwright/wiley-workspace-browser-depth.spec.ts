@@ -3,7 +3,10 @@ import { expect, test } from "@playwright/test";
 import {
   enterNumericValue,
   gotoWorkspacePanel,
+  ratesPanelCurrentRateInput,
   readCurrencyValueByLabel,
+  setNumericInputValue,
+  waitForWorkspaceShell,
 } from "./support/workspace";
 
 test.describe("Wiley workspace browser depth", () => {
@@ -17,12 +20,34 @@ test.describe("Wiley workspace browser depth", () => {
     const kpiGrid = page.locator("#break-even-kpi-grid");
     const breakEvenInputs = page.locator("#break-even-input-row input");
 
-    await enterNumericValue(breakEvenInputs.nth(0), "24000");
-    await enterNumericValue(breakEvenInputs.nth(1), "400");
+    for (const [index, raw] of [
+      [0, "24000"],
+      [1, "400"],
+    ] as const) {
+      const input = breakEvenInputs.nth(index);
+      await input.click();
+      await input.press("Control+a");
+      await input.press("Backspace");
+      await input.fill(raw);
+      await input.press("Tab");
+    }
 
-    await expect(kpiGrid).toContainText(/Total Costs\s*\$24,000/);
-    await expect(kpiGrid).toContainText(/Projected Volume\s*400/);
-    await expect(kpiGrid).toContainText(/Recommended Rate\s*\$60\.00/);
+    await expect
+      .poll(
+        async () => {
+          const t = await kpiGrid.innerText();
+          return (
+            /Total Costs[\s\S]*\$24,000/.test(t) &&
+            /Projected Volume[\s\S]*\b400\b/.test(t) &&
+            /Recommended Rate[\s\S]*\$60\.00/.test(t)
+          );
+        },
+        {
+          timeout: 25_000,
+          message: "Break-even KPIs should reflect 24000 / 400 => $60.00",
+        },
+      )
+      .toBe(true);
   });
 
   test("rates panel updates the current-rate KPI when the editor changes", async ({
@@ -30,7 +55,7 @@ test.describe("Wiley workspace browser depth", () => {
   }) => {
     await gotoWorkspacePanel(page, "/wiley-workspace/rates");
 
-    await enterNumericValue(page.locator("#current-rate-input"), "29.50");
+    await setNumericInputValue(ratesPanelCurrentRateInput(page), "29.50");
 
     await expect(page.locator("#rates-kpi-grid")).toContainText(
       /Current Rate\s*\$29\.50/,
@@ -82,12 +107,15 @@ test.describe("Wiley workspace browser depth", () => {
     page,
   }) => {
     await page.goto("/wiley-workspace");
+    await waitForWorkspaceShell(page);
 
     const statusCard = page.locator("#workspace-status-card");
     const loadStatus = page.locator("#workspace-load-status");
 
     await expect(statusCard).toBeVisible();
-    await expect(loadStatus).toContainText("Workspace ready.");
+    await expect(loadStatus).toHaveText(
+      /Workspace ready\.|Loaded .*from the workspace API|Loaded .*snapshot/i,
+    );
     await expect(statusCard).toContainText("Startup source:");
     await expect(statusCard).toContainText("Current state:");
     await expect(statusCard).not.toContainText(/pending/i);

@@ -124,7 +124,8 @@
 
                     @if (PreviewRows.Count > 0)
                     {
-                        <SfGrid TValue="QuickBooksImportPreviewRow" DataSource="@PreviewRows" AllowPaging="true" AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true" EnableHover="true" EnableStickyHeader="true" ClipMode="ClipMode.EllipsisWithTooltip" GridLines="GridLine.Horizontal" Height="320">
+                        <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-0">
+                        <SfGrid TValue="QuickBooksImportPreviewRow" DataSource="@PreviewRows" AllowPaging="true" AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true" EnableHover="true" EnableStickyHeader="true" ClipMode="ClipMode.EllipsisWithTooltip" GridLines="GridLine.Horizontal" Height="100%">
                             <GridPageSettings PageSize="5" PageCount="3" />
                             <GridColumns>
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.RowNumber)" HeaderText="Row" Width="70" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
@@ -140,6 +141,7 @@
                                 <GridColumn Field="@nameof(QuickBooksImportPreviewRow.IsDuplicate)" HeaderText="Duplicate" Width="100" Type="Syncfusion.Blazor.Grids.ColumnType.Boolean" />
                             </GridColumns>
                         </SfGrid>
+                        </div>
                     }
                     else
                     {

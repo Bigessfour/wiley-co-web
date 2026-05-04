@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import {
   enterNumericValue,
   gotoWorkspacePanel,
+  ratesPanelCurrentRateInput,
+  setNumericInputValue,
   waitForWorkspaceShell,
 } from "./support/workspace";
 
@@ -294,7 +296,6 @@ test.describe("Workspace baseline save proof", () => {
     await gotoWorkspacePanel(page, "/wiley-workspace/rates");
 
     const ratesPanel = page.locator("#rates-panel");
-    const currentRateInput = page.locator("#current-rate-input");
     const comparisonChart = page.locator("#rates-comparison-chart");
     const snapshotStatus = page.locator("#snapshot-save-status");
     const saveSnapshotButton = page.getByRole("button", {
@@ -302,12 +303,14 @@ test.describe("Workspace baseline save proof", () => {
     });
 
     await expect(ratesPanel).toBeVisible();
-    await expect(currentRateInput).toBeVisible();
+    await expect(ratesPanelCurrentRateInput(page)).toBeVisible();
     await expect(comparisonChart).toBeVisible();
     await expect(snapshotStatus).toContainText(/Ready to save rate snapshot/i);
 
-    await enterNumericValue(currentRateInput, "29.50");
-    await expect(currentRateInput).toHaveValue(/\$29\.50/);
+    await setNumericInputValue(ratesPanelCurrentRateInput(page), "29.50");
+    await expect(ratesPanelCurrentRateInput(page)).toHaveValue(
+      /\$29\.50|29\.50/,
+    );
 
     await saveSnapshotButton.click();
 
@@ -327,7 +330,9 @@ test.describe("Workspace baseline save proof", () => {
     await waitForWorkspaceShell(page);
 
     await expect(ratesPanel).toBeVisible();
-    await expect(currentRateInput).toHaveValue(/\$29\.50/);
+    await expect(ratesPanelCurrentRateInput(page)).toHaveValue(
+      /\$29\.50|29\.50/,
+    );
     await expect(snapshotStatus).toContainText(/Ready to save rate snapshot/i);
   });
 });

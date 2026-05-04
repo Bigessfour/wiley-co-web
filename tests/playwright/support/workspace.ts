@@ -11,12 +11,17 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
   const globalActionsCard = page.locator("#workspace-global-actions-card");
   const statusCard = page.locator("#workspace-status-card");
   const workspaceLoadStatus = page.locator("#workspace-load-status");
-  const loadingShellHeadline = page.getByText("Loading Wiley Widget", {
+  const staticBootHeadline = page.locator("#wiley-static-boot-headline");
+  const legacyLoadingHeadline = page.getByText("Loading Wiley Widget", {
     exact: true,
   });
 
-  if (await loadingShellHeadline.isVisible().catch(() => false)) {
-    await loadingShellHeadline
+  if (await staticBootHeadline.isVisible().catch(() => false)) {
+    await staticBootHeadline
+      .waitFor({ state: "hidden", timeout: effectiveTimeout })
+      .catch(() => undefined);
+  } else if (await legacyLoadingHeadline.isVisible().catch(() => false)) {
+    await legacyLoadingHeadline
       .waitFor({ state: "hidden", timeout: effectiveTimeout })
       .catch(() => undefined);
   }
@@ -80,6 +85,25 @@ export async function enterNumericValue(input: Locator, value: string) {
   await input.press("Tab");
 }
 
+/** Current rate editor in the rates panel (Syncfusion exposes `role="spinbutton"`). */
+export function ratesPanelCurrentRateInput(page: Page) {
+  return page
+    .locator("#rates-panel")
+    .getByRole("spinbutton", { name: "Current Rate" });
+}
+
+/** Reliable for Syncfusion masked inputs on hosted WebKit/Chromium. */
+export async function setNumericInputValue(input: Locator, value: string) {
+  const inner =
+    (await input.locator("input, textarea").count()) > 0
+      ? input.locator("input, textarea").first()
+      : input;
+  await inner.waitFor({ state: "visible", timeout: 30_000 });
+  await inner.click({ clickCount: 3 });
+  await inner.fill(value);
+  await inner.press("Tab");
+}
+
 export async function readCurrencyValueByLabel(
   container: Locator,
   label: string,
@@ -133,4 +157,18 @@ function isHostedWorkspace(page: Page) {
   const url = page.url();
 
   return url.length > 0 && !/^https?:\/\/localhost[:/]/i.test(url);
+}
+
+/** True when Playwright baseURL points at the local dev client (5230), not production hosts. */
+export function isLocalE2EBaseUrl(baseURL: string | undefined): boolean {
+  if (!baseURL) {
+    return false;
+  }
+
+  try {
+    const url = new URL(baseURL);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }

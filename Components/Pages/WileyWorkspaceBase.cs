@@ -41,6 +41,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected HttpClient HttpClient { get; set; } = default!;
 
     [Inject]
+    protected WorkspaceLocalBootstrapService WorkspaceLocalBootstrapService { get; set; } = default!;
+
+    [Inject]
     protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
 
     private bool persistenceInitialized;
@@ -54,6 +57,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsSavingBaseline { get; set; }
     protected bool IsApplyingScenario { get; set; }
     protected bool IsLoadingWorkspace { get; set; }
+    protected bool IsLoadingCouncilDemo { get; set; }
     protected bool IsExportingDocuments { get; set; }
     protected bool IsSidebarOpen { get; set; } = true;
     protected bool IsJarvisOpen { get; set; }
@@ -198,6 +202,49 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected void CloseSidebar()
     {
         IsSidebarOpen = false;
+    }
+
+    protected async Task LoadCouncilDemoSnapshotAsync()
+    {
+        if (IsLoadingCouncilDemo)
+        {
+            return;
+        }
+
+        IsLoadingCouncilDemo = true;
+        WorkspaceLoadStatus = "Loading bundled council demo snapshot...";
+        StateHasChanged();
+
+        try
+        {
+            var data = await WorkspaceLocalBootstrapService.LoadAsync().ConfigureAwait(false);
+            if (data is null)
+            {
+                WorkspaceLoadStatus = "Council demo data was not found in the published bundle.";
+                WorkspaceLogger.LogWarning("Council demo load returned null from workspace-bootstrap.json.");
+                return;
+            }
+
+            const string demoMessage =
+                "Council demo: bundled sample in data/workspace-bootstrap.json (API bypass for presentation).";
+            WorkspaceState.ApplyBootstrap(data);
+            WorkspaceState.SetStartupSource(WorkspaceStartupSource.LocalBootstrapFallback, demoMessage);
+            WorkspaceState.SetCurrentStateSource(WorkspaceStartupSource.LocalBootstrapFallback, demoMessage);
+            WorkspaceLoadStatus = "Loaded council demo snapshot from bundled sample data.";
+            _apiHealth = WorkspaceApiHealth.Degraded;
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            await RefreshScenarioCatalogAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogWarning(ex, "Council demo snapshot load failed.");
+            WorkspaceLoadStatus = $"Council demo load failed: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingCouncilDemo = false;
+            StateHasChanged();
+        }
     }
 
     protected void OpenPanel(string panelKey)
