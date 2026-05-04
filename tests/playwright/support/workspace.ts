@@ -78,11 +78,39 @@ export async function seedLeftNavCollapsed(page: Page, collapsed: boolean) {
 }
 
 export async function enterNumericValue(input: Locator, value: string) {
-  await input.click();
-  await input.selectText();
-  await input.press("Backspace");
-  await input.pressSequentially(value, { delay: 20 });
-  await input.press("Tab");
+  const target =
+    (await input.locator("input, textarea").count()) > 0
+      ? input.locator("input, textarea").first()
+      : input;
+  await target.waitFor({ state: "visible", timeout: 30_000 });
+  await target.click({ clickCount: 3 });
+  await target.fill(value);
+  await target.press("Tab");
+}
+
+/** Break-even inputs are Syncfusion numeric textboxes (`role="spinbutton"`). Prefer these over `#break-even-input-row input`, which can match hidden/helper inputs and fire events on the wrong control. */
+export function breakEvenPanelSpinbuttons(page: Page) {
+  return page.locator("#break-even-input-row").getByRole("spinbutton");
+}
+
+/**
+ * Scenario grid add/edit dialog Cost column: use the same triple-click + fill pattern as other
+ * Syncfusion numerics. Control+A + pressSequentially can append to a partially cleared mask (e.g. 12340 instead of 1234).
+ */
+export async function enterScenarioGridDialogCost(
+  dialog: Locator,
+  value: string,
+) {
+  const costHost = dialog.locator('input[name="Cost"]');
+  await costHost.waitFor({ state: "visible", timeout: 30_000 });
+  const target =
+    (await costHost.locator("input, textarea").count()) > 0
+      ? costHost.locator("input, textarea").first()
+      : costHost;
+  await target.click({ clickCount: 3 });
+  await target.press("Control+a");
+  await target.fill(value);
+  await target.press("Tab");
 }
 
 /** Current rate editor in the rates panel (Syncfusion exposes `role="spinbutton"`). */
@@ -110,7 +138,7 @@ export async function readCurrencyValueByLabel(
 ) {
   const text = await container.innerText();
   const expression = new RegExp(
-    `${escapeRegExp(label)}\\s*\\$([\\d,]+(?:\\.\\d{2})?)`,
+    `${escapeRegExp(label)}\\s*\\$\\s*([\\d,]+(?:\\.\\d{2})?)`,
   );
   const match = text.match(expression);
 
@@ -151,6 +179,18 @@ export async function prepareForVisualSnapshot(page: Page) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Normalize Syncfusion / locale currency textbox values for assertions. */
+export function parseNumericInputDisplay(raw: string): number | undefined {
+  const t = raw.replace(/[$\s]/g, "").trim();
+  if (!t) {
+    return undefined;
+  }
+  if (/^\d+,\d{2}$/.test(t)) {
+    return Number.parseFloat(t.replace(",", "."));
+  }
+  return Number.parseFloat(t.replace(/,/g, ""));
 }
 
 function isHostedWorkspace(page: Page) {

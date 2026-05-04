@@ -2,8 +2,10 @@ import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
   gotoWorkspacePanel,
+  parseNumericInputDisplay,
   prepareForVisualSnapshot,
   seedLeftNavCollapsed,
+  setNumericInputValue,
   waitForWorkspaceShell,
 } from "./support/workspace";
 import {
@@ -234,20 +236,16 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await dialog.locator("#customer-editor-account-number").fill("PW-1001");
     await dialog.locator("#customer-editor-first-name").fill("Playwright");
     await dialog.locator("#customer-editor-last-name").fill("Customer");
-    const balanceInput = dialog
-      .locator("#customer-editor-current-balance")
-      .locator("input")
-      .first();
-    await balanceInput.click();
-    await balanceInput.press("Control+a");
-    await balanceInput.press("Backspace");
-    await balanceInput.fill("12.34");
-    await balanceInput.press("Tab");
+    const balanceSpin = dialog.getByRole("spinbutton", {
+      name: "Current balance",
+    });
+    await setNumericInputValue(balanceSpin, "12.34");
     await expect
       .poll(
         async () => {
-          const raw = (await balanceInput.inputValue()).trim();
-          return /^12[.,]34$|^\$12[.,]34$/.test(raw);
+          const inner = balanceSpin.locator("input, textarea").first();
+          const n = parseNumericInputDisplay(await inner.inputValue());
+          return n !== undefined && Math.abs(n - 12.34) < 0.02;
         },
         {
           timeout: 20_000,

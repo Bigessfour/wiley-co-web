@@ -14,6 +14,7 @@
     "playwright:test:progress": "playwright test --reporter=line",
     "playwright:test:progress:single": "playwright test --reporter=line --workers=1",
     "playwright:test:ci": "playwright test --project=chromium --project=webkit",
+    "playwright:test:last-fixes": "playwright test tests/playwright/break-even-production-ready.spec.ts tests/playwright/scenario-production-ready.spec.ts tests/playwright/wiley-workspace-browser-depth.spec.ts:57 tests/playwright/workspace-baseline-save.spec.ts tests/playwright/workspace-syncfusion-controls.spec.ts:204 --project=chromium --project=webkit",
     "playwright:test:strict": "playwright test --project=chromium --project=webkit && node ./Scripts/assert-playwright-results.mjs",
     "playwright:test:hosted": "node scripts/run-playwright-hosted.js",
     "playwright:test:ui": "playwright test --ui",

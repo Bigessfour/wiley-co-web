@@ -1,7 +1,8 @@
 import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
+  breakEvenPanelSpinbuttons,
+  enterScenarioGridDialogCost,
   gotoWorkspacePanel,
   ratesPanelCurrentRateInput,
   readCurrencyValueByLabel,
@@ -18,19 +19,9 @@ test.describe("Wiley workspace browser depth", () => {
     await gotoWorkspacePanel(page, "/wiley-workspace/break-even");
 
     const kpiGrid = page.locator("#break-even-kpi-grid");
-    const breakEvenInputs = page.locator("#break-even-input-row input");
-
-    for (const [index, raw] of [
-      [0, "24000"],
-      [1, "400"],
-    ] as const) {
-      const input = breakEvenInputs.nth(index);
-      await input.click();
-      await input.press("Control+a");
-      await input.press("Backspace");
-      await input.fill(raw);
-      await input.press("Tab");
-    }
+    const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
+    await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
+    await setNumericInputValue(breakEvenSpinners.nth(1), "400");
 
     await expect
       .poll(
@@ -68,18 +59,18 @@ test.describe("Wiley workspace browser depth", () => {
   }) => {
     await gotoWorkspacePanel(page, "/wiley-workspace/scenario");
 
-    const panel = page.locator("#scenario-panel");
+    const metrics = page.locator("#scenario-metrics-panel");
     const grid = page.locator("#scenario-grid");
     const dialog = page
       .getByRole("dialog")
       .filter({ has: page.locator('input[name="Name"]') })
       .filter({ has: page.locator('input[name="Cost"]') });
     const initialScenarioCostTotal = await readCurrencyValueByLabel(
-      panel,
+      metrics,
       "Scenario Cost Total",
     );
     const initialScenarioBreakEven = await readCurrencyValueByLabel(
-      panel,
+      metrics,
       "Scenario Break-Even",
     );
     const scenarioItemName = `Live test ${Date.now()}`;
@@ -87,17 +78,17 @@ test.describe("Wiley workspace browser depth", () => {
     await page.getByRole("button", { name: "Add" }).click();
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="Name"]').fill(scenarioItemName);
-    await enterNumericValue(dialog.locator('input[name="Cost"]'), "1234");
+    await enterScenarioGridDialogCost(dialog, "1234");
     await dialog.getByRole("button", { name: "Save" }).click();
 
     await expect(grid).toContainText(scenarioItemName);
     await expect
-      .poll(() => readCurrencyValueByLabel(panel, "Scenario Cost Total"))
+      .poll(() => readCurrencyValueByLabel(metrics, "Scenario Cost Total"))
       .toBe(initialScenarioCostTotal + 1234);
     await expect
       .poll(
         async () =>
-          (await readCurrencyValueByLabel(panel, "Scenario Break-Even")) >
+          (await readCurrencyValueByLabel(metrics, "Scenario Break-Even")) >
           initialScenarioBreakEven,
       )
       .toBe(true);

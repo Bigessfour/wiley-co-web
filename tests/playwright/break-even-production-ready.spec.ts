@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { enterNumericValue, gotoWorkspacePanel } from "./support/workspace";
+import {
+  breakEvenPanelSpinbuttons,
+  gotoWorkspacePanel,
+  setNumericInputValue,
+} from "./support/workspace";
 
 test.describe("Core Panel Proof", () => {
   test("Break-even panel recalculates correctly and keeps a clean layout", async ({
@@ -17,9 +21,9 @@ test.describe("Core Panel Proof", () => {
     );
 
     // 2. Change total costs and projected volume through the numeric editors.
-    const breakEvenInputs = page.locator("#break-even-input-row input");
-    await enterNumericValue(breakEvenInputs.nth(0), "24000");
-    await enterNumericValue(breakEvenInputs.nth(1), "400");
+    const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
+    await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
+    await setNumericInputValue(breakEvenSpinners.nth(1), "400");
 
     await expect(page.locator("#break-even-kpi-grid")).toContainText(
       /Total Costs\s*\$24,000/,

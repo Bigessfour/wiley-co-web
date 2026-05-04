@@ -1,3 +1,5 @@
+import os from "node:os";
+
 import { defineConfig, devices } from "@playwright/test";
 
 const defaultLocalBaseURL = "http://localhost:5230";
@@ -26,7 +28,17 @@ export default defineConfig({
       }
       return 1;
     }
-    return process.env.CI || useManagedWebServer ? 1 : undefined;
+    // CI: keep a single worker unless PLAYWRIGHT_WORKERS is set (workflow sets 2).
+    if (process.env.CI) {
+      return 1;
+    }
+    // Local managed API + Blazor: default to several workers so full runs finish
+    // in reasonable time; override with PLAYWRIGHT_WORKERS if needed.
+    if (useManagedWebServer) {
+      const cpus = os.availableParallelism?.() ?? os.cpus().length;
+      return Math.min(Math.max(cpus, 2), 8);
+    }
+    return undefined;
   })(),
   reporter: [
     ["list"],

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
+  breakEvenPanelSpinbuttons,
   gotoWorkspacePanel,
   ratesPanelCurrentRateInput,
   setNumericInputValue,
@@ -135,7 +135,6 @@ test.describe("Workspace baseline save proof", () => {
     const status = page.locator("#baseline-save-status");
     const loadStatus = page.locator("#workspace-load-status");
     const saveButton = page.getByRole("button", { name: "Save baseline" });
-    const breakEvenInputs = page.locator("#break-even-input-row input");
 
     await expect(panel).toBeVisible();
     await expect(kpiGrid).toBeVisible();
@@ -146,8 +145,9 @@ test.describe("Workspace baseline save proof", () => {
     await expect(saveButton).toBeEnabled();
 
     // 2. Change the break-even inputs, then save through the shell action.
-    await enterNumericValue(breakEvenInputs.nth(0), "24000");
-    await enterNumericValue(breakEvenInputs.nth(1), "400");
+    const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
+    await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
+    await setNumericInputValue(breakEvenSpinners.nth(1), "400");
 
     await expect(kpiGrid).toContainText(/Total Costs\s*\$24,000/);
     await expect(kpiGrid).toContainText(/Projected Volume\s*400/);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,8 @@ namespace WileyCoWeb.Components.Pages;
 #pragma warning disable S2325
 public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 {
+    private static readonly CultureInfo WorkspaceUiCulture = CultureInfo.GetCultureInfo("en-US");
+
     protected enum WorkspaceApiHealth { Unknown, Healthy, Degraded }
 
     [Parameter]
@@ -113,14 +116,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected decimal ScenarioAdjustedDelta => WorkspaceState.AdjustedRateDelta;
     protected decimal ScenarioCostTotal => WorkspaceState.ScenarioCostTotal;
 
-    protected string CurrentRateDisplay => CurrentRate.ToString("C2");
-    protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2");
-    protected string RateDeltaDisplay => WorkspaceState.RateDelta.ToString("C2");
-    protected string ScenarioAdjustedRateDisplay => WorkspaceState.AdjustedRecommendedRate.ToString("C2");
-    protected string ScenarioAdjustedDeltaDisplay => WorkspaceState.AdjustedRateDelta.ToString("C2");
-    protected string ScenarioCostTotalDisplay => WorkspaceState.ScenarioCostTotal.ToString("C0");
-    protected string TotalCostsDisplay => TotalCosts.ToString("C0");
-    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0");
+    protected string CurrentRateDisplay => CurrentRate.ToString("C2", WorkspaceUiCulture);
+    protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2", WorkspaceUiCulture);
+    protected string RateDeltaDisplay => WorkspaceState.RateDelta.ToString("C2", WorkspaceUiCulture);
+    protected string ScenarioAdjustedRateDisplay => WorkspaceState.AdjustedRecommendedRate.ToString("C2", WorkspaceUiCulture);
+    protected string ScenarioAdjustedDeltaDisplay => WorkspaceState.AdjustedRateDelta.ToString("C2", WorkspaceUiCulture);
+    protected string ScenarioCostTotalDisplay => WorkspaceState.ScenarioCostTotal.ToString("C0", WorkspaceUiCulture);
+    protected string TotalCostsDisplay => TotalCosts.ToString("C0", WorkspaceUiCulture);
+    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0", WorkspaceUiCulture);
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
     protected double GaugeCurrentRateValue => (double)CurrentRate;
 
