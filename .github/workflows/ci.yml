@@ -237,6 +237,9 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
       PLAYWRIGHT_HTML_OPEN: never
+      # Parallel test workers (Playwright reads PLAYWRIGHT_WORKERS in playwright.config.ts).
+      # 2 is a modest bump on windows-latest; raise only if flakes stay under control.
+      PLAYWRIGHT_WORKERS: "2"
 
     steps:
       - name: Checkout code

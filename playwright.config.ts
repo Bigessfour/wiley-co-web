@@ -17,7 +17,17 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI || useManagedWebServer ? 1 : undefined,
+  workers: (() => {
+    const raw = process.env.PLAYWRIGHT_WORKERS;
+    if (raw != null && raw !== "") {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+      return 1;
+    }
+    return process.env.CI || useManagedWebServer ? 1 : undefined;
+  })(),
   reporter: [
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
