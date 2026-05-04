@@ -6,6 +6,7 @@ WileyCoWeb.Api/appsettings.Development.local.json
 wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 .DS_Store
+.cursor/
 bin/
 obj/
 wwwroot/appsettings.json
@@ -110,4 +111,3 @@ terraform.tfstate
 terraform.tfstate.backup
 .vscode/settings.json
 .vscode/launch.json
-.vscode/tasks.json
