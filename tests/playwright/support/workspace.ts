@@ -11,12 +11,17 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
   const globalActionsCard = page.locator("#workspace-global-actions-card");
   const statusCard = page.locator("#workspace-status-card");
   const workspaceLoadStatus = page.locator("#workspace-load-status");
-  const loadingShellHeadline = page.getByText("Loading Wiley Widget", {
+  const staticBootHeadline = page.locator("#wiley-static-boot-headline");
+  const legacyLoadingHeadline = page.getByText("Loading Wiley Widget", {
     exact: true,
   });
 
-  if (await loadingShellHeadline.isVisible().catch(() => false)) {
-    await loadingShellHeadline
+  if (await staticBootHeadline.isVisible().catch(() => false)) {
+    await staticBootHeadline
+      .waitFor({ state: "hidden", timeout: effectiveTimeout })
+      .catch(() => undefined);
+  } else if (await legacyLoadingHeadline.isVisible().catch(() => false)) {
+    await legacyLoadingHeadline
       .waitFor({ state: "hidden", timeout: effectiveTimeout })
       .catch(() => undefined);
   }
@@ -73,11 +78,58 @@ export async function seedLeftNavCollapsed(page: Page, collapsed: boolean) {
 }
 
 export async function enterNumericValue(input: Locator, value: string) {
-  await input.click();
-  await input.selectText();
-  await input.press("Backspace");
-  await input.pressSequentially(value, { delay: 20 });
-  await input.press("Tab");
+  const target =
+    (await input.locator("input, textarea").count()) > 0
+      ? input.locator("input, textarea").first()
+      : input;
+  await target.waitFor({ state: "visible", timeout: 30_000 });
+  await target.click({ clickCount: 3 });
+  await target.fill(value);
+  await target.press("Tab");
+}
+
+/** Break-even inputs are Syncfusion numeric textboxes (`role="spinbutton"`). Prefer these over `#break-even-input-row input`, which can match hidden/helper inputs and fire events on the wrong control. */
+export function breakEvenPanelSpinbuttons(page: Page) {
+  return page.locator("#break-even-input-row").getByRole("spinbutton");
+}
+
+/**
+ * Scenario grid add/edit dialog Cost column: use the same triple-click + fill pattern as other
+ * Syncfusion numerics. Control+A + pressSequentially can append to a partially cleared mask (e.g. 12340 instead of 1234).
+ */
+export async function enterScenarioGridDialogCost(
+  dialog: Locator,
+  value: string,
+) {
+  const costHost = dialog.locator('input[name="Cost"]');
+  await costHost.waitFor({ state: "visible", timeout: 30_000 });
+  const target =
+    (await costHost.locator("input, textarea").count()) > 0
+      ? costHost.locator("input, textarea").first()
+      : costHost;
+  await target.click({ clickCount: 3 });
+  await target.press("Control+a");
+  await target.fill(value);
+  await target.press("Tab");
+}
+
+/** Current rate editor in the rates panel (Syncfusion exposes `role="spinbutton"`). */
+export function ratesPanelCurrentRateInput(page: Page) {
+  return page
+    .locator("#rates-panel")
+    .getByRole("spinbutton", { name: "Current Rate" });
+}
+
+/** Reliable for Syncfusion masked inputs on hosted WebKit/Chromium. */
+export async function setNumericInputValue(input: Locator, value: string) {
+  const inner =
+    (await input.locator("input, textarea").count()) > 0
+      ? input.locator("input, textarea").first()
+      : input;
+  await inner.waitFor({ state: "visible", timeout: 30_000 });
+  await inner.click({ clickCount: 3 });
+  await inner.fill(value);
+  await inner.press("Tab");
 }
 
 export async function readCurrencyValueByLabel(
@@ -86,7 +138,7 @@ export async function readCurrencyValueByLabel(
 ) {
   const text = await container.innerText();
   const expression = new RegExp(
-    `${escapeRegExp(label)}\\s*\\$([\\d,]+(?:\\.\\d{2})?)`,
+    `${escapeRegExp(label)}\\s*\\$\\s*([\\d,]+(?:\\.\\d{2})?)`,
   );
   const match = text.match(expression);
 
@@ -129,8 +181,34 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Normalize Syncfusion / locale currency textbox values for assertions. */
+export function parseNumericInputDisplay(raw: string): number | undefined {
+  const t = raw.replace(/[$\s]/g, "").trim();
+  if (!t) {
+    return undefined;
+  }
+  if (/^\d+,\d{2}$/.test(t)) {
+    return Number.parseFloat(t.replace(",", "."));
+  }
+  return Number.parseFloat(t.replace(/,/g, ""));
+}
+
 function isHostedWorkspace(page: Page) {
   const url = page.url();
 
   return url.length > 0 && !/^https?:\/\/localhost[:/]/i.test(url);
+}
+
+/** True when Playwright baseURL points at the local dev client (5230), not production hosts. */
+export function isLocalE2EBaseUrl(baseURL: string | undefined): boolean {
+  if (!baseURL) {
+    return false;
+  }
+
+  try {
+    const url = new URL(baseURL);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }

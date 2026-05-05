@@ -25,6 +25,11 @@
                     <p class="mt-2 max-w-3xl text-sm text-slate-300 md:text-base">
                         Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.
                     </p>
+                    <div id="workspace-hero-data-source" class="mt-4 max-w-3xl rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-left text-xs leading-relaxed text-slate-200 md:text-sm">
+                        <div class="font-semibold text-sky-200">Data source</div>
+                        <div class="mt-1"><span class="text-slate-400">Workspace API:</span> @HostingApiHealth · <span class="text-slate-400">Bootstrap:</span> <span class="@(IsUsingStartupFallback ? "text-amber-200" : "text-emerald-200")">@StartupSourceStatus</span></div>
+                        <div class="mt-1 line-clamp-2"><span class="text-slate-400">Current state:</span> @CurrentStateSourceStatus</div>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
                     <div>
@@ -133,6 +138,7 @@
                                 <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="SaveWorkspaceBaselineAsync">@(IsSavingBaseline ? "Saving baseline..." : "Save baseline")</SfButton>
                                 <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingScenario" OnClick="SaveScenarioAsync">@(IsSavingScenario ? "Saving..." : "Save scenario")</SfButton>
                                 <SfButton Disabled="@(!CanApplySelectedScenario || IsApplyingScenario)" OnClick="ApplySelectedScenarioAsync">@(IsApplyingScenario ? "Applying..." : "Apply saved scenario")</SfButton>
+                                <SfButton CssClass="e-outline" Disabled="@IsLoadingCouncilDemo" OnClick="LoadCouncilDemoSnapshotAsync">@(IsLoadingCouncilDemo ? "Loading demo..." : "Load council demo data")</SfButton>
                                 <div class="grid grid-cols-1 gap-2 pt-2">
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers</SfButton>
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario</SfButton>
@@ -156,7 +162,7 @@
                     </div>
                 </aside>
 
-            <main id="workspace-main-content" class="min-w-0 flex-1">
+            <main id="workspace-main-content" class="min-w-0 flex-1 pb-[max(6rem,calc(4.5rem+env(safe-area-inset-bottom,0px)))]">
                 <div id="workspace-dashboard" class="w-full flex-1 overflow-auto pr-1">
                     <div class="workspace-main-shell flex min-h-[calc(100vh-18rem)] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
                         <div id="workspace-breadcrumb" class="border-b border-slate-200 pb-3">
@@ -384,16 +390,75 @@
 </LoggingErrorBoundary>
 
 <style>
+    /* Workspace design tokens (Syncfusion + shell alignment) */
+    .wiley-workspace {
+        --wiley-sf-primary: #0ea5e9;
+        --wiley-sf-primary-hover: #0284c7;
+        --wiley-sf-on-primary: #f8fafc;
+        --wiley-sf-surface: #ffffff;
+        --wiley-sf-border: rgba(148, 163, 184, 0.22);
+        --wiley-sf-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
     .wiley-workspace .workspace-sidebar {
         max-height: calc(100vh - 14rem);
         overflow: auto;
     }
 
+    /* Cards: natural height in content areas (no global stretch). */
     .wiley-workspace .e-card {
-        height: 100%;
-        border: 1px solid rgba(148, 163, 184, 0.22);
+        border: 1px solid var(--wiley-sf-border);
         border-radius: 1rem;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        box-shadow: var(--wiley-sf-shadow-card);
+    }
+
+    /* Primary actions inside workspace — align with sky accent */
+    .wiley-workspace .e-btn.e-primary {
+        background-color: var(--wiley-sf-primary);
+        border-color: var(--wiley-sf-primary);
+        color: var(--wiley-sf-on-primary);
+    }
+
+    .wiley-workspace .e-btn.e-primary:hover,
+    .wiley-workspace .e-btn.e-primary:focus {
+        background-color: var(--wiley-sf-primary-hover);
+        border-color: var(--wiley-sf-primary-hover);
+        color: var(--wiley-sf-on-primary);
+    }
+
+    /* Viewport-aware grid hosts: min height + cap + vh budget (replaces fixed 320/420/560px) */
+    .wiley-workspace .workspace-syncfusion-grid-host {
+        box-sizing: border-box;
+        min-height: 0;
+    }
+
+    .wiley-workspace .workspace-syncfusion-grid-host--compact {
+        min-height: 14rem;
+        height: min(20rem, max(14rem, calc(100vh - 19rem)));
+    }
+
+    .wiley-workspace .workspace-syncfusion-grid-host--medium {
+        min-height: 16rem;
+        height: min(26.25rem, max(16rem, calc(100vh - 21rem)));
+    }
+
+    .wiley-workspace .workspace-syncfusion-grid-host--tall {
+        min-height: 18rem;
+        height: min(35rem, max(18rem, calc(100vh - 22rem)));
+    }
+
+    /* Trends chart: responsive shell so Height="100%" resolves */
+    .wiley-workspace #trends-panel .trends-chart-viewport {
+        min-height: 14rem;
+        height: min(35rem, 70vh);
+        width: 100%;
+    }
+
+    @@media (max-width: 640px) {
+        .wiley-workspace #trends-panel .trends-chart-viewport {
+            min-height: 12rem;
+            height: min(28rem, 58vh);
+        }
     }
 
     .wiley-workspace .workspace-panel-link,

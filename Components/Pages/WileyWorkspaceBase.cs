@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,8 @@ namespace WileyCoWeb.Components.Pages;
 #pragma warning disable S2325
 public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 {
+    private static readonly CultureInfo WorkspaceUiCulture = CultureInfo.GetCultureInfo("en-US");
+
     protected enum WorkspaceApiHealth { Unknown, Healthy, Degraded }
 
     [Parameter]
@@ -41,6 +44,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected HttpClient HttpClient { get; set; } = default!;
 
     [Inject]
+    protected WorkspaceLocalBootstrapService WorkspaceLocalBootstrapService { get; set; } = default!;
+
+    [Inject]
     protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
 
     private bool persistenceInitialized;
@@ -54,6 +60,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsSavingBaseline { get; set; }
     protected bool IsApplyingScenario { get; set; }
     protected bool IsLoadingWorkspace { get; set; }
+    protected bool IsLoadingCouncilDemo { get; set; }
     protected bool IsExportingDocuments { get; set; }
     protected bool IsSidebarOpen { get; set; } = true;
     protected bool IsJarvisOpen { get; set; }
@@ -109,14 +116,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected decimal ScenarioAdjustedDelta => WorkspaceState.AdjustedRateDelta;
     protected decimal ScenarioCostTotal => WorkspaceState.ScenarioCostTotal;
 
-    protected string CurrentRateDisplay => CurrentRate.ToString("C2");
-    protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2");
-    protected string RateDeltaDisplay => WorkspaceState.RateDelta.ToString("C2");
-    protected string ScenarioAdjustedRateDisplay => WorkspaceState.AdjustedRecommendedRate.ToString("C2");
-    protected string ScenarioAdjustedDeltaDisplay => WorkspaceState.AdjustedRateDelta.ToString("C2");
-    protected string ScenarioCostTotalDisplay => WorkspaceState.ScenarioCostTotal.ToString("C0");
-    protected string TotalCostsDisplay => TotalCosts.ToString("C0");
-    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0");
+    protected string CurrentRateDisplay => CurrentRate.ToString("C2", WorkspaceUiCulture);
+    protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2", WorkspaceUiCulture);
+    protected string RateDeltaDisplay => WorkspaceState.RateDelta.ToString("C2", WorkspaceUiCulture);
+    protected string ScenarioAdjustedRateDisplay => WorkspaceState.AdjustedRecommendedRate.ToString("C2", WorkspaceUiCulture);
+    protected string ScenarioAdjustedDeltaDisplay => WorkspaceState.AdjustedRateDelta.ToString("C2", WorkspaceUiCulture);
+    protected string ScenarioCostTotalDisplay => WorkspaceState.ScenarioCostTotal.ToString("C0", WorkspaceUiCulture);
+    protected string TotalCostsDisplay => TotalCosts.ToString("C0", WorkspaceUiCulture);
+    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0", WorkspaceUiCulture);
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
     protected double GaugeCurrentRateValue => (double)CurrentRate;
 
@@ -198,6 +205,49 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected void CloseSidebar()
     {
         IsSidebarOpen = false;
+    }
+
+    protected async Task LoadCouncilDemoSnapshotAsync()
+    {
+        if (IsLoadingCouncilDemo)
+        {
+            return;
+        }
+
+        IsLoadingCouncilDemo = true;
+        WorkspaceLoadStatus = "Loading bundled council demo snapshot...";
+        StateHasChanged();
+
+        try
+        {
+            var data = await WorkspaceLocalBootstrapService.LoadAsync().ConfigureAwait(false);
+            if (data is null)
+            {
+                WorkspaceLoadStatus = "Council demo data was not found in the published bundle.";
+                WorkspaceLogger.LogWarning("Council demo load returned null from workspace-bootstrap.json.");
+                return;
+            }
+
+            const string demoMessage =
+                "Council demo: bundled sample in data/workspace-bootstrap.json (API bypass for presentation).";
+            WorkspaceState.ApplyBootstrap(data);
+            WorkspaceState.SetStartupSource(WorkspaceStartupSource.LocalBootstrapFallback, demoMessage);
+            WorkspaceState.SetCurrentStateSource(WorkspaceStartupSource.LocalBootstrapFallback, demoMessage);
+            WorkspaceLoadStatus = "Loaded council demo snapshot from bundled sample data.";
+            _apiHealth = WorkspaceApiHealth.Degraded;
+            lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+            await RefreshScenarioCatalogAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogWarning(ex, "Council demo snapshot load failed.");
+            WorkspaceLoadStatus = $"Council demo load failed: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingCouncilDemo = false;
+            StateHasChanged();
+        }
     }
 
     protected void OpenPanel(string panelKey)

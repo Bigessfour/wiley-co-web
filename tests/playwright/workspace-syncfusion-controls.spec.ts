@@ -1,10 +1,11 @@
 import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
   gotoWorkspacePanel,
+  parseNumericInputDisplay,
   prepareForVisualSnapshot,
   seedLeftNavCollapsed,
+  setNumericInputValue,
   waitForWorkspaceShell,
 } from "./support/workspace";
 import {
@@ -87,18 +88,15 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await expect(page.locator("#workspace-document-center")).toBeVisible();
     await expect(sidebarToggle).toBeVisible();
     await expect(panelToggle).toBeVisible();
-    await expect(page.locator("#workspace-jarvis-launcher")).toBeVisible();
 
     await sidebarToggle.evaluate((button) => {
       (button as HTMLButtonElement).click();
     });
     await expect(sidebarToggle).toContainText("Expand navigation rail");
 
+    await expect(panelToggle).toContainText("Collapse workspace panel");
     await panelToggle.click();
     await expect(panelToggle).toContainText("Open workspace panel");
-
-    await page.locator("#workspace-jarvis-launcher").click();
-    await expect(page.locator("#workspace-jarvis-dock")).toBeVisible();
   });
 
   test("workspace shell collapses the sidebar and opens and closes the Jarvis dock", async ({
@@ -124,6 +122,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     });
     await expect(sidebarToggle).toContainText("Expand navigation rail");
 
+    await expect(panelToggle).toContainText("Collapse workspace panel");
     await panelToggle.click();
     await expect(panelToggle).toContainText("Open workspace panel");
     await expect(sidebarRail).toHaveClass(/hidden lg:block lg:w-16/);
@@ -237,8 +236,15 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await dialog.locator("#customer-editor-account-number").fill("PW-1001");
     await dialog.locator("#customer-editor-first-name").fill("Playwright");
     await dialog.locator("#customer-editor-last-name").fill("Customer");
-    await enterNumericValue(dialogSpinbuttons.first(), "12.34");
-    await expect(dialogSpinbuttons.first()).toHaveValue(/12\.34|\$12\.34/);
+    const balanceSpin = dialog.getByRole("spinbutton", {
+      name: "Current balance",
+    });
+    await setNumericInputValue(balanceSpin, "12.34");
+    await expect
+      .poll(async () => balanceSpin.locator("input").inputValue(), {
+        timeout: 30000,
+      })
+      .toMatch(/12\.34/);
 
     await dialog.locator("#customer-editor-cancel-button").click();
     await expect(dialog).toBeHidden();
