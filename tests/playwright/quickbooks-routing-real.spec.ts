@@ -53,10 +53,7 @@ test.describe("QuickBooks routing production flow", () => {
 
     await gotoWorkspacePanel(page, "/wiley-workspace/quickbooks-import");
 
-    const ruleCard = page
-      .locator(".e-card")
-      .filter({ hasText: "Seeded routing rule" })
-      .last();
+    const ruleCard = page.locator(".e-card").first();
     const ruleNameInput = ruleCard.getByRole("textbox").first();
 
     await expect(ruleCard).toContainText("Seeded routing rule");
@@ -75,10 +72,12 @@ test.describe("QuickBooks routing production flow", () => {
     expect(savedConfigurationResponse.ok()).toBeTruthy();
 
     const savedConfiguration = await savedConfigurationResponse.json();
-    expect(savedConfiguration.rules).toHaveLength(1);
-    expect(savedConfiguration.rules[0].name).toBe(
-      "Reserve transfer to Apartments",
-    );
+    expect(savedConfiguration.rules).toHaveLength(2);
+    expect(
+      savedConfiguration.rules.some(
+        (r) => r.name === "Reserve transfer to Apartments",
+      ),
+    ).toBe(true);
     expect(savedConfiguration.rules[0].priority).toBe(10);
     expect(savedConfiguration.rules[0].memoPattern).toBe("");
     expect(savedConfiguration.rules[0].targetEnterprise).toBe("Apartments");

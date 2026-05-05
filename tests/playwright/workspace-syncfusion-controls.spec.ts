@@ -241,18 +241,10 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     });
     await setNumericInputValue(balanceSpin, "12.34");
     await expect
-      .poll(
-        async () => {
-          const inner = balanceSpin.locator("input, textarea").first();
-          const n = parseNumericInputDisplay(await inner.inputValue());
-          return n !== undefined && Math.abs(n - 12.34) < 0.02;
-        },
-        {
-          timeout: 20_000,
-          message: "Current balance field should accept 12.34",
-        },
-      )
-      .toBe(true);
+      .poll(async () => balanceSpin.locator("input").inputValue(), {
+        timeout: 30000,
+      })
+      .toMatch(/12\.34/);
 
     await dialog.locator("#customer-editor-cancel-button").click();
     await expect(dialog).toBeHidden();

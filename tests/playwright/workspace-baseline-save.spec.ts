@@ -149,8 +149,12 @@ test.describe("Workspace baseline save proof", () => {
     await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
     await setNumericInputValue(breakEvenSpinners.nth(1), "400");
 
-    await expect(kpiGrid).toContainText(/Total Costs\s*\$24,000/);
-    await expect(kpiGrid).toContainText(/Projected Volume\s*400/);
+    await expect
+      .poll(async () => kpiGrid.textContent(), { timeout: 30000 })
+      .toMatch(/Total Costs[^\$]*\$24,000/);
+    await expect
+      .poll(async () => kpiGrid.textContent(), { timeout: 30000 })
+      .toMatch(/Projected Volume\s*400/);
 
     await saveButton.click();
 

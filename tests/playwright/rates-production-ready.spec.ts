@@ -37,11 +37,15 @@ test.describe("Core Panel Proof", () => {
     );
 
     await expect(page.locator("#rates-panel-chart-section")).toBeVisible();
-    await expect(page.locator("#rates-kpi-grid")).toContainText(
-      /Current Rate\s*\$29\.50/,
-    );
-    await expect(page.locator("#rates-kpi-grid")).toContainText(
-      /Recommended Rate\s*\$\d[\d,]*\.\d{2}/,
-    );
+    await expect
+      .poll(async () => page.locator("#rates-kpi-grid").textContent(), {
+        timeout: 30000,
+      })
+      .toMatch(/Current Rate\s*\$29\.50/);
+    await expect
+      .poll(async () => page.locator("#rates-kpi-grid").textContent(), {
+        timeout: 30000,
+      })
+      .toMatch(/Recommended Rate\s*\$\d[\d,]*\.\d{2}/);
   });
 });

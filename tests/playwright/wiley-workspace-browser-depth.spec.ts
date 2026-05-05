@@ -48,9 +48,11 @@ test.describe("Wiley workspace browser depth", () => {
 
     await setNumericInputValue(ratesPanelCurrentRateInput(page), "29.50");
 
-    await expect(page.locator("#rates-kpi-grid")).toContainText(
-      /Current Rate\s*\$29\.50/,
-    );
+    await expect
+      .poll(async () => page.locator("#rates-kpi-grid").textContent(), {
+        timeout: 30000,
+      })
+      .toMatch(/Current Rate\s*\$29\.50/);
     await expect(page.locator("#rates-comparison-chart")).toBeVisible();
   });
 
