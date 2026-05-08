@@ -276,6 +276,9 @@ jobs:
       - name: Build .NET projects (for API)
         run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
+      - name: Publish API for Playwright hosts
+        run: dotnet publish WileyCoWeb.Api/WileyCoWeb.Api.csproj --configuration Release --no-build -o api_output -p:ContinuousIntegrationBuild=true
+
       - name: Setup Node.js 24
         uses: actions/setup-node@v5
         with:
