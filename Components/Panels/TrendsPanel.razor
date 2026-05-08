@@ -19,11 +19,11 @@
     }
     else
     {
-    <div id="trends-chart-region" role="img" aria-label="Projected rate trend chart">
+    <div id="trends-chart-region" class="trends-chart-viewport" role="img" aria-label="Projected rate trend chart">
     @* Theme: Fluent2 aligns the chart palette with the Syncfusion theme loaded app-wide *@
     @* ChartLegendSettings: required when the panel is printed or exported as PDF so series are identifiable *@
     @* ChartZoomSettings: allows council users to zoom into specific fiscal-year bands for detailed analysis *@
-    <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="560px" Theme="Syncfusion.Blazor.Theme.Fluent2">
+    <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%" Theme="Syncfusion.Blazor.Theme.Fluent2">
         <ChartArea>
             <ChartAreaBorder Width="0"></ChartAreaBorder>
         </ChartArea>

@@ -188,6 +188,7 @@
                                    - Row selection gives clerks a stable inspection target during large previews.
                                    - Virtualization reduces DOM growth when large QuickBooks exports are staged.
                                    - The existing test anchor (#quickbooks-preview-grid) is preserved. *@
+                                <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-0">
                                 <SfGrid ID="quickbooks-preview-grid"
                                         TValue="QuickBooksImportPreviewRow"
                                         DataSource="@PreviewRows"
@@ -202,7 +203,7 @@
                                         EnableVirtualization="true"
                                         ClipMode="ClipMode.EllipsisWithTooltip"
                                         GridLines="GridLine.Horizontal"
-                                        Height="420">
+                                        Height="100%">
                                     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
                                     <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
                                     <GridPageSettings PageSize="8" PageCount="4" />
@@ -220,6 +221,7 @@
                                         <GridColumn Field="@nameof(QuickBooksImportPreviewRow.IsDuplicate)" HeaderText="Duplicate" Width="100" Type="Syncfusion.Blazor.Grids.ColumnType.Boolean" />
                                     </GridColumns>
                                 </SfGrid>
+                                </div>
                             }
                             else
                             {

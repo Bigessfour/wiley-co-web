@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { enterNumericValue, gotoWorkspacePanel } from "./support/workspace";
+import {
+  breakEvenPanelSpinbuttons,
+  gotoWorkspacePanel,
+  setNumericInputValue,
+} from "./support/workspace";
 
 test.describe("Core Panel Proof", () => {
   test("Break-even panel renders four quadrants and apartment roll-up cards", async ({
     page,
   }) => {
-    // 1. Open /wiley-workspace/break-even from a blank session.
     await gotoWorkspacePanel(page, "/wiley-workspace/break-even");
 
     await expect(page.locator("#break-even-panel")).toBeVisible();
@@ -42,10 +45,28 @@ test.describe("Core Panel Proof", () => {
       /Effective \$\/Customer\s*\$200\.00/,
     );
 
-    // 2. Change total costs and projected volume through the numeric editors.
-    const breakEvenInputs = page.locator("#break-even-input-row input");
-    await enterNumericValue(breakEvenInputs.nth(0), "24000");
-    await enterNumericValue(breakEvenInputs.nth(1), "400");
+    const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
+    await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
+    await setNumericInputValue(breakEvenSpinners.nth(1), "400");
+
+    await expect
+      .poll(
+        async () => await page.locator("#break-even-kpi-grid").textContent(),
+        { timeout: 30000 },
+      )
+      .toMatch(/Total Costs[^\$]*\$24,000/);
+    await expect
+      .poll(
+        async () => await page.locator("#break-even-kpi-grid").textContent(),
+        { timeout: 30000 },
+      )
+      .toMatch(/Projected Volume\s*400/);
+    await expect
+      .poll(
+        async () => await page.locator("#break-even-kpi-grid").textContent(),
+        { timeout: 30000 },
+      )
+      .toMatch(/Recommended Rate\s*\$60\.00/);
 
     await expect(page.locator("#break-even-quadrant-grid")).toContainText(
       /Break-even\s*\$60\.00/,
@@ -57,9 +78,16 @@ test.describe("Core Panel Proof", () => {
       "Apartments",
     );
 
-    // 3. Re-check the layout at desktop width so the proof stays visual without a brittle baseline image.
     await page.setViewportSize({ width: 1440, height: 900 });
-    await expect(page.locator("#break-even-panel")).toBeVisible();
+    await expect(page.locator("#break-even-panel")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator("#break-even-kpi-grid")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.locator("#break-even-chart-card")).toBeVisible({
+      timeout: 10000,
+    });
     await expect(page.locator("#break-even-quadrant-grid")).toBeVisible();
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
   });

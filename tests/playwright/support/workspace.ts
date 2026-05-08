@@ -137,6 +137,49 @@ export async function enterNumericValue(input: Locator, value: string) {
   });
 }
 
+/** Break-even inputs are Syncfusion numeric textboxes (`role="spinbutton"`). */
+export function breakEvenPanelSpinbuttons(page: Page) {
+  return page.locator("#break-even-input-row").getByRole("spinbutton");
+}
+
+/**
+ * Scenario grid add/edit dialog Cost column: triple-click + fill for Syncfusion numerics.
+ */
+export async function enterScenarioGridDialogCost(
+  dialog: Locator,
+  value: string,
+) {
+  const costHost = dialog.locator('input[name="Cost"]');
+  await costHost.waitFor({ state: "visible", timeout: 30_000 });
+  const target =
+    (await costHost.locator("input, textarea").count()) > 0
+      ? costHost.locator("input, textarea").first()
+      : costHost;
+  await target.click({ clickCount: 3 });
+  await target.press("Control+a");
+  await target.fill(value);
+  await target.press("Tab");
+}
+
+/** Current rate editor in the rates panel (Syncfusion `role="spinbutton"`). */
+export function ratesPanelCurrentRateInput(page: Page) {
+  return page
+    .locator("#rates-panel")
+    .getByRole("spinbutton", { name: "Current Rate" });
+}
+
+/** Reliable for Syncfusion masked inputs on hosted WebKit/Chromium. */
+export async function setNumericInputValue(input: Locator, value: string) {
+  const inner =
+    (await input.locator("input, textarea").count()) > 0
+      ? input.locator("input, textarea").first()
+      : input;
+  await inner.waitFor({ state: "visible", timeout: 30_000 });
+  await inner.click({ clickCount: 3 });
+  await inner.fill(value);
+  await inner.press("Tab");
+}
+
 export async function readCurrencyValueByLabel(
   container: Locator,
   label: string,
@@ -184,6 +227,20 @@ export async function prepareForVisualSnapshot(page: Page) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** True when Playwright baseURL points at the local dev client (5230), not production hosts. */
+export function isLocalE2EBaseUrl(baseURL: string | undefined): boolean {
+  if (!baseURL) {
+    return false;
+  }
+
+  try {
+    const url = new URL(baseURL);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }
 
 function isHostedWorkspace(page: Page) {

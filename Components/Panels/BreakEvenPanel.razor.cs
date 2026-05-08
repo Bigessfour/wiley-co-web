@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using WileyCoWeb.Contracts;
+using WileyCoWeb.State;
 using WileyWidget.Models;
 
 namespace WileyCoWeb.Components.Panels;
@@ -14,6 +15,9 @@ public partial class BreakEvenPanel : ComponentBase
     [Parameter] public string BreakEvenRateDisplay { get; set; } = string.Empty;
     [Parameter] public bool IsSavingBaseline { get; set; }
     [Parameter] public string BaselineSaveStatus { get; set; } = string.Empty;
+    [Parameter] public double GaugeMaximum { get; set; }
+    [Parameter] public double GaugeCurrentRateValue { get; set; }
+    [Parameter] public IReadOnlyList<RateComparisonPoint> RateComparison { get; set; } = [];
     [Parameter] public IReadOnlyList<BreakEvenQuadrantData> Quadrants { get; set; } = [];
     [Parameter] public IReadOnlyList<ApartmentUnitTypeData> ApartmentUnitTypes { get; set; } = [];
     [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnTotalCostsChanged { get; set; }

@@ -51,6 +51,7 @@
                     type="button"
                     class="e-control e-btn e-lib e-inherit app-shell-nav-toggle"
                     aria-label="@NavigationRailToggleAriaLabel"
+                    aria-controls="app-shell-sidebar"
                     aria-expanded="@(!_layoutContext.IsLeftNavCollapsed ? "true" : "false")"
                     @onclick="ToggleLeftNavAsync">
                 <span class="e-btn-icon e-icons e-menu" aria-hidden="true"></span>
@@ -98,6 +99,7 @@
                        Type="@CurrentSidebarType"
                        Position="SidebarPosition.Left"
                        Target=".app-shell-body"
+                       Animate="true"
                        ShowBackdrop="@CurrentSidebarShowBackdrop"
                        CloseOnDocumentClick="@CurrentSidebarCloseOnDocumentClick"
                        EnableGestures="@CurrentSidebarEnableGestures"

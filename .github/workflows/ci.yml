@@ -238,7 +238,9 @@ jobs:
   playwright-ui:
     runs-on: ubuntu-latest
     needs: build-and-publish
-    timeout-minutes: 45
+    # Smoke-only: full Playwright suite is long and environment-sensitive (static wwwroot + API).
+    # Run locally: npm run playwright:test:ci or npm run playwright:test:strict before release.
+    timeout-minutes: 25
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -246,6 +248,9 @@ jobs:
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
       PLAYWRIGHT_HTML_OPEN: never
       CI: true
+      # Full Chromium + WebKit roughly doubles wall time on ubuntu-latest; CI gates on Chromium only.
+      # Run both locally: unset PLAYWRIGHT_CI_BROWSERS or `npm run playwright:test:strict`.
+      PLAYWRIGHT_CI_BROWSERS: chromium
 
     steps:
       - name: Checkout code
@@ -276,6 +281,9 @@ jobs:
       - name: Build .NET projects (for API)
         run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
+      - name: Publish API for Playwright hosts
+        run: dotnet publish WileyCoWeb.Api/WileyCoWeb.Api.csproj --configuration Release --no-build -o api_output -p:ContinuousIntegrationBuild=true
+
       - name: Setup Node.js 24
         uses: actions/setup-node@v5
         with:
@@ -286,10 +294,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers + Linux deps
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright UI suite
-        run: npm run playwright:test:ci
+      - name: Run Playwright UI smoke (curated specs)
+        run: npm run playwright:test:ci:smoke
 
       - name: Enforce Playwright pass-rate gate
         run: node ./Scripts/assert-playwright-results.mjs

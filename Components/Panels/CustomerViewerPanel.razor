@@ -76,10 +76,10 @@
         }
         else
         {
-        <div class="mt-3" aria-busy="@IsBusy()">
+        <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--tall mt-3 min-h-0" aria-busy="@IsBusy()">
             @* EnablePersistence: restores sort order, page number, and column widths across browser sessions *@
             @* AllowFiltering with FilterType.Menu: provides per-column filter menus for council-grade data interrogation *@
-            <SfGrid @ref="CustomerDirectoryGrid" ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" AllowExcelExport="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="560" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v1" Toolbar="@CustomerDirectoryToolbarItems">
+            <SfGrid @ref="CustomerDirectoryGrid" ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" AllowExcelExport="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="100%" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v1" Toolbar="@CustomerDirectoryToolbarItems">
                 @* ExcelExport toolbar: OnToolbarClick fires with id="customer-directory-grid_excelexport" *@
                 <GridEvents OnToolbarClick="HandleToolbarClickAsync" TValue="UtilityCustomerRecord" />
                 <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />

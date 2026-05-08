@@ -15,6 +15,7 @@
 - Use environment variables for all Syncfusion keys.
 - `SYNCFUSION_LICENSE_KEY` is the runtime license key for `Program.cs`.
 - `SYNCFUSION_API_KEY` is the Syncfusion MCP server key.
+- For local MCP, `Scripts/mcp-sf-blazor-assistant.sh` loads that API key from macOS Keychain (service `com.wileyco.syncfusion.blazor-mcp`, account `$USER`) and is referenced by `.cursor/mcp.json` and `.vscode/mcp.json`; store the key once with `security add-generic-password` (see script header).
 - Never hard-code Syncfusion keys in source files or committed config.
 - Prefer `#sf_blazor_ui_builder` and the Syncfusion MCP tools when generating UI code.
 

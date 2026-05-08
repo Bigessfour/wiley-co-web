@@ -1,9 +1,13 @@
 import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
+  breakEvenPanelSpinbuttons,
+  enterScenarioGridDialogCost,
   gotoWorkspacePanel,
+  ratesPanelCurrentRateInput,
   readCurrencyValueByLabel,
+  setNumericInputValue,
+  waitForWorkspaceShell,
 } from "./support/workspace";
 
 test.describe("Wiley workspace browser depth", () => {
@@ -14,14 +18,32 @@ test.describe("Wiley workspace browser depth", () => {
   }) => {
     await gotoWorkspacePanel(page, "/wiley-workspace/break-even");
 
+    const kpiGrid = page.locator("#break-even-kpi-grid");
     const quadrantGrid = page.locator("#break-even-quadrant-grid");
-    const breakEvenInputs = page.locator("#break-even-input-row input");
+    const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
 
     await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
 
-    await enterNumericValue(breakEvenInputs.nth(0), "24000");
-    await enterNumericValue(breakEvenInputs.nth(1), "400");
+    await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
+    await setNumericInputValue(breakEvenSpinners.nth(1), "400");
+
+    await expect
+      .poll(
+        async () => {
+          const t = await kpiGrid.innerText();
+          return (
+            /Total Costs[\s\S]*\$24,000/.test(t) &&
+            /Projected Volume[\s\S]*\b400\b/.test(t) &&
+            /Recommended Rate[\s\S]*\$60\.00/.test(t)
+          );
+        },
+        {
+          timeout: 25_000,
+          message: "Break-even KPIs should reflect 24000 / 400 => $60.00",
+        },
+      )
+      .toBe(true);
 
     await expect(quadrantGrid).toContainText(/Break-even\s*\$60\.00/);
     await expect(quadrantGrid).toContainText("Apartments");
@@ -35,11 +57,13 @@ test.describe("Wiley workspace browser depth", () => {
   }) => {
     await gotoWorkspacePanel(page, "/wiley-workspace/rates");
 
-    await enterNumericValue(page.locator("#current-rate-input"), "29.50");
+    await setNumericInputValue(ratesPanelCurrentRateInput(page), "29.50");
 
-    await expect(page.locator("#rates-kpi-grid")).toContainText(
-      /Current Rate\s*\$29\.50/,
-    );
+    await expect
+      .poll(async () => page.locator("#rates-kpi-grid").textContent(), {
+        timeout: 30000,
+      })
+      .toMatch(/Current Rate\s*\$29\.50/);
     await expect(page.locator("#rates-comparison-chart")).toBeVisible();
   });
 
@@ -48,18 +72,18 @@ test.describe("Wiley workspace browser depth", () => {
   }) => {
     await gotoWorkspacePanel(page, "/wiley-workspace/scenario");
 
-    const panel = page.locator("#scenario-panel");
+    const metrics = page.locator("#scenario-overview-section");
     const grid = page.locator("#scenario-grid");
     const dialog = page
       .getByRole("dialog")
       .filter({ has: page.locator('input[name="Name"]') })
       .filter({ has: page.locator('input[name="Cost"]') });
     const initialScenarioCostTotal = await readCurrencyValueByLabel(
-      panel,
+      metrics,
       "Scenario Cost Total",
     );
     const initialScenarioBreakEven = await readCurrencyValueByLabel(
-      panel,
+      metrics,
       "Scenario Break-Even",
     );
     const scenarioItemName = `Live test ${Date.now()}`;
@@ -67,17 +91,17 @@ test.describe("Wiley workspace browser depth", () => {
     await page.getByRole("button", { name: "Add" }).click();
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="Name"]').fill(scenarioItemName);
-    await enterNumericValue(dialog.locator('input[name="Cost"]'), "1234");
+    await enterScenarioGridDialogCost(dialog, "1234");
     await dialog.getByRole("button", { name: "Save" }).click();
 
     await expect(grid).toContainText(scenarioItemName);
     await expect
-      .poll(() => readCurrencyValueByLabel(panel, "Scenario Cost Total"))
+      .poll(() => readCurrencyValueByLabel(metrics, "Scenario Cost Total"))
       .toBe(initialScenarioCostTotal + 1234);
     await expect
       .poll(
         async () =>
-          (await readCurrencyValueByLabel(panel, "Scenario Break-Even")) >
+          (await readCurrencyValueByLabel(metrics, "Scenario Break-Even")) >
           initialScenarioBreakEven,
       )
       .toBe(true);
@@ -87,12 +111,15 @@ test.describe("Wiley workspace browser depth", () => {
     page,
   }) => {
     await page.goto("/wiley-workspace");
+    await waitForWorkspaceShell(page);
 
     const statusCard = page.locator("#workspace-status-card");
     const loadStatus = page.locator("#workspace-load-status");
 
     await expect(statusCard).toBeVisible();
-    await expect(loadStatus).toContainText("Workspace ready.");
+    await expect(loadStatus).toHaveText(
+      /Workspace ready\.|Loaded .*from the workspace API|Loaded .*snapshot/i,
+    );
     await expect(statusCard).toContainText("Startup source:");
     await expect(statusCard).toContainText("Current state:");
     await expect(statusCard).not.toContainText(/pending/i);
