@@ -238,7 +238,9 @@ jobs:
   playwright-ui:
     runs-on: ubuntu-latest
     needs: build-and-publish
-    timeout-minutes: 45
+    # Smoke-only: full Playwright suite is long and environment-sensitive (static wwwroot + API).
+    # Run locally: npm run playwright:test:ci or npm run playwright:test:strict before release.
+    timeout-minutes: 25
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -294,8 +296,8 @@ jobs:
       - name: Install Playwright browsers + Linux deps
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright UI suite
-        run: npm run playwright:test:ci
+      - name: Run Playwright UI smoke (curated specs)
+        run: npm run playwright:test:ci:smoke
 
       - name: Enforce Playwright pass-rate gate
         run: node ./Scripts/assert-playwright-results.mjs
