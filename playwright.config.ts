@@ -4,6 +4,43 @@ const defaultLocalBaseURL = "http://localhost:5230";
 const defaultLocalApiURL = "http://127.0.0.1:5231";
 const normalizeBaseURL = (value: string) => value.replace(/\/$/, "");
 const isCI = process.env.CI === "true";
+
+/** CI: comma/space-separated subset, e.g. `chromium` or `chromium,webkit`. Default: both. */
+function ciBrowserProjectNames(): ("chromium" | "webkit")[] {
+  const raw = process.env.PLAYWRIGHT_CI_BROWSERS?.trim();
+  if (!raw) {
+    return ["chromium", "webkit"];
+  }
+  const parts = raw
+    .split(/[\s,]+/)
+    .map((s) => s.toLowerCase())
+    .filter(Boolean);
+  const out: ("chromium" | "webkit")[] = [];
+  if (parts.includes("chromium")) {
+    out.push("chromium");
+  }
+  if (parts.includes("webkit")) {
+    out.push("webkit");
+  }
+  return out.length > 0 ? out : ["chromium"];
+}
+
+function browserProjects() {
+  const names = isCI
+    ? ciBrowserProjectNames()
+    : (["chromium", "webkit"] as const);
+  return names.map((name) =>
+    name === "chromium"
+      ? {
+          name: "chromium",
+          use: { ...devices["Desktop Chrome"] },
+        }
+      : {
+          name: "webkit",
+          use: { ...devices["Desktop Safari"] },
+        },
+  );
+}
 const ciWwwroot = "./publish_output/wwwroot";
 const ciApiDll = "./api_output/WileyCoWeb.Api.dll";
 
@@ -64,10 +101,14 @@ export default defineConfig({
     timeout: 15_000,
   },
   globalSetup: "./tests/playwright/global-setup.ts",
-  fullyParallel: true,
+  /** CI runs one worker; avoid extra scheduling overhead on long serial suites. */
+  fullyParallel: !isCI,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  /** One retry in CI keeps wall time bounded; local default is no retry. */
+  retries: isCI ? 1 : 0,
   workers: process.env.CI || useManagedWebServer ? 1 : undefined,
+  /** Stop runaway jobs before the GitHub job timeout (45m) with little headroom. */
+  globalTimeout: isCI ? 38 * 60 * 1000 : undefined,
   reporter: [
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
@@ -75,23 +116,11 @@ export default defineConfig({
   ],
   use: {
     baseURL: finalBaseURL,
-    trace: isCI ? "on" : "on-first-retry",
+    /** `trace: on` for every test was dominating CI wall time (I/O + zip). */
+    trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
   webServer: finalWebServer,
-  projects: [
-    {
-      name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-      },
-    },
-    {
-      name: "webkit",
-      use: {
-        ...devices["Desktop Safari"],
-      },
-    },
-  ],
+  projects: browserProjects(),
 });

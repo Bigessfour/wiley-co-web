@@ -246,6 +246,9 @@ jobs:
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
       PLAYWRIGHT_HTML_OPEN: never
       CI: true
+      # Full Chromium + WebKit roughly doubles wall time on ubuntu-latest; CI gates on Chromium only.
+      # Run both locally: unset PLAYWRIGHT_CI_BROWSERS or `npm run playwright:test:strict`.
+      PLAYWRIGHT_CI_BROWSERS: chromium
 
     steps:
       - name: Checkout code
@@ -289,7 +292,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers + Linux deps
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium
 
       - name: Run Playwright UI suite
         run: npm run playwright:test:ci
