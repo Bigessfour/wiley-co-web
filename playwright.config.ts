@@ -1,9 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const defaultLocalBaseURL = "http://localhost:5230";
-const defaultLocalApiURL = "http://127.0.0.1:5231";
 const normalizeBaseURL = (value: string) => value.replace(/\/$/, "");
 const isCI = process.env.CI === "true";
+
+/**
+ * Blazor WASM resolves the workspace API as same-host + port+1 (see ClientStartup.ResolveLocalApiBaseAddress).
+ * CI starts Kestrel on 127.0.0.1:5231 only. On Linux, `localhost` often resolves to ::1 first, so
+ * `http://localhost:5230` → `http://localhost:5231` misses the IPv4 listener and the shell never loads.
+ */
+const loopbackClientBaseURL = "http://127.0.0.1:5230";
+const defaultLocalBaseURL = isCI
+  ? loopbackClientBaseURL
+  : "http://localhost:5230";
+const defaultLocalApiURL = "http://127.0.0.1:5231";
 
 /** CI: comma/space-separated subset, e.g. `chromium` or `chromium,webkit`. Default: both. */
 function ciBrowserProjectNames(): ("chromium" | "webkit")[] {
