@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForWorkspaceShell } from "./support/workspace";
+import { waitForWorkspacePanel } from "./support/workspace";
 
 test.describe("Core Panel Proof", () => {
   test("Workspace overview opens the data dashboard panel", async ({
@@ -7,7 +7,7 @@ test.describe("Core Panel Proof", () => {
   }) => {
     await page.goto("/wiley-workspace");
 
-    await waitForWorkspaceShell(page);
+    await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
 
     await page
       .locator("#overview-data-dashboard")

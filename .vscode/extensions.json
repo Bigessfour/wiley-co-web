@@ -1,10 +1,9 @@
 {
   "recommendations": [
     "ms-dotnettools.csdevkit",
+    "ms-dotnettools.vscode-dotnet-runtime",
     "ms-dotnettools.csharp",
     "ms-dotnettools.blazorwasm-companion",
-    "JakubKozera.csharp-dev-tools",
-    "ms-dotnettools.vscode-dotnet-pack",
     "ms-playwright.playwright",
     "sakamoto66.vscode-playwright-test-runner"
   ]

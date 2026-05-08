@@ -1035,6 +1035,7 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));
 		context.Services.AddScoped(_ => telemetryClient);
 		context.Services.AddScoped(_ => new BrowserDownloadService(jsRuntime));
+		context.Services.AddSingleton(new WorkspaceLocalBootstrapService(CreateLocalBootstrapClient()));
 		configureServices?.Invoke(context.Services);
 		context.Services.AddSyncfusionBlazor();
 		context.Renderer.SetRendererInfo(new RendererInfo("WebAssembly", true));

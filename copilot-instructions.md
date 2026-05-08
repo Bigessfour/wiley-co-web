@@ -14,6 +14,7 @@ This file is the repository-level canonical policy for AI agents working in this
 - Use environment variables for all Syncfusion keys.
 - SYNCFUSION_LICENSE_KEY is the runtime license key for Program.cs.
 - SYNCFUSION_API_KEY is the Syncfusion MCP server key.
+- For local MCP on macOS, Scripts/mcp-sf-blazor-assistant.sh reads the MCP API key from Keychain (service com.wileyco.syncfusion.blazor-mcp); see that script and .cursor/mcp.json.
 - Never hard-code Syncfusion keys in source files or committed config.
 
 ## AWS MCP Policy

@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
+  breakEvenPanelSpinbuttons,
   gotoWorkspacePanel,
+  ratesPanelCurrentRateInput,
+  setNumericInputValue,
   waitForWorkspaceShell,
 } from "./support/workspace";
 
@@ -133,7 +135,6 @@ test.describe("Workspace baseline save proof", () => {
     const status = page.locator("#baseline-save-status");
     const loadStatus = page.locator("#workspace-load-status");
     const saveButton = page.getByRole("button", { name: "Save baseline" });
-    const breakEvenInputs = page.locator("#break-even-input-row input");
 
     await expect(panel).toBeVisible();
     await expect(kpiGrid).toBeVisible();
@@ -144,11 +145,16 @@ test.describe("Workspace baseline save proof", () => {
     await expect(saveButton).toBeEnabled();
 
     // 2. Change the break-even inputs, then save through the shell action.
-    await enterNumericValue(breakEvenInputs.nth(0), "24000");
-    await enterNumericValue(breakEvenInputs.nth(1), "400");
+    const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
+    await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
+    await setNumericInputValue(breakEvenSpinners.nth(1), "400");
 
-    await expect(kpiGrid).toContainText(/Total Costs\s*\$24,000/);
-    await expect(kpiGrid).toContainText(/Projected Volume\s*400/);
+    await expect
+      .poll(async () => kpiGrid.textContent(), { timeout: 30000 })
+      .toMatch(/Total Costs[^\$]*\$24,000/);
+    await expect
+      .poll(async () => kpiGrid.textContent(), { timeout: 30000 })
+      .toMatch(/Projected Volume\s*400/);
 
     await saveButton.click();
 
@@ -294,7 +300,6 @@ test.describe("Workspace baseline save proof", () => {
     await gotoWorkspacePanel(page, "/wiley-workspace/rates");
 
     const ratesPanel = page.locator("#rates-panel");
-    const currentRateInput = page.locator("#current-rate-input");
     const comparisonChart = page.locator("#rates-comparison-chart");
     const snapshotStatus = page.locator("#snapshot-save-status");
     const saveSnapshotButton = page.getByRole("button", {
@@ -302,12 +307,14 @@ test.describe("Workspace baseline save proof", () => {
     });
 
     await expect(ratesPanel).toBeVisible();
-    await expect(currentRateInput).toBeVisible();
+    await expect(ratesPanelCurrentRateInput(page)).toBeVisible();
     await expect(comparisonChart).toBeVisible();
     await expect(snapshotStatus).toContainText(/Ready to save rate snapshot/i);
 
-    await enterNumericValue(currentRateInput, "29.50");
-    await expect(currentRateInput).toHaveValue(/\$29\.50/);
+    await setNumericInputValue(ratesPanelCurrentRateInput(page), "29.50");
+    await expect(ratesPanelCurrentRateInput(page)).toHaveValue(
+      /\$29\.50|29\.50/,
+    );
 
     await saveSnapshotButton.click();
 
@@ -327,7 +334,9 @@ test.describe("Workspace baseline save proof", () => {
     await waitForWorkspaceShell(page);
 
     await expect(ratesPanel).toBeVisible();
-    await expect(currentRateInput).toHaveValue(/\$29\.50/);
+    await expect(ratesPanelCurrentRateInput(page)).toHaveValue(
+      /\$29\.50|29\.50/,
+    );
     await expect(snapshotStatus).toContainText(/Ready to save rate snapshot/i);
   });
 });

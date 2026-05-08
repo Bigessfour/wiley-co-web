@@ -12,6 +12,8 @@
             <button id="app-shell-nav-toggle"
                     type="button"
                     class="e-control e-btn e-lib e-inherit app-shell-nav-toggle"
+                    aria-controls="app-shell-sidebar"
+                    aria-expanded="@(!IsLeftNavCollapsed)"
                     @onclick="ToggleLeftNavAsync">
                 <span class="e-btn-icon e-icons e-menu" aria-hidden="true"></span>
                 <span>@NavigationRailToggleText</span>
@@ -31,10 +33,11 @@
                        Width="19rem"
                        Type="SidebarType.Push"
                        Position="SidebarPosition.Left"
-                       Target=".app-shell-body"
+                       Target="#app-shell-content"
+                       Animate="true"
                        ShowBackdrop="false"
                        CloseOnDocumentClick="false"
-                       EnableGestures="false"
+                       EnableGestures="true"
                        IsOpen="@(!IsLeftNavCollapsed)"
                        IsOpenChanged="HandleLeftNavOpenChangedAsync">
                 <NavMenu />

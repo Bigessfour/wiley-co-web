@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  enterNumericValue,
+  enterScenarioGridDialogCost,
   gotoWorkspacePanel,
   readCurrencyValueByLabel,
 } from "./support/workspace";
@@ -13,6 +13,7 @@ test.describe("Core Panel Proof", () => {
     await gotoWorkspacePanel(page, "/wiley-workspace/scenario");
 
     const panel = page.locator("#scenario-panel");
+    const metrics = page.locator("#scenario-metrics-panel");
     const grid = page.locator("#scenario-grid");
     const editStatus = page.locator("#scenario-edit-status");
 
@@ -21,11 +22,11 @@ test.describe("Core Panel Proof", () => {
     await expect(editStatus).toBeVisible();
 
     const initialScenarioCostTotal = await readCurrencyValueByLabel(
-      panel,
+      metrics,
       "Scenario Cost Total",
     );
     const initialScenarioBreakEven = await readCurrencyValueByLabel(
-      panel,
+      metrics,
       "Scenario Break-Even",
     );
     const scenarioItemName = `Live test ${Date.now()}`;
@@ -39,17 +40,17 @@ test.describe("Core Panel Proof", () => {
 
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="Name"]').fill(scenarioItemName);
-    await enterNumericValue(dialog.locator('input[name="Cost"]'), "1234");
+    await enterScenarioGridDialogCost(dialog, "1234");
     await dialog.getByRole("button", { name: "Save" }).click();
 
     await expect(grid).toContainText(scenarioItemName);
     await expect
-      .poll(() => readCurrencyValueByLabel(panel, "Scenario Cost Total"))
+      .poll(() => readCurrencyValueByLabel(metrics, "Scenario Cost Total"))
       .toBe(initialScenarioCostTotal + 1234);
     await expect
       .poll(
         async () =>
-          (await readCurrencyValueByLabel(panel, "Scenario Break-Even")) >
+          (await readCurrencyValueByLabel(metrics, "Scenario Break-Even")) >
           initialScenarioBreakEven,
       )
       .toBe(true);
@@ -57,6 +58,8 @@ test.describe("Core Panel Proof", () => {
     // 3. Confirm the edited scenario stays visible with the derived totals.
     await expect(panel).toContainText("Scenario Cost Total");
     await expect(panel).toContainText("Scenario Break-Even");
-    await expect(page.locator("#scenario-grid")).toContainText(scenarioItemName);
+    await expect(page.locator("#scenario-grid")).toContainText(
+      scenarioItemName,
+    );
   });
 });
