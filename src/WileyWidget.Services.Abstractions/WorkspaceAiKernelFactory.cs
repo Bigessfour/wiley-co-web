@@ -29,6 +29,7 @@ public sealed record WorkspaceAiServiceConfiguration(
     WorkspaceAiApiKeyResolution ApiKeyResolution,
     bool Enabled,
     string? Model,
+    bool StoreResponses,
     Uri ChatCompletionEndpoint,
     Uri LegacyResponsesEndpoint)
 {
@@ -48,6 +49,9 @@ public sealed record WorkspaceAiKernelInitializationResult(
 
 public static class WorkspaceAiKernelFactory
 {
+    public const string DefaultSemanticKernelModel = "grok-4-1-fast-reasoning";
+    public const string HttpClientName = "WorkspaceAiTransport";
+
     private static readonly Uri DirectResponsesEndpoint = NormalizeResponsesEndpoint("https://api.x.ai/v1");
     private static readonly Uri DirectChatCompletionEndpoint = NormalizeChatCompletionEndpoint("https://api.x.ai/v1");
 
@@ -59,6 +63,7 @@ public static class WorkspaceAiKernelFactory
             ResolveApiKeyResolution(configuration, apiKeyProvider),
             GetConfiguredBoolean(configuration, true, "EnableAI", "XAI:Enabled"),
             GetConfiguredString(configuration, "XaiModel", "XAI:Model", "Grok:Model"),
+            GetConfiguredBoolean(configuration, false, "XAI:StoreResponses"),
             ResolveSemanticKernelChatEndpoint(configuration),
             ResolveLegacyXaiEndpoint(configuration));
     }
@@ -126,7 +131,7 @@ public static class WorkspaceAiKernelFactory
         }
 
         var builder = Kernel.CreateBuilder();
-        var httpClient = httpClientFactory?.CreateClient("WorkspaceAiAssistantService");
+        var httpClient = httpClientFactory?.CreateClient(HttpClientName);
 
         builder.AddOpenAIChatCompletion(
             modelId: configuration.ResolveModelOrDefault(fallbackModel),
@@ -139,6 +144,39 @@ public static class WorkspaceAiKernelFactory
         var kernel = builder.Build();
         var chatService = kernel.GetRequiredService<IChatCompletionService>();
         return new WorkspaceAiKernelContext(kernel, chatService);
+    }
+
+    public static Uri NormalizeResponsesEndpoint(string? endpoint)
+    {
+        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
+        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
+        {
+            return new Uri(candidate, UriKind.Absolute);
+        }
+
+        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate[..^"/chat/completions".Length];
+        }
+
+        return new Uri($"{candidate}/responses", UriKind.Absolute);
+    }
+
+    public static Uri NormalizeChatCompletionEndpoint(string? endpoint)
+    {
+        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
+
+        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate[..^"/responses".Length];
+        }
+
+        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate[..^"/chat/completions".Length];
+        }
+
+        return new Uri(candidate, UriKind.Absolute);
     }
 
     private static Uri ResolvePreferredXaiEndpoint(
@@ -204,36 +242,4 @@ public static class WorkspaceAiKernelFactory
         return fallback;
     }
 
-    private static Uri NormalizeResponsesEndpoint(string? endpoint)
-    {
-        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
-        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
-        {
-            return new Uri(candidate, UriKind.Absolute);
-        }
-
-        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/chat/completions".Length];
-        }
-
-        return new Uri($"{candidate}/responses", UriKind.Absolute);
-    }
-
-    private static Uri NormalizeChatCompletionEndpoint(string? endpoint)
-    {
-        var candidate = (endpoint ?? "https://api.x.ai/v1").Trim().TrimEnd('/');
-
-        if (candidate.EndsWith("/responses", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/responses".Length];
-        }
-
-        if (candidate.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[..^"/chat/completions".Length];
-        }
-
-        return new Uri(candidate, UriKind.Absolute);
-    }
 }

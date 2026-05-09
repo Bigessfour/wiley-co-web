@@ -1,9 +1,47 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    <!--
+      Early dark-mode detection: runs synchronously before CSS and Blazor load
+      so the page never flickers from light to dark on first paint.
+
+      Sets two attributes on <html>:
+        data-wiley-theme="dark" | "light"  — consumed by our app.css selectors
+        data-bs-theme="dark"   | "light"  — consumed by Bootstrap 5 vars which
+                                            Syncfusion Bootstrap5 theme inherits
+
+      A matchMedia listener keeps both attributes in sync if the OS theme
+      changes while the app is open (e.g. auto-dark scheduling on macOS/iOS).
+    -->
+    <script>
+      (function () {
+        try {
+          var mq =
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)");
+          var theme = mq && mq.matches ? "dark" : "light";
+          document.documentElement.setAttribute("data-wiley-theme", theme);
+          document.documentElement.setAttribute("data-bs-theme", theme);
+          var handleThemeChange = function (e) {
+            var t = e.matches ? "dark" : "light";
+            document.documentElement.setAttribute("data-wiley-theme", t);
+            document.documentElement.setAttribute("data-bs-theme", t);
+          };
+          if (mq) {
+            if (typeof mq.addEventListener === "function") {
+              mq.addEventListener("change", handleThemeChange);
+            } else if (typeof mq.addListener === "function") {
+              mq.addListener(handleThemeChange);
+            }
+          }
+        } catch (ex) {
+          /* Non-fatal: theme defaults to light if matchMedia is unavailable */
+        }
+      })();
+    </script>
     <script>
       tailwind = {
         config: {

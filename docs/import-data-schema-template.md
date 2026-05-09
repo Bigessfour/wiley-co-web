@@ -9,32 +9,28 @@ Several files are duplicate entity families exported for different source contex
 
 Use one canonical copy per business entity family:
 
-- `chart-of-accounts` - source variants from `Full_ChartOfAccounts.xlsx WSD.xlsx`
-- `customers` - source variants from `Full_Customers.xlsx WSD.xlsx`
-- `general-ledger-fy2026` - source variants from the `Full_GeneralLedger_FY2026...` files
-- `profit-loss-by-class-monthly-fy2026` - source variants from `Full_PnL_ByClass_Monthly_FY2026.xlsx WSD.xlsx`
-- `transaction-list-by-date-all` - source variants from the `Full_TransactionList_ByDate_All...` files
-- `trial-balance-fy2026` - source variants from `Full_TrialBalance_FY2026.xlsx WSD.xlsx`
-- `vendors` - source variants from `Full_Vendors.xlsx WSD.xlsx`
+- `chart-of-accounts` - source variants from `chart-of-accounts-wsd.xlsx`
+- `customers` - source variants from `customers-wsd.xlsx`
+- `general-ledger-fy2026` - source variants from `general-ledger-fy2026-util.xlsx` and `general-ledger-fy2026-wsd.xlsx`
+- `profit-loss-by-class-monthly-fy2026` - source variants from `profit-loss-by-class-monthly-fy2026-wsd.xlsx`
+- `transaction-list-by-date-all` - source variants from `transaction-list-by-date-all.xlsx`, `transaction-list-by-date-all-util.xlsx`, and `transaction-list-by-date-all-wsd.xlsx`
+- `trial-balance-fy2026` - source variants from `trial-balance-fy2026-wsd.xlsx`
+- `vendors` - source variants from `vendors-wsd.xlsx`
 
 ### Source variants discovered
 
-- `Full_ChartOfAccounts.xlsx WSD.xlsx`
-- `Full_Customers.xlsx WSD.xlsx`
-- `Full_GeneralLedger_FY2026.xlsx Util.csv`
-- `Full_GeneralLedger_FY2026.xlsx Util.xlsx`
-- `Full_GeneralLedger_FY2026xlsx WSD.csv`
-- `Full_GeneralLedger_FY2026xlsx WSD.xlsx`
-- `Full_PnL_ByClass_Monthly_FY2026.xlsx WSD.xlsx`
-- `Full_TransactionList_ByDate_All.csv`
-- `Full_TransactionList_ByDate_All.xlsx`
-- `Full_TransactionList_ByDate_All.xlsx Util.xlsx`
-- `Full_TransactionList_ByDate_All.xlsx WSD.xlsx`
-- `Full_TrialBalance_FY2026.xlsx WSD.xlsx`
-- `Full_Vendors.xlsx WSD.xlsx`
-- `wsddata.zip`
+- `chart-of-accounts-wsd.xlsx`
+- `customers-wsd.xlsx`
+- `general-ledger-fy2026-util.xlsx`
+- `general-ledger-fy2026-wsd.xlsx`
+- `profit-loss-by-class-monthly-fy2026-wsd.xlsx`
+- `transaction-list-by-date-all.xlsx`
+- `transaction-list-by-date-all-util.xlsx`
+- `transaction-list-by-date-all-wsd.xlsx`
+- `trial-balance-fy2026-wsd.xlsx`
+- `vendors-wsd.xlsx`
 
-The nested `wsddata/` folder was reviewed and its duplicate files were removed. The folder itself is no longer part of the canonical import set.
+The duplicate CSV exports, `wsddata.zip`, and the staging `seed-pass-20260421/` bundle were removed so the import set stays unambiguous.
 
 ## Header observations
 
@@ -282,6 +278,23 @@ Support tables should carry source context and import lineage:
 - `import_row_errors`
 - `import_column_mappings`
 - `staging_records`
+
+The workbook gap for workspace-only customer fields stays manual:
+
+- `customer_type`
+- `service_address`
+- `service_city`
+- `service_state`
+- `service_zip_code`
+- `service_location`
+- `status`
+- `account_open_date`
+- `phone_number`
+- `email_address`
+- `meter_number`
+- `notes`
+
+These fields are not backed by the current QuickBooks source exports and should be entered directly in the workspace UI when needed.
 
 ## Continuity recommendation
 

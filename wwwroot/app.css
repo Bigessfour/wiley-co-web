@@ -490,3 +490,941 @@ h1:focus {
 .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+/* ── Global toast host — Wiley theme harmony layer ─────────────────────────
+   The single SfToast instance (ID="wiley-global-toast") is mounted at the
+   MainLayout shell level and anchored to the viewport bottom-right.
+
+   These rules sit on top of the Syncfusion theme base so the toasts blend
+   with the app's dark AppBar + light content surface without fighting the
+   component library defaults.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Lift the container above the sticky AppBar (z-index ~1000) and the
+   SfSidebar overlay so notifications are always readable. */
+#wiley-global-toast .e-toast-container {
+  z-index: 99990;
+}
+
+/* Shared shape: rounded corners + layered shadow that matches the card style
+   used across the workspace panels. */
+#wiley-global-toast .e-toast {
+  border-radius: 0.875rem;
+  font-family: Aptos, "Segoe UI", "Trebuchet MS", sans-serif;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.14),
+    0 8px 20px -4px rgba(0, 0, 0, 0.12);
+}
+
+/* Title: consistent with the panel eyebrow treatment. */
+#wiley-global-toast .e-toast .e-toast-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+}
+
+/* Body text: legible at small size, relaxed line-height. */
+#wiley-global-toast .e-toast .e-toast-content {
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+/* Progress bar: slim and aligned with Tailwind slate tokens. */
+#wiley-global-toast .e-toast .e-toast-progress {
+  height: 3px;
+  border-radius: 0 0 0.875rem 0.875rem;
+}
+
+/* ── Severity accent overrides ──────────────────────────────────────────── */
+
+/* Success — emerald accent matching the DebtCoverage panel hero gradient. */
+#wiley-global-toast .e-toast.wiley-toast-success {
+  border-left: 4px solid #10b981;
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  color: #064e3b;
+}
+#wiley-global-toast .e-toast.wiley-toast-success .e-toast-title {
+  color: #065f46;
+}
+#wiley-global-toast .e-toast.wiley-toast-success .e-toast-progress {
+  background: #10b981;
+}
+
+/* Error — rose accent for failures; 6 s timeout gives time to read. */
+#wiley-global-toast .e-toast.wiley-toast-error {
+  border-left: 4px solid #e11d48;
+  background: linear-gradient(135deg, #fff1f2, #ffe4e6);
+  color: #881337;
+}
+#wiley-global-toast .e-toast.wiley-toast-error .e-toast-title {
+  color: #9f1239;
+}
+#wiley-global-toast .e-toast.wiley-toast-error .e-toast-progress {
+  background: #e11d48;
+}
+
+/* Warning — amber accent matching the CapitalGap panel badge style. */
+#wiley-global-toast .e-toast.wiley-toast-warning {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  color: #78350f;
+}
+#wiley-global-toast .e-toast.wiley-toast-warning .e-toast-title {
+  color: #92400e;
+}
+#wiley-global-toast .e-toast.wiley-toast-warning .e-toast-progress {
+  background: #f59e0b;
+}
+
+/* Info — sky blue matching the AppBar brand and nav-link active accent. */
+#wiley-global-toast .e-toast.wiley-toast-info {
+  border-left: 4px solid #0ea5e9;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  color: #0c4a6e;
+}
+#wiley-global-toast .e-toast.wiley-toast-info .e-toast-title {
+  color: #075985;
+}
+#wiley-global-toast .e-toast.wiley-toast-info .e-toast-progress {
+  background: #0ea5e9;
+}
+
+/* Close button: inherit the severity text color so it reads well. */
+#wiley-global-toast .e-toast .e-toast-close-icon {
+  opacity: 0.65;
+  transition: opacity 120ms ease;
+}
+#wiley-global-toast .e-toast .e-toast-close-icon:hover {
+  opacity: 1;
+}
+
+/* ── Skeleton shimmer loader — Wiley loading UX system ─────────────────────
+   Applied to placeholder blocks that appear while data is fetching.
+   Usage: class="wiley-skeleton" on any div/span that acts as a placeholder.
+   ──────────────────────────────────────────────────────────────────────── */
+
+@keyframes wiley-shimmer {
+  0% {
+    background-position: -600px 0;
+  }
+  100% {
+    background-position: 600px 0;
+  }
+}
+
+/* Base skeleton block — apply this class plus shape/size utilities */
+.wiley-skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 1200px 100%;
+  animation: wiley-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+  display: block;
+}
+
+/* Skeleton card — full-height variant matching SfCard proportions */
+.wiley-skeleton-card {
+  composes: wiley-skeleton;
+  min-height: 7rem;
+  border-radius: 1rem;
+}
+
+/* Panel-level spinner host: provides the positioned context that SfSpinner
+   needs to center its overlay within a section rather than the whole page. */
+.wiley-panel-spinner-host {
+  position: relative;
+  min-height: 10rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SfSpinner label alignment when rendered inside a panel host */
+.wiley-panel-spinner-host .e-spinner-pane .e-spinner-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Skeleton grid rows — used in grid loading placeholders */
+.wiley-skeleton-row {
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 1200px 100%;
+  animation: wiley-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Stagger animation delay for a cascade effect on multiple skeleton rows */
+.wiley-skeleton-row:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.wiley-skeleton-row:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.wiley-skeleton-row:nth-child(4) {
+  animation-delay: 0.3s;
+}
+.wiley-skeleton-row:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+/* Hero overview skeleton grid — mirrors the workspace-overview-grid layout */
+.wiley-overview-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+
+/* Export spinner wrapper: inline beside status text */
+.wiley-export-spinner-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  vertical-align: middle;
+}
+
+/* Pulsing dot indicator used beside export status when exporting */
+@keyframes wiley-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.75);
+  }
+}
+
+.wiley-pulse-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #0ea5e9;
+  animation: wiley-pulse-dot 1.2s ease-in-out infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.wiley-pulse-dot.is-error {
+  background: #e11d48;
+}
+.wiley-pulse-dot.is-success {
+  background: #10b981;
+}
+
+/* ── Responsive shell — mobile & tablet breakpoints ────────────────────────
+   Breakpoints align with the Tailwind defaults used throughout the workspace
+   and with the C# constants in MainLayout.razor:
+     sm  = 640px   (MobileBreakpointPx — large mobile / phablet)
+     lg  = 1024px  (TabletBreakpointPx — tablet / compact laptop)
+
+   Strategy:
+     • < 1024px (tablet): hide verbose AppBar copy, tighten padding, reduce
+       SfSplitter context-rail size via Blazor bindings.
+     • < 640px (mobile): sidebar switches to Over+backdrop in Blazor;
+       SfSplitter replaced by stacked layout; tap targets enlarged.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ── Tablet (max 1023px) ────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  /* Hide "Production workspace shell" badge — not useful on compact screens */
+  .app-shell-appbar-copy {
+    display: none;
+  }
+
+  /* Slightly tighter main content padding on tablet */
+  .app-content {
+    padding: 1rem;
+  }
+
+  /* Workspace outer padding (overrides Tailwind lg:px-8) */
+  .wiley-workspace {
+    padding-inline: 0.75rem !important;
+  }
+
+  /* Splitter height: hero + doc-center are taller when they wrap on tablet */
+  .workspace-splitter.e-splitter {
+    height: calc(100vh - 26rem) !important;
+    min-height: 26rem;
+  }
+}
+
+/* ── Mobile (max 639px) ─────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  /* Shrink the brand block so it doesn't overflow the AppBar */
+  .app-shell-brand .app-eyebrow {
+    display: none;
+  }
+  .app-shell-brand .app-title {
+    font-size: 0.82rem;
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+
+  /* Hide the toggle label text — icon alone is enough on mobile */
+  .app-shell-nav-toggle-label {
+    display: none;
+  }
+
+  /* Tighten AppBar internal padding on phone */
+  .app-shell-appbar.e-appbar .e-appbar-header {
+    padding-inline: 0.5rem;
+  }
+
+  /* Full-bleed workspace: eliminate outer gutters on phone */
+  .app-content {
+    padding: 0.5rem;
+  }
+  .wiley-workspace {
+    padding-inline: 0.375rem !important;
+    padding-top: 0.5rem !important;
+  }
+
+  /* Expand tap target for AppBar toggle button */
+  #app-shell-nav-toggle {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.5rem;
+  }
+
+  /* Expand nav-link tap target to WCAG minimum 44 × 44 px */
+  .app-nav-link {
+    padding: 0.95rem 1rem;
+    min-height: 2.75rem;
+  }
+}
+
+/* ── Mobile stacked workspace layout (class applied by C# LayoutMode) ─────
+   When LayoutMode == Mobile the SfSplitter is replaced by .wiley-workspace-stack.
+   These classes style the full-width stacked column layout that replaces panes.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Root stack container */
+.wiley-workspace-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Collapsible context panel (uses native <details> for zero-JS accordion) */
+.wiley-mobile-context-rail {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+/* Summary / toggle row */
+.wiley-mobile-context-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Remove default disclosure triangle */
+  list-style: none;
+  outline: none;
+}
+.wiley-mobile-context-summary::-webkit-details-marker {
+  display: none;
+}
+/* Custom chevron via pseudo-element */
+.wiley-mobile-context-summary::after {
+  content: "\25be"; /* ▾ */
+  font-size: 0.8rem;
+  color: #64748b;
+  transition: transform 220ms ease;
+  flex-shrink: 0;
+}
+details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
+  transform: rotate(-180deg);
+}
+
+/* Context body when expanded */
+.wiley-mobile-context-body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Main content area inside mobile stack */
+.wiley-mobile-main-content {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  min-height: 24rem;
+}
+
+/* Mobile breadcrumb bar inside main content */
+.wiley-mobile-breadcrumb {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 0.75rem;
+}
+
+/* Mobile panel navigation grid */
+.wiley-mobile-panel-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.wiley-mobile-panel-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 0.5rem;
+  border-radius: 0.625rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  text-decoration: none;
+  text-align: center;
+  /* WCAG 2.1: minimum 44px touch target */
+  min-height: 2.75rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.wiley-mobile-panel-nav-item:active,
+.wiley-mobile-panel-nav-item.is-active {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+  color: #0c4a6e;
+}
+
+/* Layout mode CSS classes on .app-shell root — used for scoped overrides */
+.app-shell-mobile .app-shell-brand .app-eyebrow {
+  display: none;
+}
+
+/* Floating Jarvis button: pull up slightly on mobile to avoid home-bar overlap */
+@media (max-width: 639px) {
+  #workspace-jarvis-launcher {
+    bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+    right: 1rem;
+  }
+}
+
+/* Empty-state card — graceful no-data template for charts and grids */
+.wiley-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 14rem;
+  border: 2px dashed #cbd5e1;
+  border-radius: 1rem;
+  background: #f8fafc;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.wiley-empty-state__icon {
+  font-size: 2rem;
+  color: #94a3b8;
+}
+
+.wiley-empty-state__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.wiley-empty-state__body {
+  font-size: 0.8125rem;
+  color: #64748b;
+  max-width: 28rem;
+  line-height: 1.55;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DARK MODE — system-preference + data-wiley-theme attribute
+   ─────────────────────────────────────────────────────────────────────────
+   Strategy:
+     • The early-detection script in index.html sets data-wiley-theme="dark"
+       on <html> before first paint, preventing a light→dark flicker.
+     • It also sets data-bs-theme="dark" so Bootstrap 5 CSS variables (which
+       Syncfusion's Bootstrap5 theme inherits) automatically adapt grids,
+       dropdowns, inputs, badges, and cards.
+     • The @media (prefers-color-scheme: dark) block covers users whose
+       browsers do not run our JS early-detection (unlikely, belt-and-braces).
+     • We target both :root and html[data-wiley-theme="dark"] so the rules
+       fire for system dark AND for a future manual theme toggle.
+
+   Dark palette:
+     surface-0  #020617  (slate-950) — deepest layer: sidebar, AppBar
+     surface-1  #0f172a  (slate-900) — page/workspace background
+     surface-2  #1e293b  (slate-800) — panel cards, modals
+     surface-3  #334155  (slate-700) — secondary card, highlighted rows
+     border     rgba(148,163,184,0.14) — subtle separator
+     text-1     #f1f5f9  (slate-100) — headings
+     text-2     #cbd5e1  (slate-300) — body
+     text-3     #94a3b8  (slate-400) — captions, muted
+     accent     #38bdf8  (sky-400)   — interactive, links
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Bootstrap 5 token overrides for Syncfusion Bootstrap5 theme ──────────
+   Syncfusion's Bootstrap5 theme inherits these CSS variables, so overriding
+   them here cascades into every SfDropDownList, SfGrid, SfCard, SfTextBox,
+   SfSpinner, SfBadge, and SfButton without custom per-component CSS.
+   ──────────────────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bs-body-bg: #0f172a;
+    --bs-body-color: #f1f5f9;
+    --bs-secondary-color: rgba(241, 245, 249, 0.75);
+    --bs-tertiary-color: rgba(241, 245, 249, 0.5);
+    --bs-emphasis-color: #f8fafc;
+    --bs-border-color: rgba(148, 163, 184, 0.16);
+    --bs-border-color-translucent: rgba(148, 163, 184, 0.12);
+    --bs-secondary-bg: #1e293b;
+    --bs-tertiary-bg: #334155;
+    --bs-card-bg: #1e293b;
+    --bs-card-border-color: rgba(148, 163, 184, 0.14);
+    --bs-input-bg: #1e293b;
+    --bs-input-border-color: rgba(148, 163, 184, 0.22);
+    --bs-input-focus-border-color: #38bdf8;
+    --bs-dropdown-bg: #1e293b;
+    --bs-dropdown-border-color: rgba(148, 163, 184, 0.14);
+    --bs-dropdown-link-color: #cbd5e1;
+    --bs-dropdown-link-hover-bg: #334155;
+    --bs-dropdown-link-hover-color: #f1f5f9;
+    --bs-dropdown-link-active-bg: #0369a1;
+    --bs-dropdown-link-active-color: #f8fafc;
+    --bs-modal-bg: #1e293b;
+    --bs-modal-header-border-color: rgba(148, 163, 184, 0.14);
+  }
+}
+
+[data-wiley-theme="dark"] {
+  --bs-body-bg: #0f172a;
+  --bs-body-color: #f1f5f9;
+  --bs-secondary-color: rgba(241, 245, 249, 0.75);
+  --bs-tertiary-color: rgba(241, 245, 249, 0.5);
+  --bs-emphasis-color: #f8fafc;
+  --bs-border-color: rgba(148, 163, 184, 0.16);
+  --bs-border-color-translucent: rgba(148, 163, 184, 0.12);
+  --bs-secondary-bg: #1e293b;
+  --bs-tertiary-bg: #334155;
+  --bs-card-bg: #1e293b;
+  --bs-card-border-color: rgba(148, 163, 184, 0.14);
+  --bs-input-bg: #1e293b;
+  --bs-input-border-color: rgba(148, 163, 184, 0.22);
+  --bs-input-focus-border-color: #38bdf8;
+  --bs-dropdown-bg: #1e293b;
+  --bs-dropdown-border-color: rgba(148, 163, 184, 0.14);
+  --bs-dropdown-link-color: #cbd5e1;
+  --bs-dropdown-link-hover-bg: #334155;
+  --bs-dropdown-link-hover-color: #f1f5f9;
+  --bs-dropdown-link-active-bg: #0369a1;
+  --bs-dropdown-link-active-color: #f8fafc;
+  --bs-modal-bg: #1e293b;
+  --bs-modal-header-border-color: rgba(148, 163, 184, 0.14);
+}
+
+/* ── Wiley custom element dark overrides ────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background:
+      radial-gradient(
+        circle at top left,
+        rgba(14, 165, 233, 0.06),
+        transparent 32%
+      ),
+      linear-gradient(180deg, #0f172a 0%, #020617 100%);
+    color: #f1f5f9;
+  }
+
+  /* Main workspace background */
+  .wiley-workspace {
+    background-color: #0f172a !important;
+  }
+
+  /* Document center / export panel */
+  #workspace-document-center {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.14);
+    color: #f1f5f9;
+  }
+  #workspace-document-center h2 {
+    color: #f1f5f9;
+  }
+  #workspace-document-center p {
+    color: #94a3b8;
+  }
+
+  /* Context rail info cards (hosting info, status, navigation) */
+  #workspace-hosting-information,
+  #workspace-navigation-card,
+  #workspace-global-actions-card,
+  #workspace-status-card {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.14);
+    color: #cbd5e1;
+  }
+
+  #workspace-hosting-information .font-semibold,
+  #workspace-navigation-card .font-semibold,
+  #workspace-global-actions-card .font-semibold,
+  #workspace-status-card .font-semibold {
+    color: #f1f5f9;
+  }
+
+  /* Breadcrumb text */
+  #workspace-breadcrumb {
+    border-bottom-color: rgba(148, 163, 184, 0.14);
+  }
+  #workspace-breadcrumb .text-slate-500,
+  #workspace-breadcrumb .text-slate-800 {
+    color: #94a3b8 !important;
+  }
+  #workspace-breadcrumb .font-semibold.text-slate-800 {
+    color: #f1f5f9 !important;
+  }
+
+  /* Workspace navigation links in context rail */
+  .workspace-panel-link {
+    color: #94a3b8 !important;
+  }
+  .workspace-panel-link:hover,
+  .workspace-panel-link.bg-sky-100 {
+    background-color: #0c4a6e !important;
+    color: #bae6fd !important;
+    border-color: #0369a1 !important;
+  }
+
+  /* Splitter pane backgrounds */
+  .workspace-pane-context,
+  .workspace-pane-main,
+  .workspace-pane-jarvis {
+    background-color: #1e293b;
+  }
+
+  /* Overview cards */
+  .workspace-overview-card,
+  .workspace-overview-card-featured,
+  .workspace-overview-card-wide {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.14);
+    color: #f1f5f9;
+  }
+  .workspace-overview-card h3,
+  .workspace-overview-card-featured h3 {
+    color: #f1f5f9;
+  }
+  .workspace-overview-card p,
+  .workspace-overview-card-featured p {
+    color: #94a3b8;
+  }
+  .workspace-overview-card-kicker {
+    color: #38bdf8 !important;
+  }
+  .workspace-overview-card-metrics span {
+    color: #64748b !important;
+  }
+
+  /* Export status strip */
+  #workspace-document-center .rounded-xl.bg-slate-50 {
+    background-color: #1e293b !important;
+    color: #cbd5e1;
+  }
+
+  /* Home hub cards */
+  .home-hub-card {
+    background: rgba(30, 41, 59, 0.92);
+    border-color: rgba(148, 163, 184, 0.14);
+    color: #f1f5f9;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  }
+  .home-hub-card p {
+    color: #94a3b8;
+  }
+  .home-hub-card-index {
+    background: #0c4a6e;
+    color: #7dd3fc;
+  }
+  .home-hub-grid {
+    background: transparent;
+  }
+
+  /* Empty state */
+  .wiley-empty-state {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  .wiley-empty-state__icon {
+    color: #475569;
+  }
+  .wiley-empty-state__title {
+    color: #cbd5e1;
+  }
+  .wiley-empty-state__body {
+    color: #64748b;
+  }
+
+  /* Skeleton shimmer — dark palette */
+  .wiley-skeleton {
+    background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+    background-size: 1200px 100%;
+  }
+  .wiley-skeleton-row {
+    background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+    background-size: 1200px 100%;
+  }
+
+  /* Mobile stacked layout */
+  .wiley-mobile-context-rail {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.14);
+  }
+  .wiley-mobile-context-summary {
+    color: #cbd5e1;
+  }
+  .wiley-mobile-context-summary::after {
+    color: #64748b;
+  }
+  .wiley-mobile-context-body {
+    border-top-color: rgba(148, 163, 184, 0.08);
+  }
+  .wiley-mobile-main-content {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.14);
+  }
+  .wiley-mobile-breadcrumb {
+    border-bottom-color: rgba(148, 163, 184, 0.1);
+  }
+  .wiley-mobile-panel-nav-item {
+    background: #1e293b;
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #94a3b8;
+  }
+  .wiley-mobile-panel-nav-item:active,
+  .wiley-mobile-panel-nav-item.is-active {
+    background: #0c4a6e;
+    border-color: #0369a1;
+    color: #bae6fd;
+  }
+
+  /* Toast: light-palette variants → dark equivalents */
+  #wiley-global-toast .e-toast.wiley-toast-success {
+    background: linear-gradient(135deg, #052e16, #064e3b);
+    color: #86efac;
+    border-left-color: #16a34a;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-success .e-toast-title {
+    color: #4ade80;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-error {
+    background: linear-gradient(135deg, #1c0708, #881337);
+    color: #fca5a5;
+    border-left-color: #dc2626;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-error .e-toast-title {
+    color: #f87171;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-warning {
+    background: linear-gradient(135deg, #1c1400, #78350f);
+    color: #fde68a;
+    border-left-color: #d97706;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-warning .e-toast-title {
+    color: #fcd34d;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-info {
+    background: linear-gradient(135deg, #082f49, #0c4a6e);
+    color: #bae6fd;
+    border-left-color: #0284c7;
+  }
+  #wiley-global-toast .e-toast.wiley-toast-info .e-toast-title {
+    color: #7dd3fc;
+  }
+
+  /* Syncfusion SfCard dark surface */
+  .e-card {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.14);
+    color: #f1f5f9;
+  }
+  .e-card .e-card-header-title {
+    color: #f1f5f9;
+  }
+  .e-card .e-card-sub-title {
+    color: #94a3b8;
+  }
+
+  /* Syncfusion SfSplitter pane separators */
+  .e-splitter .e-split-bar {
+    background-color: #334155;
+    border-color: rgba(148, 163, 184, 0.14);
+  }
+  .e-splitter .e-split-bar:hover {
+    background-color: #475569;
+  }
+
+  /* Syncfusion SfListView in sidebar */
+  .e-listview,
+  .e-listview .e-list-item {
+    background-color: transparent;
+    color: inherit;
+  }
+
+  /* Syncfusion dropdowns/popups */
+  .e-popup,
+  .e-popup.e-ddl,
+  .e-dropdownlist.e-popup {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+  .e-popup .e-list-item,
+  .e-ddl.e-popup .e-list-item {
+    color: #cbd5e1;
+  }
+  .e-popup .e-list-item:hover,
+  .e-ddl.e-popup .e-list-item:hover,
+  .e-popup .e-list-item.e-active,
+  .e-ddl.e-popup .e-list-item.e-active {
+    background-color: #0c4a6e;
+    color: #bae6fd;
+  }
+
+  /* SfTextBox + SfDropDownList input surface */
+  .e-input-group,
+  .e-input-group.e-control-wrapper {
+    background-color: #1e293b;
+    border-color: rgba(148, 163, 184, 0.22);
+    color: #f1f5f9;
+  }
+  .e-input-group .e-input,
+  .e-input-group input {
+    background-color: transparent;
+    color: #f1f5f9;
+  }
+  .e-input-group.e-input-focus,
+  .e-input-group:focus-within {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+  }
+
+  /* SfButton outline variants */
+  .e-btn.e-outline {
+    color: #94a3b8;
+    border-color: rgba(148, 163, 184, 0.3);
+  }
+  .e-btn.e-outline:hover {
+    background-color: #1e293b;
+    color: #f1f5f9;
+  }
+}
+
+/* Apply the same overrides when data-wiley-theme="dark" is set explicitly
+   (for a future manual toggle that supplements the OS media query). */
+[data-wiley-theme="dark"] html,
+[data-wiley-theme="dark"] body,
+html[data-wiley-theme="dark"] body {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(14, 165, 233, 0.06),
+      transparent 32%
+    ),
+    linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  color: #f1f5f9;
+}
+
+/* ── Enhanced focus indicators (WCAG 2.1 AA: 3:1 contrast ratio minimum) ─
+   Keyboard focus rings use a 3px solid sky-400 outline that passes contrast
+   requirements on both light and dark surfaces.  We use :focus-visible so
+   mouse clicks do not show the ring (follows browser intent).
+   ──────────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 3px solid #0ea5e9;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Syncfusion interactive elements: augment their internal focus styles */
+.e-btn:focus-visible,
+.e-control:focus-visible,
+.e-input-group:focus-within {
+  outline: 3px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* App nav links: focus ring within the dark sidebar */
+.app-nav-link:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+/* Nav toggle button focus ring */
+#app-shell-nav-toggle:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+/* Workspace card-link buttons */
+.workspace-card-link:focus-visible,
+.wiley-mobile-panel-nav-item:focus-visible {
+  outline: 3px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* Mobile context accordion summary */
+.wiley-mobile-context-summary:focus-visible {
+  outline: 3px solid #0ea5e9;
+  outline-offset: 0;
+}
+
+/* Dark mode focus ring — brighter sky for low-contrast dark surfaces */
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: #38bdf8;
+  }
+  .e-btn:focus-visible,
+  .e-control:focus-visible {
+    outline-color: #38bdf8;
+  }
+}
+
+/* ── RTL layout support ──────────────────────────────────────────────────── */
+/* When dir="rtl" is set on <html>, flip directional chrome so Syncfusion
+   sidebar, nav links, and workspace panes mirror correctly without JS. */
+:root[dir="rtl"] .app-nav-link {
+  flex-direction: row-reverse;
+}
+:root[dir="rtl"] .app-nav-link:hover,
+:root[dir="rtl"] .app-nav-link.active {
+  transform: translateX(-2px);
+}
+:root[dir="rtl"] .app-shell-nav-collapsed .app-nav-link {
+  justify-content: center;
+}
+:root[dir="rtl"] #app-shell-sidebar.e-sidebar {
+  border-right: none;
+  border-left: 1px solid rgba(148, 163, 184, 0.16);
+}
+:root[dir="rtl"] .app-shell-brand {
+  margin-left: 0;
+  margin-right: 0.85rem;
+}

@@ -31,8 +31,8 @@ public sealed class WileyWorkspacePanelE2ETests
 
             // Break-even rate = TotalCosts / ProjectedVolume = 24000 / 400 = 60.00
             await Expect(page.Locator("#break-even-panel")).ToContainTextAsync("60", new() { Timeout = ActionTimeoutMs });
-            await Expect(page.Locator("#break-even-rate-gauge")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
-            await Expect(page.Locator("#break-even-rate-comparison-chart")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#break-even-quadrant-grid")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
+            await Expect(page.Locator("#apartment-config-panel")).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
         });
     }
 
@@ -44,7 +44,7 @@ public sealed class WileyWorkspacePanelE2ETests
             // Revenue summary block must be visible in the break-even panel on load.
             var breakEvenPanel = page.Locator("#break-even-panel");
             await Expect(breakEvenPanel).ToBeVisibleAsync(new() { Timeout = ActionTimeoutMs });
-            await Expect(breakEvenPanel).ToContainTextAsync("Break-Even", new() { Timeout = ActionTimeoutMs });
+            await Expect(breakEvenPanel).ToContainTextAsync("Break-Even Quadrants", new() { Timeout = ActionTimeoutMs });
         });
     }
 

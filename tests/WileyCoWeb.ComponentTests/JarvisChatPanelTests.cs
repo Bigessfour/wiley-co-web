@@ -17,6 +17,18 @@ namespace WileyCoWeb.ComponentTests;
 
 public sealed class JarvisChatPanelTests : TestContext
 {
+	private static readonly bool SyncfusionLicenseInitialized = InitializeSyncfusionLicense();
+
+	private static bool InitializeSyncfusionLicense()
+	{
+		var key = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY");
+		if (!string.IsNullOrWhiteSpace(key))
+		{
+			Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense(key);
+		}
+		return true;
+	}
+
 	[Fact]
 	public async Task AskJarvis_FirstConversationUsesLiveAnswerBeforeOnboardingFallback()
 	{

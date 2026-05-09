@@ -32,7 +32,7 @@ public partial class CustomerViewerPanel
         => customerDirectoryStatus;
 
     private bool IsBusy()
-        => isLoadingCustomers || isSavingCustomer || isDeletingCustomer;
+        => isLoadingCustomers || isSavingCustomer || isDeletingCustomer || isExportingCustomerGrid;
 
     private bool HasApiFeedback()
         => !string.IsNullOrWhiteSpace(GetCustomerApiError());

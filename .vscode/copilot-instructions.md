@@ -35,7 +35,7 @@ This file supplements the repository root copilot-instructions.md and is the alw
 ## Core Rules
 
 - This is a Blazor WebAssembly application for Wiley.co, a simple responsive financial dashboard website.
-- Syncfusion Essential Studio 33.1.44 is mandatory for all UI components.
+- Syncfusion Essential Studio 33.2.3 is mandatory for all UI components.
 - Never use plain HTML tables, MudBlazor, or built-in Blazor components for grids, charts, dashboards, spreadsheets, or PDF viewing.
 - Always use Syncfusion Blazor NuGet packages for UI work, including Syncfusion.Blazor, Syncfusion.Blazor.Spreadsheet, Syncfusion.Blazor.PdfViewer or SmartPdfViewer, and Syncfusion.Blazor.DocumentEditor when relevant.
 - Always use Syncfusion Blazor NuGet packages for UI work, including Syncfusion.Blazor, Syncfusion.Blazor.Spreadsheet, Syncfusion.Blazor.SfPdfViewer or Syncfusion.Blazor.SfSmartPdfViewer, and Syncfusion.Blazor.WordProcessor when relevant.

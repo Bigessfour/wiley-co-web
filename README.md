@@ -80,7 +80,15 @@ The API host now attempts to load the Grok secret from AWS Secrets Manager at st
 
 Local PowerShell testing shells now treat the machine-scoped `XAI_API_KEY` as canonical. The active profiles under `Documents/PowerShell` repair stale process and user copies from machine scope on startup, so a fresh `pwsh` session reflects the current workstation testing key instead of inheriting an older user-level value.
 
-Production App Runner now injects `XAI_API_KEY` from the runtime secret `wiley-widget/api/xai-api-key` and calls the direct xAI base URL `https://api.x.ai/v1`. AWS App Runner only refreshes runtime secret and environment-variable values when the service is deployed or updated, so any future xAI secret rotation requires an App Runner redeploy.
+Production App Runner now injects `XAI_API_KEY` from the runtime secret `wiley-widget/api/xai-api-key` and routes Jarvis traffic through the API Gateway xAI proxy `https://w544vrvb3i.execute-api.us-east-2.amazonaws.com/prod/v1`, with direct xAI retry disabled for the VPC-egress runtime. AWS App Runner only refreshes runtime secret and environment-variable values when the service is deployed or updated, so any future xAI secret rotation or endpoint change requires an App Runner redeploy.
+
+Jarvis now follows a split transport model that matches the current xAI and Microsoft guidance:
+
+1. Semantic Kernel stays on the OpenAI-compatible chat connector and must be configured with the service root ending in `/v1`, not `/v1/chat/completions`.
+2. The direct xAI fallback path uses the Responses API at `/v1/responses`, which is xAI's recommended primary API surface.
+3. The fallback request defaults `XAI:StoreResponses` to `false` because the app already persists conversation history locally and should not depend on xAI server-side storage unless you opt in deliberately.
+4. Direct retry from the proxy to `api.x.ai` is now opt-in through `XAI:AllowDirectRetry=true`; the safe default is disabled so App Runner does not stack unreachable internet retries behind the VPC-egress proxy path.
+5. All Jarvis/xAI traffic uses the named `IHttpClientFactory` client `WorkspaceAiTransport`, which applies pooled connections, a bounded connect timeout, response decompression, the App Runner TLS revocation workaround, and the standard .NET resilience handler.
 
 ## Aurora Database
 
@@ -175,7 +183,9 @@ AWS CLI validation on April 15, 2026 confirms the current production support pic
 - Aurora PostgreSQL cluster `wiley-co-aurora-db` remains the system of record in private VPC `vpc-0b4e1d7362da22c17`.
 - Secrets Manager contains the existing `Grok` secret for server-side xAI access and now also contains App Runner runtime secrets for the API database connection string, xAI key, and Syncfusion license.
 - API Gateway `WileyJarvisApi` (`w544vrvb3i`) still serves only as the xAI proxy and is not the workspace API host.
-- The xAI proxy still follows the AWS HTTP proxy pattern for greedy resources, but live validation on April 23, 2026 showed its current resource policy rejects anonymous `execute-api:Invoke` calls with `403 AccessDeniedException`. App Runner therefore uses the direct xAI endpoint instead of the proxy until that gateway policy is intentionally opened or SigV4-signed invocation is added.
+- The xAI proxy still follows the AWS HTTP proxy pattern for greedy resources, and its resource policy allows requests from the Wiley Aurora VPC. Public workstation calls still return `403 AccessDeniedException`, but the App Runner service uses the proxy from that VPC path so Jarvis does not depend on direct outbound internet reachability to `api.x.ai`.
+- Jarvis uses the proxy root `/prod/v1` for Semantic Kernel and normalizes any configured `.../chat/completions` suffix back to the `/v1` base URL before building the OpenAI-compatible client.
+- Direct xAI fallback remains available through `/prod/v1/responses`, with direct retry to `https://api.x.ai/v1/responses` disabled unless `XAI:AllowDirectRetry` is explicitly enabled.
 - AWS CLI provisioning created the thin API runtime path:
   - ECR repository `wiley-widget-api`
   - App Runner service `wiley-widget-api` at `https://mr7zeizxxd.us-east-2.awsapprunner.com`
@@ -187,6 +197,17 @@ AWS CLI validation on April 15, 2026 confirms the current production support pic
 Production implication: the missing compute host is now provisioned, but final cutover is not complete until the App Runner service finishes healthy startup validation and Amplify performs a release using the staged API base address. Until that release happens, the public client can still reflect the previous routing behavior.
 
 Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with public ingress and VPC egress to Aurora. For the May 11 City Council working session, `1 vCPU / 2 GB`, minimum one warm instance, remains the safer baseline if load or export activity increases.
+
+## Post-Production Operations
+
+The repository now separates day-two operations guidance from release-status notes.
+
+- Use [docs/post-production-operations-handbook.md](docs/post-production-operations-handbook.md) as the primary day-two production handbook for releases, rollback planning, monitoring, incident first response, data operations, and release evidence.
+- Use [docs/post-production-documentation-review.md](docs/post-production-documentation-review.md) for the documentation inventory, identified gaps, and the recommended follow-on doc set for release records, incident response, and secret rotation.
+- Use [docs/release-record-template.md](docs/release-record-template.md) for every production release, even small ones.
+- Use [docs/secrets-and-config-rotation-runbook.md](docs/secrets-and-config-rotation-runbook.md) when rotating runtime secrets or changing App Runner configuration.
+- Use [docs/incident-response-matrix.md](docs/incident-response-matrix.md) to classify production incidents and keep first response disciplined.
+- Keep [docs/aws-server-side-closure-plan.md](docs/aws-server-side-closure-plan.md), [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md), and [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md) as the authoritative specialist documents linked from the handbook.
 
 ## Town Email Alias Routing
 

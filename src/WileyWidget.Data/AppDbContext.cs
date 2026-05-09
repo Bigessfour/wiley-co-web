@@ -43,6 +43,7 @@ namespace WileyWidget.Data
         public DbSet<Fund> Funds { get; set; } = null!;
         public DbSet<Transaction> Transactions { get; set; } = null!;
         public DbSet<Enterprise> Enterprises { get; set; } = null!;
+        public DbSet<ApartmentUnitType> ApartmentUnitTypes { get; set; } = null!;
         public DbSet<AppSettings> AppSettings { get; set; } = null!;
         public DbSet<FiscalYearSettings> FiscalYearSettings { get; set; } = null!;
         public DbSet<UtilityCustomer> UtilityCustomers { get; set; } = null!;
@@ -211,6 +212,19 @@ namespace WileyWidget.Data
                     .IsConcurrencyToken()
                     .ValueGeneratedNever()
                     .HasDefaultValue(Array.Empty<byte>());
+
+                entity.HasMany(e => e.ApartmentUnitTypes)
+                    .WithOne(unitType => unitType.Enterprise)
+                    .HasForeignKey(unitType => unitType.EnterpriseId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ApartmentUnitType>(entity =>
+            {
+                entity.ToTable("ApartmentUnitTypes");
+                entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.MonthlyRent).HasColumnType(Decimal18_2);
+                entity.HasIndex(e => new { e.EnterpriseId, e.Name }).IsUnique();
             });
 
             modelBuilder.Entity<FiscalYearSettings>(entity =>

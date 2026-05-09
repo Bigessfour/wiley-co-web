@@ -44,7 +44,10 @@ internal static class WorkspaceTestData
         IReadOnlyList<int>? fiscalYearOptions = null,
         IReadOnlyList<WorkspaceScenarioItemData>? scenarioItems = null,
         IReadOnlyList<CustomerRow>? customerRows = null,
-        IReadOnlyList<ProjectionRow>? projectionRows = null)
+        IReadOnlyList<ProjectionRow>? projectionRows = null,
+        IReadOnlyList<BreakEvenQuadrantData>? breakEvenQuadrants = null,
+        IReadOnlyList<ApartmentUnitTypeData>? apartmentUnitTypes = null,
+        WorkspaceReserveTrajectoryData? reserveTrajectory = null)
     {
         return new WorkspaceBootstrapData(
             WaterUtility,
@@ -69,12 +72,74 @@ internal static class WorkspaceTestData
                     new ProjectionRow("FY25", 51.40m),
                     new ProjectionRow("FY26", currentRate)
                 ],
+            BreakEvenQuadrants = breakEvenQuadrants?.ToList() ?? CreateBreakEvenQuadrants(currentRate, totalCosts, projectedVolume).ToList(),
+            ApartmentUnitTypes = apartmentUnitTypes?.ToList() ?? CreateApartmentUnitTypes().ToList(),
+            ReserveTrajectory = reserveTrajectory ?? CreateReserveTrajectory(),
             ScenarioItems = scenarioItems?.ToList() ??
                 [
                     new WorkspaceScenarioItemData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1b01"), "Reserve transfer", 6200m),
                     new WorkspaceScenarioItemData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1b02"), "Vehicle replacement", 18000m)
                 ]
         };
+    }
+
+    public static WorkspaceReserveTrajectoryData CreateReserveTrajectory(
+        decimal currentReserves = 248500m,
+        decimal recommendedReserveLevel = 315000m,
+        string riskAssessment = "Moderate",
+        int pointCount = 5)
+    {
+        var forecastPoints = Enumerable.Range(1, Math.Max(1, pointCount))
+            .Select(index => new WorkspaceReserveTrajectoryPointData(
+                new DateTime(WaterFiscalYear + index - 1, 6, 30, 0, 0, 0, DateTimeKind.Utc),
+                Math.Round(currentReserves + (index * 12500m), 2, MidpointRounding.AwayFromZero),
+                Math.Round(currentReserves * 0.08m, 2, MidpointRounding.AwayFromZero)))
+            .ToList();
+
+        return new WorkspaceReserveTrajectoryData(
+            currentReserves,
+            recommendedReserveLevel,
+            riskAssessment,
+            forecastPoints);
+    }
+
+    public static IReadOnlyList<BreakEvenQuadrantData> CreateBreakEvenQuadrants(decimal currentRate, decimal totalCosts, decimal projectedVolume)
+    {
+        var breakEvenRate = projectedVolume > 0 ? Math.Round(totalCosts / projectedVolume, 2, MidpointRounding.AwayFromZero) : 0m;
+        var labels = new[] { "FY25", "FY26" };
+
+        return new[]
+        {
+            CreateBreakEvenQuadrant("Water Utility", "Water", currentRate, totalCosts, projectedVolume, breakEvenRate, labels),
+            CreateBreakEvenQuadrant("Wiley Sanitation District", "Sewer", currentRate, totalCosts, projectedVolume, breakEvenRate, labels),
+            CreateBreakEvenQuadrant("Trash", "Trash", currentRate, totalCosts, projectedVolume, breakEvenRate, labels),
+            CreateBreakEvenQuadrant("Apartments", "Apartments", currentRate, totalCosts, projectedVolume, breakEvenRate, labels)
+        };
+    }
+
+    public static IReadOnlyList<ApartmentUnitTypeData> CreateApartmentUnitTypes()
+    {
+        return new[]
+        {
+            new ApartmentUnitTypeData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1c01"), "2 Bedroom", 2, 8, 444.44m),
+            new ApartmentUnitTypeData(Guid.Parse("b94d0f45-1f42-4b4d-93d7-6e9dbe3a1c02"), "3 Bedroom", 3, 8, 555.55m)
+        };
+    }
+
+    private static BreakEvenQuadrantData CreateBreakEvenQuadrant(string enterpriseName, string enterpriseType, decimal currentRate, decimal totalCosts, decimal projectedVolume, decimal breakEvenRate, IReadOnlyList<string> labels)
+    {
+        var expensesPerCustomer = projectedVolume > 0 ? Math.Round(totalCosts / projectedVolume, 2, MidpointRounding.AwayFromZero) : 0m;
+
+        return new BreakEvenQuadrantData(
+            enterpriseName,
+            enterpriseType,
+            currentRate,
+            totalCosts,
+            totalCosts,
+            0m,
+            breakEvenRate,
+            projectedVolume,
+            labels.Select(label => new BreakEvenSeriesPoint(label, currentRate, expensesPerCustomer, breakEvenRate)).ToList());
     }
 
     public static WorkspaceBootstrapData CreatePersistedBootstrap()
