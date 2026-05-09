@@ -54,7 +54,7 @@
                     aria-controls="app-shell-sidebar"
                     aria-expanded="@(!_layoutContext.IsLeftNavCollapsed ? "true" : "false")"
                     @onclick="ToggleLeftNavAsync">
-                <span class="e-btn-icon e-icons e-menu" aria-hidden="true"></span>
+                <span class="e-btn-icon e-icons @( _layoutContext.IsLeftNavCollapsed ? "e-chevron-right" : "e-chevron-left" )" aria-hidden="true"></span>
                 @* app-shell-nav-toggle-label is hidden via CSS on mobile (< 640 px)
                    so the button shows only the hamburger icon and stays compact. *@
                 <span class="app-shell-nav-toggle-label">@NavigationRailToggleText</span>

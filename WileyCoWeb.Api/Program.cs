@@ -132,6 +132,14 @@ public partial class Program
 
     private static async Task LoadPersistedAiConfigurationAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
+        // EnsureStartupConnectionString runs before this method; degraded mode uses in-memory storage, not Aurora AppSettings.
+        if (AppDbStartupState.IsDegradedMode)
+        {
+            bootstrapLogger.LogInformation(
+                "Workspace API skipped promoting persisted AppSettings (database host is in degraded mode; use environment and secrets for AI configuration).");
+            return;
+        }
+
         try
         {
             using var context = new AppDbContextFactory(builder.Configuration).CreateDbContext();
@@ -216,18 +224,6 @@ public partial class Program
     {
         var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder).ConfigureAwait(false);
 
-        await LoadPersistedAiConfigurationAsync(builder, bootstrapLogger).ConfigureAwait(false);
-
-        var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
-        var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
-        var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
-        var xaiKeyResolved = !string.IsNullOrWhiteSpace(
-            xaiEnvironmentApiKey
-            ?? xaiConfigDirectApiKey
-            ?? xaiConfigNamedApiKey);
-        var xaiKeySource = DetermineXaiKeySource(xaiEnvironmentApiKey, xaiSecretResolution, xaiConfigDirectApiKey, xaiConfigNamedApiKey);
-        var xaiEndpointResolution = DetermineXaiEndpointResolution(builder.Configuration);
-
         var configuredConnectionString = GetConfiguredConnectionString(builder.Configuration);
         var allowDegradedStartup = ShouldAllowDegradedStartup(builder.Environment, builder.Configuration);
         var seedDevelopmentData = builder.Configuration.GetValue<bool>("Database:SeedDevelopmentData");
@@ -246,7 +242,21 @@ public partial class Program
             });
         }
 
+        // After EnsureStartupConnectionString, AppDbStartupState may activate degraded mode (no connection string),
+        // so AppDbContextFactory uses InMemory instead of requiring Aurora before we read persisted AppSettings.
         EnsureStartupConnectionString(builder, configuredConnectionString, allowDegradedStartup, bootstrapLogger);
+
+        await LoadPersistedAiConfigurationAsync(builder, bootstrapLogger).ConfigureAwait(false);
+
+        var xaiEnvironmentApiKey = Environment.GetEnvironmentVariable("XAI_API_KEY");
+        var xaiConfigDirectApiKey = builder.Configuration["XAI_API_KEY"];
+        var xaiConfigNamedApiKey = builder.Configuration["XAI:ApiKey"];
+        var xaiKeyResolved = !string.IsNullOrWhiteSpace(
+            xaiEnvironmentApiKey
+            ?? xaiConfigDirectApiKey
+            ?? xaiConfigNamedApiKey);
+        var xaiKeySource = DetermineXaiKeySource(xaiEnvironmentApiKey, xaiSecretResolution, xaiConfigDirectApiKey, xaiConfigNamedApiKey);
+        var xaiEndpointResolution = DetermineXaiEndpointResolution(builder.Configuration);
 
         var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
 

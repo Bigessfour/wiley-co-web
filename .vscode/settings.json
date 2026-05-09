@@ -1,102 +1,33 @@
 {
   "dotnet.defaultSolution": "WileyCoWeb.slnx",
-  "terminal.integrated.env.osx": {
-    "PATH": "/opt/homebrew/bin:${env:PATH}",
-    "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
+  "files.watcherExclude": {
+    "**/bin/**": true,
+    "**/obj/**": true,
+    "**/node_modules/**": true
   },
-  "terminal.integrated.env.windows": {
-    "WILEYCO_E2E_BASE_URL": "http://localhost:5230"
-  },
-  "terminal.integrated.profiles.osx": {
-    "zsh": {
-      "path": "/bin/zsh"
-    }
-  },
-  "terminal.integrated.defaultProfile.osx": "zsh",
-  "terminal.integrated.defaultProfile.windows": "PowerShell",
-  "terminal.integrated.automationProfile.osx": {
-    "path": "/bin/zsh",
-    "args": ["-NoLogo"]
-  },
-  "terminal.integrated.automationProfile.windows": {
-    "source": "PowerShell",
-    "args": ["-NoLogo"]
-  },
-  "chat.mcp.autostart": "newAndOutdated",
-  "chat.mcp.discovery.enabled": {
-    "claude-desktop": false,
-    "windsurf": false,
-    "cursor-global": false,
-    "cursor-workspace": false
-  },
-  "playwright.showTrace": true,
-  "playwright.pickLocatorCopyToClipboard": false,
-  "playwrightrunner.playwrightCommand": "npx playwright",
-  "playwrightrunner.playwrightConfigPath": "playwright.config.ts",
-  "playwrightrunner.playwrightRunProject": "chromium",
-  "playwrightrunner.playwrightDebugProject": "chromium",
-  "playwrightrunner.playwrightInspectProject": "chromium",
-  "playwrightrunner.codeLensSelector": "tests/playwright/**/*.spec.ts",
-  "editor.formatOnSave": true,
   "files.exclude": {
     "**/bin": true,
-    "**/obj": true,
-    "__remote_check__": true
+    "**/obj": true
   },
   "search.exclude": {
     "**/bin": true,
     "**/obj": true,
-    "__remote_check__": true
+    "**/node_modules": true,
+    "**/playwright-report": true,
+    "**/test-results": true
   },
-  "dotnetAcquisitionExtension.sharedExistingDotnetPath": "C:\\Program Files\\dotnet\\dotnet.exe",
-  "csharp-dev-tools.roslyn.projectOrSolutionFiles": [
-    "c:\\Users\\biges\\Desktop\\WW AWS\\WileyCoWeb.slnx"
-  ],
-  "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "none",
-  "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
-  "dotnet.server.suppressLspErrorToasts": true,
-  "dotnet.server.suppressMiscellaneousFilesToasts": true,
-  "chat.tools.terminal.autoApprove": {
-    "rg": true,
-    "rg --files": true,
-    "where rg": true
+  "[csharp]": {
+    "editor.tabSize": 4,
+    "editor.formatOnSave": true
   },
-  "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
-  "FSharp.suggestGitignore": false,
-  "workbench.settings.alwaysShowAdvancedSettings": true,
-
-  "aws.cwl.limit": 10000,
-  "aws.telemetry": false,
-  "aws.suppressPrompts": {
-    "createCredentialsProfile": true,
-    "regionAddAutomatically": true,
-    "apprunnerNotifyPricing": true,
-    "apprunnerNotifyPause": true
+  "[razor]": {
+    "editor.tabSize": 4,
+    "editor.formatOnSave": true
   },
-  "aws.cloudformation.telemetry.enabled": false,
-  "aws.cloudformation.hover.enabled": true,
-  "aws.cloudformation.completion.enabled": true,
-  "aws.cloudformation.diagnostics.cfnLint.enabled": true,
-  "aws.cloudformation.diagnostics.cfnLint.lintOnChange": true,
-  "aws.cloudformation.diagnostics.cfnGuard.enabled": true,
-  "aws.cloudformation.s3": "alwaysAsk",
-  "aws.cloudformation.diagnostics.cfnLint.customization": {
-    "regions": [
-      "us-east-2",
-      "us-east-1"
-    ]
+  "[json]": {
+    "editor.tabSize": 2
   },
-  "debug.javascript.breakOnConditionalError": true,
-  "debug.allowBreakpointsEverywhere": true,
-  "debug.inlineValues": "on",
-  "debug.showBreakpointsInOverviewRuler": true,
-  "debug.showInlineBreakpointCandidates": true,
-  "debug.toolBarLocation": "docked",
-  "debug.console.fontSize": 14,
-  "debug.console.lineHeight": 20,
-  "debug.console.wordWrap": true,
-  "debug.openDebug": "openOnDebugBreak",
-  "debug.onTaskErrors": "showErrors",
-  "debug.saveBeforeStart": "allEditorsInActiveGroup",
-  "debug.terminal.clearBeforeReusing": true
+  "[jsonc]": {
+    "editor.tabSize": 2
+  }
 }

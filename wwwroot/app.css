@@ -118,7 +118,8 @@ body {
 }
 
 .app-nav-link {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2rem 1fr;
   align-items: center;
   gap: 0.85rem;
   padding: 0.85rem 1rem;
@@ -184,7 +185,8 @@ body {
 }
 
 .app-shell-nav-collapsed .app-nav-link {
-  justify-content: center;
+  grid-template-columns: 1fr;
+  justify-items: center;
   padding-inline: 0.65rem;
 }
 
@@ -355,7 +357,8 @@ body {
 }
 
 .app-nav-link {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2rem 1fr;
   align-items: center;
   gap: 0.85rem;
   padding: 0.85rem 1rem;
@@ -376,19 +379,6 @@ body {
   color: #f8fafc;
   background: rgba(8, 47, 73, 0.9);
   border-color: rgba(56, 189, 248, 0.45);
-}
-
-.app-nav-link span:first-child {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.9);
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #7dd3fc;
 }
 
 .app-sidebar-footer {
