@@ -16,6 +16,8 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Http.Resilience;
 using Npgsql;
 using Syncfusion.Licensing;
@@ -26,6 +28,7 @@ using WileyWidget.Models;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.Configuration;
 using WileyWidget.Services.HealthChecks;
 using WileyWidget.Services.Logging;
 using BusinessActivityLogRepository = WileyWidget.Business.Interfaces.IActivityLogRepository;
@@ -305,6 +308,22 @@ public partial class Program
             }
         }
 
+        if (app.Configuration.GetValue<bool>("Database:EnsureWorkspacePanelBudgetWhenEmpty"))
+        {
+            try
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+                await using var context = await contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+                var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("WileyWidget.WorkspacePanelBudget");
+                await WorkspacePanelBudgetSeed.EnsureBudgetEntriesWhenDatabaseHasNoBudgetAsync(context, seedLogger).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Optional workspace panel budget seed did not complete.");
+            }
+        }
+
         logger.LogInformation("Workspace API host initialized in {ElapsedMs}ms.", startupStopwatch.ElapsedMilliseconds);
 
         ConfigureMiddleware(app, logger);
@@ -458,6 +477,9 @@ public partial class Program
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
             });
         builder.Services.AddMemoryCache();
+
+        builder.Services.Configure<WorkspacePanelFallbackOptions>(
+            builder.Configuration.GetSection(WorkspacePanelFallbackOptions.SectionName));
 
         builder.Services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new AppDbContextFactory(builder.Configuration));
         builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext());
@@ -1110,11 +1132,8 @@ public partial class Program
 
         await context.Database.EnsureCreatedAsync();
 
-        if (await context.Enterprises.AnyAsync())
+        if (!await context.Enterprises.AnyAsync())
         {
-            return;
-        }
-
         context.Enterprises.AddRange(
             WorkspaceEnterpriseSeedCatalog.All.Select(seed => new WileyWidget.Models.Enterprise
             {
@@ -1188,6 +1207,10 @@ public partial class Program
             });
 
         await context.SaveChangesAsync();
+        }
+
+        var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("WileyWidget.SeedDevelopmentData");
+        await WorkspacePanelBudgetSeed.EnsureBudgetEntriesWhenDatabaseHasNoBudgetAsync(context, seedLogger).ConfigureAwait(false);
     }
 
     private static async Task<QuickBooksImportRequest?> ReadQuickBooksImportRequestAsync(HttpRequest request, CancellationToken cancellationToken)

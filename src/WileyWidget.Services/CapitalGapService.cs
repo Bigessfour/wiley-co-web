@@ -1,8 +1,10 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using WileyWidget.Business.Interfaces;
 using WileyWidget.Models;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.Configuration;
 
 namespace WileyWidget.Services;
 
@@ -13,11 +15,16 @@ public sealed class CapitalGapService : ICapitalGapService
 
     private readonly IBudgetRepository budgetRepository;
     private readonly ILogger<CapitalGapService> logger;
+    private readonly IOptions<WorkspacePanelFallbackOptions> fallbackOptions;
 
-    public CapitalGapService(IBudgetRepository budgetRepository, ILogger<CapitalGapService> logger)
+    public CapitalGapService(
+        IBudgetRepository budgetRepository,
+        ILogger<CapitalGapService> logger,
+        IOptions<WorkspacePanelFallbackOptions> fallbackOptions)
     {
         this.budgetRepository = budgetRepository ?? throw new ArgumentNullException(nameof(budgetRepository));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.fallbackOptions = fallbackOptions ?? throw new ArgumentNullException(nameof(fallbackOptions));
     }
 
     public async Task<CapitalGapResult> BuildAsync(string enterpriseName, int fiscalYear, CancellationToken cancellationToken = default)
@@ -33,6 +40,27 @@ public sealed class CapitalGapService : ICapitalGapService
         }
 
         var normalizedEnterprise = enterpriseName.Trim();
+
+        try
+        {
+            return await BuildFromLiveBudgetAsync(normalizedEnterprise, fiscalYear, cancellationToken).ConfigureAwait(false);
+        }
+        catch (CapitalGapNotFoundException ex) when (fallbackOptions.Value.UseSyntheticCapitalGapWhenNoBudgetData)
+        {
+            logger.LogWarning(
+                ex,
+                "Returning synthetic capital gap for {Enterprise} FY {FiscalYear} because live budget data was insufficient.",
+                normalizedEnterprise,
+                fiscalYear);
+            return WorkspaceSyntheticPanelData.BuildCapitalGap(normalizedEnterprise, fiscalYear);
+        }
+    }
+
+    private async Task<CapitalGapResult> BuildFromLiveBudgetAsync(
+        string normalizedEnterprise,
+        int fiscalYear,
+        CancellationToken cancellationToken)
+    {
         var budgetEntries = (await budgetRepository.GetByFiscalYearAsync(fiscalYear, cancellationToken).ConfigureAwait(false)).ToList();
         if (budgetEntries.Count == 0)
         {

@@ -5,6 +5,7 @@
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 
+@* Affordability remains client-side via AffordabilityAnalysisService (snapshot + rate math). A future slice can hydrate from /api/workspace/knowledge when the contract exposes affordability rows; keep this service as fallback for council demos. *@
 @inject AffordabilityAnalysisService AffordabilityAnalysisService
 
 <div id="affordability-dashboard-panel" class="space-y-4" aria-live="polite">

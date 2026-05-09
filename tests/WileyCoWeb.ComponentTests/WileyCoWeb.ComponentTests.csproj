@@ -31,4 +31,8 @@
     <ProjectReference Include="..\..\WileyCoWeb.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\wwwroot\index.html" Link="test-assets\wwwroot-index.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
