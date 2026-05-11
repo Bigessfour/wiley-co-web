@@ -2,7 +2,6 @@ import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
   gotoWorkspacePanel,
-  parseNumericInputDisplay,
   prepareForVisualSnapshot,
   seedLeftNavCollapsed,
   setNumericInputValue,

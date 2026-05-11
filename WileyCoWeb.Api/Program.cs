@@ -2004,7 +2004,12 @@ public partial class Program
             SnapshotDate = DateOnly.FromDateTime(savedAt.UtcDateTime),
             CreatedAt = savedAt,
             Notes = BuildScenarioNotes(request, normalizedScenarioName),
-            Payload = JsonSerializer.Serialize(request.Snapshot with { ActiveScenarioName = normalizedScenarioName, LastUpdatedUtc = savedAt.ToString("O") })
+            Payload = JsonSerializer.Serialize(request.Snapshot with
+            {
+                ActiveScenarioName = normalizedScenarioName,
+                LastUpdatedUtc = savedAt.ToString("O"),
+                ScenarioDescription = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim()
+            })
         };
     }
 

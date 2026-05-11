@@ -42,5 +42,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@modelcontextprotocol/server-everything": "^2026.1.26"
+  },
+  "overrides": {
+    "ip-address": "10.2.0"
   }
 }

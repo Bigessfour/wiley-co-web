@@ -63,7 +63,7 @@
                     <div class="grid gap-3 md:grid-cols-3">
                         <SfButton id="export-customers-excel-button" CssClass="e-primary" IsPrimary="true" Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers to Excel</SfButton>
                         <SfButton id="export-scenario-excel-button" Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario to Excel</SfButton>
-                        <SfButton id="export-workspace-pdf-button" Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">Download PDF rate packet</SfButton>
+                        <SfButton id="export-workspace-pdf-button" Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">@WorkspacePdfExportLabel</SfButton>
                     </div>
                     <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                         <span class="font-semibold text-slate-700">Export status:</span> @DocumentExportStatus
@@ -142,7 +142,7 @@
                                 <div class="grid grid-cols-1 gap-2 pt-2">
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportCustomerWorkbookAsync">Export customers</SfButton>
                                     <SfButton Disabled="@IsExportingDocuments" OnClick="ExportScenarioWorkbookAsync">Export scenario</SfButton>
-                                    <SfButton Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">Export PDF packet</SfButton>
+                                    <SfButton Disabled="@IsExportingDocuments" OnClick="ExportWorkspacePdfAsync">@WorkspacePdfExportLabel</SfButton>
                                 </div>
                             </div>
                         </div>
@@ -311,7 +311,8 @@
                                                               ScenarioAdjustedDeltaDisplay="@ScenarioAdjustedDeltaDisplay"
                                                               ScenarioItems="@ScenarioItems"
                                                               ScenarioToolbarItems="@ScenarioToolbarItems"
-                                                              OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
+                                                              OnScenarioGridActionComplete="HandleScenarioGridActionComplete"
+                                                              OnLoadNewHireImpactTemplate="LoadNewHireImpactTemplateAsync" />
                                         break;
                                     case "customers":
                                         <CustomerViewerPanel @key="ActivePanelKey" />

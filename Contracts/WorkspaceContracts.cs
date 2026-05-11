@@ -85,4 +85,5 @@ public sealed record WorkspaceBootstrapData(
     public List<CustomerRow>? CustomerRows { get; init; }
     public List<ProjectionRow>? ProjectionRows { get; init; }
     public List<WorkspaceScenarioItemData>? ScenarioItems { get; init; }
+    public string? ScenarioDescription { get; init; }
 }

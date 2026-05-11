@@ -149,6 +149,28 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void WileyWorkspace_PersonnelScenario_UsesCouncilRatePacketExportLabel()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			"Council personnel hire scenario",
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			scenarioItems:
+			[
+				new WorkspaceScenarioItemData(Guid.NewGuid(), "PT City Clerk", 6250m),
+				new WorkspaceScenarioItemData(Guid.NewGuid(), "FT Field Employee", 18333.33m)
+			]));
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		Assert.Contains("Export Council Rate Packet", cut.Markup);
+		Assert.DoesNotContain("Download PDF rate packet", cut.Markup);
+	}
+
+	[Fact]
 	public void WileyWorkspace_JarvisLauncher_OpensFloatingDock()
 	{
 		using var context = CreateContext();
@@ -393,6 +415,42 @@ public sealed class ComponentPageTests
 			Assert.Contains(panel.ScenarioItems, item => item.Name == "Late capital" && item.Cost == 5000m);
 			Assert.Equal(workspaceState.ScenarioCostTotal, panel.ScenarioCostTotal);
 			Assert.Equal(workspaceState.AdjustedRecommendedRate, panel.ScenarioAdjustedRate);
+		});
+	}
+
+	[Fact]
+	public async Task WileyWorkspace_ScenarioPlannerPanel_LoadsNewHireImpactTemplate()
+	{
+		using var context = CreateContext();
+		var workspaceState = context.Services.GetRequiredService<WorkspaceState>();
+		workspaceState.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.CouncilReviewScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			WorkspaceTestData.WaterTotalCosts,
+			WorkspaceTestData.WaterProjectedVolume,
+			DateTime.UtcNow.ToString("O"),
+			scenarioItems:
+			[
+				new WorkspaceScenarioItemData(Guid.NewGuid(), "Old draft item", 100m)
+			]));
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "scenario"));
+
+		await cut.InvokeAsync(() => cut.Find("#load-new-hire-impact-template-button").Click());
+
+		cut.WaitForAssertion(() =>
+		{
+			var panel = cut.FindComponent<ScenarioPlannerPanel>().Instance;
+
+			Assert.Equal("HIRES-2026-Q2-001 – PT Clerk + FT Field", workspaceState.ActiveScenarioName);
+			Assert.Equal(2, panel.ScenarioItems.Count);
+			Assert.Contains(panel.ScenarioItems, item => item.Name.Contains("PT City Clerk", StringComparison.Ordinal) && item.Cost == 6250m);
+			Assert.Contains(panel.ScenarioItems, item => item.Name.Contains("FT Field Employee", StringComparison.Ordinal) && decimal.Round(item.Cost, 2) == 18333.33m);
+			Assert.DoesNotContain(panel.ScenarioItems, item => item.Name == "Old draft item");
+			Assert.Equal(workspaceState.ScenarioCostTotal, panel.ScenarioCostTotal);
+			Assert.Contains("Knowledge refreshed", cut.Markup);
+			Assert.Contains("Export Council Rate Packet", cut.Markup);
 		});
 	}
 

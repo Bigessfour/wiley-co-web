@@ -13,6 +13,11 @@ namespace WileyCoWeb.Components.Pages;
 public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 {
     private static readonly CultureInfo WorkspaceUiCulture = CultureInfo.GetCultureInfo("en-US");
+    private const string NewHireImpactScenarioName = "HIRES-2026-Q2-001 – PT Clerk + FT Field";
+    private const decimal PartTimeClerkAnnualSalary = 25_000m;
+    private const decimal PartTimeClerkEnterpriseShare = 0.25m;
+    private const decimal FieldEmployeeAnnualSalary = 55_000m;
+    private const decimal FieldEmployeeEnterpriseShare = 1m / 3m;
 
     protected enum WorkspaceApiHealth { Unknown, Healthy, Degraded }
 
@@ -36,6 +41,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     [Inject]
     protected WorkspaceDocumentExportService WorkspaceDocumentExportService { get; set; } = default!;
+
+    [Inject]
+    protected WorkspaceKnowledgeApiService WorkspaceKnowledgeApiService { get; set; } = default!;
 
     [Inject]
     protected BrowserDownloadService BrowserDownloadService { get; set; } = default!;
@@ -115,6 +123,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected decimal ScenarioAdjustedRate => WorkspaceState.AdjustedRecommendedRate;
     protected decimal ScenarioAdjustedDelta => WorkspaceState.AdjustedRateDelta;
     protected decimal ScenarioCostTotal => WorkspaceState.ScenarioCostTotal;
+    protected bool HasPersonnelScenario => WorkspaceDocumentExportService.ContainsPersonnelScenario(WorkspaceState, ScenarioDescription);
+    protected string WorkspacePdfExportLabel => HasPersonnelScenario ? "Export Council Rate Packet" : "Download PDF rate packet";
 
     protected string CurrentRateDisplay => CurrentRate.ToString("C2", WorkspaceUiCulture);
     protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2", WorkspaceUiCulture);
@@ -437,6 +447,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         {
             var scenarioSnapshot = await WorkspaceSnapshotApiService.GetScenarioSnapshotAsync(SelectedScenarioSnapshotId.Value);
             WorkspaceState.ApplyBootstrap(scenarioSnapshot);
+            ScenarioDescription = scenarioSnapshot.ScenarioDescription ?? ScenarioDescription;
             ScenarioPersistenceStatus = $"Applied saved scenario '{WorkspaceState.ActiveScenarioName}'.";
             WorkspaceLoadStatus = $"Loaded {WorkspaceState.ContextSummary} from saved scenario.";
             lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
@@ -504,7 +515,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected Task ExportWorkspacePdfAsync()
     {
         return ExportDocumentAsync(
-            () => WorkspaceDocumentExportService.CreateWorkspacePdfReport(WorkspaceState),
+            () => WorkspaceDocumentExportService.CreateWorkspacePdfReport(
+                WorkspaceState,
+                string.IsNullOrWhiteSpace(ScenarioDescription) ? null : ScenarioDescription.Trim()),
             "Preparing PDF rate packet...");
     }
 
@@ -757,6 +770,60 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         if (args.RequestType is Syncfusion.Blazor.Grids.Action.Save or Syncfusion.Blazor.Grids.Action.Delete)
         {
             WorkspaceState.Refresh();
+        }
+    }
+
+    protected async Task LoadNewHireImpactTemplateAsync()
+    {
+        var clerkAllocation = PartTimeClerkAnnualSalary * PartTimeClerkEnterpriseShare;
+        var fieldAllocation = FieldEmployeeAnnualSalary * FieldEmployeeEnterpriseShare;
+
+        foreach (var scenarioItemId in WorkspaceState.ScenarioItems.Select(item => item.Id).ToArray())
+        {
+            WorkspaceState.RemoveScenarioItem(scenarioItemId);
+        }
+
+        WorkspaceState.SetActiveScenarioName(NewHireImpactScenarioName);
+        WorkspaceState.AddScenarioItem(
+            "PT City Clerk - 25% enterprise allocation of $25,000",
+            clerkAllocation);
+        WorkspaceState.AddScenarioItem(
+            "FT Field Employee - 33.3% Water/Sewer/Apartments allocation of $55,000",
+            fieldAllocation);
+
+        ScenarioDescription =
+            "New hire impact template: PT City Clerk at $25,000 annual salary split 25% across four enterprises, plus FT Field Employee at $55,000 annual salary split one-third across Water, Sewer, and Apartments.";
+        SelectedScenarioSnapshotId = null;
+        ScenarioPersistenceStatus = "Loaded new hire impact template and recomputed scenario rates. Refreshing workspace knowledge...";
+        WorkspaceState.SetCurrentStateSource(
+            WorkspaceStartupSource.BrowserStorageRestore,
+            "New hire impact template loaded into the local workspace draft.");
+        StateHasChanged();
+
+        await RefreshKnowledgeForNewHireTemplateAsync().ConfigureAwait(false);
+    }
+
+    private async Task RefreshKnowledgeForNewHireTemplateAsync()
+    {
+        try
+        {
+            var knowledge = await WorkspaceKnowledgeApiService.GetAsync(
+                new WorkspaceKnowledgeRequest(WorkspaceState.ToBootstrapData(), TopVarianceCount: 5, ForecastYears: 5)).ConfigureAwait(false);
+
+            ScenarioPersistenceStatus =
+                $"Loaded new hire impact template. Knowledge refreshed: {knowledge.OperationalStatus}";
+            _apiHealth = WorkspaceApiHealth.Healthy;
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogWarning(ex, "Workspace knowledge refresh failed after loading the new hire impact template.");
+            ScenarioPersistenceStatus =
+                $"Loaded new hire impact template. Knowledge refresh failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
+        }
+        finally
+        {
+            StateHasChanged();
         }
     }
 
