@@ -121,7 +121,7 @@ internal sealed partial class WorkspaceReferenceDataImportService
     private void ProcessCustomerWorkbookRows(string filePath, WorkbookMetadata workbookMetadata, IReadOnlyList<CustomerWorkbookRow> workbookRows, DateTime importedAtUtc, AppDbContext context, IDictionary<string, UtilityCustomer> customersByAccountNumber, HashSet<string> synchronizedAccountNumbers, UtilityCustomerImportStats stats) => ProcessCustomerRows(filePath, ResolveEnterpriseNameOrDefault(workbookMetadata.CompanyFileName, Path.GetFileName(filePath)), workbookRows, importedAtUtc, context, customersByAccountNumber, synchronizedAccountNumbers, stats);
 
     private static string ResolveEnterpriseNameOrDefault(string? companyFileName, string fileName)
-        => ResolveEnterpriseName(companyFileName, fileName) ?? "Water Utility";
+        => ResolveEnterpriseName(companyFileName, fileName) ?? WorkspaceEnterpriseCatalog.WaterUtility;
 
     private void ProcessCustomerRows(string filePath, string enterpriseName, IReadOnlyList<CustomerWorkbookRow> workbookRows, DateTime importedAtUtc, AppDbContext context, IDictionary<string, UtilityCustomer> customersByAccountNumber, HashSet<string> synchronizedAccountNumbers, UtilityCustomerImportStats stats) { foreach (var row in workbookRows) { ProcessCustomerRow(filePath, enterpriseName, row, importedAtUtc, context, customersByAccountNumber, synchronizedAccountNumbers, stats); } }
 
@@ -310,7 +310,8 @@ internal sealed partial class WorkspaceReferenceDataImportService
 
     private static bool LooksLikeGeneralLedgerFile(string? fileName)
         => !string.IsNullOrWhiteSpace(fileName)
-            && fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase);
+            && (fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase)
+                || fileName.Contains("general-ledger", StringComparison.OrdinalIgnoreCase));
 
     private static int GetSampleLedgerFilePreference(string filePath)
         => Path.GetExtension(filePath).ToLowerInvariant() switch
@@ -709,7 +710,7 @@ internal sealed partial class WorkspaceReferenceDataImportService
         yield return seed.Name;
         yield return seed.DepartmentName;
 
-        if (string.Equals(seed.Name, "Water Utility", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(seed.Name, WorkspaceEnterpriseCatalog.WaterUtility, StringComparison.OrdinalIgnoreCase))
         {
             yield return "Water";
             yield break;
@@ -750,7 +751,13 @@ internal sealed partial class WorkspaceReferenceDataImportService
     private static bool IsCustomerWorkbook(string fileName)
         => fileName.Contains("Customer", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsSampleLedgerFile(string filePath) { var fileName = Path.GetFileName(filePath); return IsSupportedSampleLedgerExtension(fileName) && !IsCustomerWorkbook(fileName) && fileName.Contains("GeneralLedger", StringComparison.OrdinalIgnoreCase); }
+    private static bool IsSampleLedgerFile(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        return IsSupportedSampleLedgerExtension(fileName)
+            && !IsCustomerWorkbook(fileName)
+            && LooksLikeGeneralLedgerFile(fileName);
+    }
 
     private static bool IsSupportedSampleLedgerExtension(string fileName) { var extension = Path.GetExtension(fileName); return extension.Equals(".csv", StringComparison.OrdinalIgnoreCase) || extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) || extension.Equals(".xls", StringComparison.OrdinalIgnoreCase); }
 

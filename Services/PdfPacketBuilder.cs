@@ -1,7 +1,6 @@
 using Syncfusion.Drawing;
 using Syncfusion.Pdf;
 using Syncfusion.Pdf.Graphics;
-using Syncfusion.Pdf.Grid;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -9,15 +8,50 @@ namespace WileyCoWeb.Services;
 public sealed class PdfPacketBuilder
 {
     private const string PdfContentType = "application/pdf";
-    private const int MaxNarrativeLength = 900;
+
+    // ── Page geometry ─────────────────────────────────────────────────────────
+    private const float PageLeft      = 36f;
+    private const float HeaderBandH   = 32f;
+    private const float FooterBandH   = 24f;
+    private const float ContentStartY = HeaderBandH + 12f;
+    private const float LineH         = 18f;
+    private const float SectionGap    = 10f;
+
+    // ── Brand colours (Wiley slate-950 / cyan-700 palette) ───────────────────
+    private static readonly PdfColor Navy  = new(15, 23, 42);
+    private static readonly PdfColor Cyan  = new(14, 116, 144);
+    private static readonly PdfColor Dark  = new(30, 41, 59);
+    private static readonly PdfColor Muted = new(148, 163, 184);
+
+    // ── Public API ────────────────────────────────────────────────────────────
 
     public WorkspaceExportDocument CreateWorkspacePdfReport(
         WorkspaceState workspaceState,
         string? scenarioNarrative = null,
         PersonnelPacketContext? personnelPacket = null)
     {
-        return CreateWorkspacePdfReportCore(workspaceState, scenarioNarrative, personnelPacket);
+        return CreateWorkspacePdfReportCore(workspaceState, NormalizeNarrative(scenarioNarrative), personnelPacket);
     }
+
+    public WorkspaceExportDocument CreateReserveTrajectoryPdfReport(WorkspaceState workspaceState)
+    {
+        return CreateReserveTrajectoryPdfReportCore(workspaceState);
+    }
+
+    /// <summary>
+    /// Builds a professional filename in the form
+    /// <c>WileyCo-{label}-{enterprise}-FY{year}-Q{n}-{yyyy-MM-dd}.{ext}</c>.
+    /// </summary>
+    public static string BuildFileName(WorkspaceState workspaceState, string label, string extension)
+    {
+        var enterprise = SanitizeFileName(workspaceState.SelectedEnterprise);
+        var now        = DateTimeOffset.UtcNow;
+        var quarter    = $"Q{(now.Month - 1) / 3 + 1}";
+        var date       = now.ToString("yyyy-MM-dd");
+        return $"WileyCo-{label}-{enterprise}-FY{workspaceState.SelectedFiscalYear}-{quarter}-{date}.{extension}";
+    }
+
+    // ── Core builders ─────────────────────────────────────────────────────────
 
     private static WorkspaceExportDocument CreateWorkspacePdfReportCore(
         WorkspaceState workspaceState,
@@ -27,437 +61,386 @@ public sealed class PdfPacketBuilder
         ArgumentNullException.ThrowIfNull(workspaceState);
 
         using var document = new PdfDocument();
-        RenderWorkspaceRatePacket(document, workspaceState, NormalizeNarrative(scenarioNarrative), personnelPacket);
+        var state = new PageState(document, "RATE PACKET");
+
+        state.DrawText("Wiley Workspace Rate Packet", state.Layout.TitleFont, new PdfSolidBrush(Dark));
+        state.DrawText(workspaceState.ContextSummary, state.Layout.SectionFont, new PdfSolidBrush(Cyan));
+        state.DrawText($"Generated: {DateTimeOffset.UtcNow:MMMM d, yyyy}", state.Layout.SmallFont, new PdfSolidBrush(Muted));
+        state.Y += SectionGap;
+        state.DrawDivider();
+
+        RenderCouncilNarrativeSection(state, scenarioNarrative);
+        RenderRateSection(state, workspaceState);
+        RenderBreakEvenSection(state, workspaceState);
+        RenderScenarioSection(state, workspaceState);
+        RenderPersonnelSection(state, personnelPacket);
+        RenderCustomerSection(state, workspaceState);
+        RenderProjectionSection(state, workspaceState);
+        RenderReserveSummarySection(state, workspaceState);
+        RenderAssumptionsAppendix(state);
+
+        ApplyPageNumbers(document, state.Layout);
 
         using var stream = new MemoryStream();
         document.Save(stream);
-
         return new WorkspaceExportDocument(
-            $"{BuildFileStem(workspaceState)}-rate-packet.pdf",
+            BuildFileName(workspaceState, "Rate-Packet", "pdf"),
             PdfContentType,
             stream.ToArray());
     }
 
-    private static void RenderWorkspaceRatePacket(
-        PdfDocument document,
-        WorkspaceState workspaceState,
-        string? scenarioNarrative,
-        PersonnelPacketContext? personnelPacket)
+    private static WorkspaceExportDocument CreateReserveTrajectoryPdfReportCore(WorkspaceState workspaceState)
     {
-        var layout = CreatePacketLayout();
-        var writer = new PdfPacketWriter(document, layout);
+        ArgumentNullException.ThrowIfNull(workspaceState);
 
-        WritePacketHeader(writer, workspaceState);
-        WriteNarrativeSection(writer, scenarioNarrative);
-        WriteSummarySection(writer, workspaceState);
-        WriteRateVisualizationSection(writer, workspaceState);
-        WriteScenarioItemsSection(writer, workspaceState);
-        WritePersonnelSection(writer, personnelPacket);
-        WriteProjectionSection(writer, workspaceState);
-        WriteAssumptionsAppendix(writer);
+        using var document = new PdfDocument();
+        var state = new PageState(document, "RESERVE TRAJECTORY");
+
+        state.DrawText("Wiley Workspace Reserve Trajectory", state.Layout.TitleFont, new PdfSolidBrush(Dark));
+        state.DrawText(workspaceState.ContextSummary, state.Layout.SectionFont, new PdfSolidBrush(Cyan));
+        state.DrawText($"Generated: {DateTimeOffset.UtcNow:MMMM d, yyyy}", state.Layout.SmallFont, new PdfSolidBrush(Muted));
+        state.Y += SectionGap;
+        state.DrawDivider();
+
+        RenderReserveSummarySection(state, workspaceState);
+        RenderReserveForecastSection(state, workspaceState);
+
+        ApplyPageNumbers(document, state.Layout);
+
+        using var stream = new MemoryStream();
+        document.Save(stream);
+        return new WorkspaceExportDocument(
+            BuildFileName(workspaceState, "Reserve-Trajectory", "pdf"),
+            PdfContentType,
+            stream.ToArray());
     }
 
-    private static PdfPacketLayout CreatePacketLayout()
+    // ── Section renderers ─────────────────────────────────────────────────────
+
+    private static void RenderCouncilNarrativeSection(PageState state, string? scenarioNarrative)
     {
-        return new PdfPacketLayout(
-            new PdfStandardFont(PdfFontFamily.Helvetica, 18, PdfFontStyle.Bold),
-            new PdfStandardFont(PdfFontFamily.Helvetica, 12, PdfFontStyle.Bold),
-            new PdfStandardFont(PdfFontFamily.Helvetica, 10),
-            new PdfStandardFont(PdfFontFamily.Helvetica, 9),
-            new PdfSolidBrush(new PdfColor(15, 23, 42)),
-            new PdfSolidBrush(new PdfColor(14, 116, 144)),
-            new PdfSolidBrush(new PdfColor(226, 232, 240)),
-            new PdfSolidBrush(new PdfColor(56, 189, 248)),
-            new PdfSolidBrush(new PdfColor(14, 165, 233)),
-            36,
-            32,
-            36,
-            18);
+        if (string.IsNullOrWhiteSpace(scenarioNarrative)) return;
+
+        state.EnsureSpace(SectionGap + LineH * 3);
+        state.DrawSectionHeading("Council planning narrative");
+        state.DrawBodyLine(scenarioNarrative);
+        state.Y += SectionGap;
     }
 
-    private static void WritePacketHeader(PdfPacketWriter writer, WorkspaceState workspaceState)
+    private static void RenderRateSection(PageState state, WorkspaceState ws)
     {
-        writer.DrawText("TOWN OF WILEY, COLORADO | UTILITY RATE STUDY", writer.Layout.TitleFont, writer.Layout.Brush);
-        writer.Advance(writer.Layout.LineHeight * 0.75f);
-        writer.DrawText(workspaceState.ContextSummary, writer.Layout.SectionFont, writer.Layout.AccentBrush);
-        writer.Advance(writer.Layout.LineHeight * 0.5f);
-        writer.DrawText($"Generated {DateTimeOffset.Now:g}", writer.Layout.SmallFont, writer.Layout.Brush);
-        writer.Advance(writer.Layout.LineHeight);
+        state.EnsureSpace(SectionGap + LineH * 8);
+        state.DrawSectionHeading("Rate Summary");
+        WriteKV(state, "Current rate",        ws.CurrentRate.ToString("C2"));
+        WriteKV(state, "Break-even rate",      ws.RecommendedRate.ToString("C2"));
+        WriteKV(state, "Adjusted break-even",  ws.AdjustedRecommendedRate.ToString("C2"));
+        WriteKV(state, "Rate delta",           ws.RateDelta.ToString("C2"));
+        WriteKV(state, "Total costs",          ws.TotalCosts.ToString("C0"));
+        WriteKV(state, "Projected volume",     ws.ProjectedVolume.ToString("N0"));
+        WriteKV(state, "Scenario cost total",  ws.ScenarioCostTotal.ToString("C0"));
+        state.Y += SectionGap;
     }
 
-    private static void WriteNarrativeSection(PdfPacketWriter writer, string? scenarioNarrative)
+    private static void RenderBreakEvenSection(PageState state, WorkspaceState ws)
     {
-        if (string.IsNullOrWhiteSpace(scenarioNarrative))
+        if (ws.BreakEvenQuadrants.Count == 0) return;
+
+        state.EnsureSpace(SectionGap + LineH * 2);
+        state.DrawSectionHeading("Break-Even Analysis");
+
+        foreach (var q in ws.BreakEvenQuadrants)
         {
-            return;
+            state.EnsureSpace(LineH * 5);
+            state.DrawBodyLine($"  {q.EnterpriseName}  ({q.EnterpriseType})", state.Layout.BoldFont);
+            WriteKV(state, "    Break-even rate",  q.BreakEvenRate.ToString("C2"));
+            WriteKV(state, "    Monthly balance",  q.MonthlyBalance.ToString("C0"));
+            WriteKV(state, "    Eff. customers",   q.EffectiveCustomerCount.ToString("N0"));
+            state.Y += SectionGap * 0.5f;
         }
 
-        writer.DrawSectionTitle("Council planning narrative");
-        writer.DrawWrappedText(scenarioNarrative, 72);
-        writer.Advance(writer.Layout.LineHeight * 0.5f);
+        state.Y += SectionGap * 0.5f;
     }
 
-    private static void WriteSummarySection(PdfPacketWriter writer, WorkspaceState workspaceState)
+    private static void RenderScenarioSection(PageState state, WorkspaceState ws)
     {
-        writer.DrawSectionTitle("Financial summary");
+        state.EnsureSpace(SectionGap + LineH * 2);
+        state.DrawSectionHeading("Scenario Items");
 
-        foreach (var line in BuildSummaryLines(workspaceState))
+        if (ws.ScenarioItems.Count == 0)
         {
-            writer.DrawText(line, writer.Layout.BodyFont, writer.Layout.Brush);
+            state.DrawBodyLine("No scenario items are currently applied.");
+        }
+        else
+        {
+            foreach (var item in ws.ScenarioItems)
+            {
+                state.EnsureSpace(LineH);
+                state.DrawBodyLine($"  {item.Name}  —  {item.Cost:C0}");
+            }
         }
 
-        writer.Advance(writer.Layout.LineHeight * 0.5f);
+        state.Y += SectionGap;
     }
 
-    private static void WriteRateVisualizationSection(PdfPacketWriter writer, WorkspaceState workspaceState)
+    private static void RenderPersonnelSection(PageState state, PersonnelPacketContext? personnelPacket)
     {
-        writer.DrawSectionTitle("Rate comparison visualization");
+        if (personnelPacket is null) return;
 
-        var current = workspaceState.CurrentRate;
-        var adjusted = workspaceState.AdjustedRecommendedRate;
-        var maxRate = Math.Max(Math.Max(current, adjusted), 1m);
-        var labelWidth = 150f;
-        var barWidth = writer.ContentWidth - labelWidth - 70f;
-        var barHeight = 12f;
-        var rowHeight = writer.Layout.LineHeight * 1.25f;
-
-        writer.EnsureSpace(rowHeight * 2 + writer.Layout.LineHeight);
-        DrawRateBar(writer, "Current rate", current, maxRate, labelWidth, barWidth, barHeight);
-        writer.Advance(rowHeight);
-        DrawRateBar(writer, "Scenario break-even", adjusted, maxRate, labelWidth, barWidth, barHeight);
-        writer.Advance(rowHeight);
-        writer.DrawText($"Scenario rate delta: {workspaceState.AdjustedRateDelta:C2}", writer.Layout.SmallFont, writer.Layout.Brush);
-        writer.Advance(writer.Layout.LineHeight * 0.5f);
-    }
-
-    private static void WriteScenarioItemsSection(PdfPacketWriter writer, WorkspaceState workspaceState)
-    {
-        writer.DrawSectionTitle("Scenario items");
-
-        if (workspaceState.ScenarioItems.Count == 0)
-        {
-            writer.DrawText("No scenario items are currently applied.", writer.Layout.BodyFont, writer.Layout.Brush);
-            writer.Advance(writer.Layout.LineHeight * 0.5f);
-            return;
-        }
-
-        var grid = CreateGrid(["Scenario item", "Annual cost", "Share"]);
-        var scenarioTotal = workspaceState.ScenarioCostTotal;
-
-        foreach (var item in workspaceState.ScenarioItems)
-        {
-            var row = grid.Rows.Add();
-            row.Cells[0].Value = item.Name;
-            row.Cells[1].Value = item.Cost.ToString("C0");
-            row.Cells[2].Value = scenarioTotal == 0m ? "0%" : $"{item.Cost / scenarioTotal:P0}";
-        }
-
-        writer.DrawGrid(grid);
-        writer.Advance(writer.Layout.LineHeight * 0.5f);
-    }
-
-    private static void WritePersonnelSection(PdfPacketWriter writer, PersonnelPacketContext? personnelPacket)
-    {
-        if (personnelPacket is null)
-        {
-            return;
-        }
-
-        writer.DrawSectionTitle("New Personnel Cost Allocation");
-        writer.DrawText("$25k Clerk: 25.0% split across Water, Sewer, Trash, and Apartments.", writer.Layout.BodyFont, writer.Layout.Brush);
-        writer.DrawText("$55k Field Employee: 33.3% split across Water, Sewer, and Apartments.", writer.Layout.BodyFont, writer.Layout.Brush);
-        var allocationGrid = CreateGrid(["Position", "Annual cost", "Allocation basis", "Water", "Sewer", "Trash", "Apartments"]);
+        state.EnsureSpace(SectionGap + LineH * 10);
+        state.DrawSectionHeading("New Personnel Cost Allocation");
+        state.DrawBodyLine("$25,000 Clerk: 25.0% split across Water, Sewer, Trash, and Apartments.");
+        state.DrawBodyLine("$55,000 Field Employee: 33.3% split across Water, Sewer, and Apartments.");
 
         foreach (var line in personnelPacket.AllocationLines)
         {
-            var row = allocationGrid.Rows.Add();
-            row.Cells[0].Value = line.Position;
-            row.Cells[1].Value = line.AnnualCost.ToString("C0");
-            row.Cells[2].Value = line.AllocationBasis;
-            row.Cells[3].Value = line.WaterAllocation.ToString("C0");
-            row.Cells[4].Value = line.SewerAllocation.ToString("C0");
-            row.Cells[5].Value = line.TrashAllocation.ToString("C0");
-            row.Cells[6].Value = line.ApartmentsAllocation.ToString("C0");
+            state.EnsureSpace(LineH * 2);
+            state.DrawBodyLine($"  {line.Position}: {line.AllocationBasis}", state.Layout.BoldFont);
+            state.DrawBodyLine($"    Water {line.WaterAllocation:C0} | Sewer {line.SewerAllocation:C0} | Trash {line.TrashAllocation:C0} | Apartments {line.ApartmentsAllocation:C0}");
         }
 
-        writer.DrawGrid(allocationGrid);
-
-        writer.DrawSectionTitle("Prorated annual cost per enterprise");
-        var enterpriseGrid = CreateGrid(["Enterprise", "Prorated annual personnel cost"]);
+        state.EnsureSpace(LineH * 7);
+        state.DrawSectionHeading("Prorated annual cost per enterprise");
         foreach (var allocation in personnelPacket.EnterpriseAllocations)
         {
-            var row = enterpriseGrid.Rows.Add();
-            row.Cells[0].Value = allocation.Enterprise;
-            row.Cells[1].Value = allocation.AnnualCost.ToString("C0");
+            state.DrawBodyLine($"  {allocation.Enterprise}: {allocation.AnnualCost:C0}");
         }
 
-        writer.DrawGrid(enterpriseGrid);
+        state.EnsureSpace(LineH * 7);
+        state.DrawSectionHeading("Rate Impact Summary");
+        WriteKV(state, "Current rate", personnelPacket.CurrentRate.ToString("C2"));
+        WriteKV(state, "Proposed rate", personnelPacket.ProposedRate.ToString("C2"));
+        WriteKV(state, "% increase", personnelPacket.PercentIncrease.ToString("P1"));
+        WriteKV(state, "Current annual revenue", personnelPacket.CurrentAnnualRevenue.ToString("C0"));
+        WriteKV(state, "New annual revenue", personnelPacket.ProposedAnnualRevenue.ToString("C0"));
 
-        writer.DrawSectionTitle("Rate Impact Summary");
-        var rateGrid = CreateGrid(["Current rate", "Proposed rate", "% increase", "Current annual revenue", "New annual revenue"]);
-        var rateRow = rateGrid.Rows.Add();
-        rateRow.Cells[0].Value = personnelPacket.CurrentRate.ToString("C2");
-        rateRow.Cells[1].Value = personnelPacket.ProposedRate.ToString("C2");
-        rateRow.Cells[2].Value = personnelPacket.PercentIncrease.ToString("P1");
-        rateRow.Cells[3].Value = personnelPacket.CurrentAnnualRevenue.ToString("C0");
-        rateRow.Cells[4].Value = personnelPacket.ProposedAnnualRevenue.ToString("C0");
-        writer.DrawGrid(rateGrid);
-
-        writer.DrawInsightBox(personnelPacket.PlanningInsight);
+        state.DrawBodyLine(personnelPacket.PlanningInsight);
+        state.Y += SectionGap;
     }
 
-    private static void WriteProjectionSection(PdfPacketWriter writer, WorkspaceState workspaceState)
+    private static void RenderCustomerSection(PageState state, WorkspaceState ws)
     {
-        writer.DrawSectionTitle("Projection series");
+        state.EnsureSpace(SectionGap + LineH * 5);
+        state.DrawSectionHeading("Customer Summary");
+        WriteKV(state, "Total customers",     ws.Customers.Count.ToString("N0"));
+        WriteKV(state, "Filtered customers",  ws.FilteredCustomerCount.ToString("N0"));
+        WriteKV(state, "Service filter",      ws.SelectedCustomerService);
+        WriteKV(state, "City limits filter",  ws.SelectedCustomerCityLimits);
+        state.Y += SectionGap;
+    }
 
-        if (workspaceState.ProjectionSeries.Count == 0)
+    private static void RenderProjectionSection(PageState state, WorkspaceState ws)
+    {
+        if (ws.ProjectionSeries.Count == 0) return;
+
+        state.EnsureSpace(SectionGap + LineH * 2);
+        state.DrawSectionHeading("Rate Projection Series");
+
+        foreach (var point in ws.ProjectionSeries)
         {
-            writer.DrawText("No projection series is currently available.", writer.Layout.BodyFont, writer.Layout.Brush);
+            state.EnsureSpace(LineH);
+            state.DrawBodyLine($"  {point.Year}:  {point.Rate:C2}");
+        }
+
+        state.Y += SectionGap;
+    }
+
+    private static void RenderReserveSummarySection(PageState state, WorkspaceState ws)
+    {
+        state.EnsureSpace(SectionGap + LineH * 5);
+        state.DrawSectionHeading("Reserve Trajectory Summary");
+
+        var trajectory = ws.ReserveTrajectory;
+        if (trajectory is null)
+        {
+            state.DrawBodyLine("Reserve trajectory data is not available.");
+            state.Y += SectionGap;
             return;
         }
 
-        var grid = CreateGrid(["Year", "Projected rate"]);
-
-        foreach (var point in workspaceState.ProjectionSeries)
-        {
-            var row = grid.Rows.Add();
-            row.Cells[0].Value = point.Year;
-            row.Cells[1].Value = point.Rate.ToString("C2");
-        }
-
-        writer.DrawGrid(grid);
+        WriteKV(state, "Current reserves",           trajectory.CurrentReserves.ToString("C0"));
+        WriteKV(state, "Recommended reserve level",  trajectory.RecommendedReserveLevel.ToString("C0"));
+        WriteKV(state, "Risk assessment",            trajectory.RiskAssessment);
+        WriteKV(state, "Forecast points",            trajectory.ForecastPoints.Count.ToString("N0"));
+        state.Y += SectionGap;
     }
 
-    private static void WriteAssumptionsAppendix(PdfPacketWriter writer)
+    private static void RenderReserveForecastSection(PageState state, WorkspaceState ws)
     {
-        writer.Advance(writer.Layout.LineHeight * 0.25f);
-        writer.DrawSectionTitle("Assumptions & Data Sources");
+        state.EnsureSpace(SectionGap + LineH * 2);
+        state.DrawSectionHeading("Reserve Forecast");
+
+        var trajectory = ws.ReserveTrajectory;
+        if (trajectory?.ForecastPoints is not { Count: > 0 })
+        {
+            state.DrawBodyLine("No reserve forecast data is currently available.");
+            return;
+        }
+
+        foreach (var point in trajectory.ForecastPoints)
+        {
+            state.EnsureSpace(LineH);
+            state.DrawBodyLine($"  {point.DateUtc:MMM yy}:  {point.PredictedReserves:C0}  \u00b1{point.ConfidenceInterval:C0}");
+        }
+    }
+
+    private static void RenderAssumptionsAppendix(PageState state)
+    {
+        state.EnsureSpace(SectionGap + LineH * 5);
+        state.DrawSectionHeading("Assumptions & Data Sources");
 
         foreach (var line in BuildAssumptionsAppendixLines())
         {
-            writer.DrawText(line, writer.Layout.SmallFont, writer.Layout.Brush);
+            state.DrawBodyLine($"  - {line}");
         }
     }
 
-    private sealed record PdfPacketLayout(
-        PdfStandardFont TitleFont,
-        PdfStandardFont SectionFont,
-        PdfStandardFont BodyFont,
-        PdfStandardFont SmallFont,
-        PdfSolidBrush Brush,
-        PdfSolidBrush AccentBrush,
-        PdfSolidBrush MutedBrush,
-        PdfSolidBrush CurrentRateBrush,
-        PdfSolidBrush ScenarioRateBrush,
-        float Left,
-        float Top,
-        float Right,
-        float LineHeight);
+    // ── Page layout helpers ───────────────────────────────────────────────────
 
-    private static IEnumerable<string> BuildSummaryLines(WorkspaceState workspaceState)
+    private static void WriteKV(PageState state, string key, string value)
     {
-        yield return $"Current rate: {workspaceState.CurrentRate:C2}";
-        yield return $"Break-even rate: {workspaceState.RecommendedRate:C2}";
-        yield return $"Scenario break-even rate: {workspaceState.AdjustedRecommendedRate:C2}";
-        yield return $"Scenario rate delta: {workspaceState.AdjustedRateDelta:C2}";
-        yield return $"Total costs: {workspaceState.TotalCosts:C0}";
-        yield return $"Adjusted total costs: {workspaceState.AdjustedTotalCosts:C0}";
-        yield return $"Projected volume: {workspaceState.ProjectedVolume:N0}";
-        yield return $"Scenario cost total: {workspaceState.ScenarioCostTotal:C0}";
-        yield return $"Visible customers: {workspaceState.FilteredCustomerCount}";
+        state.EnsureSpace(LineH);
+        state.Graphics.DrawString($"  {key}:", state.Layout.BodyFont, new PdfSolidBrush(Muted), new PointF(PageLeft, state.Y));
+        state.Graphics.DrawString(value, state.Layout.BodyFont, new PdfSolidBrush(Dark), new PointF(PageLeft + 210f, state.Y));
+        state.Y += LineH;
     }
 
-    private static IEnumerable<string> BuildAssumptionsAppendixLines()
+    private static void ApplyPageNumbers(PdfDocument document, PacketLayout layout)
     {
-        yield return "- Data source: Live Aurora ledger_entries after QuickBooks import";
-        yield return "- AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)";
-        yield return "- Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)";
-    }
-
-    private static PdfGrid CreateGrid(IReadOnlyList<string> headers)
-    {
-        var grid = new PdfGrid
+        var total = document.Pages.Count;
+        for (var i = 0; i < total; i++)
         {
-            AllowRowBreakAcrossPages = false
-        };
+            var page    = document.Pages[i];
+            var g       = page.Graphics;
+            var size    = page.GetClientSize();
+            var footerY = size.Height - FooterBandH + 4f;
 
-        grid.Columns.Add(headers.Count);
-        grid.Headers.Add(1);
+            g.DrawLine(
+                new PdfPen(Muted, 0.5f),
+                new PointF(PageLeft, footerY - 2f),
+                new PointF(size.Width - PageLeft, footerY - 2f));
 
-        var header = grid.Headers[0];
-        for (var index = 0; index < headers.Count; index++)
-        {
-            header.Cells[index].Value = headers[index];
-            header.Cells[index].Style.BackgroundBrush = new PdfSolidBrush(new PdfColor(14, 116, 144));
-            header.Cells[index].Style.TextBrush = PdfBrushes.White;
+            g.DrawString(
+                $"Page {i + 1} of {total}  |  Wiley Workspace \u2014 Confidential",
+                layout.SmallFont,
+                new PdfSolidBrush(Muted),
+                new PointF(PageLeft, footerY));
         }
-
-        return grid;
     }
 
-    private static void DrawRateBar(
-        PdfPacketWriter writer,
-        string label,
-        decimal value,
-        decimal maxRate,
-        float labelWidth,
-        float barWidth,
-        float barHeight)
+    // ── File naming ───────────────────────────────────────────────────────────
+
+    private static string SanitizeFileName(string value)
     {
-        var layout = writer.Layout;
-        var y = writer.Y;
-        var labelPoint = new PointF(layout.Left, y);
-        writer.Graphics.DrawString(label, layout.BodyFont, layout.Brush, labelPoint);
-
-        var barX = layout.Left + labelWidth;
-        var barY = y + 2;
-        writer.Graphics.DrawRectangle(layout.MutedBrush, new RectangleF(barX, barY, barWidth, barHeight));
-
-        var fillWidth = (float)(value / maxRate) * barWidth;
-        var fillBrush = label.StartsWith("Current", StringComparison.Ordinal)
-            ? layout.CurrentRateBrush
-            : layout.ScenarioRateBrush;
-        writer.Graphics.DrawRectangle(fillBrush, new RectangleF(barX, barY, fillWidth, barHeight));
-
-        writer.Graphics.DrawString(value.ToString("C2"), layout.BodyFont, layout.Brush, new PointF(barX + barWidth + 10, y));
+        var invalidChars = Path.GetInvalidFileNameChars();
+        return new string(value
+            .Trim()
+            .Select(c => invalidChars.Contains(c) ? '-' : char.ToLowerInvariant(c))
+            .ToArray())
+            .Replace(' ', '-');
     }
 
     private static string? NormalizeNarrative(string? scenarioNarrative)
     {
+        const int maxNarrativeLength = 900;
+
         if (string.IsNullOrWhiteSpace(scenarioNarrative))
         {
             return null;
         }
 
         var normalized = scenarioNarrative.Trim();
-        return normalized.Length <= MaxNarrativeLength
+        return normalized.Length <= maxNarrativeLength
             ? normalized
-            : $"{normalized[..MaxNarrativeLength]}...";
+            : $"{normalized[..maxNarrativeLength]}...";
     }
 
-    private sealed class PdfPacketWriter
+    private static IEnumerable<string> BuildAssumptionsAppendixLines()
     {
-        private readonly PdfDocument document;
+        yield return "Data source: Live Aurora ledger_entries after QuickBooks import";
+        yield return "AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)";
+        yield return "Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)";
+    }
 
-        public PdfPacketWriter(PdfDocument document, PdfPacketLayout layout)
+    // ── Layout fonts record ───────────────────────────────────────────────────
+
+    private sealed class PacketLayout
+    {
+        public readonly PdfStandardFont TitleFont   = new(PdfFontFamily.Helvetica, 20, PdfFontStyle.Bold);
+        public readonly PdfStandardFont SectionFont = new(PdfFontFamily.Helvetica, 11, PdfFontStyle.Bold);
+        public readonly PdfStandardFont BoldFont    = new(PdfFontFamily.Helvetica, 9,  PdfFontStyle.Bold);
+        public readonly PdfStandardFont BodyFont    = new(PdfFontFamily.Helvetica, 9);
+        public readonly PdfStandardFont SmallFont   = new(PdfFontFamily.Helvetica, 8);
+    }
+
+    // ── PageState: carries mutable current-page tracking state ───────────────
+
+    private sealed class PageState
+    {
+        private readonly PdfDocument _document;
+        private readonly string      _continuedLabel;
+        private PdfPage              _currentPage;
+
+        public readonly PacketLayout Layout = new();
+        public float       Y        { get; set; }
+        public PdfGraphics Graphics => _currentPage.Graphics;
+
+        public PageState(PdfDocument document, string bandLabel)
         {
-            this.document = document;
-            Layout = layout;
-            Page = document.Pages.Add();
-            Graphics = Page.Graphics;
-            Y = layout.Top;
-            DrawFooter();
+            _document       = document;
+            _continuedLabel = $"{bandLabel} \u2014 CONTINUED";
+            _currentPage    = document.Pages.Add();
+            DrawBrandBand(bandLabel);
+            Y = ContentStartY;
         }
 
-        public PdfPacketLayout Layout { get; }
-        public PdfPage Page { get; private set; }
-        public PdfGraphics Graphics { get; private set; }
-        public float Y { get; private set; }
-        public float ContentWidth => Page.GetClientSize().Width - Layout.Left - Layout.Right;
-
-        public void DrawSectionTitle(string title)
+        public void DrawBrandBand(string label)
         {
-            EnsureSpace(Layout.LineHeight * 2);
-            Graphics.DrawString(title, Layout.SectionFont, Layout.AccentBrush, new PointF(Layout.Left, Y));
-            Y += Layout.LineHeight * 1.25f;
+            var size = _currentPage.GetClientSize();
+            Graphics.DrawRectangle(new PdfSolidBrush(Navy), new RectangleF(0, 0, size.Width, HeaderBandH));
+            Graphics.DrawString(label, Layout.SmallFont, new PdfSolidBrush(Muted), new PointF(PageLeft, 9f));
         }
 
         public void DrawText(string text, PdfFont font, PdfBrush brush)
         {
-            EnsureSpace(Layout.LineHeight);
-            Graphics.DrawString(text, font, brush, new PointF(Layout.Left, Y));
-            Y += Layout.LineHeight;
+            Graphics.DrawString(text, font, brush, new PointF(PageLeft, Y));
+            Y += LineH;
         }
 
-        public void DrawWrappedText(string text, float height)
+        public void DrawDivider()
         {
-            EnsureSpace(height + Layout.LineHeight);
-            var bounds = new RectangleF(Layout.Left, Y, ContentWidth, height);
-            var format = new PdfStringFormat
-            {
-                WordWrap = PdfWordWrapType.Word
-            };
-            Graphics.DrawString(text, Layout.BodyFont, Layout.Brush, bounds, format);
-            Y += height + Layout.LineHeight * 0.5f;
+            var size = _currentPage.GetClientSize();
+            Graphics.DrawLine(
+                new PdfPen(Muted, 0.75f),
+                new PointF(PageLeft, Y),
+                new PointF(size.Width - PageLeft, Y));
+            Y += 10f;
         }
 
-        public void DrawInsightBox(string text)
+        public void DrawSectionHeading(string heading)
         {
-            const float height = 78f;
-            EnsureSpace(height + Layout.LineHeight);
-
-            var bounds = new RectangleF(Layout.Left, Y, ContentWidth, height);
-            Graphics.DrawRectangle(Layout.MutedBrush, bounds);
-            Graphics.DrawRectangle(Layout.AccentBrush, new RectangleF(Layout.Left, Y, 4, height));
-
-            var textBounds = new RectangleF(Layout.Left + 12, Y + 10, ContentWidth - 24, height - 20);
-            var format = new PdfStringFormat
-            {
-                WordWrap = PdfWordWrapType.Word
-            };
-            Graphics.DrawString(text, Layout.BodyFont, Layout.Brush, textBounds, format);
-            Y += height + Layout.LineHeight * 0.75f;
+            Graphics.DrawRectangle(new PdfSolidBrush(Cyan), new RectangleF(PageLeft, Y + 1f, 3f, LineH - 2f));
+            Graphics.DrawString(heading, Layout.SectionFont, new PdfSolidBrush(Cyan), new PointF(PageLeft + 8f, Y));
+            Y += LineH + 2f;
         }
 
-        public void DrawGrid(PdfGrid grid)
+        public void DrawBodyLine(string text, PdfFont? font = null)
         {
-            EnsureSpace(Layout.LineHeight * 3);
-            var format = new PdfGridLayoutFormat
-            {
-                Break = PdfLayoutBreakType.FitPage,
-                Layout = PdfLayoutType.Paginate
-            };
-            var result = grid.Draw(Page, new PointF(Layout.Left, Y), format);
-            Page = result.Page;
-            Graphics = Page.Graphics;
-            Y = result.Bounds.Bottom + Layout.LineHeight * 0.75f;
+            Graphics.DrawString(text, font ?? Layout.BodyFont, new PdfSolidBrush(Dark), new PointF(PageLeft, Y));
+            Y += LineH;
         }
 
-        public void EnsureSpace(float height)
+        public void EnsureSpace(float required)
         {
-            if (Y + height <= Page.GetClientSize().Height - Layout.Top)
-            {
-                return;
-            }
-
-            Page = document.Pages.Add();
-            Graphics = Page.Graphics;
-            Y = Layout.Top;
-            DrawFooter();
+            var clientH = _currentPage.GetClientSize().Height;
+            if (Y + required > clientH - FooterBandH - 10f)
+                AddPage();
         }
 
-        public void Advance(float height)
+        private void AddPage()
         {
-            EnsureSpace(height);
-            Y += height;
+            _currentPage = _document.Pages.Add();
+            DrawBrandBand(_continuedLabel);
+            Y = ContentStartY;
         }
-
-        private void DrawFooter()
-        {
-            var pageSize = Page.GetClientSize();
-            var footerY = pageSize.Height - Layout.Top + Layout.LineHeight * 0.35f;
-            Graphics.DrawString(
-                "Powered by Wiley Widget + Semantic Kernel",
-                Layout.SmallFont,
-                Layout.AccentBrush,
-                new PointF(Layout.Left, footerY));
-        }
-    }
-
-    private static string BuildFileStem(WorkspaceState workspaceState)
-    {
-        var enterprise = SanitizeFileName(workspaceState.SelectedEnterprise);
-        return $"{enterprise}-fy{workspaceState.SelectedFiscalYear}";
-    }
-
-    private static string SanitizeFileName(string value)
-    {
-        var invalidChars = Path.GetInvalidFileNameChars();
-        var sanitized = new string(value
-            .Trim()
-            .Select(character => invalidChars.Contains(character) ? '-' : char.ToLowerInvariant(character))
-            .ToArray());
-
-        return sanitized.Replace(' ', '-');
     }
 }

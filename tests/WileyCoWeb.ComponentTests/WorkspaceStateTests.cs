@@ -50,6 +50,8 @@ public sealed class WorkspaceStateTests
 			roundTripped.EnterpriseOptions);
 		Assert.Equal(new[] { WorkspaceTestData.PriorFiscalYear, WorkspaceTestData.WaterFiscalYear, 2027 }, roundTripped.FiscalYearOptions);
 		Assert.Equal(new[] { "All Services", "Water", "Sewer" }, roundTripped.CustomerServiceOptions);
+		Assert.Equal(4, roundTripped.BreakEvenQuadrants?.Count);
+		Assert.Equal(2, roundTripped.ApartmentUnitTypes?.Count);
 		Assert.Single(roundTripped.ScenarioItems!);
 		Assert.Equal(scenarioId, roundTripped.ScenarioItems![0].Id);
 		Assert.Equal(2, roundTripped.CustomerRows?.Count);

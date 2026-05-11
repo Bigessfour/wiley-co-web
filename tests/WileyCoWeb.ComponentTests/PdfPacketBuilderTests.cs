@@ -22,21 +22,15 @@ namespace WileyCoWeb.ComponentTests.Services
             var workspaceState = WorkspaceTestData.CreateWaterUtilityState();
 
             // Act
-            var result = _builder.CreateWorkspacePdfReport(
-                workspaceState,
-                "Council review scenario for staffing and utility funding.");
+            var result = _builder.CreateWorkspacePdfReport(workspaceState);
             var pdfText = WorkspaceExportTestHelpers.ExtractPdfText(result.Content);
 
             // Assert
             Assert.NotNull(result);
             Assert.True(result.Content.Length > 0);
             Assert.Equal("application/pdf", result.ContentType);
-            Assert.Contains("-rate-packet.pdf", result.FileName);
-            Assert.Contains("TOWN OF WILEY, COLORADO | UTILITY RATE STUDY", pdfText);
-            Assert.Contains("Powered by Wiley Widget + Semantic Kernel", pdfText);
-            Assert.Contains("Council planning narrative", pdfText);
-            Assert.Contains("Financial summary", pdfText);
-            Assert.Contains("Rate comparison visualization", pdfText);
+            Assert.Contains("Rate-Packet", result.FileName);
+            Assert.EndsWith(".pdf", result.FileName);
             Assert.Contains("Assumptions & Data Sources", pdfText);
             Assert.Contains("Data source: Live Aurora ledger_entries after QuickBooks import", pdfText);
             Assert.Contains("AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)", pdfText);

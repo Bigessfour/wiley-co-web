@@ -38,6 +38,8 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         Assert.NotNull(payload.CustomerRows);
         Assert.NotNull(payload.ProjectionRows);
         Assert.NotNull(payload.ScenarioItems);
+        Assert.NotNull(payload.BreakEvenQuadrants);
+        Assert.NotNull(payload.ApartmentUnitTypes);
         Assert.Contains("Water Utility", payload.EnterpriseOptions);
         Assert.Contains("Wiley Sanitation District", payload.EnterpriseOptions);
         Assert.Contains("Trash", payload.EnterpriseOptions);
@@ -47,6 +49,11 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         Assert.Equal("All Services", payload.CustomerServiceOptions.First());
         Assert.Equal(2, payload.CustomerRows.Count);
         Assert.Equal(4, payload.ProjectionRows.Count);
+        Assert.Equal(4, payload.BreakEvenQuadrants.Count);
+        Assert.Equal(2, payload.ApartmentUnitTypes.Count);
+        Assert.NotNull(payload.ReserveTrajectory);
+        Assert.NotEmpty(payload.ReserveTrajectory!.ForecastPoints);
+        Assert.NotEmpty(payload.ReserveTrajectory.RiskAssessment);
         Assert.NotEmpty(payload.ScenarioItems);
         Assert.Contains(payload.ScenarioItems, item => item.Name == "Water Utility reserve target");
     }

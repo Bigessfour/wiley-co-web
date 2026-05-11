@@ -19,7 +19,12 @@ test.describe("Wiley workspace browser depth", () => {
     await gotoWorkspacePanel(page, "/wiley-workspace/break-even");
 
     const kpiGrid = page.locator("#break-even-kpi-grid");
+    const quadrantGrid = page.locator("#break-even-quadrant-grid");
     const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
+
+    await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
+    await expect(page.locator("#apartment-config-panel")).toBeVisible();
+
     await setNumericInputValue(breakEvenSpinners.nth(0), "24000");
     await setNumericInputValue(breakEvenSpinners.nth(1), "400");
 
@@ -39,6 +44,12 @@ test.describe("Wiley workspace browser depth", () => {
         },
       )
       .toBe(true);
+
+    await expect(quadrantGrid).toContainText(/Break-even\s*\$60\.00/);
+    await expect(quadrantGrid).toContainText("Apartments");
+    await expect(page.locator("#apartment-config-panel")).toContainText(
+      /Effective \$\/Customer\s*\$200\.00/,
+    );
   });
 
   test("rates panel updates the current-rate KPI when the editor changes", async ({
@@ -61,7 +72,7 @@ test.describe("Wiley workspace browser depth", () => {
   }) => {
     await gotoWorkspacePanel(page, "/wiley-workspace/scenario");
 
-    const metrics = page.locator("#scenario-metrics-panel");
+    const metrics = page.locator("#scenario-overview-section");
     const grid = page.locator("#scenario-grid");
     const dialog = page
       .getByRole("dialog")

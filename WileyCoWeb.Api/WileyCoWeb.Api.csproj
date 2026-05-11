@@ -23,6 +23,10 @@
       Link="Contracts/WorkspaceKnowledgeContracts.cs" />
     <Compile Include="..\Contracts\UtilityCustomerContracts.cs"
       Link="Contracts/UtilityCustomerContracts.cs" />
+    <Compile Include="..\Contracts\DebtCoverageContracts.cs"
+      Link="Contracts/DebtCoverageContracts.cs" />
+    <Compile Include="..\Contracts\CapitalGapContracts.cs"
+      Link="Contracts/CapitalGapContracts.cs" />
   </ItemGroup>
 
 </Project>

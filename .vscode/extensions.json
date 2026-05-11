@@ -1,5 +1,6 @@
 {
   "recommendations": [
+    "amazonwebservices.aws-toolkit-vscode",
     "ms-dotnettools.csdevkit",
     "ms-dotnettools.vscode-dotnet-runtime",
     "ms-dotnettools.csharp",

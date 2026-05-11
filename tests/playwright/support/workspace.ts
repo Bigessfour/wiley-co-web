@@ -2,50 +2,80 @@ import { expect } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
 const leftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
+const layoutStorageKey = "wiley.workspace.layout.v2";
+
+export async function waitForWorkspaceShellRender(
+  page: Page,
+  timeout = 30_000,
+) {
+  const effectiveTimeout = Math.max(timeout, 30_000);
+  const sidebarToggle = page.locator("#app-shell-nav-toggle");
+
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+  await expect(sidebarToggle).toBeVisible({ timeout: effectiveTimeout });
+  await expect(page.locator("#workspace-init-skeleton")).toHaveCount(0, {
+    timeout: effectiveTimeout,
+  });
+  await expect
+    .poll(
+      async () =>
+        ((await sidebarToggle.textContent().catch(() => "")) ?? "").trim()
+          .length > 0,
+      {
+        timeout: effectiveTimeout,
+        message: "Wait for workspace shell chrome to finish rendering",
+      },
+    )
+    .toBe(true);
+}
+
+export async function waitForWorkspacePanel(
+  page: Page,
+  visibleSelector: string,
+  timeout = 30_000,
+) {
+  const effectiveTimeout = Math.max(timeout, 30_000);
+
+  await waitForWorkspaceShellRender(page, effectiveTimeout);
+  await expect(page.locator(visibleSelector)).toBeVisible({
+    timeout: effectiveTimeout,
+  });
+}
 
 export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
-  const effectiveTimeout = isHostedWorkspace(page)
-    ? Math.max(timeout, 90_000)
-    : timeout;
-  const dashboard = page.locator("#workspace-dashboard");
+  const effectiveTimeout = Math.max(timeout, 90_000);
+  const sidebarToggle = page.locator("#app-shell-nav-toggle");
   const globalActionsCard = page.locator("#workspace-global-actions-card");
   const statusCard = page.locator("#workspace-status-card");
-  const workspaceLoadStatus = page.locator("#workspace-load-status");
-  const staticBootHeadline = page.locator("#wiley-static-boot-headline");
-  const legacyLoadingHeadline = page.getByText("Loading Wiley Widget", {
+  const workspaceLoadStatus = statusCard.locator("#workspace-load-status");
+  const loadingShellHeadline = page.getByText("Loading Wiley Widget", {
     exact: true,
   });
 
-  if (await staticBootHeadline.isVisible().catch(() => false)) {
-    await staticBootHeadline
-      .waitFor({ state: "hidden", timeout: effectiveTimeout })
-      .catch(() => undefined);
-  } else if (await legacyLoadingHeadline.isVisible().catch(() => false)) {
-    await legacyLoadingHeadline
-      .waitFor({ state: "hidden", timeout: effectiveTimeout })
-      .catch(() => undefined);
-  }
-
-  await expect(dashboard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(globalActionsCard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(statusCard).toBeVisible({ timeout: effectiveTimeout });
-  await expect(workspaceLoadStatus).toBeVisible({ timeout: effectiveTimeout });
+  await waitForWorkspaceShellRender(page, effectiveTimeout);
+  await expect(statusCard).toBeAttached({ timeout: effectiveTimeout / 3 });
   await expect
     .poll(
       async () => {
+        const splashVisible = await loadingShellHeadline
+          .isVisible()
+          .catch(() => false);
+        const globalActionsCount = await globalActionsCard
+          .count()
+          .catch(() => 0);
+        const sidebarToggleText =
+          (await sidebarToggle.textContent().catch(() => "")) ?? "";
         const globalActionsText =
           (await globalActionsCard.textContent().catch(() => "")) ?? "";
-        const statusText =
-          (await statusCard.textContent().catch(() => "")) ?? "";
         const workspaceLoadText =
           (await workspaceLoadStatus.textContent().catch(() => "")) ?? "";
 
         return (
-          !/Refreshing\.\.\./i.test(globalActionsText) &&
-          /Startup source:/i.test(statusText) &&
-          /Current state:/i.test(statusText) &&
-          !/pending/i.test(statusText) &&
-          !/Loading .*workspace API/i.test(workspaceLoadText)
+          sidebarToggleText.trim().length > 0 &&
+          !splashVisible &&
+          !/Loading .*workspace API/i.test(workspaceLoadText) &&
+          (globalActionsCount === 0 ||
+            !/Refreshing\.\.\./i.test(globalActionsText))
         );
       },
       {
@@ -57,45 +87,63 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
 }
 
 export async function gotoWorkspacePanel(page: Page, route: string) {
-  await page.goto(route);
+  await page.goto("/wiley-workspace");
+  await waitForWorkspaceShell(page);
+
+  if (route === "/wiley-workspace") {
+    return;
+  }
+
+  const linkName = getWorkspacePanelLinkName(route);
+  await page
+    .locator("#workspace-navigation-card")
+    .getByRole("link", { name: linkName })
+    .click();
+
+  await expect(page).toHaveURL(route);
   await waitForWorkspaceShell(page);
 }
 
 export async function seedLeftNavCollapsed(page: Page, collapsed: boolean) {
-  const storedValue = collapsed.toString();
+  const storedValue = JSON.stringify({
+    LeftNavCollapsed: collapsed,
+    ContextRailCollapsed: false,
+    JarvisOpen: false,
+  });
 
   await page.addInitScript(
-    ({ storageKey, initialValue }) => {
+    ({ currentStorageKey, legacyStorageKey, initialValue, legacyValue }) => {
       try {
-        window.localStorage.setItem(storageKey, initialValue);
+        window.localStorage.setItem(currentStorageKey, initialValue);
+        window.localStorage.setItem(legacyStorageKey, legacyValue);
       } catch {}
     },
     {
-      storageKey: leftNavStorageKey,
+      currentStorageKey: layoutStorageKey,
+      legacyStorageKey: leftNavStorageKey,
       initialValue: storedValue,
+      legacyValue: collapsed.toString(),
     },
   );
 }
 
 export async function enterNumericValue(input: Locator, value: string) {
-  const target =
-    (await input.locator("input, textarea").count()) > 0
-      ? input.locator("input, textarea").first()
-      : input;
-  await target.waitFor({ state: "visible", timeout: 30_000 });
-  await target.click({ clickCount: 3 });
-  await target.fill(value);
-  await target.press("Tab");
+  await input.click();
+  await input.selectText();
+  await input.press("Backspace");
+  await input.pressSequentially(value, { delay: 20 });
+  await input.evaluate((element) => {
+    (element as HTMLElement).blur();
+  });
 }
 
-/** Break-even inputs are Syncfusion numeric textboxes (`role="spinbutton"`). Prefer these over `#break-even-input-row input`, which can match hidden/helper inputs and fire events on the wrong control. */
+/** Break-even inputs are Syncfusion numeric textboxes (`role="spinbutton"`). */
 export function breakEvenPanelSpinbuttons(page: Page) {
   return page.locator("#break-even-input-row").getByRole("spinbutton");
 }
 
 /**
- * Scenario grid add/edit dialog Cost column: use the same triple-click + fill pattern as other
- * Syncfusion numerics. Control+A + pressSequentially can append to a partially cleared mask (e.g. 12340 instead of 1234).
+ * Scenario grid add/edit dialog Cost column: triple-click + fill for Syncfusion numerics.
  */
 export async function enterScenarioGridDialogCost(
   dialog: Locator,
@@ -113,7 +161,7 @@ export async function enterScenarioGridDialogCost(
   await target.press("Tab");
 }
 
-/** Current rate editor in the rates panel (Syncfusion exposes `role="spinbutton"`). */
+/** Current rate editor in the rates panel (Syncfusion `role="spinbutton"`). */
 export function ratesPanelCurrentRateInput(page: Page) {
   return page
     .locator("#rates-panel")
@@ -138,7 +186,7 @@ export async function readCurrencyValueByLabel(
 ) {
   const text = await container.innerText();
   const expression = new RegExp(
-    `${escapeRegExp(label)}\\s*\\$\\s*([\\d,]+(?:\\.\\d{2})?)`,
+    `${escapeRegExp(label)}\\s*\\$([\\d,]+(?:\\.\\d{2})?)`,
   );
   const match = text.match(expression);
 
@@ -181,24 +229,6 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Normalize Syncfusion / locale currency textbox values for assertions. */
-export function parseNumericInputDisplay(raw: string): number | undefined {
-  const t = raw.replace(/[$\s]/g, "").trim();
-  if (!t) {
-    return undefined;
-  }
-  if (/^\d+,\d{2}$/.test(t)) {
-    return Number.parseFloat(t.replace(",", "."));
-  }
-  return Number.parseFloat(t.replace(/,/g, ""));
-}
-
-function isHostedWorkspace(page: Page) {
-  const url = page.url();
-
-  return url.length > 0 && !/^https?:\/\/localhost[:/]/i.test(url);
-}
-
 /** True when Playwright baseURL points at the local dev client (5230), not production hosts. */
 export function isLocalE2EBaseUrl(baseURL: string | undefined): boolean {
   if (!baseURL) {
@@ -210,5 +240,44 @@ export function isLocalE2EBaseUrl(baseURL: string | undefined): boolean {
     return url.hostname === "localhost" || url.hostname === "127.0.0.1";
   } catch {
     return false;
+  }
+}
+
+function isHostedWorkspace(page: Page) {
+  const url = page.url();
+
+  return url.length > 0 && !/^https?:\/\/localhost[:/]/i.test(url);
+}
+
+function getWorkspacePanelLinkName(route: string) {
+  switch (route) {
+    case "/wiley-workspace/break-even":
+      return "Break-Even";
+    case "/wiley-workspace/apartment-config":
+      return "Apartment Config";
+    case "/wiley-workspace/rates":
+      return "Rates";
+    case "/wiley-workspace/quickbooks-import":
+      return "QuickBooks Import";
+    case "/wiley-workspace/scenario":
+      return "Scenario Planner";
+    case "/wiley-workspace/customers":
+      return "Customer Viewer";
+    case "/wiley-workspace/affordability":
+      return "Affordability";
+    case "/wiley-workspace/debt-coverage":
+      return "Debt Coverage";
+    case "/wiley-workspace/capital-gap":
+      return "Capital Gap";
+    case "/wiley-workspace/reserve-trajectory":
+      return "Reserve Trajectory";
+    case "/wiley-workspace/trends":
+      return "Trends";
+    case "/wiley-workspace/decision-support":
+      return "Decision Support";
+    case "/wiley-workspace/data-dashboard":
+      return "Data Dashboard";
+    default:
+      throw new Error(`Unsupported workspace route: ${route}`);
   }
 }

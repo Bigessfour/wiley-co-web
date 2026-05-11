@@ -95,6 +95,44 @@ public sealed class QuickBooksImportApiTests : IClassFixture<ApiApplicationFacto
 	}
 
 	[Fact]
+	public async Task Commit_RejectsSemanticDuplicateAcrossDifferentFileFormats()
+	{
+		await factory.ResetDatabaseAsync();
+		using var client = factory.CreateClient();
+
+		var firstCommitResponse = await PostImportAsync(client, "/api/imports/quickbooks/commit", CreateQuickBooksCsv());
+		firstCommitResponse.EnsureSuccessStatusCode();
+
+		var previewResponse = await PostImportAsync(
+			client,
+			"/api/imports/quickbooks/preview",
+			CreateQuickBooksWorkbookMatchingCsv(),
+			"quickbooks-ledger.xlsx",
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		previewResponse.EnsureSuccessStatusCode();
+
+		var preview = await previewResponse.Content.ReadFromJsonAsync<QuickBooksImportPreviewResponse>(jsonOptions);
+		Assert.NotNull(preview);
+		Assert.True(preview.IsDuplicate);
+		Assert.Equal(2, preview.DuplicateRows);
+		Assert.All(preview.Rows, row => Assert.True(row.IsDuplicate));
+
+		var duplicateResponse = await PostImportAsync(
+			client,
+			"/api/imports/quickbooks/commit",
+			CreateQuickBooksWorkbookMatchingCsv(),
+			"quickbooks-ledger.xlsx",
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+
+		var duplicateCommit = await duplicateResponse.Content.ReadFromJsonAsync<QuickBooksImportCommitResponse>(jsonOptions);
+		Assert.NotNull(duplicateCommit);
+		Assert.True(duplicateCommit.IsDuplicate);
+		Assert.Equal(0, duplicateCommit.ImportedRows);
+		Assert.Contains("already exist", duplicateCommit.StatusMessage, StringComparison.OrdinalIgnoreCase);
+	}
+
+	[Fact]
 	public async Task Assistant_ReturnsContextualGuidanceForLoadedPreview()
 	{
 		await factory.ResetDatabaseAsync();
@@ -233,6 +271,61 @@ public sealed class QuickBooksImportApiTests : IClassFixture<ApiApplicationFacto
 					["", "", "", "Type", "", "Date", "", "Num", "", "Name", "", "Memo", "", "Account", "", "Clr", "", "Split", "", "Amount", "", "Balance"],
 					["Jan - Dec 26"],
 					["", "", "", "Deposit", "", "46024", "", "", "", "WATER PAYMENTS", "", "VIA CREDIT CARD", "", "105 · ACCOUNTS RECEIVABLE", "", "", "", "101 · CASH IN BANK - UTILITY", "", "-362.90", "", "0.00"]
+				]));
+		}
+
+		return stream.ToArray();
+	}
+
+	private static byte[] CreateQuickBooksWorkbookMatchingCsv()
+	{
+		using var stream = new MemoryStream();
+		using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+		{
+			WriteEntry(
+				archive,
+				"[Content_Types].xml",
+				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+				+ "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
+				+ "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>"
+				+ "<Default Extension=\"xml\" ContentType=\"application/xml\"/>"
+				+ "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>"
+				+ "<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"
+				+ "</Types>");
+
+			WriteEntry(
+				archive,
+				"_rels/.rels",
+				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+				+ "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+				+ "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>"
+				+ "</Relationships>");
+
+			WriteEntry(
+				archive,
+				"xl/workbook.xml",
+				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+				+ "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">"
+				+ "<sheets>"
+				+ "<sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rId1\"/>"
+				+ "</sheets>"
+				+ "</workbook>");
+
+			WriteEntry(
+				archive,
+				"xl/_rels/workbook.xml.rels",
+				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+				+ "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+				+ "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>"
+				+ "</Relationships>");
+
+			WriteEntry(
+				archive,
+				"xl/worksheets/sheet1.xml",
+				BuildWorksheetXml([
+					["Date", "Type", "Num", "Name", "Memo", "Account", "Split", "Amount", "Balance", "Clr"],
+					["01/01/2026", "Invoice", "1001", "Town of Wiley", "Water Billing", "Water Revenue", "Accounts Receivable", "125.00", "125.00", "C"],
+					["01/02/2026", "Payment", "1002", "Town of Wiley", "Payment Received", "Accounts Receivable", "Water Revenue", "-125.00", "0.00", "C"]
 				]));
 		}
 

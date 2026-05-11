@@ -148,9 +148,9 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         using var client = factory.CreateClient();
         using var form = new MultipartFormDataContent();
 
-        AddImportFile(form, "Full_Customers.xlsx WSD.xlsx");
-        AddImportFile(form, "Full_GeneralLedger_FY2026.xlsx Util.xlsx");
-        AddImportFile(form, "Full_GeneralLedger_FY2026xlsx WSD.xlsx");
+        AddImportFile(form, "customers-wsd.xlsx");
+        AddImportFile(form, "general-ledger-fy2026-util.xlsx");
+        AddImportFile(form, "general-ledger-fy2026-wsd.xlsx");
         form.Add(new StringContent("true"), "includeSampleLedgerData");
         form.Add(new StringContent("true"), "applyDefaultEnterpriseBaselines");
 

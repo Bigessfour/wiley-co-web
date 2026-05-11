@@ -63,14 +63,16 @@ test.describe("QuickBooks routing production flow", () => {
 
     await gotoWorkspacePanel(page, "/wiley-workspace/quickbooks-import");
 
-    const routingRulesPanel = page.getByRole("tabpanel", {
-      name: "Routing Rules",
-    });
-    const ruleNameInput = routingRulesPanel.getByRole("textbox", {
-      name: "Rule name",
-    });
+    // Import flow renders multiple `.e-card` blocks above the tab strip; routing rules live under "Routing Rules".
+    await page.getByRole("tab", { name: "Routing Rules" }).click();
 
-    await expect(routingRulesPanel).toContainText("Seeded routing rule");
+    const ruleCard = page
+      .locator(".e-card")
+      .filter({ hasText: "Seeded routing rule" })
+      .first();
+    const ruleNameInput = ruleCard.getByPlaceholder("Rule name");
+
+    await expect(ruleCard).toBeVisible({ timeout: 30_000 });
     await expect(ruleNameInput).toHaveValue("Seeded routing rule");
 
     await ruleNameInput.fill("Reserve transfer to Apartments");
@@ -86,15 +88,17 @@ test.describe("QuickBooks routing production flow", () => {
     expect(savedConfigurationResponse.ok()).toBeTruthy();
 
     const savedConfiguration = await savedConfigurationResponse.json();
-    expect(savedConfiguration.rules).toHaveLength(1);
+    const savedRule = savedConfiguration.rules.find(
+      (r) => r.name === "Reserve transfer to Apartments",
+    );
     expect(
-      savedConfiguration.rules.some(
-        (r) => r.name === "Reserve transfer to Apartments",
-      ),
-    ).toBe(true);
-    expect(savedConfiguration.rules[0].priority).toBe(10);
-    expect(savedConfiguration.rules[0].memoPattern).toBe("");
-    expect(savedConfiguration.rules[0].targetEnterprise).toBe("Apartments");
+      savedRule,
+      "expected renamed routing rule after UI save",
+    ).toBeTruthy();
+    expect(savedConfiguration.rules).toHaveLength(1);
+    expect(savedRule!.priority).toBe(10);
+    expect(savedRule!.memoPattern).toBe("");
+    expect(savedRule!.targetEnterprise).toBe("Apartments");
 
     const uniqueToken = `${Date.now()}`;
     const uniqueFileName = `reserve-transfer-${uniqueToken}.csv`;

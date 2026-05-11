@@ -2,22 +2,24 @@ using System.Globalization;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
+using WileyWidget.Models;
 
 namespace WileyCoWeb.Components.Pages;
 
 #pragma warning disable S2325
 public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 {
-    private static readonly CultureInfo WorkspaceUiCulture = CultureInfo.GetCultureInfo("en-US");
     private const string NewHireImpactScenarioName = "HIRES-2026-Q2-001 – PT Clerk + FT Field";
-    private const decimal PartTimeClerkAnnualSalary = 25_000m;
+    private const decimal PartTimeClerkAnnualSalary = 25000m;
+    private const decimal FieldEmployeeAnnualSalary = 55000m;
     private const decimal PartTimeClerkEnterpriseShare = 0.25m;
-    private const decimal FieldEmployeeAnnualSalary = 55_000m;
     private const decimal FieldEmployeeEnterpriseShare = 1m / 3m;
+    private static readonly CultureInfo WorkspaceUiCulture = CultureInfo.GetCultureInfo("en-US");
 
     protected enum WorkspaceApiHealth { Unknown, Healthy, Degraded }
 
@@ -43,9 +45,6 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected WorkspaceDocumentExportService WorkspaceDocumentExportService { get; set; } = default!;
 
     [Inject]
-    protected WorkspaceKnowledgeApiService WorkspaceKnowledgeApiService { get; set; } = default!;
-
-    [Inject]
     protected BrowserDownloadService BrowserDownloadService { get; set; } = default!;
 
     [Inject]
@@ -56,6 +55,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     [Inject]
     protected ILogger<WileyWorkspaceBase> WorkspaceLogger { get; set; } = default!;
+
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; } = default!;
+
+    private DotNetObjectReference<WileyWorkspaceBase>? _networkStatusRef;
 
     private bool persistenceInitialized;
     private bool isRefreshingScenarioCatalog;
@@ -71,7 +75,20 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected bool IsLoadingCouncilDemo { get; set; }
     protected bool IsExportingDocuments { get; set; }
     protected bool IsSidebarOpen { get; set; } = true;
-    protected bool IsJarvisOpen { get; set; }
+
+    /// <summary>
+    /// <c>true</c> from component creation until the first-render
+    /// persistence initialization cycle completes.  Used to render a
+    /// skeleton scaffold so the workspace never shows a jarring empty state.
+    /// </summary>
+    protected bool IsInitializingWorkspace { get; private set; } = true;
+
+    /// <summary>
+    /// <c>true</c> when the Jarvis chat panel is open.  Reading this goes
+    /// through the layout context so that any component can observe the same
+    /// value without a direct reference to <see cref="WileyWorkspaceBase"/>.
+    /// </summary>
+    protected bool IsJarvisOpen => LayoutContext?.IsJarvisOpen ?? false;
 
     protected string SnapshotSaveStatus { get; set; } = "Ready to save rate snapshot";
     protected string BaselineSaveStatus { get; set; } = "Baseline changes are local until you save them.";
@@ -79,8 +96,22 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected string WorkspaceLoadStatus { get; set; } = "Workspace initialization is pending.";
     protected string DocumentExportStatus { get; set; } = "Excel and PDF exports are ready.";
 
-    protected long? SelectedScenarioSnapshotId { get; set; }
-    protected string ScenarioDescription { get; set; } = string.Empty;
+    protected long? SelectedScenarioSnapshotId
+    {
+        get => WorkspaceState.SelectedScenarioSnapshotId;
+        set => WorkspaceState.SetSelectedScenarioSnapshotId(value);
+    }
+
+    protected string ScenarioDescription
+    {
+        get => WorkspaceState.ScenarioDescription;
+        set => WorkspaceState.SetScenarioDescription(value);
+    }
+
+    protected string WorkspacePdfExportLabel => WorkspaceDocumentExportService.ContainsPersonnelScenario(WorkspaceState, ScenarioDescription)
+        ? "Export Council Rate Packet"
+        : "Download PDF rate packet";
+
     protected IReadOnlyList<WorkspaceScenarioSummaryResponse> SavedScenarios { get; set; } = [];
 
     protected string SelectedEnterprise
@@ -123,8 +154,6 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected decimal ScenarioAdjustedRate => WorkspaceState.AdjustedRecommendedRate;
     protected decimal ScenarioAdjustedDelta => WorkspaceState.AdjustedRateDelta;
     protected decimal ScenarioCostTotal => WorkspaceState.ScenarioCostTotal;
-    protected bool HasPersonnelScenario => WorkspaceDocumentExportService.ContainsPersonnelScenario(WorkspaceState, ScenarioDescription);
-    protected string WorkspacePdfExportLabel => HasPersonnelScenario ? "Export Council Rate Packet" : "Download PDF rate packet";
 
     protected string CurrentRateDisplay => CurrentRate.ToString("C2", WorkspaceUiCulture);
     protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2", WorkspaceUiCulture);
@@ -135,12 +164,16 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected string TotalCostsDisplay => TotalCosts.ToString("C0", WorkspaceUiCulture);
     protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0", WorkspaceUiCulture);
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
+    protected WorkspaceReserveTrajectoryData? ReserveTrajectory => WorkspaceState.ReserveTrajectory;
     protected double GaugeCurrentRateValue => (double)CurrentRate;
 
     protected IEnumerable<string> EnterpriseOptions => WorkspaceState.EnterpriseOptions;
     protected IEnumerable<int> FiscalYearOptions => WorkspaceState.FiscalYearOptions;
     protected IReadOnlyList<string> CustomerServiceOptions => WorkspaceState.CustomerServiceOptions;
     protected IReadOnlyList<string> CustomerCityLimitOptions => WorkspaceState.CustomerCityLimitOptions;
+    protected IReadOnlyList<BreakEvenQuadrantData> HeroBreakEvenQuadrants => BreakEvenQuadrants
+        .OrderBy(quadrant => GetHeroBreakEvenSortKey(quadrant))
+        .ToArray();
 
     protected IReadOnlyList<RateComparisonPoint> RateComparison => WorkspaceState.RateComparison;
     protected IReadOnlyList<ScenarioItem> ScenarioItems => WorkspaceState.ScenarioItems;
@@ -148,11 +181,31 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected int FilteredCustomerCount => WorkspaceState.FilteredCustomerCount;
     protected string FilteredCustomerCountDisplay => FilteredCustomerCount.ToString();
     protected IReadOnlyList<ProjectionRow> ProjectionSeries => WorkspaceState.ProjectionSeries;
+    protected IReadOnlyList<BreakEvenQuadrantData> BreakEvenQuadrants => WorkspaceState.BreakEvenQuadrants;
+    protected IReadOnlyList<ApartmentUnitTypeData> ApartmentUnitTypes => WorkspaceState.ApartmentUnitTypes;
     protected bool CanApplySelectedScenario => SelectedScenarioSnapshotId is > 0;
     protected string StartupSourceStatus => WorkspaceState.StartupSourceStatus;
     protected bool IsUsingStartupFallback => WorkspaceState.IsUsingStartupFallback;
     protected string CurrentStateSourceStatus => WorkspaceState.CurrentStateSourceStatus;
     protected bool IsUsingBrowserRestoredState => WorkspaceState.IsUsingBrowserRestoredState;
+
+    /// <summary>
+    /// <c>true</c> when the browser has reported that network access is lost
+    /// (<c>navigator.onLine == false</c>).  Drives the offline-indicator banner
+    /// in <c>WileyWorkspace.razor</c>.  Updates automatically via JS interop.
+    /// </summary>
+    protected bool IsOffline => WorkspaceState.IsOffline;
+
+    /// <summary>
+    /// Returns a localised, human-readable label for the most recent download
+    /// of the given export type, e.g. "4/25/2026 2:15 PM", or "Never".
+    /// </summary>
+    /// <param name="exportKey">
+    /// One of "customer-excel", "scenario-excel", "workspace-pdf",
+    /// "reserve-excel", or "reserve-pdf".
+    /// </param>
+    protected string GetLastExportedDisplay(string exportKey)
+        => WorkspaceState.GetLastExportedDisplay(exportKey);
 
     protected string CustomerSearchTerm
     {
@@ -188,17 +241,30 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         WorkspaceApiHealth.Degraded => "Degraded",
         _ => "Unknown"
     };
+    /// <summary>True when the left navigation rail is in its docked/collapsed state.</summary>
     protected bool IsLeftNavRailCollapsed => LayoutContext?.IsLeftNavCollapsed ?? false;
+
+    /// <summary>True when the workspace context-rail splitter pane (pane 0) is collapsed.</summary>
+    protected bool IsContextRailCollapsed => LayoutContext?.IsContextRailCollapsed ?? false;
+
+    /// <summary>Current viewport layout mode from the resize observer.</summary>
+    protected WorkspaceLayoutMode LayoutMode => LayoutContext?.LayoutMode ?? WorkspaceLayoutMode.Desktop;
+
     protected string NavigationRailToggleText => IsLeftNavRailCollapsed ? "Expand navigation" : "Collapse navigation";
 
     protected IReadOnlyList<WorkspacePanelNavItem> PanelNavItems { get; } =
     [
         new("overview", "Overview"),
         new("break-even", "Break-Even"),
+        new("apartment-config", "Apartment Config"),
         new("rates", "Rates"),
         new("quickbooks-import", "QuickBooks Import"),
         new("scenario", "Scenario Planner"),
         new("customers", "Customer Viewer"),
+        new("affordability", "Affordability"),
+        new("reserve-trajectory", "Reserve Trajectory"),
+        new("debt-coverage", "Debt Coverage"),
+        new("capital-gap", "Capital Gap"),
         new("trends", "Trends"),
         new("decision-support", "Decision Support"),
         new("data-dashboard", "Data Dashboard")
@@ -288,7 +354,9 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         _ = TrackNavigationClickAsync(clickTelemetry);
 
-        IsJarvisOpen = false;
+        // Close the Jarvis panel through the layout context so all subscribers
+        // (including the SfSplitter pane binding) react to the change.
+        LayoutContext?.SetJarvisOpen(false);
         NavigationManager.NavigateTo(route);
     }
 
@@ -309,9 +377,33 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         IsSidebarOpen = !IsSidebarOpen;
     }
 
+    /// <summary>
+    /// Toggles the Jarvis chat panel through the layout context so all
+    /// layout subscribers observe the change immediately.
+    /// </summary>
     protected void ToggleJarvis()
     {
-        IsJarvisOpen = !IsJarvisOpen;
+        LayoutContext?.SetJarvisOpen(!IsJarvisOpen);
+    }
+
+    /// <summary>
+    /// Notifies the layout context that the context-rail splitter pane
+    /// collapsed.  Called from the <c>SplitterEvents.Collapsed</c> handler
+    /// in <c>WileyWorkspace.razor</c>.
+    /// </summary>
+    protected void NotifyContextRailCollapsed()
+    {
+        LayoutContext?.SetContextRailCollapsed(true);
+    }
+
+    /// <summary>
+    /// Notifies the layout context that the context-rail splitter pane
+    /// expanded.  Called from the <c>SplitterEvents.Expanded</c> handler
+    /// in <c>WileyWorkspace.razor</c>.
+    /// </summary>
+    protected void NotifyContextRailExpanded()
+    {
+        LayoutContext?.SetContextRailCollapsed(false);
     }
 
     protected Task ToggleLeftNavRailAsync()
@@ -323,15 +415,31 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected async Task HandleEnterpriseChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args)
     {
+        if (string.Equals(args.Value, SelectedEnterprise, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         await ReloadWorkspaceAsync(args.Value, SelectedFiscalYear);
     }
 
     protected async Task HandleFiscalYearChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<int, int> args)
     {
+        if (args.Value == SelectedFiscalYear)
+        {
+            return;
+        }
+
         await ReloadWorkspaceAsync(SelectedEnterprise, args.Value);
     }
 
     protected Task RefreshWorkspaceAsync() => ReloadWorkspaceAsync(SelectedEnterprise, SelectedFiscalYear);
+
+    protected Task HandleApartmentUnitTypesChanged(IReadOnlyList<ApartmentUnitTypeData> unitTypes)
+    {
+        WorkspaceState.SetApartmentUnitTypes(unitTypes);
+        return Task.CompletedTask;
+    }
 
     protected void HandleSavedScenarioChanged(Syncfusion.Blazor.DropDowns.ChangeEventArgs<long?, WorkspaceScenarioSummaryResponse> args)
     {
@@ -342,7 +450,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         {
             ScenarioDescription = selectedScenario.Description ?? string.Empty;
             ScenarioPersistenceStatus = $"Selected saved scenario '{selectedScenario.ScenarioName}'.";
+            return;
         }
+
+        ScenarioDescription = string.Empty;
+        ScenarioPersistenceStatus = "Saved scenario selection cleared.";
     }
 
     protected async Task SaveScenarioAsync()
@@ -447,7 +559,6 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         {
             var scenarioSnapshot = await WorkspaceSnapshotApiService.GetScenarioSnapshotAsync(SelectedScenarioSnapshotId.Value);
             WorkspaceState.ApplyBootstrap(scenarioSnapshot);
-            ScenarioDescription = scenarioSnapshot.ScenarioDescription ?? ScenarioDescription;
             ScenarioPersistenceStatus = $"Applied saved scenario '{WorkspaceState.ActiveScenarioName}'.";
             WorkspaceLoadStatus = $"Loaded {WorkspaceState.ContextSummary} from saved scenario.";
             lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
@@ -502,14 +613,24 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateCustomerWorkbook(WorkspaceState),
-            "Preparing customer workbook...");
+            "Preparing customer workbook...",
+            "customer-excel");
     }
 
     protected Task ExportScenarioWorkbookAsync()
     {
         return ExportDocumentAsync(
             () => WorkspaceDocumentExportService.CreateScenarioWorkbook(WorkspaceState),
-            "Preparing scenario workbook...");
+            "Preparing scenario workbook...",
+            "scenario-excel");
+    }
+
+    protected Task ExportReserveTrajectoryWorkbookAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateReserveTrajectoryWorkbook(WorkspaceState),
+            "Preparing reserve trajectory workbook...",
+            "reserve-excel");
     }
 
     protected Task ExportWorkspacePdfAsync()
@@ -518,7 +639,49 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             () => WorkspaceDocumentExportService.CreateWorkspacePdfReport(
                 WorkspaceState,
                 string.IsNullOrWhiteSpace(ScenarioDescription) ? null : ScenarioDescription.Trim()),
-            "Preparing PDF rate packet...");
+            "Preparing PDF rate packet...",
+            "workspace-pdf");
+    }
+
+    protected Task LoadNewHireImpactTemplateAsync()
+    {
+        var clerkAllocation = PartTimeClerkAnnualSalary * PartTimeClerkEnterpriseShare;
+        var fieldAllocation = FieldEmployeeAnnualSalary * FieldEmployeeEnterpriseShare;
+
+        foreach (var scenarioItemId in WorkspaceState.ScenarioItems.Select(item => item.Id).ToArray())
+        {
+            WorkspaceState.RemoveScenarioItem(scenarioItemId);
+        }
+
+        WorkspaceState.SetActiveScenarioName(NewHireImpactScenarioName);
+        WorkspaceState.AddScenarioItem(
+            "PT City Clerk - 25% enterprise allocation of $25,000",
+            clerkAllocation);
+        WorkspaceState.AddScenarioItem(
+            "FT Field Employee - 33.3% Water/Sewer/Apartments allocation of $55,000",
+            fieldAllocation);
+        ScenarioDescription =
+            "New hire impact template: PT City Clerk at $25,000 annual salary split 25% across four enterprises, plus FT Field Employee at $55,000 annual salary split one-third across Water, Sewer, and Apartments.";
+        SelectedScenarioSnapshotId = null;
+        ScenarioPersistenceStatus = "Loaded new hire impact template and recomputed scenario rates.";
+
+        return Task.CompletedTask;
+    }
+
+    protected Task ExportReserveTrajectoryPdfAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateReserveTrajectoryPdfReport(WorkspaceState),
+            "Preparing reserve trajectory PDF...",
+            "reserve-pdf");
+    }
+
+    protected Task ExportRatePacketZipAsync()
+    {
+        return ExportDocumentAsync(
+            () => WorkspaceDocumentExportService.CreateRatePacketZip(WorkspaceState),
+            "Building rate packet ZIP (PDF + Excel)...",
+            "rate-packet-zip");
     }
 
     protected void HandleTotalCostsChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
@@ -574,6 +737,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         lastWorkspaceSyncUtc = DateTimeOffset.UtcNow;
+
+        // Mark initialization complete so the skeleton scaffold is removed.
+        IsInitializingWorkspace = false;
+
+        // Register navigator.onLine bridge so offline banner appears immediately
+        // if the browser has already lost connectivity during startup.
+        await RegisterNetworkStatusAsync();
+
         StateHasChanged();
     }
 
@@ -581,6 +752,24 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     {
         WorkspaceState.Changed -= HandleWorkspaceStateChanged;
         WorkspacePersistenceService.Dispose();
+
+        // Unsubscribe the JS network-status listener and dispose the .NET reference
+        // so the JS callback cannot fire after this component has been torn down.
+        if (_networkStatusRef is not null)
+        {
+            try
+            {
+                _ = JSRuntime.InvokeVoidAsync("wileyNetworkStatus.unsubscribe");
+            }
+            catch
+            {
+                // Best-effort: ignore JS errors during disposal.
+            }
+
+            _networkStatusRef.Dispose();
+            _networkStatusRef = null;
+        }
+
         GC.SuppressFinalize(this);
     }
 
@@ -626,6 +815,54 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         return "Workspace ready.";
+    }
+
+    // ── Network status interop ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Registers a <c>navigator.onLine</c> bridge so the workspace can show an
+    /// offline-indicator banner immediately when the browser loses connectivity.
+    /// </summary>
+    private async Task RegisterNetworkStatusAsync()
+    {
+        try
+        {
+            _networkStatusRef = DotNetObjectReference.Create(this);
+            var isOnline = await JSRuntime.InvokeAsync<bool>("wileyNetworkStatus.isOnline");
+            WorkspaceState.SetOffline(!isOnline);
+            await JSRuntime.InvokeVoidAsync("wileyNetworkStatus.subscribe", _networkStatusRef);
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal: network-status detection is best-effort.  The offline
+            // banner simply will not appear in environments where JS interop is
+            // unavailable (SSR pre-render, unit tests, etc.).
+            WorkspaceLogger.LogDebug(ex, "Network status registration failed; assuming online.");
+        }
+    }
+
+    /// <summary>
+    /// Called by the JS runtime when the browser <c>online</c> or <c>offline</c>
+    /// event fires.  Updates <see cref="WorkspaceState.IsOffline"/> so the
+    /// offline-indicator banner appears or disappears immediately.
+    /// </summary>
+    [JSInvokable]
+    public void HandleOnlineStatusChanged(bool isOnline)
+    {
+        WorkspaceState.SetOffline(!isOnline);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static int GetHeroBreakEvenSortKey(BreakEvenQuadrantData quadrant)
+    {
+        return WorkspaceEnterpriseCatalog.GetSortOrder(quadrant.EnterpriseName);
+    }
+
+    protected static string GetHeroBreakEvenLabel(BreakEvenQuadrantData quadrant)
+    {
+        return string.IsNullOrWhiteSpace(quadrant.EnterpriseName)
+            ? quadrant.EnterpriseType
+            : quadrant.EnterpriseName;
     }
 
     private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)
@@ -737,7 +974,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         ScenarioPersistenceStatus = status;
     }
 
-    private async Task ExportDocumentAsync(Func<WorkspaceExportDocument> exportFactory, string pendingStatus)
+    private async Task ExportDocumentAsync(Func<WorkspaceExportDocument> exportFactory, string pendingStatus, string exportKey)
     {
         if (IsExportingDocuments)
         {
@@ -753,6 +990,10 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             var document = exportFactory();
             await BrowserDownloadService.DownloadAsync(document);
             DocumentExportStatus = $"Downloaded {document.FileName}";
+
+            // Record when this export type was last downloaded so the document
+            // centre can show an accurate "last exported" timestamp.
+            WorkspaceState.SetLastExported(exportKey, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
@@ -773,60 +1014,6 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
     }
 
-    protected async Task LoadNewHireImpactTemplateAsync()
-    {
-        var clerkAllocation = PartTimeClerkAnnualSalary * PartTimeClerkEnterpriseShare;
-        var fieldAllocation = FieldEmployeeAnnualSalary * FieldEmployeeEnterpriseShare;
-
-        foreach (var scenarioItemId in WorkspaceState.ScenarioItems.Select(item => item.Id).ToArray())
-        {
-            WorkspaceState.RemoveScenarioItem(scenarioItemId);
-        }
-
-        WorkspaceState.SetActiveScenarioName(NewHireImpactScenarioName);
-        WorkspaceState.AddScenarioItem(
-            "PT City Clerk - 25% enterprise allocation of $25,000",
-            clerkAllocation);
-        WorkspaceState.AddScenarioItem(
-            "FT Field Employee - 33.3% Water/Sewer/Apartments allocation of $55,000",
-            fieldAllocation);
-
-        ScenarioDescription =
-            "New hire impact template: PT City Clerk at $25,000 annual salary split 25% across four enterprises, plus FT Field Employee at $55,000 annual salary split one-third across Water, Sewer, and Apartments.";
-        SelectedScenarioSnapshotId = null;
-        ScenarioPersistenceStatus = "Loaded new hire impact template and recomputed scenario rates. Refreshing workspace knowledge...";
-        WorkspaceState.SetCurrentStateSource(
-            WorkspaceStartupSource.BrowserStorageRestore,
-            "New hire impact template loaded into the local workspace draft.");
-        StateHasChanged();
-
-        await RefreshKnowledgeForNewHireTemplateAsync().ConfigureAwait(false);
-    }
-
-    private async Task RefreshKnowledgeForNewHireTemplateAsync()
-    {
-        try
-        {
-            var knowledge = await WorkspaceKnowledgeApiService.GetAsync(
-                new WorkspaceKnowledgeRequest(WorkspaceState.ToBootstrapData(), TopVarianceCount: 5, ForecastYears: 5)).ConfigureAwait(false);
-
-            ScenarioPersistenceStatus =
-                $"Loaded new hire impact template. Knowledge refreshed: {knowledge.OperationalStatus}";
-            _apiHealth = WorkspaceApiHealth.Healthy;
-        }
-        catch (Exception ex)
-        {
-            WorkspaceLogger.LogWarning(ex, "Workspace knowledge refresh failed after loading the new hire impact template.");
-            ScenarioPersistenceStatus =
-                $"Loaded new hire impact template. Knowledge refresh failed: {ex.Message}";
-            _apiHealth = WorkspaceApiHealth.Degraded;
-        }
-        finally
-        {
-            StateHasChanged();
-        }
-    }
-
     private static string NormalizePanelKey(string? value)
     {
         var candidate = string.IsNullOrWhiteSpace(value)
@@ -841,7 +1028,11 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "quickbooks-import" => "quickbooks-import",
             "scenario" => "scenario",
             "customers" => "customers",
+            "affordability" => "affordability",
             "trends" => "trends",
+            "reserve-trajectory" => "reserve-trajectory",
+            "debt-coverage" => "debt-coverage",
+            "capital-gap" => "capital-gap",
             "decision-support" => "decision-support",
             "data-dashboard" => "data-dashboard",
             _ => "overview"

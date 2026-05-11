@@ -49,7 +49,7 @@ test.describe("Workspace box-method layout", () => {
     ]);
   });
 
-  test("scenario panel keeps summary, metrics, and grid in a readable vertical stack", async ({
+  test("scenario panel keeps overview and grid workbench in a readable vertical stack", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
@@ -57,13 +57,11 @@ test.describe("Workspace box-method layout", () => {
     await waitForWorkspaceShell(page);
 
     const scenarioPanel = page.locator("#scenario-panel");
-    const summary = page.locator("#scenario-summary-panel");
-    const metrics = page.locator("#scenario-metrics-panel");
-    const grid = page.locator("#scenario-grid-panel");
+    const overview = page.locator("#scenario-overview-section");
+    const gridWorkbench = page.locator("#scenario-grid-workbench-card");
 
-    await expect(summary).toBeInside(scenarioPanel, { padding: 0 });
-    await expect(metrics).toBeInside(scenarioPanel, { padding: 0 });
-    await expect(grid).toBeInside(scenarioPanel, { padding: 0 });
-    await expectVerticalStack([summary, metrics, grid]);
+    await expect(overview).toBeInside(scenarioPanel, { padding: 0 });
+    await expect(gridWorkbench).toBeInside(scenarioPanel, { padding: 0 });
+    await expectVerticalStack([overview, gridWorkbench]);
   });
 });

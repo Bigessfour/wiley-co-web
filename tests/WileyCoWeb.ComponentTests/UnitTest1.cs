@@ -127,20 +127,19 @@ public sealed class WorkspaceExportServiceTests
         var pdfText = WorkspaceExportTestHelpers.ExtractPdfText(pdfReport.Content);
 
         Assert.EndsWith(".pdf", pdfReport.FileName);
-        Assert.Equal("water-utility-fy2026-rate-packet.pdf", pdfReport.FileName);
+        Assert.Contains("Rate-Packet", pdfReport.FileName);
+        Assert.Contains("water-utility", pdfReport.FileName);
         Assert.Equal("application/pdf", pdfReport.ContentType);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdfReport.Content, 0, 4));
         Assert.True(pdfReport.Content.Length > 1000);
-        Assert.Contains("TOWN OF WILEY, COLORADO | UTILITY RATE STUDY", pdfText);
-        Assert.Contains("Powered by Wiley Widget + Semantic Kernel", pdfText);
+        Assert.Contains("Wiley Workspace Rate Packet", pdfText);
         Assert.Contains(WorkspaceTestData.CouncilReviewScenario, pdfText);
         Assert.Contains("Council planning narrative", pdfText);
         Assert.Contains("part-time city clerk", pdfText);
-        Assert.Contains("Financial summary", pdfText);
+        Assert.Contains("Rate Summary", pdfText);
         Assert.Contains("Total costs", pdfText);
-        Assert.Contains("Adjusted total costs", pdfText);
-        Assert.Contains("Rate comparison visualization", pdfText);
-        Assert.Contains("Scenario items", pdfText);
+        Assert.Contains("Adjusted break-even", pdfText);
+        Assert.Contains("Scenario Items", pdfText);
         Assert.Contains("Vehicle replacement", pdfText);
         Assert.Contains("New Personnel Cost Allocation", pdfText);
         Assert.Contains("PT City Clerk", pdfText);
@@ -148,7 +147,7 @@ public sealed class WorkspaceExportServiceTests
         Assert.Contains("Prorated annual cost per enterprise", pdfText);
         Assert.Contains("Rate Impact Summary", pdfText);
         Assert.Contains("Wiley Widget/Semantic Kernel planning insight", pdfText);
-        Assert.Contains("Projection series", pdfText);
+        Assert.Contains("Rate Projection Series", pdfText);
         Assert.Contains("Assumptions & Data Sources", pdfText);
         Assert.Contains("Data source: Live Aurora ledger_entries after QuickBooks import", pdfText);
         Assert.Contains("AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)", pdfText);

@@ -1,0 +1,264 @@
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.Inputs
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.Services
+
+@inject AffordabilityAnalysisService AffordabilityAnalysisService
+
+<div id="affordability-dashboard-panel" class="space-y-4" aria-live="polite">
+    <section id="affordability-hero" class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 p-5 text-white shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">Affordability Analysis</p>
+                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Monthly bill burden versus MHI</h2>
+                <p class="mt-2 max-w-3xl text-sm text-slate-300">Model how customer-class bills move across rate scenarios and compare the result to monthly median household income.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
+                <div>
+                    <div class="text-slate-400">Enterprise</div>
+                    <div class="font-semibold text-white">@SelectedEnterprise</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">Fiscal Year</div>
+                    <div class="font-semibold text-white">@SelectedFiscalYear</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">Households</div>
+                    <div class="font-semibold text-white">@AffordabilitySnapshot.Summary.CustomerCount.ToString("N0")</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">Risk Band</div>
+                    <div class="font-semibold text-cyan-300">@AffordabilitySnapshot.Summary.RiskBand</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="affordability-inputs" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Scenario Inputs</p>
+        <div class="mt-3 grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <SfNumericTextBox TValue="decimal"
+                              ID="affordability-monthly-mhi-input"
+                              Value="@MonthlyMhi"
+                              Placeholder="Monthly MHI"
+                              FloatLabelType="FloatLabelType.Auto"
+                              Min="1"
+                              Width="100%"
+                              Format="C0">
+                <NumericTextBoxEvents TValue="decimal" ValueChange="OnMonthlyMhiChanged" />
+            </SfNumericTextBox>
+            <SfCard>
+                <CardHeader Title="Affordability Status" SubTitle="@AffordabilitySnapshot.Summary.RiskBand" />
+                <CardContent Content="@AffordabilitySnapshot.Summary.RiskNarrative" />
+            </SfCard>
+        </div>
+    </section>
+
+    <section id="affordability-kpis" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SfCard ID="affordability-kpi-average-bill">
+            <CardHeader Title="Average Monthly Bill" SubTitle="Modeled baseline" />
+            <CardContent Content="@AffordabilitySnapshot.Summary.AverageMonthlyBill.ToString("C0")" />
+        </SfCard>
+        <SfCard ID="affordability-kpi-mhi-share">
+            <CardHeader Title="Bill % of MHI" SubTitle="Average monthly burden" />
+            <CardContent Content="@($"{AffordabilitySnapshot.Summary.AverageBillPctOfMhi:F1}%")" />
+        </SfCard>
+        <SfCard ID="affordability-kpi-customer-count">
+            <CardHeader Title="Customers Modeled" SubTitle="Live directory count" />
+            <CardContent Content="@AffordabilitySnapshot.Summary.CustomerCount.ToString("N0")" />
+        </SfCard>
+        <SfCard ID="affordability-kpi-class-count">
+            <CardHeader Title="Class Buckets" SubTitle="Heatmap rows" />
+            <CardContent Content="@AffordabilitySnapshot.CustomerClasses.Count.ToString("N0")" />
+        </SfCard>
+    </section>
+
+    <section id="affordability-gauge-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-1">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Affordability Gauge</p>
+            <p class="text-sm text-slate-600">Average monthly bill as a percentage of MHI.</p>
+        </div>
+        <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
+            @* AnimationDuration: smooth gauge needle animation consistent with DataDashboard gauge baseline *@
+            <SfCircularGauge ID="affordability-gauge"
+                             AllowMargin="true"
+                             AnimationDuration="700"
+                             Width="100%"
+                             Height="220px">
+                <CircularGaugeAxes>
+                    <CircularGaugeAxis Minimum="0" Maximum="12" StartAngle="210" EndAngle="150" Radius="80%">
+                        <CircularGaugeAxisLineStyle Width="8" Color="#cbd5e1" />
+                        <CircularGaugeAxisLabelStyle Format="{value}%">
+                            <CircularGaugeAxisLabelFont Size="10px" />
+                        </CircularGaugeAxisLabelStyle>
+                        <CircularGaugeRanges>
+                            <CircularGaugeRange Start="0" End="4" Color="#6ee7b7" StartWidth="8" EndWidth="8" />
+                            <CircularGaugeRange Start="4" End="6" Color="#fde68a" StartWidth="8" EndWidth="8" />
+                            <CircularGaugeRange Start="6" End="8" Color="#fdba74" StartWidth="8" EndWidth="8" />
+                            <CircularGaugeRange Start="8" End="12" Color="#fca5a5" StartWidth="8" EndWidth="8" />
+                        </CircularGaugeRanges>
+                        <CircularGaugePointers>
+                            <CircularGaugePointer Value="@((double)Math.Min(AffordabilitySnapshot.Summary.AverageBillPctOfMhi, 12m))" Radius="70%" Color="#0f172a" />
+                        </CircularGaugePointers>
+                    </CircularGaugeAxis>
+                </CircularGaugeAxes>
+            </SfCircularGauge>
+        </div>
+    </section>
+
+    <section id="affordability-class-chart" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-1">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Class Impact</p>
+            <p class="text-sm text-slate-600">Stacked monthly bill comparison across the modeled rate scenarios.</p>
+        </div>
+        <div class="mt-3">
+            @* Theme Fluent2: consistent palette; ZoomSettings: class-impact chart is analytical; selection zoom allows per-class drill-down *@
+            <SfChart ID="affordability-class-impact-chart"
+                     Title="Monthly bill by class and scenario"
+                     AccessibilityDescription="Stacked column chart showing how monthly bill burden changes by customer class across the modeled rate scenarios."
+                     EnableAnimation="true"
+                     UseGroupingSeparator="true"
+                     Width="100%"
+                     Height="360px"
+                     Theme="Syncfusion.Blazor.Theme.Fluent2">
+                <ChartArea>
+                    <ChartAreaBorder Width="0" />
+                </ChartArea>
+                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
+                    <ChartAxisMajorGridLines Width="0" />
+                </ChartPrimaryXAxis>
+                <ChartPrimaryYAxis LabelFormat="C0">
+                    <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
+                </ChartPrimaryYAxis>
+                <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top" />
+                <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="false" />
+                <ChartTooltipSettings Enable="true" Shared="true" Format="${point.x}: ${point.y}" />
+                <ChartSeriesCollection>
+                    @foreach (var classSnapshot in AffordabilitySnapshot.CustomerClasses)
+                    {
+                        <ChartSeries DataSource="@GetScenarioSeriesForClass(classSnapshot.ClassName)"
+                                     XName="ScenarioName"
+                                     YName="MonthlyBill"
+                                     Name="@classSnapshot.ClassName"
+                                     Type="ChartSeriesType.StackingColumn"
+                                     Fill="@classSnapshot.AccentColor">
+                            <ChartMarker>
+                                <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Top" Format="C0">
+                                    <ChartDataLabelFont Size="10px" />
+                                </ChartDataLabel>
+                            </ChartMarker>
+                        </ChartSeries>
+                    }
+                </ChartSeriesCollection>
+            </SfChart>
+        </div>
+    </section>
+
+    <section id="affordability-heatmap-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-1">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Bill Burden Heatmap</p>
+            <p class="text-sm text-slate-600">Customer class by rate scenario, shaded by bill as a percentage of MHI.</p>
+        </div>
+
+        <div class="mt-4 overflow-auto">
+            <div class="min-w-[52rem] space-y-2">
+                <div class="grid gap-2" style="grid-template-columns: 12rem repeat(@AffordabilitySnapshot.RateScenarios.Count, minmax(0, 1fr));">
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Customer class</div>
+                    @foreach (var scenario in AffordabilitySnapshot.RateScenarios)
+                    {
+                        <div class="rounded-lg bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-700">@scenario.ScenarioName</div>
+                    }
+                </div>
+
+                @foreach (var classSnapshot in AffordabilitySnapshot.CustomerClasses)
+                {
+                    <div class="grid gap-2" style="grid-template-columns: 12rem repeat(@AffordabilitySnapshot.RateScenarios.Count, minmax(0, 1fr));">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div class="text-sm font-semibold text-slate-900">@classSnapshot.ClassName</div>
+                            <div class="mt-1 text-xs text-slate-500">~@classSnapshot.EstimatedCustomerCount.ToString("N0") customers</div>
+                        </div>
+
+                        @foreach (var scenario in AffordabilitySnapshot.RateScenarios)
+                        {
+                            var cell = GetScenarioPoint(classSnapshot.ClassName, scenario.ScenarioName);
+                            <div class="rounded-lg border px-3 py-3 text-center shadow-sm" style="@GetHeatmapCellStyle(cell.MonthlyBillPctOfMhi)">
+                                <div class="text-sm font-semibold">@cell.MonthlyBill.ToString("C0")</div>
+                                <div class="mt-1 text-xs font-medium">@cell.MonthlyBillPctOfMhi.ToString("F1")% of MHI</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+
+    <p class="text-xs text-slate-500">This first slice uses modeled class baselines and workspace customer counts. The panel can later be switched to persisted bill history without changing the dashboard shape.</p>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<CustomerRow> Customers { get; set; } = [];
+    [Parameter] public string SelectedEnterprise { get; set; } = string.Empty;
+    [Parameter] public int SelectedFiscalYear { get; set; }
+
+    private decimal MonthlyMhi { get; set; } = 5_500m;
+    private AffordabilityDashboardSnapshot AffordabilitySnapshot { get; set; } = new(
+        new AffordabilitySummary(5_500m, 0, 0m, 0m, "Ready", "Enter a monthly MHI to see modeled affordability."),
+        [],
+        [],
+        []);
+
+    protected override void OnParametersSet()
+    {
+        RecalculateDashboard();
+    }
+
+    private Task OnMonthlyMhiChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
+    {
+        MonthlyMhi = Math.Max(args.Value, 1m);
+        RecalculateDashboard();
+        return Task.CompletedTask;
+    }
+
+    private void RecalculateDashboard()
+    {
+        AffordabilitySnapshot = AffordabilityAnalysisService.BuildDashboard(Customers, MonthlyMhi);
+    }
+
+    private IReadOnlyList<AffordabilityScenarioPoint> GetScenarioSeriesForClass(string className)
+    {
+        return AffordabilitySnapshot.ScenarioPoints
+            .Where(point => string.Equals(point.ClassName, className, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(point => point.ScenarioIndex)
+            .ToList();
+    }
+
+    private AffordabilityScenarioPoint GetScenarioPoint(string className, string scenarioName)
+    {
+        return AffordabilitySnapshot.ScenarioPoints.First(point =>
+            string.Equals(point.ClassName, className, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(point.ScenarioName, scenarioName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string GetHeatmapCellStyle(decimal billPctOfMhi)
+    {
+        var background = billPctOfMhi < 4m
+            ? "rgba(34, 197, 94, 0.16)"
+            : billPctOfMhi < 6m
+                ? "rgba(250, 204, 21, 0.18)"
+                : billPctOfMhi < 8m
+                    ? "rgba(251, 146, 60, 0.2)"
+                    : "rgba(248, 113, 113, 0.2)";
+
+        var border = billPctOfMhi < 4m
+            ? "rgba(34, 197, 94, 0.35)"
+            : billPctOfMhi < 6m
+                ? "rgba(250, 204, 21, 0.35)"
+                : billPctOfMhi < 8m
+                    ? "rgba(251, 146, 60, 0.35)"
+                    : "rgba(248, 113, 113, 0.35)";
+
+        return $"background-color: {background}; border-color: {border}; color: #0f172a;";
+    }
+}

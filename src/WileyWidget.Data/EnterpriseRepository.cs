@@ -52,6 +52,7 @@ public class EnterpriseRepository : IEnterpriseRepository
 
                 await using var context = await _contextFactory.CreateDbContextAsync();
                 enterprises = await context.Enterprises
+                    .Include(e => e.ApartmentUnitTypes)
                     .Where(e => !e.IsDeleted)
                     .AsNoTracking()
                     .OrderBy(e => e.Name)
@@ -97,6 +98,8 @@ public class EnterpriseRepository : IEnterpriseRepository
 
         var query = context.Enterprises.Where(e => !e.IsDeleted).AsQueryable();
 
+        query = query.Include(e => e.ApartmentUnitTypes);
+
         // Apply sorting
         query = ApplySorting(query, sortBy, sortDescending);
 
@@ -141,6 +144,7 @@ public class EnterpriseRepository : IEnterpriseRepository
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
         return await context.Enterprises
+            .Include(e => e.ApartmentUnitTypes)
             .AsNoTracking()
             .OrderByDescending(e => e.Id)
             .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
@@ -153,6 +157,7 @@ public class EnterpriseRepository : IEnterpriseRepository
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
         return await context.Enterprises
+            .Include(e => e.ApartmentUnitTypes)
             .Where(e => !e.IsDeleted && e.Type == type)
             .AsNoTracking()
             .ToListAsync();
