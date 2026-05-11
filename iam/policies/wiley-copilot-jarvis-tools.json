@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ApiGatewayInspectAndTestInvokeWileyJarvisApi",
+      "Effect": "Allow",
+      "Action": ["apigateway:GET", "apigateway:POST"],
+      "Resource": [
+        "arn:aws:apigateway:us-east-2::/restapis/w544vrvb3i",
+        "arn:aws:apigateway:us-east-2::/restapis/w544vrvb3i/*"
+      ]
+    },
+    {
+      "Sid": "SignedInvokeJarvisExecuteApi",
+      "Effect": "Allow",
+      "Action": "execute-api:Invoke",
+      "Resource": "arn:aws:execute-api:us-east-2:570912405222:w544vrvb3i/prod/*"
+    },
+    {
+      "Sid": "ReadXaiRuntimeSecretForJarvisVerification",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:us-east-2:570912405222:secret:wiley-widget/api/xai-api-key-*"
+    }
+  ]
+}

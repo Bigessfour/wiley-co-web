@@ -152,8 +152,22 @@ public partial class Program
                 AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "EnableAI", "true");
             }
 
-            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:ApiKey", settings.XaiApiKey);
-            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI_API_KEY", settings.XaiApiKey);
+            var skipPromotingPersistedXaiApiKey = ShouldSkipPersistedXaiApiKeyPromotion(builder);
+            if (!skipPromotingPersistedXaiApiKey)
+            {
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:ApiKey", settings.XaiApiKey);
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI_API_KEY", settings.XaiApiKey);
+                AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiKey", settings.XaiApiKey);
+            }
+            else if (!string.IsNullOrWhiteSpace(settings.XaiApiKey))
+            {
+                bootstrapLogger.LogInformation(
+                    "Skipping AppSettings.XaiApiKey promotion: {Reason}. AWS Secrets Manager / XAI_API_KEY environment is the key source.",
+                    builder.Environment.IsProduction()
+                        ? "host is Production"
+                        : "XAI_API_KEY is already set in the environment");
+            }
+
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Endpoint", settings.XaiApiEndpoint);
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:ChatEndpoint", settings.XaiApiEndpoint);
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Model", settings.XaiModel);
@@ -161,7 +175,6 @@ public partial class Program
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:TimeoutSeconds", settings.XaiTimeout.ToString(CultureInfo.InvariantCulture));
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:MaxTokens", settings.XaiMaxTokens.ToString(CultureInfo.InvariantCulture));
             AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XAI:Temperature", settings.XaiTemperature.ToString(CultureInfo.InvariantCulture));
-            AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiKey", settings.XaiApiKey);
             if (!HasConfiguredCanonicalXaiEndpoint(builder.Configuration, injectedConfiguration))
             {
                 AddRuntimeConfigurationValue(injectedConfiguration, builder.Configuration, "XaiApiEndpoint", settings.XaiApiEndpoint);
@@ -209,8 +222,89 @@ public partial class Program
     private static bool HasInjectedValue(IReadOnlyDictionary<string, string?> injectedConfiguration, string key)
         => injectedConfiguration.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
 
+    private static bool ShouldSkipPersistedXaiApiKeyPromotion(WebApplicationBuilder builder)
+        => builder.Environment.IsProduction()
+            || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("XAI_API_KEY"));
+
+    /// <summary>
+    /// App Runner injects the Secrets Manager <em>SecretString</em> into <c>XAI_API_KEY</c>. When that string is JSON,
+    /// normalize so Semantic Kernel sends a bare Bearer token (not the whole JSON document).
+    /// </summary>
+    private static void NormalizeAppRunnerInjectedXaiApiKey(WebApplicationBuilder builder, ILogger bootstrapLogger)
+    {
+        var raw = Environment.GetEnvironmentVariable("XAI_API_KEY");
+        if (string.IsNullOrWhiteSpace(raw) || !raw.TrimStart().StartsWith("{", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var extracted = XaiApiKeyFormatter.ExtractUsableKey(raw);
+        if (string.IsNullOrWhiteSpace(extracted))
+        {
+            bootstrapLogger.LogWarning(
+                "XAI_API_KEY appears to be JSON but no known API-key field was found. Set the secret to a plain key or JSON with XAI_API_KEY, ApiKey, XaiApiKey, or GrokApiKey.");
+            return;
+        }
+
+        if (string.Equals(extracted, raw, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Environment.SetEnvironmentVariable("XAI_API_KEY", extracted);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["XAI_API_KEY"] = extracted,
+            ["XAI:ApiKey"] = extracted,
+        });
+
+        bootstrapLogger.LogInformation("Normalized XAI_API_KEY from JSON secret envelope for xAI requests (value not logged).");
+    }
+
+    private static void EnforceXaiApiKeyStartupGuards(WebApplicationBuilder builder, ILogger bootstrapLogger, string? effectiveXaiKey)
+    {
+        if (builder.Environment.IsEnvironment("IntegrationTest"))
+        {
+            return;
+        }
+
+        var aiEnabled = builder.Configuration.GetValue("XAI:Enabled", true)
+            && builder.Configuration.GetValue("EnableAI", true);
+
+        if (!aiEnabled)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(effectiveXaiKey))
+        {
+            if (builder.Environment.IsProduction())
+            {
+                throw new InvalidOperationException(
+                    "AI is enabled but no XAI_API_KEY was resolved. Configure the App Runner / Secrets Manager runtime secret.");
+            }
+
+            bootstrapLogger.LogWarning("AI is enabled but no XAI_API_KEY is configured; Jarvis will use fallbacks outside Production.");
+            return;
+        }
+
+        var issue = XaiApiKeyGuards.TryGetRuntimeValidationIssue(effectiveXaiKey);
+        if (issue is null)
+        {
+            return;
+        }
+
+        if (builder.Environment.IsProduction())
+        {
+            throw new InvalidOperationException("XAI_API_KEY validation failed: " + issue);
+        }
+
+        bootstrapLogger.LogWarning("XAI_API_KEY validation warning: {Issue}", issue);
+    }
+
     private static async Task<StartupRuntimeOptions> PrepareStartupRuntimeOptionsAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
+        NormalizeAppRunnerInjectedXaiApiKey(builder, bootstrapLogger);
         var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder).ConfigureAwait(false);
 
         await LoadPersistedAiConfigurationAsync(builder, bootstrapLogger).ConfigureAwait(false);
@@ -247,6 +341,11 @@ public partial class Program
 
         var allowedWorkspaceClientOrigins = BuildAllowedWorkspaceClientOrigins(builder.Configuration);
 
+        var effectiveXaiKey = xaiEnvironmentApiKey ?? xaiConfigDirectApiKey ?? xaiConfigNamedApiKey;
+        EnforceXaiApiKeyStartupGuards(builder, bootstrapLogger, effectiveXaiKey);
+        var xaiKeyFingerprint = XaiApiKeyGuards.ComputeFingerprint(effectiveXaiKey);
+        var xaiKeyLength = string.IsNullOrWhiteSpace(effectiveXaiKey) ? 0 : effectiveXaiKey.Trim().Length;
+
         return new StartupRuntimeOptions(
             syncfusionLicenseResult,
             xaiSecretResolution,
@@ -256,7 +355,9 @@ public partial class Program
             configuredConnectionString,
             allowDegradedStartup,
             seedDevelopmentData,
-            allowedWorkspaceClientOrigins);
+            allowedWorkspaceClientOrigins,
+            xaiKeyFingerprint,
+            xaiKeyLength);
     }
 
     private static async Task RunStartupHostAsync(
@@ -276,6 +377,8 @@ public partial class Program
             startupOptions.XaiKeySource,
             startupOptions.XaiKeyResolved,
             startupOptions.XaiSecretResolution,
+            startupOptions.XaiKeyFingerprintForLog,
+            startupOptions.XaiKeyLengthForLog,
             builder.Environment.EnvironmentName);
 
         LogXaiEndpointResolution(
@@ -351,7 +454,9 @@ public partial class Program
         string? ConfiguredConnectionString,
         bool AllowDegradedStartup,
         bool SeedDevelopmentData,
-        IReadOnlySet<string> AllowedWorkspaceClientOrigins);
+        IReadOnlySet<string> AllowedWorkspaceClientOrigins,
+        string XaiKeyFingerprintForLog,
+        int XaiKeyLengthForLog);
 
     private static string DetermineXaiKeySource(string? xaiEnvironmentApiKey, XaiSecretResolutionResult xaiSecretResolution, string? xaiConfigDirectApiKey, string? xaiConfigNamedApiKey)
     {
@@ -704,6 +809,8 @@ public partial class Program
         string xaiKeySource,
         bool xaiKeyResolved,
         XaiSecretResolutionResult xaiSecretResolution,
+        string xaiKeyFingerprintForLog,
+        int xaiKeyLengthForLog,
         string environmentName)
     {
         var logData = BuildStartupKeyResolutionLogData(
@@ -711,12 +818,15 @@ public partial class Program
             syncfusionLicenseKey,
             xaiKeySource,
             xaiKeyResolved,
-            xaiSecretResolution);
+            xaiSecretResolution,
+            xaiKeyFingerprintForLog,
+            xaiKeyLengthForLog);
 
         logger.LogInformation(
             "WileyWidget.Startup.KeyResolution Environment={Environment} SyncfusionKeySource={SyncfusionKeySource} " +
             "SyncfusionKeyPresent={SyncfusionKeyPresent} SyncfusionKeyLength={SyncfusionKeyLength} " +
             "SyncfusionKeyFingerprint={SyncfusionKeyFingerprint} XaiKeySource={XaiKeySource} XaiKeyPresent={XaiKeyPresent} " +
+            "XaiKeyLength={XaiKeyLength} XaiKeyFingerprint={XaiKeyFingerprint} " +
             "XaiEnvironmentKeyPresent={XaiEnvironmentKeyPresent} XaiConfigDirectKeyPresent={XaiConfigDirectKeyPresent} " +
             "XaiConfigNamedKeyPresent={XaiConfigNamedKeyPresent} XaiSecretFetchAttempted={XaiSecretFetchAttempted} " +
             "XaiSecretName={XaiSecretName} XaiAwsRegion={XaiAwsRegion} XaiSecretFetchStatus={XaiSecretFetchStatus} " +
@@ -729,6 +839,8 @@ public partial class Program
             logData.SyncfusionKeyFingerprint,
             logData.XaiKeySource,
             logData.XaiKeyPresent,
+            logData.XaiKeyLength,
+            logData.XaiKeyFingerprint,
             logData.XaiEnvironmentKeyPresent,
             logData.XaiConfigDirectKeyPresent,
             logData.XaiConfigNamedKeyPresent,
@@ -763,7 +875,9 @@ public partial class Program
         string? syncfusionLicenseKey,
         string xaiKeySource,
         bool xaiKeyResolved,
-        XaiSecretResolutionResult xaiSecretResolution)
+        XaiSecretResolutionResult xaiSecretResolution,
+        string xaiKeyFingerprint,
+        int xaiKeyLength)
     {
         return new StartupKeyResolutionLogData(
             syncfusionKeySource,
@@ -772,6 +886,8 @@ public partial class Program
             KeyFingerprint(syncfusionLicenseKey),
             xaiKeySource,
             xaiKeyResolved,
+            xaiKeyLength,
+            xaiKeyFingerprint,
             xaiSecretResolution.EnvironmentKeyPresent,
             xaiSecretResolution.ConfigDirectKeyPresent,
             xaiSecretResolution.ConfigNamedKeyPresent,
@@ -813,6 +929,8 @@ public partial class Program
         string SyncfusionKeyFingerprint,
         string XaiKeySource,
         bool XaiKeyPresent,
+        int XaiKeyLength,
+        string XaiKeyFingerprint,
         bool XaiEnvironmentKeyPresent,
         bool XaiConfigDirectKeyPresent,
         bool XaiConfigNamedKeyPresent,
