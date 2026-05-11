@@ -1,4 +1,6 @@
 using Microsoft.Playwright;
+using Syncfusion.Pdf;
+using Syncfusion.Pdf.Parsing;
 using static Microsoft.Playwright.Assertions;
 
 namespace WileyCoWeb.E2ETests;
@@ -360,9 +362,21 @@ public sealed class WileyWorkspaceE2ETests
 			var scenarioDownload = await page.RunAndWaitForDownloadAsync(() => scenarioExportButton.ClickAsync());
 			Assert.EndsWith(".xlsx", scenarioDownload.SuggestedFilename, StringComparison.OrdinalIgnoreCase);
 
-			var pdfExportButton = page.Locator("text=Download PDF rate packet").First;
+			await OpenPanelAsync(page, "scenario");
+			await page.Locator("#load-new-hire-impact-template-button").ClickAsync();
+			await Expect(page.Locator("#scenario-name-input")).ToHaveValueAsync(new System.Text.RegularExpressions.Regex("HIRES-2026-Q2-001"), new() { Timeout = 30000 });
+			await Expect(page.Locator("#export-workspace-pdf-button")).ToContainTextAsync("Export Council Rate Packet", new() { Timeout = 30000 });
+
+			var pdfExportButton = page.Locator("#export-workspace-pdf-button");
 			var pdfDownload = await page.RunAndWaitForDownloadAsync(() => pdfExportButton.ClickAsync());
 			Assert.EndsWith(".pdf", pdfDownload.SuggestedFilename, StringComparison.OrdinalIgnoreCase);
+
+			var pdfText = await ExtractDownloadedPdfTextAsync(pdfDownload);
+			Assert.Contains("New Personnel Cost Allocation", pdfText);
+			Assert.Contains("PT City Clerk", pdfText);
+			Assert.Contains("FT Field Employee", pdfText);
+			Assert.True(CountOccurrences(pdfText, "$6,250") >= 4, "Expected $6,250 clerk allocations for Water, Sewer, Trash, and Apartments.");
+			Assert.True(CountOccurrences(pdfText, "$18,333") >= 3, "Expected $18,333 field allocations for Water, Sewer, and Apartments.");
 		});
 	}
 
@@ -449,6 +463,48 @@ public sealed class WileyWorkspaceE2ETests
 	private static async Task UploadQuickBooksFileAsync(IPage page, string filePath)
 	{
 		await QuickBooksImportE2EHelpers.UploadQuickBooksFileAsync(page, filePath, 30000);
+	}
+
+	private static async Task<string> ExtractDownloadedPdfTextAsync(IDownload download)
+	{
+		var tempFile = Path.Combine(Path.GetTempPath(), $"wiley-e2e-pdf-{Guid.NewGuid():N}.pdf");
+
+		try
+		{
+			await download.SaveAsAsync(tempFile);
+
+			await using var stream = File.OpenRead(tempFile);
+			using var loadedDocument = new PdfLoadedDocument(stream);
+			var builder = new System.Text.StringBuilder();
+
+			foreach (PdfPageBase page in loadedDocument.Pages)
+			{
+				builder.AppendLine(page.ExtractText());
+			}
+
+			return builder.ToString();
+		}
+		finally
+		{
+			if (File.Exists(tempFile))
+			{
+				File.Delete(tempFile);
+			}
+		}
+	}
+
+	private static int CountOccurrences(string value, string searchText)
+	{
+		var count = 0;
+		var index = 0;
+
+		while ((index = value.IndexOf(searchText, index, StringComparison.Ordinal)) >= 0)
+		{
+			count++;
+			index += searchText.Length;
+		}
+
+		return count;
 	}
 
 	private static string NormalizeNumericValue(string value)

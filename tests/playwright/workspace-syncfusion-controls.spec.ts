@@ -240,7 +240,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     });
     await setNumericInputValue(balanceSpin, "12.34");
     await expect
-      .poll(async () => balanceSpin.locator("input").inputValue(), {
+      .poll(async () => balanceSpin.inputValue(), {
         timeout: 30000,
       })
       .toMatch(/12\.34/);
@@ -385,11 +385,11 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await prepareForVisualSnapshot(page);
 
     const dataDashboardPanel = page.locator("#data-dashboard-panel");
+    await expect(dataDashboardPanel).toBeVisible();
+    await expect(page.locator("#budget-variance-chart")).toBeVisible();
+    await expect(page.locator("#coverage-ratio-gauge")).toBeVisible();
 
-    if (browserName !== "chromium") {
-      await expect(dataDashboardPanel).toBeVisible();
-      await expect(page.locator("#budget-variance-chart")).toBeVisible();
-      await expect(page.locator("#coverage-ratio-gauge")).toBeVisible();
+    if (browserName !== "chromium" || !isVisualSnapshotRunEnabled()) {
       return;
     }
 
@@ -418,10 +418,11 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       return;
     }
 
-    if (browserName !== "chromium") {
-      await expect(jarvisSurface).toBeVisible();
-      await expect(page.locator("#jarvis-runtime-status")).toBeVisible();
-      await expect(page.locator("#jarvis-question-input")).toBeVisible();
+    await expect(jarvisSurface).toBeVisible();
+    await expect(page.locator("#jarvis-runtime-status")).toBeVisible();
+    await expect(page.locator("#jarvis-question-input")).toBeVisible();
+
+    if (browserName !== "chromium" || !isVisualSnapshotRunEnabled()) {
       return;
     }
 
@@ -434,3 +435,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     });
   });
 });
+
+function isVisualSnapshotRunEnabled() {
+  return process.env.WILEYCO_VISUAL_SNAPSHOTS === "1";
+}

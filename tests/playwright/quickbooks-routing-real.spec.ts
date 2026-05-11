@@ -1,6 +1,9 @@
 import { Buffer } from "node:buffer";
+import { mkdir, rm } from "node:fs/promises";
+import { resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "@playwright/test";
-import type { TestInfo } from "@playwright/test";
+import type { APIRequestContext, TestInfo } from "@playwright/test";
 import { gotoWorkspacePanel, isLocalE2EBaseUrl } from "./support/workspace";
 
 const emptyConfiguration = {
@@ -9,16 +12,22 @@ const emptyConfiguration = {
 };
 
 test.describe("QuickBooks routing production flow", () => {
-  test.afterEach(async ({ request }, testInfo) => {
+  test.describe.configure({ mode: "serial" });
+  let releaseRoutingLock: (() => Promise<void>) | undefined;
+
+  test.beforeEach(async ({}, testInfo) => {
     if (
       !isLocalE2EBaseUrl(testInfo.project.use.baseURL as string | undefined)
     ) {
       return;
     }
 
-    await request.put(buildRoutingUrl(testInfo), {
-      data: emptyConfiguration,
-    });
+    releaseRoutingLock = await acquireRoutingLock();
+  });
+
+  test.afterEach(async () => {
+    await releaseRoutingLock?.();
+    releaseRoutingLock = undefined;
   });
 
   test("QuickBooks routing controls persist bound values and drive the real import pipeline", async ({
@@ -29,6 +38,7 @@ test.describe("QuickBooks routing production flow", () => {
       !isLocalE2EBaseUrl(testInfo.project.use.baseURL as string | undefined),
       "Full routing + commit pipeline requires local WileyCoWeb + API (ports 5230/5231); skip on hosted smoke.",
     );
+    await resetRoutingConfigurationAsync(request, testInfo);
     await request.put(buildRoutingUrl(testInfo), {
       data: {
         rules: [
@@ -53,10 +63,14 @@ test.describe("QuickBooks routing production flow", () => {
 
     await gotoWorkspacePanel(page, "/wiley-workspace/quickbooks-import");
 
-    const ruleCard = page.locator(".e-card").first();
-    const ruleNameInput = ruleCard.getByRole("textbox").first();
+    const routingRulesPanel = page.getByRole("tabpanel", {
+      name: "Routing Rules",
+    });
+    const ruleNameInput = routingRulesPanel.getByRole("textbox", {
+      name: "Rule name",
+    });
 
-    await expect(ruleCard).toContainText("Seeded routing rule");
+    await expect(routingRulesPanel).toContainText("Seeded routing rule");
     await expect(ruleNameInput).toHaveValue("Seeded routing rule");
 
     await ruleNameInput.fill("Reserve transfer to Apartments");
@@ -72,7 +86,7 @@ test.describe("QuickBooks routing production flow", () => {
     expect(savedConfigurationResponse.ok()).toBeTruthy();
 
     const savedConfiguration = await savedConfigurationResponse.json();
-    expect(savedConfiguration.rules).toHaveLength(2);
+    expect(savedConfiguration.rules).toHaveLength(1);
     expect(
       savedConfiguration.rules.some(
         (r) => r.name === "Reserve transfer to Apartments",
@@ -139,6 +153,7 @@ test.describe("QuickBooks routing production flow", () => {
       !isLocalE2EBaseUrl(testInfo.project.use.baseURL as string | undefined),
       "Routing PUT + live preview requires local API; skip on hosted smoke.",
     );
+    await resetRoutingConfigurationAsync(request, testInfo);
     const configurationResponse = await request.put(buildRoutingUrl(testInfo), {
       data: {
         rules: [
@@ -218,6 +233,37 @@ function buildRoutingUrl(testInfo: TestInfo) {
       : "http://localhost:5230");
 
   return `${resolveApiBaseUrl(configuredBaseUrl)}/api/imports/quickbooks/routing`;
+}
+
+async function resetRoutingConfigurationAsync(
+  request: APIRequestContext,
+  testInfo: TestInfo,
+) {
+  await request.put(buildRoutingUrl(testInfo), {
+    data: emptyConfiguration,
+  });
+}
+
+async function acquireRoutingLock() {
+  const lockDirectory = resolve("test-results", "quickbooks-routing.lock");
+  const expiresAt = Date.now() + 60_000;
+
+  while (Date.now() < expiresAt) {
+    try {
+      await mkdir(lockDirectory);
+      return async () => {
+        await rm(lockDirectory, { recursive: true, force: true });
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+        throw error;
+      }
+
+      await delay(250);
+    }
+  }
+
+  throw new Error("Timed out waiting for QuickBooks routing test lock.");
 }
 
 function resolveApiBaseUrl(baseUrl: string) {

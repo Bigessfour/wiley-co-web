@@ -54,6 +54,7 @@ public sealed class PdfPacketBuilder
         WriteScenarioItemsSection(writer, workspaceState);
         WritePersonnelSection(writer, personnelPacket);
         WriteProjectionSection(writer, workspaceState);
+        WriteAssumptionsAppendix(writer);
     }
 
     private static PdfPacketLayout CreatePacketLayout()
@@ -227,6 +228,17 @@ public sealed class PdfPacketBuilder
         writer.DrawGrid(grid);
     }
 
+    private static void WriteAssumptionsAppendix(PdfPacketWriter writer)
+    {
+        writer.Advance(writer.Layout.LineHeight * 0.25f);
+        writer.DrawSectionTitle("Assumptions & Data Sources");
+
+        foreach (var line in BuildAssumptionsAppendixLines())
+        {
+            writer.DrawText(line, writer.Layout.SmallFont, writer.Layout.Brush);
+        }
+    }
+
     private sealed record PdfPacketLayout(
         PdfStandardFont TitleFont,
         PdfStandardFont SectionFont,
@@ -253,6 +265,13 @@ public sealed class PdfPacketBuilder
         yield return $"Projected volume: {workspaceState.ProjectedVolume:N0}";
         yield return $"Scenario cost total: {workspaceState.ScenarioCostTotal:C0}";
         yield return $"Visible customers: {workspaceState.FilteredCustomerCount}";
+    }
+
+    private static IEnumerable<string> BuildAssumptionsAppendixLines()
+    {
+        yield return "- Data source: Live Aurora ledger_entries after QuickBooks import";
+        yield return "- AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)";
+        yield return "- Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)";
     }
 
     private static PdfGrid CreateGrid(IReadOnlyList<string> headers)

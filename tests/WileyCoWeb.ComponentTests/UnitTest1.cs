@@ -149,6 +149,10 @@ public sealed class WorkspaceExportServiceTests
         Assert.Contains("Rate Impact Summary", pdfText);
         Assert.Contains("Wiley Widget/Semantic Kernel planning insight", pdfText);
         Assert.Contains("Projection series", pdfText);
+        Assert.Contains("Assumptions & Data Sources", pdfText);
+        Assert.Contains("Data source: Live Aurora ledger_entries after QuickBooks import", pdfText);
+        Assert.Contains("AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)", pdfText);
+        Assert.Contains("Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)", pdfText);
     }
 
     [Fact]
