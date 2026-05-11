@@ -59,7 +59,7 @@ public sealed partial class SecretResolver
     private async Task<string?> TryLoadSecretApiKeyAsync(SecretResolutionContext context)
     {
         var secretValue = await LoadSecretValueAsync(context).ConfigureAwait(false);
-        return TryExtractApiKey(secretValue);
+        return XaiApiKeyFormatter.ExtractUsableKey(secretValue);
     }
 
     private async Task<string?> LoadSecretValueAsync(SecretResolutionContext context)
@@ -71,50 +71,6 @@ public sealed partial class SecretResolver
         }).ConfigureAwait(false);
 
         return response.SecretString;
-    }
-
-    private static string? TryExtractApiKey(string? secretValue)
-        => string.IsNullOrWhiteSpace(secretValue) ? null : TryExtractApiKeyCore(secretValue.Trim());
-
-    private static string? TryExtractApiKeyCore(string trimmedSecretValue)
-        => trimmedSecretValue.StartsWith('{')
-            ? TryExtractApiKeyFromJson(trimmedSecretValue) ?? trimmedSecretValue
-            : trimmedSecretValue;
-
-    private static string? TryExtractApiKeyFromJson(string json)
-    {
-        try
-        {
-            using var document = System.Text.Json.JsonDocument.Parse(json);
-            return TryExtractApiKeyFromJsonRoot(document.RootElement) ?? json;
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return json;
-        }
-    }
-
-    private static string? TryExtractApiKeyFromJsonRoot(System.Text.Json.JsonElement root)
-    {
-        if (root.ValueKind != System.Text.Json.JsonValueKind.Object)
-        {
-            return null;
-        }
-
-        return TryReadApiKeyProperty(root);
-    }
-
-    private static string? TryReadApiKeyProperty(System.Text.Json.JsonElement root)
-    {
-        foreach (var propertyName in new[] { "XAI_API_KEY", "ApiKey", "XaiApiKey", "GrokApiKey", "XAI:ApiKey" })
-        {
-            if (root.TryGetProperty(propertyName, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String)
-            {
-                return value.GetString();
-            }
-        }
-
-        return null;
     }
 
     private void InjectResolvedApiKey(SecretResolutionContext context, string apiKey)

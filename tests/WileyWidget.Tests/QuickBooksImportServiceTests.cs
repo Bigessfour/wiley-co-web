@@ -232,9 +232,46 @@ public sealed class QuickBooksImportServiceTests
     [Fact]
     public void NormalizeSignatureDate_WhenValueIsWhitespace_ReturnsEmptyString()
     {
-        var result = InvokePrivateStatic<string>(nameof(QuickBooksImportService), "NormalizeSignatureDate", "   ");
+        Assert.Equal(string.Empty, QuickBooksLedgerSignature.NormalizeSignatureDate("   "));
+    }
 
-        Assert.Equal(string.Empty, result);
+    [Fact]
+    public async Task PreviewAsync_RemovesDuplicateTabularLines_FromCsv()
+    {
+        var service = CreateService();
+        var csv = CreateSparseTransactionListCsv().TrimEnd()
+            + "\n,,,Deposit,,01/02/2026,,,,WATER PAYMENTS,,VIA CREDIT CARD,,105 · ACCOUNTS RECEIVABLE,,,,101 · CASH IN BANK - UTILITY,,-362.90,,0.00\n";
+
+        var preview = await service.PreviewAsync(
+            Encoding.UTF8.GetBytes(csv),
+            "transaction-list-with-dup.csv",
+            "Water Utility",
+            2026);
+
+        Assert.Equal(2, preview.TotalRows);
+        Assert.False(preview.IsDuplicate);
+    }
+
+    [Fact]
+    public async Task PreviewAsync_RemovesDuplicateTabularLines_FromXlsx_WhenNotAdjacent()
+    {
+        var service = CreateService();
+        var workbookBytes = CreateWorkbook(
+            ["Date", "Type", "Num", "Name", "Memo", "Account", "Split", "Amount", "Balance", "Clr"],
+            ["Jan - Dec 26"],
+            ["01/01/2026", "Invoice", "1001", "Town of Wiley", "Water Billing", "Water Revenue", "Accounts Receivable", "125.00", "125.00", "C"],
+            ["01/02/2026", "Payment", "1002", "Town of Wiley", "Payment Received", "Accounts Receivable", "Water Revenue", "-125.00", "0.00", "C"],
+            ["01/01/2026", "Invoice", "1001", "Town of Wiley", "Water Billing", "Water Revenue", "Accounts Receivable", "125.00", "125.00", "C"]);
+
+        var preview = await service.PreviewAsync(
+            workbookBytes,
+            "quickbooks-ledger-dup.xlsx",
+            "Water Utility",
+            2026);
+
+        Assert.Equal(2, preview.TotalRows);
+        Assert.False(preview.IsDuplicate);
+        Assert.Equal(4, preview.Rows[^1].RowNumber);
     }
 
     [Fact]
@@ -321,17 +358,6 @@ public sealed class QuickBooksImportServiceTests
             .Options;
 
         return new AppDbContextFactory(options);
-    }
-
-    private static T InvokePrivateStatic<T>(string declaringTypeName, string methodName, params object?[] args)
-    {
-        var type = typeof(QuickBooksImportService);
-        Assert.Equal(declaringTypeName, type.Name);
-
-        var method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
-        Assert.NotNull(method);
-
-        return Assert.IsType<T>(method!.Invoke(null, args));
     }
 
     private static async Task<(int DuplicateRows, IReadOnlyList<QuickBooksImportPreviewRow> Rows)> InvokeAnalyzeRoutedDuplicatesAsync(

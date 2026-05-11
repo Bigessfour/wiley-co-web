@@ -57,10 +57,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="WileyWidget.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Remove WinForms-specific or desktop-only files -->
     <Compile Remove="**\*WinForms.cs" />
     <Compile Remove="**\*Windows.cs" />
@@ -77,6 +73,8 @@
     <Compile Include="QuickBooksRoutingService.cs" />
     <Compile Include="QuickBooksCsvParser.cs" />
     <Compile Include="QuickBooksExcelParser.cs" />
+    <Compile Include="QuickBooksImportLineDeduper.cs" />
+    <Compile Include="QuickBooksLedgerSignature.cs" />
     <Compile Include="..\..\Contracts\QuickBooksImportContracts.cs" Link="Contracts\QuickBooksImportContracts.cs" />
     <Compile Include="..\..\Contracts\QuickBooksRoutingContracts.cs"
       Link="Contracts\QuickBooksRoutingContracts.cs" />
