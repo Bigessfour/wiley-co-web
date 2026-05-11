@@ -95,7 +95,7 @@
                                   Disabled="@IsExportingDocuments"
                                   IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
                                   OnClick="ExportWorkspacePdfAsync">
-                            @(IsExportingDocuments ? "Building PDF…" : "Download PDF rate packet")
+                            @(IsExportingDocuments ? "Building PDF…" : WorkspacePdfExportLabel)
                         </SfButton>
                     </div>
                     @* Export status row: shows inline spinner dot while export is in-flight *@
@@ -501,7 +501,8 @@
                                                               ScenarioAdjustedDeltaDisplay="@ScenarioAdjustedDeltaDisplay"
                                                               ScenarioItems="@ScenarioItems"
                                                               ScenarioToolbarItems="@ScenarioToolbarItems"
-                                                              OnScenarioGridActionComplete="HandleScenarioGridActionComplete" />
+                                                              OnScenarioGridActionComplete="HandleScenarioGridActionComplete"
+                                                              OnLoadNewHireImpactTemplate="LoadNewHireImpactTemplateAsync" />
                                         break;
                                     case "customers":
                                         <CustomerViewerPanel @key="ActivePanelKey" />

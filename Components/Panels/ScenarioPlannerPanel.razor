@@ -91,13 +91,18 @@
                                 <span id="scenario-edit-status" role="status" aria-live="polite" class="text-sm">@ScenarioEditStatusText</span>
                             </div>
 
-                            <SfTooltip Content="The grid uses paging plus virtualization to stay responsive as scenario lists grow, while dialog editing keeps names and costs readable on smaller screens."
-                                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
-                                       OpensOn="Hover Focus"
-                                       ShowTipPointer="true"
-                                       CloseDelay="200">
-                                <span class="e-badge e-badge-info" tabindex="0">Dialog edit workflow</span>
-                            </SfTooltip>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <SfButton ID="load-new-hire-impact-template-button" CssClass="e-primary" IsPrimary="true" OnClick="OnLoadNewHireImpactTemplate">
+                                    Load New Hire Impact Template (Clerk + Field Employee)
+                                </SfButton>
+                                <SfTooltip Content="The grid uses paging plus virtualization to stay responsive as scenario lists grow, while dialog editing keeps names and costs readable on smaller screens."
+                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                           OpensOn="Hover Focus"
+                                           ShowTipPointer="true"
+                                           CloseDelay="200">
+                                    <span class="e-badge e-badge-info" tabindex="0">Dialog edit workflow</span>
+                                </SfTooltip>
+                            </div>
                         </div>
                     </CardContent>
                 </SfCard>
@@ -184,6 +189,7 @@
     [Parameter] public IReadOnlyList<ScenarioItem> ScenarioItems { get; set; } = [];
     [Parameter] public IReadOnlyList<string> ScenarioToolbarItems { get; set; } = [];
     [Parameter] public EventCallback<Syncfusion.Blazor.Grids.ActionEventArgs<ScenarioItem>> OnScenarioGridActionComplete { get; set; }
+    [Parameter] public EventCallback OnLoadNewHireImpactTemplate { get; set; }
 
     private bool IsScenarioGridBusy { get; set; }
 

@@ -1,4 +1,6 @@
-﻿using Syncfusion.XlsIO;
+﻿using Syncfusion.Pdf;
+using Syncfusion.Pdf.Parsing;
+using Syncfusion.XlsIO;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -119,8 +121,10 @@ public sealed class WorkspaceExportServiceTests
     {
         var state = WorkspaceExportTestHelpers.BuildWorkspaceState();
         var service = new WorkspaceDocumentExportService();
+        const string councilNarrative = "Council staffing narrative: plan funding for a part-time city clerk and a full-time utility employee.";
 
-        var pdfReport = service.CreateWorkspacePdfReport(state);
+        var pdfReport = service.CreateWorkspacePdfReport(state, councilNarrative);
+        var pdfText = WorkspaceExportTestHelpers.ExtractPdfText(pdfReport.Content);
 
         Assert.EndsWith(".pdf", pdfReport.FileName);
         Assert.Contains("Rate-Packet", pdfReport.FileName);
@@ -128,6 +132,56 @@ public sealed class WorkspaceExportServiceTests
         Assert.Equal("application/pdf", pdfReport.ContentType);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdfReport.Content, 0, 4));
         Assert.True(pdfReport.Content.Length > 1000);
+        Assert.Contains("Wiley Workspace Rate Packet", pdfText);
+        Assert.Contains(WorkspaceTestData.CouncilReviewScenario, pdfText);
+        Assert.Contains("Council planning narrative", pdfText);
+        Assert.Contains("part-time city clerk", pdfText);
+        Assert.Contains("Rate Summary", pdfText);
+        Assert.Contains("Total costs", pdfText);
+        Assert.Contains("Adjusted break-even", pdfText);
+        Assert.Contains("Scenario Items", pdfText);
+        Assert.Contains("Vehicle replacement", pdfText);
+        Assert.Contains("New Personnel Cost Allocation", pdfText);
+        Assert.Contains("PT City Clerk", pdfText);
+        Assert.Contains("FT Field Employee", pdfText);
+        Assert.Contains("Prorated annual cost per enterprise", pdfText);
+        Assert.Contains("Rate Impact Summary", pdfText);
+        Assert.Contains("Wiley Widget/Semantic Kernel planning insight", pdfText);
+        Assert.Contains("Rate Projection Series", pdfText);
+        Assert.Contains("Assumptions & Data Sources", pdfText);
+        Assert.Contains("Data source: Live Aurora ledger_entries after QuickBooks import", pdfText);
+        Assert.Contains("AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)", pdfText);
+        Assert.Contains("Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)", pdfText);
+    }
+
+    [Fact]
+    public void CreateWorkspacePdfReport_DetectsPersonnelScenarioItems_AndWritesCouncilAllocationSections()
+    {
+        var state = new WorkspaceState();
+        state.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+            "Council personnel hire scenario",
+            WorkspaceTestData.WaterCurrentRate,
+            WorkspaceTestData.WaterTotalCosts,
+            WorkspaceTestData.WaterProjectedVolume,
+            scenarioItems:
+            [
+                new WorkspaceScenarioItemData(Guid.NewGuid(), "PT City Clerk", 6250m),
+                new WorkspaceScenarioItemData(Guid.NewGuid(), "FT Field Employee", 18333.33m)
+            ]));
+        var service = new WorkspaceDocumentExportService();
+
+        var pdfReport = service.CreateWorkspacePdfReport(state);
+        var pdfText = WorkspaceExportTestHelpers.ExtractPdfText(pdfReport.Content);
+
+        Assert.Contains("New Personnel Cost Allocation", pdfText);
+        Assert.Contains("$25,000", pdfText);
+        Assert.Contains("25.0% split across Water, Sewer, Trash, and Apartments", pdfText);
+        Assert.Contains("$55,000", pdfText);
+        Assert.Contains("33.3% split across Water, Sewer, and Apartments", pdfText);
+        Assert.Contains("Prorated annual cost per enterprise", pdfText);
+        Assert.Contains("Rate Impact Summary", pdfText);
+        Assert.Contains("New annual revenue", pdfText);
+        Assert.Contains("reserve capacity", pdfText);
     }
 }
 
@@ -143,6 +197,20 @@ internal static class WorkspaceExportTestHelpers
         var workbook = application.Workbooks.Open(stream);
         assertion(workbook);
         workbook.Close();
+    }
+
+    public static string ExtractPdfText(byte[] pdfBytes)
+    {
+        using var stream = new MemoryStream(pdfBytes, writable: false);
+        using var loadedDocument = new PdfLoadedDocument(stream);
+        var builder = new System.Text.StringBuilder();
+
+        foreach (PdfPageBase page in loadedDocument.Pages)
+        {
+            builder.AppendLine(page.ExtractText());
+        }
+
+        return builder.ToString();
     }
 
     public static WorkspaceState BuildWorkspaceState()

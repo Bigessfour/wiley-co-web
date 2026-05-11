@@ -25,9 +25,12 @@ public sealed class PdfPacketBuilder
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    public WorkspaceExportDocument CreateWorkspacePdfReport(WorkspaceState workspaceState)
+    public WorkspaceExportDocument CreateWorkspacePdfReport(
+        WorkspaceState workspaceState,
+        string? scenarioNarrative = null,
+        PersonnelPacketContext? personnelPacket = null)
     {
-        return CreateWorkspacePdfReportCore(workspaceState);
+        return CreateWorkspacePdfReportCore(workspaceState, NormalizeNarrative(scenarioNarrative), personnelPacket);
     }
 
     public WorkspaceExportDocument CreateReserveTrajectoryPdfReport(WorkspaceState workspaceState)
@@ -50,7 +53,10 @@ public sealed class PdfPacketBuilder
 
     // ── Core builders ─────────────────────────────────────────────────────────
 
-    private static WorkspaceExportDocument CreateWorkspacePdfReportCore(WorkspaceState workspaceState)
+    private static WorkspaceExportDocument CreateWorkspacePdfReportCore(
+        WorkspaceState workspaceState,
+        string? scenarioNarrative,
+        PersonnelPacketContext? personnelPacket)
     {
         ArgumentNullException.ThrowIfNull(workspaceState);
 
@@ -63,12 +69,15 @@ public sealed class PdfPacketBuilder
         state.Y += SectionGap;
         state.DrawDivider();
 
+        RenderCouncilNarrativeSection(state, scenarioNarrative);
         RenderRateSection(state, workspaceState);
         RenderBreakEvenSection(state, workspaceState);
         RenderScenarioSection(state, workspaceState);
+        RenderPersonnelSection(state, personnelPacket);
         RenderCustomerSection(state, workspaceState);
         RenderProjectionSection(state, workspaceState);
         RenderReserveSummarySection(state, workspaceState);
+        RenderAssumptionsAppendix(state);
 
         ApplyPageNumbers(document, state.Layout);
 
@@ -107,6 +116,16 @@ public sealed class PdfPacketBuilder
     }
 
     // ── Section renderers ─────────────────────────────────────────────────────
+
+    private static void RenderCouncilNarrativeSection(PageState state, string? scenarioNarrative)
+    {
+        if (string.IsNullOrWhiteSpace(scenarioNarrative)) return;
+
+        state.EnsureSpace(SectionGap + LineH * 3);
+        state.DrawSectionHeading("Council planning narrative");
+        state.DrawBodyLine(scenarioNarrative);
+        state.Y += SectionGap;
+    }
 
     private static void RenderRateSection(PageState state, WorkspaceState ws)
     {
@@ -160,6 +179,41 @@ public sealed class PdfPacketBuilder
             }
         }
 
+        state.Y += SectionGap;
+    }
+
+    private static void RenderPersonnelSection(PageState state, PersonnelPacketContext? personnelPacket)
+    {
+        if (personnelPacket is null) return;
+
+        state.EnsureSpace(SectionGap + LineH * 10);
+        state.DrawSectionHeading("New Personnel Cost Allocation");
+        state.DrawBodyLine("$25,000 Clerk: 25.0% split across Water, Sewer, Trash, and Apartments.");
+        state.DrawBodyLine("$55,000 Field Employee: 33.3% split across Water, Sewer, and Apartments.");
+
+        foreach (var line in personnelPacket.AllocationLines)
+        {
+            state.EnsureSpace(LineH * 2);
+            state.DrawBodyLine($"  {line.Position}: {line.AllocationBasis}", state.Layout.BoldFont);
+            state.DrawBodyLine($"    Water {line.WaterAllocation:C0} | Sewer {line.SewerAllocation:C0} | Trash {line.TrashAllocation:C0} | Apartments {line.ApartmentsAllocation:C0}");
+        }
+
+        state.EnsureSpace(LineH * 7);
+        state.DrawSectionHeading("Prorated annual cost per enterprise");
+        foreach (var allocation in personnelPacket.EnterpriseAllocations)
+        {
+            state.DrawBodyLine($"  {allocation.Enterprise}: {allocation.AnnualCost:C0}");
+        }
+
+        state.EnsureSpace(LineH * 7);
+        state.DrawSectionHeading("Rate Impact Summary");
+        WriteKV(state, "Current rate", personnelPacket.CurrentRate.ToString("C2"));
+        WriteKV(state, "Proposed rate", personnelPacket.ProposedRate.ToString("C2"));
+        WriteKV(state, "% increase", personnelPacket.PercentIncrease.ToString("P1"));
+        WriteKV(state, "Current annual revenue", personnelPacket.CurrentAnnualRevenue.ToString("C0"));
+        WriteKV(state, "New annual revenue", personnelPacket.ProposedAnnualRevenue.ToString("C0"));
+
+        state.DrawBodyLine(personnelPacket.PlanningInsight);
         state.Y += SectionGap;
     }
 
@@ -229,6 +283,17 @@ public sealed class PdfPacketBuilder
         }
     }
 
+    private static void RenderAssumptionsAppendix(PageState state)
+    {
+        state.EnsureSpace(SectionGap + LineH * 5);
+        state.DrawSectionHeading("Assumptions & Data Sources");
+
+        foreach (var line in BuildAssumptionsAppendixLines())
+        {
+            state.DrawBodyLine($"  - {line}");
+        }
+    }
+
     // ── Page layout helpers ───────────────────────────────────────────────────
 
     private static void WriteKV(PageState state, string key, string value)
@@ -272,6 +337,28 @@ public sealed class PdfPacketBuilder
             .Select(c => invalidChars.Contains(c) ? '-' : char.ToLowerInvariant(c))
             .ToArray())
             .Replace(' ', '-');
+    }
+
+    private static string? NormalizeNarrative(string? scenarioNarrative)
+    {
+        const int maxNarrativeLength = 900;
+
+        if (string.IsNullOrWhiteSpace(scenarioNarrative))
+        {
+            return null;
+        }
+
+        var normalized = scenarioNarrative.Trim();
+        return normalized.Length <= maxNarrativeLength
+            ? normalized
+            : $"{normalized[..maxNarrativeLength]}...";
+    }
+
+    private static IEnumerable<string> BuildAssumptionsAppendixLines()
+    {
+        yield return "Data source: Live Aurora ledger_entries after QuickBooks import";
+        yield return "AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)";
+        yield return "Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)";
     }
 
     // ── Layout fonts record ───────────────────────────────────────────────────
