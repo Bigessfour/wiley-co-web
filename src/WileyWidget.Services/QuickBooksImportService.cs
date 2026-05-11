@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using CsvHelper;
@@ -181,47 +180,6 @@ public sealed class QuickBooksImportService
 	private static string BuildOverlapBlockedStatusMessage(int duplicateRows)
 		=> $"{duplicateRows} routed row(s) already exist in the target enterprise scope(s). The commit step will be blocked to prevent duplicate ledger postings.";
 
-	private static string NormalizeSignatureText(string? value)
-		=> string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToUpperInvariant();
-
-	private static string NormalizeSignatureDate(string? value)
-	{
-		if (string.IsNullOrWhiteSpace(value))
-		{
-			return string.Empty;
-		}
-
-		return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
-			? parsed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-			: NormalizeSignatureText(value);
-	}
-
-	private static string BuildLedgerSignature(QuickBooksImportPreviewRow row)
-		=> string.Join("|",
-			NormalizeSignatureText(row.RoutedEnterprise),
-			NormalizeSignatureDate(row.EntryDate),
-			NormalizeSignatureText(row.EntryType),
-			NormalizeSignatureText(row.TransactionNumber),
-			NormalizeSignatureText(row.Name),
-			NormalizeSignatureText(row.Memo),
-			NormalizeSignatureText(row.AccountName),
-			NormalizeSignatureText(row.SplitAccount),
-			row.Amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
-			NormalizeSignatureText(row.ClearedFlag));
-
-	private static string BuildLedgerSignature(LedgerEntry entry)
-		=> string.Join("|",
-			NormalizeSignatureText(entry.EntryScope),
-			entry.EntryDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
-			NormalizeSignatureText(entry.EntryType),
-			NormalizeSignatureText(entry.TransactionNumber),
-			NormalizeSignatureText(entry.Name),
-			NormalizeSignatureText(entry.Memo),
-			NormalizeSignatureText(entry.AccountName),
-			NormalizeSignatureText(entry.SplitAccount),
-			entry.Amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
-			NormalizeSignatureText(entry.ClearedFlag));
-
 	private async Task<DuplicateRowAnalysis> AnalyzeRoutedDuplicatesAsync(AppDbContext context, IReadOnlyList<QuickBooksImportPreviewRow> routedRows, CancellationToken cancellationToken)
 	{
 		if (routedRows.Count == 0)
@@ -246,7 +204,7 @@ public sealed class QuickBooksImportService
 			.Where(entry => scopes.Contains(entry.EntryScope))
 			.ToListAsync(cancellationToken)
 			.ConfigureAwait(false))
-			.Select(BuildLedgerSignature)
+			.Select(QuickBooksLedgerSignature.FromLedgerEntry)
 			.ToHashSet(StringComparer.Ordinal);
 
 		var duplicateRows = 0;
@@ -254,7 +212,7 @@ public sealed class QuickBooksImportService
 
 		foreach (var row in routedRows)
 		{
-			var isDuplicate = existingSignatures.Contains(BuildLedgerSignature(row));
+			var isDuplicate = existingSignatures.Contains(QuickBooksLedgerSignature.FromPreviewRow(row));
 			if (isDuplicate)
 			{
 				duplicateRows++;
