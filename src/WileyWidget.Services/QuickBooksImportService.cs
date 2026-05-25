@@ -45,6 +45,11 @@ public sealed class QuickBooksImportService
 	{
 		logger.LogInformation("Previewing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var preview = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
+
+		// Slice 2c: proactive structural validation (max rows, amount bounds, allowed enterprises).
+		// Throws ArgumentException -> 400 via GlobalExceptionHandler (consistent with other invalid input paths).
+		ValidateStructuralLimits(preview, selectedEnterprise);
+
 		var routedPreview = await routingService.ApplyRoutingAsync(preview, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
@@ -76,6 +81,10 @@ public sealed class QuickBooksImportService
 	{
 		logger.LogInformation("Committing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var parsedRows = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
+
+		// Slice 2c: proactive structural validation (same limits as preview for defense-in-depth).
+		ValidateStructuralLimits(parsedRows, selectedEnterprise);
+
 		var routedRows = await routingService.ApplyRoutingAsync(parsedRows, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
@@ -267,12 +276,43 @@ public sealed class QuickBooksImportService
 			return new DuplicateRowAnalysis(0, routedRows.ToList());
 		}
 
-		var existingSignatures = (await context.LedgerEntries
+		// Refactored (Slice 2b): project only the 10 signature fields instead of full LedgerEntry entities.
+		// Avoids loading entire ledger into memory for overlap detection. Leverages IX_ledger_entries_entry_scope
+		// and IX_ledger_entries_entry_date from the SchemaAlignmentProductionReadiness migration (20260525204607).
+		// Tradeoff documented: for municipal-scale data (typically <5k-10k rows per enterprise scope) the in-memory
+		// hashset is fast and simple. For very large ledgers, a future migration could add a persisted SignatureHash
+		// column + index and push the duplicate check fully server-side (e.g. via ANY or temp table).
+		var projected = await context.LedgerEntries
 			.AsNoTracking()
 			.Where(entry => scopes.Contains(entry.EntryScope))
+			.Select(entry => new
+			{
+				entry.EntryScope,
+				entry.EntryDate,
+				entry.EntryType,
+				entry.TransactionNumber,
+				entry.Name,
+				entry.Memo,
+				entry.AccountName,
+				entry.SplitAccount,
+				entry.Amount,
+				entry.ClearedFlag
+			})
 			.ToListAsync(cancellationToken)
-			.ConfigureAwait(false))
-			.Select(BuildLedgerSignature)
+			.ConfigureAwait(false);
+
+		var existingSignatures = projected
+			.Select(p => string.Join("|",
+				NormalizeSignatureText(p.EntryScope),
+				NormalizeSignatureDate(p.EntryDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+				NormalizeSignatureText(p.EntryType),
+				NormalizeSignatureText(p.TransactionNumber),
+				NormalizeSignatureText(p.Name),
+				NormalizeSignatureText(p.Memo),
+				NormalizeSignatureText(p.AccountName),
+				NormalizeSignatureText(p.SplitAccount),
+				p.Amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
+				NormalizeSignatureText(p.ClearedFlag)))
 			.ToHashSet(StringComparer.Ordinal);
 
 		var duplicateRows = 0;
@@ -294,6 +334,25 @@ public sealed class QuickBooksImportService
 
 	private static string ComputeFileHash(byte[] fileBytes)
 		=> Convert.ToHexString(SHA256.HashData(fileBytes));
+
+	private void ValidateStructuralLimits(IReadOnlyList<QuickBooksImportPreviewRow> rows, string selectedEnterprise)
+	{
+		const int MaxRows = 10000;
+		const decimal MaxAmount = 999_999_999.99m;
+		var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		{
+			"Water Utility", "Electric Utility", "Sewer Utility", "General Fund", "Town of Wiley"
+		};
+
+		if (rows.Count > MaxRows)
+			throw new ArgumentException($"QuickBooks row count ({rows.Count}) exceeds maximum allowed for preview/commit ({MaxRows}).");
+
+		if (rows.Any(r => r.Amount.HasValue && Math.Abs(r.Amount.Value) > MaxAmount))
+			throw new ArgumentException($"QuickBooks contains amount(s) exceeding allowed bound (+/-{MaxAmount:N2}).");
+
+		if (!allowed.Contains(selectedEnterprise))
+			throw new ArgumentException($"Enterprise '{selectedEnterprise}' is not permitted for QuickBooks imports in this environment.");
+	}
 
 	private sealed record DuplicateRowAnalysis(int DuplicateRows, IReadOnlyList<QuickBooksImportPreviewRow> Rows);
 

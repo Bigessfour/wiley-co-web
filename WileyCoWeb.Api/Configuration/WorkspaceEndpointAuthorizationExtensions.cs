@@ -15,4 +15,20 @@ public static class WorkspaceEndpointAuthorizationExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Applies WorkspaceReadPolicy (RequireAuthenticatedUser) only when Authentication:Jwt:Enabled.
+    /// In Development with JWT disabled, leaves endpoint open (existing pattern).
+    /// </summary>
+    public static RouteHandlerBuilder RequireWorkspaceReadAuth(
+        this RouteHandlerBuilder builder,
+        IConfiguration configuration)
+    {
+        if (configuration.GetValue<bool>($"{JwtAuthenticationOptions.SectionName}:Enabled"))
+        {
+            return builder.RequireAuthorization(JwtAuthenticationExtensions.WorkspaceReadPolicy);
+        }
+
+        return builder;
+    }
 }

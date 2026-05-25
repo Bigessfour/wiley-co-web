@@ -59,6 +59,20 @@
                    so the button shows only the hamburger icon and stays compact. *@
                 <span class="app-shell-nav-toggle-label">@NavigationRailToggleText</span>
             </button>
+            <!-- Theme toggle (Slice 1): discoverable, keyboard accessible (Enter/Space),
+                 placed immediately after nav toggle for muscle memory. Reuses existing
+                 button classes + label hiding on mobile. Handler (added in follow-up edit)
+                 flips data-wiley-theme + data-bs-theme, persists via wileyWorkspaceStorage,
+                 and prepares Syncfusion link swap via the id added in index.html. -->
+            <button id="app-shell-theme-toggle"
+                    type="button"
+                    class="e-control e-btn e-lib e-inherit app-shell-theme-toggle"
+                    aria-label="Toggle dark or light theme (current: light)"
+                    title="Toggle theme"
+                    @onclick="ToggleThemeAsync">
+                <span aria-hidden="true">🌓</span>
+                <span class="app-shell-nav-toggle-label">Theme</span>
+            </button>
             <div class="app-shell-brand" aria-label="Wiley.co workspace shell">
                 <span class="app-eyebrow">Wiley.co</span>
                 <span class="app-title">Syncfusion Finance Workspace</span>
@@ -148,6 +162,14 @@
     /// After the first restore the new consolidated key takes over.
     /// </summary>
     private const string LegacyLeftNavStorageKey = "wiley.workspace.left-nav-collapsed.v2";
+
+    // ── Theme (Slice 1) ───────────────────────────────────────────────────────
+    /// <summary>
+    /// Storage key for user theme preference ("light" | "dark"). Stored via the
+    /// same wileyWorkspaceStorage wrapper as layout state for consistency.
+    /// Takes precedence over OS matchMedia on subsequent loads.
+    /// </summary>
+    private const string ThemeStorageKey = "wiley.workspace.theme";
 
     // ── Breakpoints (must match CSS / Tailwind breakpoints) ───────────────────
 
@@ -342,6 +364,11 @@
         // restored state immediately on first paint.
         StateHasChanged();
 
+        // Theme (Slice 1): apply any persisted user preference (overrides the
+        // OS default set by the early script in index.html). Must run after JS
+        // interop is available.
+        await ApplyStoredThemeAsync();
+
         // If we read from the legacy key, write the consolidated key now so the
         // next load uses the new format.
         if (restored.IsLegacyMigration)
@@ -505,6 +532,63 @@
 
         // Persist the full layout snapshot so every state dimension is saved.
         await PersistLayoutStateAsync();
+    }
+
+    // ── Theme toggle (Slice 1, minimal diff on existing persistence pattern) ──
+    private string _currentTheme = "light"; // "light" | "dark" — user preference or OS default
+
+    /// <summary>
+    /// Toggles between light/dark, updates the document data attributes (consumed
+    /// by app.css and Syncfusion Bootstrap5 theme via data-bs-theme), persists the
+    /// choice using the same wileyWorkspaceStorage as layout, and re-renders.
+    /// </summary>
+    private async Task ToggleThemeAsync()
+    {
+        var newTheme = _currentTheme == "dark" ? "light" : "dark";
+        _currentTheme = newTheme;
+
+        try
+        {
+            // Set both attributes so app.css dark rules + Bootstrap/Syncfusion inheritance activate.
+            await JSRuntime.InvokeVoidAsync("eval",
+                $"document.documentElement.setAttribute('data-wiley-theme', '{newTheme}');" +
+                $"document.documentElement.setAttribute('data-bs-theme', '{newTheme}');");
+
+            // Persist user choice (independent of OS).
+            await JSRuntime.InvokeVoidAsync(
+                "wileyWorkspaceStorage.setItem", ThemeStorageKey, newTheme);
+        }
+        catch
+        {
+            // Non-fatal (private mode, etc.). State still flipped for this session.
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Applies a stored (or default) theme on load. Called from RestoreLayoutStateAsync
+    /// after the layout restore so the first paint respects user preference.
+    /// </summary>
+    private async Task ApplyStoredThemeAsync()
+    {
+        try
+        {
+            var stored = await JSRuntime.InvokeAsync<string?>(
+                "wileyWorkspaceStorage.getItem", ThemeStorageKey);
+
+            if (!string.IsNullOrWhiteSpace(stored) && (stored == "dark" || stored == "light"))
+            {
+                _currentTheme = stored;
+                await JSRuntime.InvokeVoidAsync("eval",
+                    $"document.documentElement.setAttribute('data-wiley-theme', '{stored}');" +
+                    $"document.documentElement.setAttribute('data-bs-theme', '{stored}');");
+            }
+        }
+        catch
+        {
+            // OS default (set by the early script in index.html) remains.
+        }
     }
 
     // ── IAsyncDisposable ──────────────────────────────────────────────────────

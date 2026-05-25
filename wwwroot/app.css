@@ -807,6 +807,75 @@ h1:focus {
 
 /* Summary / toggle row */
 .wiley-mobile-context-summary {
+  /* ── Dark theme overrides (Slice 1) — activated when MainLayout toggle (or early OS script) sets data-wiley-theme="dark" ──
+   Covers body/content surfaces, cards, text, links, focus, skeleton, mobile rail, and toast tweaks.
+   Uses colors consistent with the existing dark shell (appbar/sidebar/nav) for harmony.
+   Keeps contrast AA for body text and interactive elements.
+*/
+  [data-wiley-theme="dark"] {
+    /* Body and base content */
+    html,
+    body {
+      background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+      color: #f8fafc;
+    }
+
+    /* Content cards, panels, home hub, workspace areas */
+    .home-hub-card,
+    .wiley-workspace,
+    .app-content,
+    .wiley-mobile-context-rail,
+    .wiley-skeleton-card {
+      background: #1e293b;
+      border-color: rgba(148, 163, 184, 0.28);
+      color: #f8fafc;
+    }
+
+    .home-hub-card p,
+    .app-sidebar-stat span,
+    .home-hub-copy {
+      color: #94a3b8;
+    }
+
+    /* Links and primary actions (sky accent to match brand/nav) */
+    a,
+    .btn-link {
+      color: #7dd3fc;
+    }
+    .btn-primary {
+      background-color: #0ea5e9;
+      border-color: #0284c8;
+      color: #0f172a;
+    }
+
+    /* Focus rings for keyboard users (visible on dark) */
+    .btn:focus,
+    .form-control:focus,
+    .form-check-input:focus {
+      box-shadow:
+        0 0 0 0.1rem #0f172a,
+        0 0 0 0.25rem #38bdf8;
+    }
+
+    /* Skeleton loaders (used for future loading states in panels) */
+    .wiley-skeleton,
+    .wiley-skeleton-row {
+      background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+      background-size: 1200px 100%;
+    }
+
+    /* Mobile context rail explicit (was light) */
+    .wiley-mobile-context-rail {
+      background: #1e293b;
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    /* Toast host refinements for dark surface (severity accents remain strong) */
+    #wiley-global-toast .e-toast {
+      background: #1e293b;
+      color: #f8fafc;
+    }
+  }
   display: flex;
   align-items: center;
   justify-content: space-between;

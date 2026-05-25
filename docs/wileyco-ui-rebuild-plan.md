@@ -501,6 +501,161 @@ Add new services if the current ones are too tied to the old budget workflow.
 - [x] Export flows for Excel and PDF deliverables.
 - [ ] Amplify deployment hardening.
 
+## 2026 UI/UX Polish Execution — Detailed Slice Plan (Grok CLI Audit, 2026-05-25)
+
+**Produced by:** Direct filesystem exploration (multiple list_dir + 20+ read_file on primary shell/panels/state/theme files + greps + structure analysis) + spawned `plan` sub-agent (ID 019e615f-9b8a-7203-beed-9699d7525e46, read-only, followed AGENTS.md mandatory reads). Sub-agent progressed slowly on docs; primary audit data used to generate this actionable plan for immediate autonomous slice-by-slice execution (no user confirmation between todos per instructions).
+
+**Mandatory Constraints (AGENTS.md — never regress)**
+
+- .NET 9.0.313 (global.json), Syncfusion 33.x (license bootstrap in ClientStartup.cs + index.html must remain untouched).
+- Customer export: ONLY via `#export-customer-grid-excel-button` → `ExportCustomerDirectoryAsync` / XlsIO (CustomerViewerPanel). Never SfGrid toolbar Excel.
+- Workspace nav: `gotoWorkspacePanel` pattern in Playwright; panel IDs and shell in WileyWorkspace.razor.
+- Jarvis: `SfAIAssistView` on secure `/api/ai/*` paths (health alias `/api/jarvis/health`); response uses `latestUsedFallback`.
+- Rate display: Council rates from snapshot / `EnterpriseRateService` (src/WileyWidget.Abstractions). No wrong scenario KPIs.
+- Minimal diffs, match existing naming/partial-class patterns (e.g. \*Panel.razor + .razor.cs, WorkspaceState pub/sub via `Changed` event).
+- Verification gates after slices: `dotnet build WileyCoWeb.csproj`, HighRisk component tests, `npm run playwright:test:ci:highrisk`. Fix only UI-caused regressions.
+- No temp/, no secrets, no direct main push. Split PRs recommended (theme+shell vs panels vs a11y/perf).
+
+**Current State from Audit (key evidence from tool reads)**
+
+- **Shell strength**: MainLayout.razor uses SfAppBar + SfSidebar (EnableDock, responsive Type=Push/Over + ShowBackdrop on mobile <640px, gestures, EnablePersistence). WorkspaceLayoutContext cascaded. Toggle has excellent a11y (aria-label, controls, expanded). Persistence: "wiley.workspace.layout.v2" via wileyWorkspaceStorage wrapper (wwwroot/js/workspace-storage.js) + legacy migration. Breakpoints: 640 mobile, 1024 tablet. (MainLayout.razor:41-122, 198-234, .razor.css:41-81).
+- **Theme foundation (incomplete)**: index.html:19-43 has synchronous OS `matchMedia("(prefers-color-scheme: dark)")` that sets `data-wiley-theme` + `data-bs-theme` on <html> (consumed by app.css + Bootstrap/Syncfusion inheritance per comment). Single static Syncfusion link: `_content/Syncfusion.Blazor.Themes/bootstrap5.css` (line 48). No user toggle, no persistence of choice, no dark variant CSS loaded.
+- **CSS gaps (P0)**: MainLayout.razor.css:84 `color-scheme: light only; background: lightyellow;` on #blazor-error-ui (hard blocker). .top-row light #f7f7f7 (line 16). app.css: body light gradients (#f8fafc → #eef2ff), color #0f172a; dark shell (appbar/sidebar/nav) already present but content/cards need full `[data-wiley-theme="dark"]` overrides. (Reads: MainLayout.razor.css:1-103, app.css:1-300+).
+- **Persistence pattern (reuse)**: wileyWorkspaceStorage.getItem/setItem (localStorage wrapper). MainLayout uses consolidated JSON under "wiley.workspace.layout.v2". Extend for theme (preferred) or parallel "wiley.workspace.theme" key for minimal diff.
+- **State / perf**: WorkspaceState (sealed, `event Action? Changed`, many selected\*/filter fields + row lists, StartupSource/IsUsingFallback, IsOffline). Pub/sub drives panels; potential for unnecessary re-renders on every mutation (Slice 5 target). Snapshot load in WileyWorkspaceBase + bootstrap task (ClientStartup.cs:64).
+- **Panels (full inventory from list_dir + names + AGENTS)**: 15 total.
+  - Top-level: JarvisChatPanel.razor/.razor.cs (SfAIAssistView, health messaging), QuickBooksImportPanel.razor + QuickBooksImportPanelWrapper.razor (SfStepper, SfFileUpload, preview SfGrid, validation).
+  - Panels/: RatesPanel.razor, BreakEvenPanel.razor+.cs, ScenarioPlannerPanel.razor, CapitalGapPanel.razor, DebtCoveragePanel.razor, ReserveTrajectoryPanel.razor, AffordabilityDashboardPanel.razor, TrendsPanel.razor, DataDashboardPanel.razor, DecisionSupportPanel.razor, ApartmentConfigPanel.razor, CustomerViewerPanel.razor + 4 partials (.razor.cs, Bindings.cs, Helpers.cs, Shared.cs — SfGrid + custom export).
+- **Controls**: Heavy Syncfusion (SfGrid for customers/import preview, SfChart for rates/trends/break-even, SfAIAssistView for Jarvis, SfSidebar/AppBar/Stepper/Toast/Dialog). Prefer theme classes + built-in states over wrappers.
+- **A11y / responsive / perf gaps**: Mobile sidebar already strong (backdrop, gestures); confirm focus trap on drawer. No theme toggle (keyboard accessible needed). Numeric formatting and empty states inconsistent across panels. SfGrid virtualization/paging not confirmed for large customer sets. Excessive Changed notifications possible in WorkspaceState.
+- **Docs read**: AGENTS.md, .cursor/skills/wiley-widget-completion/SKILL.md, wileyco-ui-rebuild-plan.md (Phase 6 short), playwright-ui-test-strategy.md, wiley-widget-functional-breakdown.md, council-readiness etc.
+
+**P0 / P1 / P2 Prioritized Backlog**
+**P0 (shell + theme + a11y baseline — do first, protect council flows)**:
+
+1. Complete dark/light Fluent2/Bootstrap5 via persisted toggle + Syncfusion CSS swap (data attrs + dynamic link or class; fix light-only CSS).
+2. Add discoverable, keyboard-accessible theme toggle in SfAppBar (next to existing nav toggle; reuse aria patterns).
+3. Extend layout persistence (v2 JSON or new key) so user choice survives reload and is independent of OS.
+4. Fix all hardcoded light values in MainLayout.razor.css + app.css content areas for both themes (WCAG AA contrast).
+5. Loading/skeleton states during snapshot bootstrap in WileyWorkspace (non-blocking).
+6. Mobile nav polish (focus trap if missing, touch targets, consistent backdrops).
+
+**P1 (panel visual + flow polish — batch by domain)**:
+
+- Rates/break-even/scenarios/capital/debt/reserve/affordability/trends/dashboard: chart palettes aligned to data-wiley-theme tokens, consistent currency/rate formatting (use existing EnterpriseRateService), empty/error states when snapshot slice missing.
+- QuickBooks: stepper clarity, preview table readability, validation error surfacing, laptop-responsive upload/preview.
+- Customer: grid filter UX polish, #export-customer-grid-excel-button prominence and XlsIO path 100% preserved, add paging/virtualization if row counts justify.
+- Jarvis: chat rail theming (match new dark/light), conversation labels, degraded/unavailable health messaging from /api/ai/health.
+- Consistent panel headers, action button placement, badges, toasts, spacing/typography across all.
+
+**P2 (perf micro-opts + advanced a11y)**:
+
+- Audit/reduce StateHasChanged and Changed event firings in WorkspaceState (profile with bUnit or devtools).
+- Defer heavy SfChart/SfGrid init until panel visible (extend existing lazy in shell if present).
+- Full a11y: aria-label/for on all forms, SfGrid/SfChart aria, KB nav for all primary actions, contrast verification in both themes.
+- Document tradeoffs in functional-breakdown.md.
+
+**Detailed Slice Execution Plan (implement in strict order; read_file before every search_replace on source; run focused tests after each risky slice)**
+
+**Slice 0 — Audit & Plan (this section — COMPLETE upon plan write + todo update)**
+
+- Deliverable: This markdown (appended to Phase 6).
+- Evidence: All tool results above + directory listings.
+- Post-slice: Write plan, mark todos, begin Slice 1 reads immediately.
+
+**Slice 1 — Theme System (dark/light end-to-end) — P0**
+
+- Goals: Persisted user choice (overrides OS), full Syncfusion 33.x support (bootstrap5 + dark equivalent or Fluent2), zero light-only hardcodes, accessible toggle, minimal diff.
+- Files & minimal changes (evidence-based):
+  - wwwroot/index.html: Add `id="syncfusion-theme-link"` to the existing bootstrap5.css <link> (line 48). Optionally add a second <link id="syncfusion-theme-dark" ... bootstrap5-dark.css disabled> for swap (or rely on data-bs-theme if Syncfusion v33 Bootstrap5 fully inherits — verify at runtime). Keep license scripts untouched.
+  - Components/Layout/MainLayout.razor: Add theme toggle button in SfAppBar (after nav toggle, before brand; reuse "e-control e-btn e-lib e-inherit" + icon + aria-label pattern from lines 50-60). Wire to new handler that calls JS to set data attrs + flip link + persist. Extend OnAfterRender/restore to include theme. Use existing wileyWorkspaceStorage.
+  - Components/Layout/MainLayout.razor.css: Remove `color-scheme: light only` (line 84); make #blazor-error-ui theme-aware (or neutral). Add dark variants for .top-row if still needed.
+  - wwwroot/app.css: Complete `[data-wiley-theme="dark"]` rules for body, .home-hub-card, content backgrounds, text, borders, cards (build on existing dark shell rules at lines 28-78+). Ensure contrast AA for body text.
+  - (Optional minimal) Add simple static helpers or extend WorkspaceLayoutContext with Theme property (or keep in MainLayout for smallest diff). Key: "wiley.workspace.theme" or augment layout.v2 JSON.
+  - ClientStartup.cs / Program.cs: **Zero changes** (license path confirmed clean).
+- Post-slice tests: `dotnet build WileyCoWeb.csproj`. Manual toggle in dev (both themes, reload persistence, keyboard Enter/Space on button, OS change does not override after user choice). Add bUnit smoke later in Slice 6.
+- Risks: Syncfusion dark CSS must exist for v33 (bootstrap5-dark.css under \_content/...); if not, fall back to CSS var overrides or additional stylesheet. Protect existing data-bs-theme usage.
+- Acceptance: Toggle discoverable in shell, both themes render all panels/grids/charts without broken contrast or missing icons, choice persists, no license regression.
+
+**Slice 2 — Shell & Navigation UX Polish — P0**
+
+- Goals: Loading skeletons during bootstrap, consistent panel titles/breadcrumbs (enterprise + fiscal year from WorkspaceState), mobile focus management, action button consistency.
+- Files: MainLayout.razor (add skeleton placeholder or progress in content area during !WorkspaceState.IsInitialized), WileyWorkspace.razor (panel header area, context display, lazy render hooks), NavMenu.razor/.razor.css (minor polish), WorkspaceState (expose IsLoading / snapshot status if missing).
+- Changes: Add simple CSS skeleton or SfSpinner during first snapshot load (non-blocking). Add breadcrumb text in appbar or panel header using selectedEnterprise + selectedFiscalYear. Ensure all panels have consistent <h2> or SfToolbar title + action buttons on right. Confirm/ add focus trap for mobile sidebar drawer (SfSidebar may provide; supplement with JS if needed).
+- Tests: `dotnet test ...ComponentTests.csproj --filter "Category=HighRisk"`. Playwright subset for mobile nav if available.
+- Acceptance: No blocking UI on snapshot, clear context for council user, mobile drawer usable with keyboard + touch.
+
+**Slice 3 — Panel Polish (batch) — P1**
+
+- Rates / financial panels (RatesPanel, BreakEven, ScenarioPlanner, Capital/Debt/Reserve/Affordability/Trends/DataDashboard):
+  - Align any hard-coded chart colors to CSS vars or data-theme conditionals.
+  - Use consistent formatting (currency, 2-4 decimals for rates) — forward through EnterpriseRateService where possible.
+  - Add empty state UI (no data in snapshot slice) and error states.
+- QuickBooksImportPanel + Wrapper: Stepper labels clearer, preview grid styling for readability (theme aware), validation messages prominent but not blocking, upload zone + preview stack nicely on laptop (≤1440px).
+- CustomerViewerPanel (all partials): Improve filter UX (clear button, service/city chips), ensure #export-customer-grid-excel-button is visually prominent (primary style, icon) and wired only to XlsIO path (read the .razor.cs / Helpers before any touch). Add SfGrid PageSettings or VirtualScroll if customerRows > 300.
+- JarvisChatPanel: Theme the rail/container for dark/light, add labels for conversation turns, surface health status (call /api/ai/health or alias, show "degraded / using fallback" messaging per AGENTS).
+- All: Consistent spacing (use existing .app-content padding), badge styles, toast usage via ToastHost.
+- Tests: Build + manual per-panel smoke. HighRisk component tests for export/QuickBooks paths (do not touch backend guards).
+- Acceptance: All panels look polished and usable in both themes on laptop; export button still triggers correct XlsIO flow; no regression in QB duplicate detection or Jarvis secure path.
+
+**Slice 4 — Accessibility Pass (WCAG AA target) — P0/P1**
+
+- Run contrast checker (manual or tool) on both themes for body text, links, badges, grid headers, chart labels.
+- Add/fix: aria-label on all icon-only buttons, for/id on form inputs (rate inputs, scenario forms, filters), roles where needed (search regions, etc.).
+- SfGrid: ensure proper aria for sort/filter/paging.
+- SfChart: title/desc or aria-describedby.
+- Keyboard: full tab order through nav, toggles, primary panel actions, modals. Test Escape on dialogs/drawers.
+- Files: All shell + panels (batch edits after reading each).
+- Tests: Manual KB + screen reader simulation; bUnit for label presence in Slice 6.
+- Acceptance: No low-contrast text in either theme; all critical actions keyboard operable; no regression to existing nav/panel flows.
+
+**Slice 5 — Performance Pass — P2**
+
+- WorkspaceState.cs: Audit every place `changed?.Invoke()` or property setters that fire it. Reduce frequency (e.g. batch updates, throttle). Measure re-render impact on panels.
+- Lazy: Confirm or extend panel visibility-based init (WileyWorkspace.razor hosts panels; use @if or render fragment + OnVisible).
+- Heavy controls: Defer SfChart creation and SfGrid data bind until panel is the active/visible one (use OnParametersSet + flags).
+- Snapshot: Ensure bootstrap task (ClientStartup) + WorkspaceState population does not block first paint of shell.
+- Tradeoffs: Document any (e.g. "eager load of small lists kept for council instant filter UX") in docs/wiley-widget-functional-breakdown.md.
+- Tests: Build + timing observations in dev; existing HighRisk (no new perf tests unless simple).
+- Acceptance: Noticeable faster first panel render and filter response; no functional change.
+
+**Slice 6 — Tests & Docs — Required**
+
+- Add bUnit tests (tests/WileyCoWeb.ComponentTests/): theme toggle persistence + render in both modes, layout context restore, 2-3 panel smoke tests (e.g. RatesPanel empty state, customer grid export button presence). Mark Category=HighRisk.
+- Run after every slice: focused HighRisk component tests + `npm run playwright:test:ci:highrisk` (only fix regressions your UI change introduced).
+- Update this doc: check off completed Phase 6 items with evidence (build logs, test counts, before/after screenshots if captured).
+- Update functional-breakdown.md with any perf tradeoffs or new a11y notes.
+- Final gate (all must pass before claim done):
+  ```
+  dotnet build WileyCoWeb.csproj
+  dotnet test tests/WileyCoWeb.ComponentTests/WileyCoWeb.ComponentTests.csproj --filter "Category=HighRisk"
+  npm run playwright:test:ci:highrisk
+  ```
+- Optional broader: full component test suite, specific playwright workspace-syncfusion-controls.spec.ts (chromium).
+
+**Risk Register & Rollback**
+
+- High: Syncfusion theme swap breaks existing grids/charts (mitigation: test all panels in both themes before Slice 3; keep static light as fallback).
+- Medium: Persistence key collision or migration (reuse existing v2 JSON shape).
+- Low: Mobile focus trap adds complexity (SfSidebar CloseOnDocumentClick + gestures already handle most; add only if audit shows gap).
+- Canonical protection: Every slice explicitly lists "read Customer export / Jarvis / rate paths before editing; never alter button IDs or API routes."
+- Rollback: git revert per-slice commits; no combined mega-PR.
+
+**Before/After Council UX Notes (laptop + mobile clerk workflows)**
+
+- Before: OS dark mode partially applied to shell only; content/grids/charts could have low contrast or broken icons in dark; no way for user to force light for projector/council meeting; mobile drawer worked but no theme awareness; rates/trends panels had inconsistent formatting and no empty states.
+- After: One-click theme toggle (persistent, keyboard, in appbar); full dark mode with good contrast for evening work or preference; all financial panels (rates, break-even, scenarios, trends) instantly readable in either mode; clearer import wizard and customer export; Jarvis chat matches theme and surfaces health; faster perceived load with skeletons; WCAG AA baseline for clerk accessibility. Council reviews (rates, what-if, customer directory) become more reliable across devices and lighting conditions.
+
+**Test Evidence Plan (per slice)**
+
+- Slice 1: Build success + manual theme matrix (light/dark, persisted, toggle).
+- Slice 3/4: HighRisk tests pass (CustomerDirectoryExportTests, QuickBooksImport_RejectsDuplicate..., EnterpriseRateServiceTests, JarvisHealthApiTests) + Playwright high-risk.
+- Slice 6: New bUnit count (target +3-5), full gate output recorded in PR.
+
+**Next Immediate Action (autonomous, no confirmation)**: Mark Slice 0 complete in todo, set Slice 1 in_progress, perform required read_file on all files to be edited in Slice 1, then execute minimal theme changes (toggle + CSS fixes + persistence + link id) using search_replace only after those reads. Run build after first theme edit. Continue slices 2-6 + gates + self-verification /check.
+
+This plan is the single source of truth for the polish. All changes will be minimal, evidence-based, and protective of existing council-facing behavior.
+
 ## Suggested File/Project Changes
 
 - [ ] Add `WileyCo.Shared` for shared domain models and DTOs.

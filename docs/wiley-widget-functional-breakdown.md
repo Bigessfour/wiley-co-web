@@ -68,6 +68,7 @@ This is a code-trace proof standard, not an executed test certification, unless 
 - Status update 2026-04-18: Syncfusion go/no-go validation is green for the current local workspace. The focused component, unit, integration, route-smoke, panel-flow, dashboard, QuickBooks, Jarvis, customer CRUD, and scenario browser suites all passed against the local `http://localhost:5230` / `http://localhost:5231` stack.
 
 * Archived snapshot exports are proven only through the API today. No workspace-shell trigger ships in the current widget, and any dedicated shell action remains later product scope.
+* Snapshot exports (POST /api/workspace/snapshot/{id}/exports and download) are synchronous in-request operations (XlsIO + artifact persist). Async queue/export worker is future work (documented for ops capacity planning).
 * Remaining observability work is post-release infrastructure only: the current App Runner X-Ray path is still unproven in production, and OpenTelemetry is the preferred successor path.
 
 ## Syncfusion Wiring Status

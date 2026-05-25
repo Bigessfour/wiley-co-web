@@ -29,6 +29,7 @@ using WileyWidget.Models;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.Telemetry;
 using WileyWidget.Services.Configuration;
 using WileyWidget.Services.HealthChecks;
 using WileyWidget.Services.Logging;
@@ -49,6 +50,10 @@ public partial class Program
         request => request.ProjectedVolume <= 0 ? "Projected volume must be greater than zero." : null,
         request => request.CurrentRate < 0 || request.TotalCosts < 0 ? "Workspace baseline values cannot be negative." : null
     };
+    // Slice 4a: EnterpriseValidator / BudgetDataValidator (FluentValidation) exist in Models/Validators but are not wired into the API pipeline.
+    // Inline rules above (and similar in scenario/knowledge) + DataAnnotations in models suffice for current council-facing writes.
+    // Minimal diff: no FV auto-registration or per-endpoint ValidateAsync to avoid new DI surface and behavior change.
+    // If FV wiring added later, register via services.AddFluentValidationAutoValidation() + validators.
     private static readonly Func<WorkspaceScenarioSaveRequest, string?>[] WorkspaceScenarioSaveValidationRules = new Func<WorkspaceScenarioSaveRequest, string?>[]
     {
         request => request.Snapshot == null ? "A workspace snapshot is required." : null,
@@ -530,6 +535,24 @@ public partial class Program
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
         builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
 
+        // Fix 1 (P0 AICache DI regression): Always wire safe NullAIService fallback so any host (incl. ApiApplicationFactory IntegrationTest) can resolve IAIService.
+        // Mirrors TelemetryStartupService config-gate pattern but defaults *off* for AICache in test factories; real AI stack (when XAI keys present) can override or condition later.
+        builder.Services.AddSingleton<IAIService, NullAIService>();
+
+        // Slice 5a: register orphan hosted services behind config flags (defaults off for AICache to avoid IAIService resolution in test hosts without full AI).
+        // TelemetryStartupService: DB health/startup telemetry (ops-expected, gate on Telemetry:StartupServiceEnabled).
+        if (builder.Configuration.GetValue<bool>("Telemetry:StartupServiceEnabled", true))
+        {
+            builder.Services.AddHostedService<TelemetryStartupService>();
+        }
+        // AICacheWarmingService: config-gated (AI:CacheWarming:Enabled or AI:Enabled), explicitly skipped in IntegrationTest env per test factory pattern; Null fallback ensures ctor succeeds even if guard edge-triggered.
+        var isIntegrationTestEnv = builder.Environment.IsEnvironment("IntegrationTest");
+        if (!isIntegrationTestEnv &&
+            (builder.Configuration.GetValue<bool>("AI:Enabled", false) || builder.Configuration.GetValue<bool>("AI:CacheWarming:Enabled", false)))
+        {
+            builder.Services.AddHostedService<AICacheWarmingService>();
+        }
+
         // Deterministic license tracking via health check (covers the new registration logic in this file)
         builder.Services.AddHealthChecks()
             .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
@@ -926,9 +949,9 @@ public partial class Program
         app.MapPost("/api/imports/quickbooks/preview", MapQuickBooksPreviewEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapPost("/api/imports/quickbooks/commit", MapQuickBooksCommitEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapPost("/api/imports/quickbooks/assistant", MapQuickBooksAssistantEndpoint).RequireWorkspaceMutatingAuth(config);
-        app.MapGet("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationEndpoint);
+        app.MapGet("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationEndpoint).RequireWorkspaceReadAuth(config);
         app.MapPut("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationUpdateEndpoint).RequireWorkspaceMutatingAuth(config);
-        app.MapGet("/api/imports/quickbooks/history", MapQuickBooksImportHistoryEndpoint);
+        app.MapGet("/api/imports/quickbooks/history", MapQuickBooksImportHistoryEndpoint).RequireWorkspaceReadAuth(config);
         app.MapPost("/api/imports/quickbooks/reroute", MapQuickBooksHistoricalRerouteEndpoint).RequireWorkspaceMutatingAuth(config);
     }
 
@@ -941,6 +964,27 @@ public partial class Program
         }
 
         var preview = await importService.PreviewAsync(importRequest.FileBytes, importRequest.FileName, importRequest.SelectedEnterprise, importRequest.SelectedFiscalYear, cancellationToken);
+
+        // Slice 2c: proactive structural validation (max rows, amount bounds). Returns consistent ValidationProblem 400.
+        const int MaxPreviewRows = 50_000;
+        const decimal MaxAmountAbs = 1_000_000_000m;
+        var rowCount = preview?.Rows?.Count ?? preview?.TotalRows ?? 0;
+        if (rowCount > MaxPreviewRows)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["rows"] = new[] { $"Preview contains {rowCount} rows; maximum allowed is {MaxPreviewRows}." }
+            });
+        }
+        var badAmountRow = preview?.Rows?.FirstOrDefault(r => Math.Abs(r.Amount ?? 0) > MaxAmountAbs);
+        if (badAmountRow is not null)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["amount"] = new[] { $"Row amount {badAmountRow.Amount} exceeds absolute bound {MaxAmountAbs}." }
+            });
+        }
+
         return Results.Ok(preview);
     }
 
@@ -1582,7 +1626,7 @@ public partial class Program
                     detail: ex.Message,
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
-        });
+        }).RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static void MapWorkspaceDebtCoverageEndpoint(WebApplication app)
@@ -1897,7 +1941,7 @@ public partial class Program
         {
             var snapshot = await composer.BuildAsync(enterprise, fiscalYear, cancellationToken);
             return Results.Ok(snapshot);
-        });
+        }).RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static void MapWorkspaceSnapshotPostEndpoint(WebApplication app)
@@ -2380,7 +2424,8 @@ public partial class Program
 
     private static void MapWorkspaceSnapshotExportsGetEndpoint(WebApplication app)
     {
-        app.MapGet("/api/workspace/snapshot/{snapshotId:long}/exports", MapWorkspaceSnapshotExportsGetAsync);
+        app.MapGet("/api/workspace/snapshot/{snapshotId:long}/exports", MapWorkspaceSnapshotExportsGetAsync)
+           .RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceSnapshotExportsGetAsync(
@@ -2453,7 +2498,7 @@ public partial class Program
             }
 
             return Results.File(artifact.Payload, artifact.ContentType, artifact.FileName);
-        }).RequireWorkspaceMutatingAuth(app.Configuration);
+        }).RequireWorkspaceReadAuth(app.Configuration);
     }
 
     internal static WorkspaceSnapshotArtifactSummary BuildArtifactSummary(BudgetSnapshotArtifact artifact)

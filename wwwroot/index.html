@@ -43,7 +43,15 @@
       })();
     </script>
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <!--
+      Syncfusion 33.x Bootstrap5 theme (light base).
+      id enables future dark variant swap (bootstrap5-dark.css or equivalent)
+      driven by the theme toggle in MainLayout without altering license bootstrap.
+      The data-bs-theme (set early by the OS script above) is intended to be
+      inherited by this theme + our app.css overrides.
+    -->
     <link
+      id="syncfusion-theme"
       rel="stylesheet"
       href="_content/Syncfusion.Blazor.Themes/bootstrap5.css"
     />
@@ -54,13 +62,23 @@
 
   <body>
     <div id="app">
-      <div class="d-flex min-vh-100 align-items-center justify-content-center bg-dark px-3 text-center text-white">
-        <div class="w-100" style="max-width: 28rem;">
+      <div
+        class="d-flex min-vh-100 align-items-center justify-content-center bg-dark px-3 text-center text-white"
+      >
+        <div class="w-100" style="max-width: 28rem">
           <div class="d-flex justify-content-center mb-4">
-            <div class="spinner-border text-primary" role="status" style="width: 3.5rem; height: 3.5rem; border-width: 0.35rem;" aria-hidden="true"></div>
+            <div
+              class="spinner-border text-primary"
+              role="status"
+              style="width: 3.5rem; height: 3.5rem; border-width: 0.35rem"
+              aria-hidden="true"
+            ></div>
           </div>
           <div>
-            <div class="text-uppercase fw-semibold small text-primary" style="letter-spacing: 0.28em;">
+            <div
+              class="text-uppercase fw-semibold small text-primary"
+              style="letter-spacing: 0.28em"
+            >
               Starting client
             </div>
             <div id="wiley-static-boot-headline" class="mt-2 h4 fw-semibold">

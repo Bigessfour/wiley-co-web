@@ -374,11 +374,12 @@ Best-practice cadence:
 - Keep operator access limited to named deployment and support owners.
 - Review alarm actions and notification recipients after team or ownership changes.
 - Keep production domain, API host, and data-store changes out of the same release window unless there is a documented rollback plan for the combined change.
-- **API JWT scaffolding:** `Authentication:Jwt:Enabled` gates mutating routes and export downloads. Production values (Town of Wiley Cognito):
+- **API JWT scaffolding:** `Authentication:Jwt:Enabled` gates mutating routes (POST/PUT/DELETE + commit/reroute) and now also read paths via `RequireWorkspaceReadAuth`: snapshot GET, knowledge POST, export list/download, QuickBooks routing/history GET. Production values (Town of Wiley Cognito):
   - `Authentication__Jwt__Enabled=true`
   - `Authentication__Jwt__Authority=https://cognito-idp.us-east-2.amazonaws.com/us-east-2_DmY7BCBIp`
   - `Authentication__Jwt__Audience=2m6vp91m9938jpbg2efivr2p8k` (Amplify web app client)
-  - Amplify Auth must send `Authorization: Bearer` tokens on mutating API calls. When JWT is disabled (local dev / integration tests), identity falls back to `X-Wiley-User-*` headers only — never rely on those headers in production with JWT disabled on a public host.
+  - Amplify Auth must send `Authorization: Bearer` tokens on protected calls (mutating + the listed reads). When JWT is disabled (local dev / integration tests), endpoints remain open and identity falls back to `X-Wiley-User-*` headers only — never rely on those headers in production with JWT disabled on a public host.
+  - Integration tests prove 401 on read endpoints when JWT enabled in test factory (no token).
 - **Copilot / operator Cognito smoke tests:** IAM user `copilot` has managed policy `WileyWidgetCopilotCognitoSmokeTest` (Cognito admin auth on pool `us-east-2_DmY7BCBIp` + read secret `wiley-widget/temp/copilot-cognito-smoke`). With `copilot` AWS credentials configured:
   - `pwsh Scripts/get-cognito-smoke-token.ps1` — returns a Bearer access token
   - `pwsh Scripts/smoke-test-jarvis-production.ps1` — exercises `/api/ai/health` and `/api/ai/chat` on App Runner
