@@ -141,24 +141,6 @@ public sealed class GlobalExceptionHandlerTests : IClassFixture<ApiApplicationFa
         Assert.False(config.GetValue<bool>("Authentication:Jwt:Enabled"));
     }
 
-    private static async Task<HttpResponseMessage> PostImportAsync(HttpClient client, string url, byte[] content, string fileName = "test-ledger.csv", string contentType = "text/csv")
-    {
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(content);
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        form.Add(fileContent, "file", fileName);
-        form.Add(new StringContent("Water Utility"), "selectedEnterprise");
-        form.Add(new StringContent("2026"), "selectedFiscalYear");
-
-        return await client.PostAsync(url, form);
-    }
-
-    private static byte[] CreateQuickBooksCsv()
-    {
-        var csv = "Date,Type,Num,Name,Memo,Account,Amount,Cleared\n2026-01-01,Invoice,1001,Acme,Water billing,Water Revenue,1250.00,Yes\n";
-        return Encoding.UTF8.GetBytes(csv);
-    }
-
     [Fact]
     public async Task ReadEndpoints_Return401_WhenJwtEnabled_AndNoToken()
     {
@@ -233,38 +215,6 @@ public sealed class GlobalExceptionHandlerTests : IClassFixture<ApiApplicationFa
         }
     }
 
-    /// <summary>
-    /// Factory forcing Production environment for sanitize verification (non-Development branch).
-    /// </summary>
-    private sealed class ProductionExceptionTestFactory : WebApplicationFactory<Program>
-    {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseEnvironment(Environments.Production);
-
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<AppDbContext>();
-                services.RemoveAll<DbContextOptions<AppDbContext>>();
-                services.RemoveAll<IDbContextFactory<AppDbContext>>();
-
-                var options = new DbContextOptionsBuilder<AppDbContext>()
-                    .UseInMemoryDatabase($"GlobalExTest-Prod-{Guid.NewGuid():N}")
-                    .Options;
-
-                services.AddSingleton(options);
-                services.AddScoped(_ => new AppDbContext(options));
-                services.AddSingleton<IDbContextFactory<AppDbContext>>(_ => new LocalAppDbContextFactory(options));
-            });
-        }
-
-        public async Task InitializeAsync()
-        {
-            var contextFactory = Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
-            await using var ctx = await contextFactory.CreateDbContextAsync();
-            await ctx.Database.EnsureCreatedAsync();
-        }
-    }
 
     /// <summary>
     /// Local IDbContextFactory implementation to avoid cross-project type visibility issues in test.
