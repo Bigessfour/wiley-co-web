@@ -71,8 +71,8 @@ Status: Repo-level web rebuild and the AI centerpiece are functionally far along
 
 #### Phase 6 - Polish
 
-- [ ] Complete the remaining responsive refinements and final theme polish.
-- [ ] Harden Amplify deployment for production operations.
+- [x] Complete the remaining responsive refinements and final theme polish. (Addressed via prior shell hardening + MainLayout responsive/layout-context/a11y + theme toggle; verified in stabilization gate + code review.)
+- [ ] Harden Amplify deployment for production operations. (Ops follow-up per post-production-operations-handbook.md; not code change in this pass.)
 
 #### Backend, Shared, and Continuity Work
 
