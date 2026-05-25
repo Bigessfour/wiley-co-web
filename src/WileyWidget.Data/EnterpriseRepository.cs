@@ -117,12 +117,13 @@ public class EnterpriseRepository : IEnterpriseRepository
     }
 
     /// <summary>
-    /// Gets an IQueryable for flexible querying and paging
+    /// Gets an IQueryable for flexible querying and paging.
+    /// Throws — use GetPagedAsync to avoid undisposed DbContext leaks.
     /// </summary>
-    public async Task<IQueryable<Enterprise>> GetQueryableAsync(CancellationToken cancellationToken = default)
+    public Task<IQueryable<Enterprise>> GetQueryableAsync(CancellationToken cancellationToken = default)
     {
-        var context = await _contextFactory.CreateDbContextAsync();
-        return context.Enterprises.Where(e => !e.IsDeleted).AsQueryable();
+        throw new NotSupportedException(
+            "GetQueryableAsync returns an undisposed DbContext-bound IQueryable. Use GetPagedAsync or GetAllAsync instead.");
     }
 
     /// <summary>
@@ -168,7 +169,7 @@ public class EnterpriseRepository : IEnterpriseRepository
     /// </summary>
     public async Task<Enterprise> AddAsync(Enterprise enterprise, CancellationToken cancellationToken = default)
     {
-        var context = await _contextFactory.CreateDbContextAsync();
+        await using var context = await _contextFactory.CreateDbContextAsync();
         context.Enterprises.Add(enterprise);
         await context.SaveChangesAsync();
         return enterprise;
@@ -181,7 +182,7 @@ public class EnterpriseRepository : IEnterpriseRepository
     {
         ArgumentNullException.ThrowIfNull(enterprise);
 
-        var context = await _contextFactory.CreateDbContextAsync();
+        await using var context = await _contextFactory.CreateDbContextAsync();
 
         // Set audit fields
         enterprise.ModifiedDate = DateTime.UtcNow;

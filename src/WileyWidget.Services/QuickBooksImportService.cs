@@ -138,14 +138,40 @@ public sealed class QuickBooksImportService
 
 		context.ImportBatches.Add(batch);
 		context.SourceFiles.Add(sourceFile);
-		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-		foreach (var row in routedRows)
+		if (context.Database.IsRelational())
 		{
-			context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
+			await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+			try
+			{
+				await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+				foreach (var row in routedRows)
+				{
+					context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
+				}
+
+				await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+				await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+			}
+			catch
+			{
+				await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+				throw;
+			}
+		}
+		else
+		{
+			await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+			foreach (var row in routedRows)
+			{
+				context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
+			}
+
+			await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		}
 
-		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, routedRows.Count);
 
 		return new QuickBooksImportCommitResponse(

@@ -734,6 +734,15 @@ public class UtilityCustomer : IValidatableObject
     /// Date the record was last modified
     /// </summary>
     public DateTime LastModifiedDate { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// Optional FK to Enterprise for direct SQL filtering (p4-snapshot-perf) and relational integrity.
+    /// Backfill via import services; legacy rows remain null and use inference.
+    /// </summary>
+    public int? EnterpriseId { get; set; }
+
+    [ForeignKey(nameof(EnterpriseId))]
+    public Enterprise? Enterprise { get; set; }
 }
 
 /// <summary>

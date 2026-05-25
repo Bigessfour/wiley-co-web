@@ -43,8 +43,11 @@ const contentTypes = new Map([
   [".png", "image/png"],
   [".svg", "image/svg+xml"],
   [".txt", "text/plain; charset=utf-8"],
+  [".wasm", "application/wasm"],
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
+  [".dat", "application/octet-stream"],
+  [".blat", "application/octet-stream"],
 ]);
 
 const writeFile = (response, filePath) => {

@@ -30,6 +30,13 @@ public sealed class ExcelWorkbookBuilder
         return CreateRatePacketWorkbookCore(workspaceState);
     }
 
+    public WorkspaceExportDocument CreateUtilityCustomerDirectoryWorkbook(
+        IReadOnlyList<UtilityCustomerRecord> customers,
+        WorkspaceState workspaceState)
+    {
+        return CreateUtilityCustomerDirectoryWorkbookCore(customers, workspaceState);
+    }
+
     private static ExcelEngine CreateExcelEngine()
     {
         var excelEngine = new ExcelEngine();
@@ -84,6 +91,79 @@ public sealed class ExcelWorkbookBuilder
         PopulateReserveTrajectoryForecastWorksheet(forecastSheet, workspaceState);
 
         return CreateWorkbookExport(workbook, $"{BuildFileStem(workspaceState)}-reserve-trajectory.xlsx");
+    }
+
+    private WorkspaceExportDocument CreateUtilityCustomerDirectoryWorkbookCore(
+        IReadOnlyList<UtilityCustomerRecord> customers,
+        WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(customers);
+        ArgumentNullException.ThrowIfNull(workspaceState);
+
+        using var excelEngine = CreateExcelEngine();
+        var workbook = excelEngine.Excel.Workbooks.Create(1);
+        var worksheet = workbook.Worksheets[0];
+        worksheet.Name = "Customer Directory";
+
+        PopulateUtilityCustomerDirectoryWorksheet(worksheet, customers, workspaceState);
+        return CreateWorkbookExport(workbook, $"{BuildFileStem(workspaceState)}-customers.xlsx");
+    }
+
+    private static void PopulateUtilityCustomerDirectoryWorksheet(
+        IWorksheet worksheet,
+        IReadOnlyList<UtilityCustomerRecord> customers,
+        WorkspaceState workspaceState)
+    {
+        WriteWorkbookTitle(worksheet, $"{workspaceState.SelectedEnterprise} utility customer directory", 1, 7);
+        worksheet.Range[2, 1].Text = "Scenario";
+        worksheet.Range[2, 2].Text = workspaceState.ActiveScenarioName;
+        worksheet.Range[3, 1].Text = "Fiscal Year";
+        worksheet.Range[3, 2].Number = workspaceState.SelectedFiscalYear;
+        worksheet.Range[4, 1].Text = "Active Filters";
+        worksheet.Range[4, 2].Text = BuildCustomerDirectoryFilterSummary(workspaceState);
+
+        WriteHeaderRow(worksheet, 6, ["Account #", "Customer", "Customer Type", "Location", "Status", "Balance", "Phone"]);
+
+        var rowIndex = 7;
+        foreach (var customer in customers)
+        {
+            worksheet.Range[rowIndex, 1].Text = customer.AccountNumber;
+            worksheet.Range[rowIndex, 2].Text = customer.DisplayName;
+            worksheet.Range[rowIndex, 3].Text = customer.CustomerType;
+            worksheet.Range[rowIndex, 4].Text = customer.ServiceLocation;
+            worksheet.Range[rowIndex, 5].Text = customer.Status;
+            worksheet.Range[rowIndex, 6].Number = (double)customer.CurrentBalance;
+            worksheet.Range[rowIndex, 6].NumberFormat = CurrencyNumberFormat;
+            worksheet.Range[rowIndex, 7].Text = customer.PhoneNumber ?? string.Empty;
+            rowIndex++;
+        }
+
+        worksheet.AutoFilters.FilterRange = worksheet.Range[6, 1, Math.Max(rowIndex - 1, 6), 7];
+        worksheet.UsedRange.AutofitColumns();
+    }
+
+    private static string BuildCustomerDirectoryFilterSummary(WorkspaceState workspaceState)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(workspaceState.CustomerSearchTerm))
+        {
+            parts.Add($"Search: {workspaceState.CustomerSearchTerm.Trim()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(workspaceState.SelectedCustomerService)
+            && !string.Equals(workspaceState.SelectedCustomerService, "All Services", StringComparison.Ordinal))
+        {
+            parts.Add($"Customer Type: {workspaceState.SelectedCustomerService}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(workspaceState.SelectedCustomerCityLimits)
+            && !string.Equals(workspaceState.SelectedCustomerCityLimits, "All", StringComparison.Ordinal))
+        {
+            parts.Add($"City Limits: {workspaceState.SelectedCustomerCityLimits}");
+        }
+
+        return parts.Count == 0 ? "None" : string.Join("; ", parts);
     }
 
     private static void PopulateCustomerWorksheet(IWorksheet worksheet, WorkspaceState workspaceState)

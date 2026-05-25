@@ -1,5 +1,7 @@
 using WileyCoWeb.Contracts;
 
+using WileyWidget.Abstractions;
+
 namespace WileyCoWeb.State;
 
 public sealed class WorkspaceState
@@ -546,6 +548,7 @@ public sealed class WorkspaceState
         var hasChanged = SetDecimalWithoutNotify(ref currentRate, rate, currentRate);
         if (hasChanged)
         {
+            hasChanged |= ApplySelectedEnterpriseQuadrantScalarsWithoutNotify(totalCosts, projectedVolume, currentRate);
             hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("current-rate");
             NotifyChanged();
         }
@@ -556,6 +559,7 @@ public sealed class WorkspaceState
         var hasChanged = SetDecimalWithoutNotify(ref totalCosts, costs, totalCosts);
         if (hasChanged)
         {
+            hasChanged |= ApplySelectedEnterpriseQuadrantScalarsWithoutNotify(totalCosts, projectedVolume, currentRate);
             hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("total-costs");
             NotifyChanged();
         }
@@ -566,6 +570,7 @@ public sealed class WorkspaceState
         var hasChanged = SetDecimalWithoutNotify(ref projectedVolume, volume, projectedVolume);
         if (hasChanged)
         {
+            hasChanged |= ApplySelectedEnterpriseQuadrantScalarsWithoutNotify(totalCosts, projectedVolume, currentRate);
             hasChanged |= RecalculateBreakEvenQuadrantsWithoutNotify("projected-volume");
             NotifyChanged();
         }
@@ -732,19 +737,58 @@ public sealed class WorkspaceState
         return true;
     }
 
+    private bool ApplySelectedEnterpriseQuadrantScalarsWithoutNotify(decimal costs, decimal volume, decimal rate)
+    {
+        if (breakEvenQuadrants.Count == 0 || string.IsNullOrWhiteSpace(selectedEnterprise))
+        {
+            return false;
+        }
+
+        var hasChanged = false;
+        for (var index = 0; index < breakEvenQuadrants.Count; index++)
+        {
+            var quadrant = breakEvenQuadrants[index];
+            if (!string.Equals(quadrant.EnterpriseName, selectedEnterprise, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var updated = quadrant with
+            {
+                MonthlyExpenses = costs,
+                EffectiveCustomerCount = volume,
+                CurrentRate = rate
+            };
+
+            if (updated == quadrant)
+            {
+                return false;
+            }
+
+            breakEvenQuadrants[index] = updated;
+            hasChanged = true;
+            break;
+        }
+
+        return hasChanged;
+    }
+
     private BreakEvenQuadrantData RecalculateBreakEvenQuadrant(BreakEvenQuadrantData quadrant)
     {
-        var effectiveCustomerCount = Math.Max(1m, ProjectedVolume);
-        var breakEvenRate = Math.Round(RateCalculator.CalculateRecommendedRate(TotalCosts, ProjectedVolume), 2, MidpointRounding.AwayFromZero);
-        var monthlyRevenue = Math.Round(quadrant.CurrentRate * effectiveCustomerCount, 2, MidpointRounding.AwayFromZero);
-        var monthlyBalance = Math.Round(monthlyRevenue - TotalCosts, 2, MidpointRounding.AwayFromZero);
+        var effectiveCustomerCount = Math.Max(1m, quadrant.EffectiveCustomerCount);
+        var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(
+            quadrant.MonthlyExpenses,
+            effectiveCustomerCount,
+            roundToCurrency: false);
+        var monthlyRevenue = EnterpriseRateService.CalculateMonthlyRevenue(quadrant.CurrentRate, effectiveCustomerCount);
+        var monthlyBalance = EnterpriseRateService.CalculateMonthlyBalance(monthlyRevenue, quadrant.MonthlyExpenses);
         var seriesPoints = RecalculateBreakEvenSeriesPoints(quadrant.SeriesPoints, quadrant.CurrentRate, breakEvenRate);
 
         return new BreakEvenQuadrantData(
             quadrant.EnterpriseName,
             quadrant.EnterpriseType,
             quadrant.CurrentRate,
-            TotalCosts,
+            quadrant.MonthlyExpenses,
             monthlyRevenue,
             monthlyBalance,
             breakEvenRate,

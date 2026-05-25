@@ -1,6 +1,7 @@
 @using System.Globalization
 @using System.Text.Json
 @using Microsoft.Extensions.DependencyInjection
+@using Microsoft.JSInterop
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Grids
@@ -17,6 +18,7 @@
 
 @inject QuickBooksImportApiService ImportApi
 @inject IServiceProvider ServiceProvider
+@inject IJSRuntime JSRuntime
 
 <SfCard CssClass="h-full">
     <CardHeader Title="QuickBooks Import" SubTitle="Clerk-facing CSV/XLSX intake with preview, duplicate checks, and commit confirmation." />
@@ -480,6 +482,8 @@
     };
 
     private const long MaxImportFileSize = 52_428_800;
+    private const string UploaderInputId = "quickbooks-import-uploader";
+    private static readonly TimeSpan UploadReadTimeout = TimeSpan.FromSeconds(15);
 
     [Parameter]
     public WorkspaceState WorkspaceState { get; set; } = default!;
@@ -488,7 +492,7 @@
 
     private readonly Dictionary<string, object> UploaderInputAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["id"] = "quickbooks-import-uploader",
+        ["id"] = UploaderInputId,
         ["aria-label"] = "Choose QuickBooks files",
         ["aria-describedby"] = "quickbooks-import-uploader-help"
     };
@@ -572,13 +576,14 @@
         }
     }
 
-    private Task HandleUploaderFileSelectedAsync(SelectedEventArgs args)
+    private async Task HandleUploaderFileSelectedAsync(SelectedEventArgs args)
     {
         _ = args;
         StatusHeadline = "File selection started";
         StatusMessage = "Validating the selected QuickBooks export and staging it for preview.";
         ImportProgress = Math.Max(ImportProgress, 10);
-        return InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
+        await StageSelectedUploadFromUploaderAsync().ConfigureAwait(false);
     }
 
     private async Task HandleUploaderValueChangeAsync(UploadChangeEventArgs args)
@@ -589,31 +594,31 @@
             return;
         }
 
+        await StageSelectedUploadFromUploaderAsync(args.Files).ConfigureAwait(false);
+    }
+
+    private async Task StageSelectedUploadFromUploaderAsync(IReadOnlyList<UploadFiles>? uploadFiles = null)
+    {
+        var selectionFailed = false;
+
         try
         {
             IsBusy = true;
             ImportProgress = 15;
-            await InvokeAsync(StateHasChanged);
 
-            byte[]? activeFileBytes = null;
-            string activeFileName = string.Empty;
-
-            foreach (var file in args.Files)
+            var stagedFile = await ReadStagedUploadFileAsync(uploadFiles).ConfigureAwait(false);
+            if (stagedFile is null)
             {
-                await using var memoryStream = new MemoryStream();
-                await using var fileStream = file.File.OpenReadStream(MaxImportFileSize);
-                await fileStream.CopyToAsync(memoryStream).ConfigureAwait(false);
-
-                activeFileBytes = memoryStream.ToArray();
-                activeFileName = file.File.Name;
+                throw new InvalidOperationException("No QuickBooks export bytes were available after file selection.");
             }
 
-            SelectedFileBytes = activeFileBytes;
-            SelectedFileName = activeFileName;
-            StagedFileCount = args.Files.Count;
+            SelectedFileBytes = stagedFile.Value.Bytes;
+            SelectedFileName = stagedFile.Value.Name;
+            StagedFileCount = stagedFile.Value.FileCount;
         }
         catch (Exception ex)
         {
+            selectionFailed = true;
             SelectedFileBytes = null;
             SelectedFileName = string.Empty;
             StagedFileCount = 0;
@@ -625,6 +630,12 @@
         finally
         {
             IsBusy = false;
+        }
+
+        if (selectionFailed)
+        {
+            await InvokeAsync(StateHasChanged);
+            return;
         }
 
         PreviewResponse = null;
@@ -644,6 +655,42 @@
         ShowCommitDialog = false;
         await InvokeAsync(StateHasChanged);
     }
+
+    private async Task<(byte[] Bytes, string Name, int FileCount)?> ReadStagedUploadFileAsync(IReadOnlyList<UploadFiles>? files)
+    {
+        if (files is { Count: > 0 })
+        {
+            var uploadFile = files[^1];
+
+            try
+            {
+                using var readTimeout = new CancellationTokenSource(UploadReadTimeout);
+                await using var memoryStream = new MemoryStream();
+                await using var fileStream = uploadFile.File.OpenReadStream(MaxImportFileSize, readTimeout.Token);
+                await fileStream.CopyToAsync(memoryStream, readTimeout.Token).ConfigureAwait(false);
+
+                return (memoryStream.ToArray(), uploadFile.File.Name, files.Count);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or InvalidOperationException or JSException)
+            {
+                // Syncfusion IBrowserFile streams can stall under automation; fall back to the native input.
+            }
+        }
+
+        var domPayload = await JSRuntime.InvokeAsync<DomUploaderFilePayload?>(
+            "wileyQuickBooks.readSelectedFile",
+            UploaderInputId,
+            MaxImportFileSize).ConfigureAwait(false);
+
+        if (domPayload is null || domPayload.Bytes.Length == 0)
+        {
+            return null;
+        }
+
+        return (domPayload.Bytes, domPayload.Name, domPayload.FileCount);
+    }
+
+    private sealed record DomUploaderFilePayload(string Name, byte[] Bytes, int FileCount);
 
     private async Task OpenCommitDialogAsync()
     {

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
+using WileyWidget.Abstractions;
 using WileyWidget.Models;
 
 namespace WileyCoWeb.Components.Panels;
@@ -36,7 +37,7 @@ public partial class BreakEvenPanel : ComponentBase
     private IReadOnlyList<BreakEvenQuadrantData> BuildFallbackQuadrants()
     {
         var labels = new[] { "Current", "Projected", "Forward" };
-        var breakEvenRate = ProjectedVolume > 0 ? TotalCosts / ProjectedVolume : 0m;
+        var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(TotalCosts, ProjectedVolume, roundToCurrency: true);
         var expensesPerCustomer = breakEvenRate;
 
         return new[]
@@ -50,7 +51,7 @@ public partial class BreakEvenPanel : ComponentBase
 
     private BreakEvenQuadrantData BuildFallbackQuadrant(string enterpriseName, string enterpriseType, IReadOnlyList<string> labels, decimal breakEvenRate, decimal expensesPerCustomer)
     {
-        var revenue = ProjectedVolume > 0 ? TotalCosts / ProjectedVolume : 0m;
+        var revenue = EnterpriseRateService.CalculateBreakEvenRate(TotalCosts, ProjectedVolume, roundToCurrency: true);
         var seriesPoints = labels
             .Select(label => new BreakEvenSeriesPoint(label, revenue, expensesPerCustomer, breakEvenRate))
             .ToList();
@@ -69,7 +70,7 @@ public partial class BreakEvenPanel : ComponentBase
 
     protected double GetRateAdequacy(BreakEvenQuadrantData quadrant)
         => quadrant.BreakEvenRate > 0 && quadrant.CurrentRate > 0
-            ? Math.Min((double)(quadrant.CurrentRate / quadrant.BreakEvenRate * 100m), 150.0)
+            ? (double)EnterpriseRateService.CalculateRateAdequacyPercent(quadrant.CurrentRate, quadrant.BreakEvenRate)
             : 0.0;
 
     protected string GetRateAdequacyCssClass(BreakEvenQuadrantData quadrant)

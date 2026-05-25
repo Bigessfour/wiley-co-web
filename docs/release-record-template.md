@@ -76,7 +76,7 @@ Use this section whenever the release could affect chat, transport, model config
 - Enterprise tested:
 - Fiscal year tested:
 - Non-onboarding turn completed: Yes / No
-- `UsedFallback=false` observed: Yes / No
+- `latestUsedFallback=false` observed: Yes / No
 - `AnswerSource` observed:
 - `FailureCode` observed:
 - `ElapsedMs` observed:

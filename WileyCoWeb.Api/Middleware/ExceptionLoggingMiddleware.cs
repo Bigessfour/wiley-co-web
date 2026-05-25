@@ -46,6 +46,7 @@ public sealed class ExceptionLoggingMiddleware
 
             LogExceptionDetails(ex, requestId);
 
+            // Let GlobalExceptionHandler (UseExceptionHandler) produce ProblemDetails.
             throw;
         }
     }

@@ -9,6 +9,7 @@ The canonical database shape is the EF Core migration set in `src/WileyWidget.Da
 Current initial PostgreSQL migration:
 
 - `20260415122817_InitialCreate.cs`
+- `20260525204607_SchemaAlignmentProductionReadiness.cs` — schema alignment (Charge FK, BudgetInteraction cleanup, UtilityCustomers.EnterpriseId, audit/ledger/budget indexes, QuickBooks routing tables, ApartmentUnitTypes)
 - `AppDbContextModelSnapshot.cs`
 
 Do not treat `docs/amplify-db-schema.sql` as the full database definition anymore. That SQL file is now only an import-pipeline reference.
@@ -76,6 +77,14 @@ If you only need to bring Aurora forward without a wipe:
 ./Scripts/reset-aurora-postgres.ps1
 ```
 
+Or apply through the Data API when direct TCP is unavailable:
+
+```powershell
+./Scripts/apply-aurora-migration-data-api.ps1 -NoBuild
+```
+
+**Production note:** `SchemaAlignmentProductionReadiness` drops legacy `Charges.BillId` and `BudgetInteraction.EnterpriseId` after copying data to canonical columns. It fails fast if orphan `Charges` rows exist. Run `RUN_POSTGRES_TESTS=true dotnet test tests/WileyCoWeb.IntegrationTests --filter Category=Postgres` locally before Aurora apply.
+
 ## Manual Equivalent Commands
 
 ```powershell
@@ -99,6 +108,11 @@ Schema validation:
 - `Enterprises`
 - `BudgetEntries`
 - `MunicipalAccounts`
+- `Charges.UtilityBillId` present; legacy `Charges.BillId` absent
+- `BudgetInteraction.PrimaryEnterpriseId` present; legacy `BudgetInteraction.EnterpriseId` absent
+- `UtilityCustomers.EnterpriseId` nullable FK + index
+- `IX_AuditEntries_Timestamp`, `IX_ledger_entries_entry_date`, `IX_ledger_entries_entry_scope`, `IX_BudgetEntries_SourceFilePath`
+- `ApartmentUnitTypes`, `quickbooks_routing_rules`, `quickbooks_allocation_profiles`
 
 API validation:
 

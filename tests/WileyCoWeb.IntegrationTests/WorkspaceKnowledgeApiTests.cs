@@ -8,6 +8,7 @@ using WileyWidget.Services.Abstractions;
 
 namespace WileyCoWeb.IntegrationTests;
 
+[Trait("Category", "HighRisk")]
 public sealed class WorkspaceKnowledgeApiTests : IClassFixture<ApiApplicationFactory>
 {
     private readonly ApiApplicationFactory factory;

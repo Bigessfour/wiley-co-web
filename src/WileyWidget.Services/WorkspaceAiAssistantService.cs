@@ -174,8 +174,9 @@ public sealed class WorkspaceAiAssistantService
             };
 
             logger.LogInformation("Workspace AI returned onboarding fallback for first conversation {ConversationId}", conversationId);
-            LogRequestCompleted(request, onboardingResponse, conversationId, conversationHistory.Count, "onboarding", null, requestStopwatch.ElapsedMilliseconds);
-            return onboardingResponse;
+            var finalizedOnboarding = FinalizeResponse(onboardingResponse, activeUser, conversationId, conversationHistory.Count, "onboarding", userProfileSummary: BuildOnboardingProfileSummary(activeUser));
+            LogRequestCompleted(request, finalizedOnboarding, conversationId, conversationHistory.Count, "onboarding", null, requestStopwatch.ElapsedMilliseconds);
+            return finalizedOnboarding;
         }
 
         var assistant = kernelContext.Value;
@@ -192,10 +193,10 @@ public sealed class WorkspaceAiAssistantService
         {
             try
             {
-                var liveResponse = await ExecuteSemanticKernelAsync(assistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+                var liveResponse = await ExecuteSemanticKernelAsync(assistant, activeUser, request, question, conversationHistory, "semantic_kernel", cancellationToken).ConfigureAwait(false);
                 if (liveResponse is not null)
                 {
-                    LogRequestCompleted(request, liveResponse, conversationId, liveResponse.ConversationMessageCount, "semantic_kernel", null, requestStopwatch.ElapsedMilliseconds);
+                    LogRequestCompleted(request, liveResponse, conversationId, liveResponse.ConversationMessageCount, liveResponse.AnswerSource ?? "semantic_kernel", liveResponse.FailureCode, requestStopwatch.ElapsedMilliseconds);
                     return liveResponse;
                 }
             }
@@ -236,15 +237,16 @@ public sealed class WorkspaceAiAssistantService
                 var directAssistant = CreateKernelContext(directChatCompletionEndpoint);
                 if (directAssistant is not null)
                 {
-                    var directResponse = await ExecuteSemanticKernelAsync(directAssistant, activeUser, request, question, conversationHistory, cancellationToken).ConfigureAwait(false);
+                    var directResponse = await ExecuteSemanticKernelAsync(directAssistant, activeUser, request, question, conversationHistory, "semantic_kernel_direct_retry", cancellationToken).ConfigureAwait(false);
                     if (directResponse is not null)
                     {
                         logger.LogInformation(
                             "Workspace AI returned a direct xAI answer for {Enterprise} FY {FiscalYear} after proxy transport failure.",
                             request.SelectedEnterprise,
                             request.SelectedFiscalYear);
-                        LogRequestCompleted(request, directResponse, conversationId, directResponse.ConversationMessageCount, "semantic_kernel_direct_retry", fallbackDiagnosticCode, requestStopwatch.ElapsedMilliseconds);
-                        return directResponse;
+                        var finalizedDirect = directResponse with { FailureCode = fallbackDiagnosticCode };
+                        LogRequestCompleted(request, finalizedDirect, conversationId, finalizedDirect.ConversationMessageCount, finalizedDirect.AnswerSource ?? "semantic_kernel_direct_retry", fallbackDiagnosticCode, requestStopwatch.ElapsedMilliseconds);
+                        return finalizedDirect;
                     }
                 }
             }
@@ -278,7 +280,7 @@ public sealed class WorkspaceAiAssistantService
                 conversationId,
                 conversationHistory.Count,
                 fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
-            var finalRateLimitedResponse = ApplyUserMetadata(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count);
+            var finalRateLimitedResponse = FinalizeResponse(rateLimitedResponse, activeUser, conversationId, conversationHistory.Count, "rate_limit_fallback", fallbackDiagnosticCode ?? "rate_limited");
             LogRequestCompleted(request, finalRateLimitedResponse, conversationId, conversationHistory.Count, "rate_limit_fallback", fallbackDiagnosticCode ?? "rate_limited", requestStopwatch.ElapsedMilliseconds);
             return finalRateLimitedResponse;
         }
@@ -291,7 +293,7 @@ public sealed class WorkspaceAiAssistantService
 
             var legacyResponse = new WorkspaceChatResponse(question, legacyResult.Answer, true, contextSummary);
             logger.LogInformation("Workspace AI returned legacy xAI fallback answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, conversationHistory.Count);
-            var finalLegacyResponse = ApplyUserMetadata(legacyResponse, activeUser, conversationId, conversationHistory.Count);
+            var finalLegacyResponse = FinalizeResponse(legacyResponse, activeUser, conversationId, conversationHistory.Count, "legacy_xai_fallback", fallbackDiagnosticCode ?? legacyResult.FailureCode);
             LogRequestCompleted(request, finalLegacyResponse, conversationId, conversationHistory.Count, "legacy_xai_fallback", fallbackDiagnosticCode ?? legacyResult.FailureCode, requestStopwatch.ElapsedMilliseconds);
             return finalLegacyResponse;
         }
@@ -310,7 +312,7 @@ public sealed class WorkspaceAiAssistantService
             conversationHistory.Count,
             fallbackDiagnosticCode ?? semanticKernelStatusCode,
             fallbackDiagnosticMessage ?? semanticKernelStatusMessage);
-        var finalFallbackResponse = ApplyUserMetadata(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count);
+        var finalFallbackResponse = FinalizeResponse(fallbackChatResponse, activeUser, conversationId, conversationHistory.Count, "deterministic_fallback", fallbackDiagnosticCode ?? semanticKernelStatusCode);
         LogRequestCompleted(request, finalFallbackResponse, conversationId, conversationHistory.Count, "deterministic_fallback", fallbackDiagnosticCode ?? semanticKernelStatusCode, requestStopwatch.ElapsedMilliseconds);
         return finalFallbackResponse;
     }
@@ -358,12 +360,15 @@ public sealed class WorkspaceAiAssistantService
     private KernelContext? CreateKernelContext(Uri chatEndpoint)
         => InitializeKernelContext(chatEndpoint);
 
+    public bool IsSemanticKernelAvailable => kernelContext.Value is not null;
+
     private async Task<WorkspaceChatResponse?> ExecuteSemanticKernelAsync(
         KernelContext assistant,
         ResolvedUserContext activeUser,
         WorkspaceChatRequest request,
         string question,
         IReadOnlyList<WorkspaceChatMessage> conversationHistory,
+        string answerSource,
         CancellationToken cancellationToken)
     {
         var conversationId = BuildConversationId(activeUser, request);
@@ -403,7 +408,7 @@ public sealed class WorkspaceAiAssistantService
 
             var chatResponse = new WorkspaceChatResponse(question, answer, false, BuildContextSummary(request));
             logger.LogInformation("Workspace AI returned tool-backed answer for conversation {ConversationId} with {TurnCount} stored turns", conversationId, updatedConversationHistory.Count);
-            return ApplyUserMetadata(chatResponse, activeUser, conversationId, updatedConversationHistory.Count);
+            return FinalizeResponse(chatResponse, activeUser, conversationId, updatedConversationHistory.Count, answerSource);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -958,6 +963,28 @@ public sealed class WorkspaceAiAssistantService
             ConversationMessageCount = messageCount,
             IsFirstConversation = messageCount <= 2,
             CanResetConversation = true
+        };
+    }
+
+    private static WorkspaceChatResponse FinalizeResponse(
+        WorkspaceChatResponse response,
+        ResolvedUserContext user,
+        string conversationId,
+        int messageCount,
+        string answerSource,
+        string? failureCode = null,
+        string? userProfileSummary = null)
+    {
+        return response with
+        {
+            UserDisplayName = user.DisplayName,
+            UserProfileSummary = userProfileSummary ?? user.PreferencesSummary,
+            ConversationId = conversationId,
+            ConversationMessageCount = messageCount,
+            IsFirstConversation = messageCount <= 2,
+            CanResetConversation = true,
+            AnswerSource = answerSource,
+            FailureCode = failureCode
         };
     }
 

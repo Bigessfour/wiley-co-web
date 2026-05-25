@@ -40,6 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="src\WileyWidget.Abstractions\WileyWidget.Abstractions.csproj" />
     <ProjectReference Include="src\WileyWidget.Models\WileyWidget.Models.csproj" />
   </ItemGroup>
 

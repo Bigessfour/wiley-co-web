@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
+using WileyWidget.Abstractions;
 using WileyWidget.Data;
 using WileyWidget.Models;
 using WileyWidget.Models.Amplify;
@@ -123,7 +124,7 @@ internal sealed class WorkspaceSnapshotComposer
         WorkspaceSnapshotSelectionData selectionData,
         CancellationToken cancellationToken)
     {
-        var customers = await LoadCustomersAsync(context, selectionData.SelectedEnterprise.Name, cancellationToken);
+        var customers = await LoadCustomersAsync(context, selectionData.SelectedEnterprise, cancellationToken);
         var customerRows = BuildCustomerRows(selectionData.PersistedSnapshot, customers);
         var serviceOptions = BuildServiceOptions(customerRows);
 
@@ -308,8 +309,27 @@ internal sealed class WorkspaceSnapshotComposer
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<List<UtilityCustomer>> LoadCustomersAsync(AppDbContext context, string selectedEnterpriseName, CancellationToken cancellationToken)
+    private async Task<List<UtilityCustomer>> LoadCustomersAsync(AppDbContext context, Enterprise selectedEnterprise, CancellationToken cancellationToken)
     {
+        var selectedEnterpriseName = selectedEnterprise.Name;
+
+        if (selectedEnterprise.Id > 0)
+        {
+            var byEnterpriseId = await context.UtilityCustomers
+                .AsNoTracking()
+                .Where(customer => customer.EnterpriseId == selectedEnterprise.Id)
+                .OrderBy(customer => customer.AccountNumber)
+                .ThenBy(customer => customer.LastName)
+                .ThenBy(customer => customer.FirstName)
+                .ToListAsync(cancellationToken);
+
+            if (byEnterpriseId.Count > 0)
+            {
+                return byEnterpriseId;
+            }
+        }
+
+        // Legacy rows without EnterpriseId FK: fall back to heuristic matching until backfill completes.
         return (await context.UtilityCustomers
                 .AsNoTracking()
                 .ToListAsync(cancellationToken))
@@ -393,7 +413,7 @@ internal sealed class WorkspaceSnapshotComposer
 
     private static decimal CalculateRecommendedRate(decimal totalCosts, decimal projectedVolume)
     {
-        return projectedVolume == 0 ? 0m : Math.Round(totalCosts / projectedVolume, 2, MidpointRounding.AwayFromZero);
+        return EnterpriseRateService.CalculateBreakEvenRate(totalCosts, projectedVolume, roundToCurrency: false);
     }
 
     private static List<ProjectionRow> BuildProjectionRowsFromPersisted(WorkspaceBootstrapData persistedSnapshot)
@@ -425,10 +445,10 @@ internal sealed class WorkspaceSnapshotComposer
     private static BreakEvenQuadrantData BuildBreakEvenQuadrant(Enterprise enterprise, IReadOnlyList<ProjectionRow> projectionRows)
     {
         var effectiveCustomers = Math.Max(1m, enterprise.EffectiveCustomerCount);
-        var breakEvenRate = Math.Round(enterprise.MonthlyExpenses / effectiveCustomers, 2, MidpointRounding.AwayFromZero);
+        var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(enterprise.MonthlyExpenses, effectiveCustomers, roundToCurrency: false);
         var monthlyRevenue = Math.Round(enterprise.MonthlyRevenue, 2, MidpointRounding.AwayFromZero);
         var monthlyBalance = Math.Round(enterprise.MonthlyBalance, 2, MidpointRounding.AwayFromZero);
-        var expensesPerCustomer = Math.Round(enterprise.MonthlyExpenses / effectiveCustomers, 2, MidpointRounding.AwayFromZero);
+        var expensesPerCustomer = breakEvenRate;
 
         var seriesPoints = BuildBreakEvenSeriesPoints(projectionRows, enterprise.CurrentRate, breakEvenRate, expensesPerCustomer);
 

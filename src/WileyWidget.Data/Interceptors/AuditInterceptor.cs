@@ -21,15 +21,18 @@ namespace WileyWidget.Data.Interceptors
         private readonly ILogger<AuditInterceptor> _logger;
         private readonly IUserContext _userContext;
         private readonly IAuditService _auditService;
+        private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
         public AuditInterceptor(
             ILogger<AuditInterceptor> logger,
             IUserContext userContext,
-            IAuditService auditService)
+            IAuditService auditService,
+            IDbContextFactory<AppDbContext> contextFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userContext = userContext ?? throw new ArgumentNullException(nameof(userContext));
             _auditService = auditService ?? throw new ArgumentNullException(nameof(auditService));
+            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         }
 
         public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
@@ -277,16 +280,10 @@ namespace WileyWidget.Data.Interceptors
         {
             try
             {
-                if (context is AppDbContext appContext)
-                {
-                    await appContext.AuditEntries.AddRangeAsync(auditEntries, cancellationToken);
-                    await appContext.SaveChangesAsync(cancellationToken);
-                    _logger.LogInformation("AuditInterceptor: Persisted {Count} audit entries", auditEntries.Count);
-                }
-                else
-                {
-                    _logger.LogWarning("AuditInterceptor: Cannot persist audit entries - context is not AppDbContext");
-                }
+                await using var auditContext = await _contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+                await auditContext.AuditEntries.AddRangeAsync(auditEntries, cancellationToken).ConfigureAwait(false);
+                await auditContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("AuditInterceptor: Persisted {Count} audit entries", auditEntries.Count);
             }
             catch (Exception ex)
             {

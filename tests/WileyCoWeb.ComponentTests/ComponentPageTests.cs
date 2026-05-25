@@ -336,8 +336,15 @@ public sealed class ComponentPageTests
 
 		Assert.Equal(4, workspaceState.BreakEvenQuadrants.Count);
 		Assert.Contains(workspaceState.BreakEvenQuadrants, quadrant => quadrant.EnterpriseName == WorkspaceTestData.WaterUtility);
-		Assert.All(workspaceState.BreakEvenQuadrants, quadrant => Assert.Equal(60.00m, quadrant.BreakEvenRate));
-		Assert.All(workspaceState.BreakEvenQuadrants, quadrant => Assert.All(quadrant.SeriesPoints, point => Assert.Equal(60.00m, point.BreakEvenPerCustomer)));
+
+		var waterQuadrant = workspaceState.BreakEvenQuadrants.Single(quadrant => quadrant.EnterpriseName == WorkspaceTestData.WaterUtility);
+		Assert.Equal(60.00m, waterQuadrant.BreakEvenRate);
+		Assert.All(waterQuadrant.SeriesPoints, point => Assert.Equal(60.00m, point.BreakEvenPerCustomer));
+
+		var unchangedBaselineRate = Math.Round(WorkspaceTestData.BaselineTotalCosts / WorkspaceTestData.BaselineProjectedVolume, 2, MidpointRounding.AwayFromZero);
+		Assert.All(
+			workspaceState.BreakEvenQuadrants.Where(quadrant => quadrant.EnterpriseName != WorkspaceTestData.WaterUtility),
+			quadrant => Assert.Equal(unchangedBaselineRate, quadrant.BreakEvenRate));
 	}
 
 	[Fact]

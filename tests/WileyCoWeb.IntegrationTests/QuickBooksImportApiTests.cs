@@ -63,6 +63,7 @@ public sealed class QuickBooksImportApiTests : IClassFixture<ApiApplicationFacto
 	}
 
 	[Fact]
+	[Trait("Category", "HighRisk")]
 	public async Task Commit_PersistsRows_AndRejectsDuplicateFile()
 	{
 		await factory.ResetDatabaseAsync();
@@ -92,6 +93,64 @@ public sealed class QuickBooksImportApiTests : IClassFixture<ApiApplicationFacto
 		Assert.True(duplicateCommit.IsDuplicate);
 		Assert.Equal(0, duplicateCommit.ImportedRows);
 		Assert.Contains("Duplicate QuickBooks import blocked", duplicateCommit.StatusMessage);
+	}
+
+	[Fact]
+	[Trait("Category", "HighRisk")]
+	public async Task QuickBooksImport_RejectsDuplicateFileHash()
+	{
+		await factory.ResetDatabaseAsync();
+		using var client = factory.CreateClient();
+
+		var firstCommitResponse = await PostImportAsync(client, "/api/imports/quickbooks/commit", CreateQuickBooksCsv());
+		firstCommitResponse.EnsureSuccessStatusCode();
+
+		var duplicateResponse = await PostImportAsync(client, "/api/imports/quickbooks/commit", CreateQuickBooksCsv());
+		Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+
+		var duplicateCommit = await duplicateResponse.Content.ReadFromJsonAsync<QuickBooksImportCommitResponse>(jsonOptions);
+		Assert.NotNull(duplicateCommit);
+		Assert.True(duplicateCommit.IsDuplicate);
+		Assert.Contains("duplicate", duplicateCommit.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+		var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
+		await using var context = await contextFactory.CreateDbContextAsync();
+		Assert.Equal(1, await context.ImportBatches.CountAsync());
+	}
+
+	[Fact]
+	[Trait("Category", "HighRisk")]
+	public async Task QuickBooksImport_RejectsDuplicateFileHash_ForExcelWorkbook()
+	{
+		await factory.ResetDatabaseAsync();
+		using var client = factory.CreateClient();
+		var fileBytes = CreateQuickBooksWorkbookMatchingCsv();
+
+		var firstCommitResponse = await PostImportAsync(
+			client,
+			"/api/imports/quickbooks/commit",
+			fileBytes,
+			"duplicate-test.xlsx",
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		firstCommitResponse.EnsureSuccessStatusCode();
+
+		var duplicateResponse = await PostImportAsync(
+			client,
+			"/api/imports/quickbooks/commit",
+			fileBytes,
+			"duplicate-test.xlsx",
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+		Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+
+		var duplicateCommit = await duplicateResponse.Content.ReadFromJsonAsync<QuickBooksImportCommitResponse>(jsonOptions);
+		Assert.NotNull(duplicateCommit);
+		Assert.True(duplicateCommit.IsDuplicate);
+		Assert.Contains("duplicate", duplicateCommit.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+		var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
+		await using var context = await contextFactory.CreateDbContextAsync();
+		Assert.Equal(1, await context.ImportBatches.CountAsync());
+		Assert.Equal(1, await context.SourceFiles.CountAsync());
 	}
 
 	[Fact]

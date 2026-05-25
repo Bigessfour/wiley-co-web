@@ -65,7 +65,7 @@ Current platform note:
 
 - Execute the normal QuickBooks import flow through the upload panel.
 - Retain import evidence: operator, enterprise, fiscal year, filenames, counts, and follow-up validation results.
-- Reconfirm that workspace snapshot, workspace knowledge, and one non-onboarding Jarvis turn still reflect current live data.
+- Reconfirm that workspace snapshot, workspace knowledge, `/api/ai/health`, and one non-onboarding Jarvis turn still reflect current live data.
 - Review runtime sizing and alarm thresholds against the last month of traffic and import activity.
 
 ## 4. Normal Release Workflow
@@ -192,6 +192,18 @@ Current alarms documented for the production runtime include:
 Operational note:
 
 - `WileyCo-Jarvis-FallbackUsed` and `WileyCo-Jarvis-Legacy403Forbidden` are currently diagnostic-only unless re-promoted to notification actions.
+
+### Jarvis health endpoint
+
+`GET /api/ai/health` (alias: `GET /api/jarvis/health`) returns the latest Jarvis turn metadata:
+
+- `semanticKernelAvailable`
+- `latestAnswerSource`
+- `latestUsedFallback`
+- `latestFailureCode`
+- `lastTurnAtUtc`
+
+Use this endpoint during release validation alongside CloudWatch `AnswerSource` queries. A council-ready release should show at least one non-onboarding turn with `latestAnswerSource=semantic_kernel` and `latestUsedFallback=false`.
 
 ### Jarvis completion log
 
@@ -362,6 +374,15 @@ Best-practice cadence:
 - Keep operator access limited to named deployment and support owners.
 - Review alarm actions and notification recipients after team or ownership changes.
 - Keep production domain, API host, and data-store changes out of the same release window unless there is a documented rollback plan for the combined change.
+- **API JWT scaffolding:** `Authentication:Jwt:Enabled` gates mutating routes and export downloads. Production values (Town of Wiley Cognito):
+  - `Authentication__Jwt__Enabled=true`
+  - `Authentication__Jwt__Authority=https://cognito-idp.us-east-2.amazonaws.com/us-east-2_DmY7BCBIp`
+  - `Authentication__Jwt__Audience=2m6vp91m9938jpbg2efivr2p8k` (Amplify web app client)
+  - Amplify Auth must send `Authorization: Bearer` tokens on mutating API calls. When JWT is disabled (local dev / integration tests), identity falls back to `X-Wiley-User-*` headers only — never rely on those headers in production with JWT disabled on a public host.
+- **Copilot / operator Cognito smoke tests:** IAM user `copilot` has managed policy `WileyWidgetCopilotCognitoSmokeTest` (Cognito admin auth on pool `us-east-2_DmY7BCBIp` + read secret `wiley-widget/temp/copilot-cognito-smoke`). With `copilot` AWS credentials configured:
+  - `pwsh Scripts/get-cognito-smoke-token.ps1` — returns a Bearer access token
+  - `pwsh Scripts/smoke-test-jarvis-production.ps1` — exercises `/api/ai/health` and `/api/ai/chat` on App Runner
+  - Requires the current API image (Jarvis routes + JWT). Rotate the smoke-test Cognito password via Secrets Manager after use.
 
 ## 13. Standing Follow-Up Work
 

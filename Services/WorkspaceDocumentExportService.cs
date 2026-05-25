@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System.IO.Compression;
+using WileyCoWeb.Contracts;
 using WileyCoWeb.State;
 
 namespace WileyCoWeb.Services;
@@ -19,6 +20,23 @@ public sealed class WorkspaceDocumentExportService(
 
         var document = _excelBuilder.CreateCustomerWorkbook(workspaceState);
         logger?.LogInformation("Customer workbook export created: {FileName} ({ByteCount} bytes)", document.FileName, document.Content.LongLength);
+        return document;
+    }
+
+    public WorkspaceExportDocument CreateUtilityCustomerDirectoryWorkbook(
+        IReadOnlyList<UtilityCustomerRecord> customers,
+        WorkspaceState workspaceState)
+    {
+        ArgumentNullException.ThrowIfNull(customers);
+        ArgumentNullException.ThrowIfNull(workspaceState);
+        logger?.LogInformation(
+            "Creating utility customer directory export for {Enterprise} FY {FiscalYear} with {CustomerCount} filtered customers.",
+            workspaceState.SelectedEnterprise,
+            workspaceState.SelectedFiscalYear,
+            customers.Count);
+
+        var document = _excelBuilder.CreateUtilityCustomerDirectoryWorkbook(customers, workspaceState);
+        logger?.LogInformation("Utility customer directory export created: {FileName} ({ByteCount} bytes)", document.FileName, document.Content.LongLength);
         return document;
     }
 

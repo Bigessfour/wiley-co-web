@@ -3,6 +3,7 @@
 @using Syncfusion.Blazor.CircularGauge
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
+@using WileyWidget.Abstractions
 
 <div class="space-y-6" id="data-dashboard-panel">
 
@@ -297,10 +298,11 @@
     [Parameter] public int SelectedFiscalYear { get; set; }
 
     // ── Computed KPIs ─────────────────────────────────────────────────────────
-    private decimal MonthlyRevenue => CurrentRate * ProjectedVolume;
-    private decimal NetPosition    => MonthlyRevenue - TotalCosts;
-    private double CoverageRatio   => TotalCosts > 0 ? (double)(MonthlyRevenue / TotalCosts) : 0d;
-    private double RateAdequacy    => RecommendedRate > 0 ? (double)(CurrentRate / RecommendedRate * 100m) : 0d;
+    private decimal EffectiveBreakEvenRate => ScenarioCostTotal > 0m ? AdjustedRecommendedRate : RecommendedRate;
+    private decimal MonthlyRevenue => EnterpriseRateService.CalculateMonthlyRevenue(CurrentRate, ProjectedVolume);
+    private decimal NetPosition => EnterpriseRateService.CalculateMonthlyBalance(MonthlyRevenue, ScenarioCostTotal > 0m ? TotalCosts + ScenarioCostTotal : TotalCosts);
+    private double CoverageRatio => TotalCosts > 0 ? (double)(MonthlyRevenue / (ScenarioCostTotal > 0m ? TotalCosts + ScenarioCostTotal : TotalCosts)) : 0d;
+    private double RateAdequacy => EffectiveBreakEvenRate > 0 ? (double)EnterpriseRateService.CalculateRateAdequacyPercent(CurrentRate, EffectiveBreakEvenRate) : 0d;
 
     // ── Waterfall ─────────────────────────────────────────────────────────────
     private IReadOnlyList<WaterfallPoint> WaterfallPoints

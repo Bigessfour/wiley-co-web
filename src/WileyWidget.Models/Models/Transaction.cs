@@ -26,6 +26,13 @@ public class Transaction : IAuditable
     public BudgetEntry BudgetEntry { get; set; } = null!;
 
     /// <summary>
+    /// Optional municipal account for this transaction (p2 schema alignment with BudgetEntry)
+    /// </summary>
+    public int? MunicipalAccountId { get; set; }
+    [ForeignKey("MunicipalAccountId")]
+    public MunicipalAccount? MunicipalAccount { get; set; }
+
+    /// <summary>
     /// Transaction amount
     /// </summary>
     [Required]

@@ -1,0 +1,13 @@
+# Wiley Widget — project-scoped Grok Build config
+# Docs: https://docs.x.ai/build/overview
+#
+# Grok merges: cwd/.grok/config.toml > repo-root/.grok/config.toml > ~/.grok/config.toml
+# Project files currently support [mcp_servers] only. Model, UI, and permission defaults
+# belong in ~/.grok/config.toml or CLI flags (see Scripts/setup-grok.ps1).
+
+# Example MCP servers (uncomment and configure as needed):
+# [mcp_servers.github]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-github"]
+# env = { GITHUB_PERSONAL_ACCESS_TOKEN = "ghp_xxx" }
+# enabled = true

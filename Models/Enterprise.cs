@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using WileyWidget.Abstractions;
 
 namespace WileyWidget.Models;
 
@@ -259,7 +260,10 @@ public partial class Enterprise : ISoftDeletable
     public decimal MonthlyBalance => MonthlyRevenue - MonthlyExpenses;
 
     [NotMapped]
-    public decimal BreakEvenRate => EffectiveCustomerCount > 0 ? MonthlyExpenses / EffectiveCustomerCount : 0;
+    public decimal BreakEvenRate => EnterpriseRateService.CalculateBreakEvenRate(
+        MonthlyExpenses,
+        EffectiveCustomerCount,
+        roundToCurrency: false);
 
     [NotMapped]
     public string UnitLabel => string.Equals(Type, "Apartments", StringComparison.OrdinalIgnoreCase) ? "Units" : "Customers";
@@ -392,11 +396,12 @@ public partial class Enterprise : ISoftDeletable
 
     public decimal CalculateRateAdjustmentForTarget(decimal targetBalance)
     {
-        if (CitizenCount == 0)
+        // Redirect to EffectiveCustomerCount per p1-rate-consolidation; use domain Effective count (handles Apartments)
+        if (EffectiveCustomerCount <= 0)
             return 0;
 
         var targetRevenue = MonthlyExpenses + targetBalance;
-        var targetRate = targetRevenue / CitizenCount;
+        var targetRate = targetRevenue / EffectiveCustomerCount;
         return targetRate - CurrentRate;
     }
 

@@ -3,6 +3,7 @@ using Syncfusion.Drawing;
 using Syncfusion.Pdf;
 using Syncfusion.Pdf.Graphics;
 using Syncfusion.XlsIO;
+using WileyWidget.Abstractions;
 
 namespace WileyWidget.Services;
 
@@ -294,8 +295,11 @@ public sealed class WorkspaceSnapshotExportArchiveService
         public List<WorkspaceArchiveProjectionRow> ProjectionRows { get; init; } = [];
 
         public decimal ScenarioCostTotal => ScenarioItems.Sum(item => item.Cost);
-        public decimal RecommendedRate => ProjectedVolume is null or 0 ? 0m : (TotalCosts ?? 0m) / ProjectedVolume.Value;
-        public decimal AdjustedRecommendedRate => ProjectedVolume is null or 0 ? 0m : ((TotalCosts ?? 0m) + ScenarioCostTotal) / ProjectedVolume.Value;
+        public decimal RecommendedRate => EnterpriseRateService.CalculateBreakEvenRate(TotalCosts ?? 0m, ProjectedVolume ?? 0m);
+        public decimal AdjustedRecommendedRate => EnterpriseRateService.CalculateAdjustedBreakEvenRate(
+            TotalCosts ?? 0m,
+            ScenarioCostTotal,
+            ProjectedVolume ?? 0m);
         public string ContextSummary => $"{SelectedEnterprise} FY {SelectedFiscalYear} | {ActiveScenarioName}";
     }
 

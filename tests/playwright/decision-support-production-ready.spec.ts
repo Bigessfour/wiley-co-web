@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { gotoWorkspacePanel } from "./support/workspace";
 
+function decisionSupportMainPanel(page: import("@playwright/test").Page) {
+  return page.locator("#decision-support-panel").first();
+}
+
+function decisionSupportJarvisUi(page: import("@playwright/test").Page) {
+  return decisionSupportMainPanel(page).locator("#jarvis-chat-ui").first();
+}
+
 test.describe("Unique Interaction Proof", () => {
   test("Decision support proves both assistant-enabled and fallback states", async ({
     page,
@@ -106,7 +114,7 @@ test.describe("Unique Interaction Proof", () => {
                 question: "What should I know about the current workspace?",
                 recommendation:
                   "Focus on the current rate gap, scenario pressure, and customer mix before publishing.",
-                usedFallback: false,
+                latestUsedFallback: false,
                 createdAtUtc: "2026-04-19T00:00:00Z",
               },
             ];
@@ -137,7 +145,8 @@ test.describe("Unique Interaction Proof", () => {
           question,
           answer:
             "Focus on the current rate gap, scenario pressure, and customer mix before publishing.",
-          usedFallback: false,
+          latestUsedFallback: false,
+          answerSource: "semantic_kernel",
           contextSummary: requestBody?.contextSummary ?? "",
           userDisplayName: "Playwright Analyst",
           userProfileSummary: "Deterministic browser-test profile",
@@ -156,83 +165,203 @@ test.describe("Unique Interaction Proof", () => {
       });
     });
 
+    // Stabilize Jarvis health for assistant-enabled surface (canonical latestUsedFallback field).
+    await page.route("**/api/ai/health", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "healthy",
+          semanticKernelAvailable: true,
+          latestAnswerSource: "semantic_kernel",
+          latestUsedFallback: false,
+          latestFailureCode: null,
+          lastTurnAtUtc: "2026-04-19T00:00:00Z",
+        }),
+      });
+    });
+
     // 1. Open /wiley-workspace/decision-support from a blank session.
     await gotoWorkspacePanel(page, "/wiley-workspace/decision-support");
 
-    await expect(page.locator("#decision-support-panel")).toBeVisible();
+    const panel = decisionSupportMainPanel(page);
+    await expect(panel).toBeVisible();
     await expect(page.locator("#workspace-breadcrumb")).toContainText(
       "Decision Support",
     );
 
-    const jarvisSurface = page.locator("#jarvis-chat-ui");
+    const jarvisSurface = decisionSupportJarvisUi(page);
     const fallbackNote = page.getByText(
       "This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.",
     );
 
     if (await jarvisSurface.count()) {
-      await expect(page.locator("#jarvis-runtime-status")).toBeVisible();
-      await expect(page.locator("#jarvis-question-input")).toBeVisible();
-      await expect(page.locator("#jarvis-conversation-history")).toBeVisible();
+      await expect(panel.locator("#jarvis-runtime-status")).toBeVisible();
+      await expect(panel.locator("#jarvis-question-input")).toBeVisible();
+      await expect(panel.locator("#jarvis-conversation-history")).toBeVisible();
       await expect(
-        page.locator("#jarvis-recommendation-history"),
+        panel.locator("#jarvis-recommendation-history"),
       ).toBeVisible();
-      await expect(page.locator("#jarvis-chat-answer")).toBeVisible();
+      await expect(panel.locator("#jarvis-chat-answer")).toBeVisible();
 
-      await expect(page.locator("#jarvis-runtime-status")).toContainText(
+      await expect(panel.locator("#jarvis-runtime-status")).toContainText(
         /Live AI available|Deterministic fallback active|Awaiting Jarvis response/,
       );
-      await expect(page.locator("#jarvis-conversation-history")).toContainText(
+      await expect(panel.locator("#jarvis-conversation-history")).toContainText(
         "No prior Jarvis turns yet.",
       );
       await expect(
-        page.locator("#jarvis-recommendation-history"),
+        panel.locator("#jarvis-recommendation-history"),
       ).toContainText(
         /No saved recommendations yet for this workspace scope\.|Loaded 1 saved recommendation for this workspace scope\./,
       );
 
       // 2. If the assistant surface is present, ask one short question and then reset the thread.
       const question = "What should I know about the current workspace?";
-      await page.locator("#jarvis-question-input").fill(question);
+      await panel.locator("#jarvis-question-input").fill(question);
       await expect(
-        page.getByRole("button", { name: "Ask Jarvis" }),
+        panel.getByRole("button", { name: "Ask Jarvis" }),
       ).toBeEnabled();
-      await page.getByRole("button", { name: "Ask Jarvis" }).click();
+      await panel.getByRole("button", { name: "Ask Jarvis" }).click();
 
-      await expect(page.locator("#jarvis-chat-answer")).toContainText(
+      await expect(panel.locator("#jarvis-chat-answer")).toContainText(
         "Focus on the current rate gap, scenario pressure, and customer mix before publishing.",
       );
-      await expect(page.locator("#jarvis-conversation-history")).toContainText(
+      await expect(panel.locator("#jarvis-conversation-history")).toContainText(
         question,
       );
-      await expect(page.locator("#jarvis-conversation-history")).toContainText(
+      await expect(panel.locator("#jarvis-conversation-history")).toContainText(
         "Focus on the current rate gap, scenario pressure, and customer mix before publishing.",
       );
       await expect(
-        page.locator("#jarvis-recommendation-history"),
+        panel.locator("#jarvis-recommendation-history"),
       ).toContainText(
         "Loaded 1 saved recommendation for this workspace scope.",
       );
-      await expect(page.locator("#jarvis-runtime-status")).toContainText(
-        "Live AI available",
+      await expect(panel.locator("#jarvis-runtime-status")).toContainText(
+        /Live AI \(semantic_kernel\)|Live AI available/,
       );
 
-      await page.getByRole("button", { name: "Reset Thread" }).click();
-      await expect(page.locator("#jarvis-question-input")).toHaveValue("");
-      await expect(page.locator("#jarvis-chat-answer")).toContainText(
+      await panel.getByRole("button", { name: "Reset Thread" }).click();
+      await expect(panel.locator("#jarvis-question-input")).toHaveValue("");
+      await expect(panel.locator("#jarvis-chat-answer")).toContainText(
         "Jarvis thread reset for the current workspace context.",
       );
-      await expect(page.locator("#jarvis-conversation-history")).toContainText(
+      await expect(panel.locator("#jarvis-conversation-history")).toContainText(
         "No prior Jarvis turns yet.",
       );
       await expect(
-        page.locator("#jarvis-recommendation-history"),
+        panel.locator("#jarvis-recommendation-history"),
       ).toContainText("No saved recommendations yet for this workspace scope.");
     } else {
       // 3. If only fallback guidance is available, verify the fallback copy and actions remain understandable.
       await expect(fallbackNote).toBeVisible();
-      await expect(page.locator("#decision-support-panel")).toContainText(
+      await expect(panel).toContainText(
         "server-side Semantic Kernel assistant",
       );
     }
+  });
+
+  test("Jarvis production turn records semantic_kernel answer source", async ({
+    page,
+    request,
+  }) => {
+    await page.route("**/api/workspace/knowledge", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          selectedEnterprise: "Town of Wiley",
+          selectedFiscalYear: 2026,
+          operationalStatus: "Live guidance available",
+          executiveSummary: "Mocked guidance for browser verification.",
+          rateRationale: "Mocked guidance for browser verification.",
+          currentRate: 27.5,
+          totalCosts: 12500,
+          projectedVolume: 450,
+          scenarioCostTotal: 0,
+          breakEvenRate: 30.25,
+          adjustedBreakEvenRate: 30.25,
+          rateGap: 2.75,
+          adjustedRateGap: 2.75,
+          monthlyRevenue: 12375,
+          netPosition: -125,
+          coverageRatio: 0.99,
+          currentReserveBalance: 7200,
+          recommendedReserveLevel: 6800,
+          reserveRiskAssessment: "Low",
+          generatedAtUtc: "2026-04-19T00:00:00Z",
+          insights: [],
+          recommendedActions: [],
+          topVariances: [],
+        }),
+      });
+    });
+
+    await page.route("**/api/ai/recommendations**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: [] }),
+      });
+    });
+
+    await page.route("**/api/ai/chat", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          question: "What is the current break-even rate?",
+          answer:
+            "The current break-even rate is driven by total costs divided by projected volume.",
+          latestUsedFallback: false,
+          answerSource: "semantic_kernel",
+          contextSummary: "Town of Wiley FY 2026 workspace",
+          conversationId: "jarvis-health-e2e",
+          conversationMessageCount: 2,
+          isFirstConversation: false,
+          canResetConversation: true,
+        }),
+      });
+    });
+
+    await page.route("**/api/ai/health", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "healthy",
+          semanticKernelAvailable: true,
+          latestAnswerSource: "semantic_kernel",
+          latestUsedFallback: false,
+          latestFailureCode: null,
+          lastTurnAtUtc: "2026-04-19T00:00:00Z",
+        }),
+      });
+    });
+
+    await gotoWorkspacePanel(page, "/wiley-workspace/decision-support");
+
+    const panel = decisionSupportMainPanel(page);
+    const jarvisSurface = decisionSupportJarvisUi(page);
+
+    if (await jarvisSurface.count()) {
+      await panel
+        .locator("#jarvis-question-input")
+        .fill("What is the current break-even rate?");
+      await panel.getByRole("button", { name: "Ask Jarvis" }).click();
+      await expect(panel.locator("#jarvis-chat-answer")).toContainText(
+        "break-even rate",
+      );
+      await expect(panel.locator("#jarvis-runtime-status")).toContainText(
+        /Live AI \(semantic_kernel\)|Live AI available/,
+      );
+    }
+
+    const healthBody = await page.evaluate(async () => {
+      const response = await fetch("/api/ai/health");
+      return response.json();
+    });
+    expect(healthBody.latestAnswerSource).toBe("semantic_kernel");
   });
 });

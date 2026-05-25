@@ -12,6 +12,7 @@ using Amazon.SecretsManager.Model;
 using Amazon.XRay.Recorder.Core;
 using Amazon.XRay.Recorder.Handlers.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
@@ -73,6 +74,10 @@ public partial class Program
         try
         {
             builder = WebApplication.CreateBuilder(args);
+            builder.WebHost.ConfigureKestrel(serverOptions =>
+            {
+                serverOptions.Limits.MaxRequestBodySize = 52_428_800; // 50 MB — QuickBooks / reference imports
+            });
             if (builder.Environment.IsDevelopment())
             {
                 builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
@@ -519,6 +524,7 @@ public partial class Program
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
         builder.Services.AddSingleton<IWorkspaceAiKernelProvider, WorkspaceAiKernelProvider>();
         builder.Services.AddSingleton<WorkspaceAiAssistantService>();
+        builder.Services.AddSingleton<IJarvisHealthState, JarvisHealthState>();
         builder.Services.AddSingleton<UserContext>();
         builder.Services.AddSingleton<IUserContext>(sp => sp.GetRequiredService<UserContext>());
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
@@ -527,11 +533,30 @@ public partial class Program
         // Deterministic license tracking via health check (covers the new registration logic in this file)
         builder.Services.AddHealthChecks()
             .AddCheck<SyncfusionLicenseHealthCheck>("syncfusion-license", Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded);
+
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddProblemDetails(options =>
+        {
+            options.CustomizeProblemDetails = ctx =>
+            {
+                ctx.ProblemDetails.Extensions["traceId"] = ctx.HttpContext.TraceIdentifier;
+            };
+        });
+
+        builder.Services.AddWorkspaceJwtAuthentication(builder.Configuration);
     }
 
     private static void ConfigureMiddleware(WebApplication app, ILogger logger)
     {
+        app.UseExceptionHandler();
+        app.UseStatusCodePages();
         app.UseExceptionLogging();
+
+        if (app.Configuration.GetValue<bool>($"{JwtAuthenticationOptions.SectionName}:Enabled"))
+        {
+            app.UseAuthentication();
+            app.UseAuthorization();
+        }
 
         app.Use(async (context, next) =>
         {
@@ -887,20 +912,24 @@ public partial class Program
 
     private static void MapWorkspaceAiChatEndpoint(WebApplication app)
     {
-        app.MapPost("/api/ai/chat", MapWorkspaceAiChatMessageEndpoint);
-        app.MapPost("/api/ai/chat/reset", MapWorkspaceAiChatResetEndpoint);
+        var config = app.Configuration;
+        app.MapPost("/api/ai/chat", MapWorkspaceAiChatMessageEndpoint).RequireWorkspaceMutatingAuth(config);
+        app.MapPost("/api/ai/chat/reset", MapWorkspaceAiChatResetEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint);
+        app.MapGet("/api/ai/health", MapWorkspaceAiHealthEndpoint);
+        app.MapGet("/api/jarvis/health", MapWorkspaceAiHealthEndpoint);
     }
 
     private static void MapQuickBooksImportEndpoints(WebApplication app)
     {
-        app.MapPost("/api/imports/quickbooks/preview", MapQuickBooksPreviewEndpoint);
-        app.MapPost("/api/imports/quickbooks/commit", MapQuickBooksCommitEndpoint);
-        app.MapPost("/api/imports/quickbooks/assistant", MapQuickBooksAssistantEndpoint);
+        var config = app.Configuration;
+        app.MapPost("/api/imports/quickbooks/preview", MapQuickBooksPreviewEndpoint).RequireWorkspaceMutatingAuth(config);
+        app.MapPost("/api/imports/quickbooks/commit", MapQuickBooksCommitEndpoint).RequireWorkspaceMutatingAuth(config);
+        app.MapPost("/api/imports/quickbooks/assistant", MapQuickBooksAssistantEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapGet("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationEndpoint);
-        app.MapPut("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationUpdateEndpoint);
+        app.MapPut("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationUpdateEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapGet("/api/imports/quickbooks/history", MapQuickBooksImportHistoryEndpoint);
-        app.MapPost("/api/imports/quickbooks/reroute", MapQuickBooksHistoricalRerouteEndpoint);
+        app.MapPost("/api/imports/quickbooks/reroute", MapQuickBooksHistoricalRerouteEndpoint).RequireWorkspaceMutatingAuth(config);
     }
 
     private static async Task<IResult> MapQuickBooksPreviewEndpoint(HttpRequest request, QuickBooksImportService importService, CancellationToken cancellationToken)
@@ -970,7 +999,7 @@ public partial class Program
         return Results.Ok(response);
     }
 
-    private static async Task<IResult> MapWorkspaceAiChatMessageEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, ILogger<Program> logger, CancellationToken cancellationToken)
+    private static async Task<IResult> MapWorkspaceAiChatMessageEndpoint(HttpRequest request, WorkspaceAiAssistantService assistantService, IJarvisHealthState jarvisHealth, ILogger<Program> logger, CancellationToken cancellationToken)
     {
         var chatRequest = await request.ReadFromJsonAsync<WorkspaceChatRequest>(cancellationToken: cancellationToken);
         if (chatRequest is null || string.IsNullOrWhiteSpace(chatRequest.Question))
@@ -995,11 +1024,16 @@ public partial class Program
 
         var chatResponse = await assistantService.AskAsync(chatRequest, cancellationToken);
 
+        jarvisHealth.SetSemanticKernelAvailability(assistantService.IsSemanticKernelAvailable);
+        jarvisHealth.RecordTurn(chatResponse.AnswerSource, chatResponse.UsedFallback, chatResponse.FailureCode);
+
         logger.LogInformation(
-            "Jarvis chat request completed: Enterprise={Enterprise} FiscalYear={FiscalYear} UsedFallback={UsedFallback} ConversationId={ConversationId} MessageCount={ConversationMessageCount}",
+            "Jarvis chat request completed: Enterprise={Enterprise} FiscalYear={FiscalYear} UsedFallback={UsedFallback} AnswerSource={AnswerSource} FailureCode={FailureCode} ConversationId={ConversationId} MessageCount={ConversationMessageCount}",
             chatRequest.SelectedEnterprise,
             chatRequest.SelectedFiscalYear,
             chatResponse.UsedFallback,
+            chatResponse.AnswerSource ?? "unknown",
+            chatResponse.FailureCode ?? "none",
             chatResponse.ConversationId,
             chatResponse.ConversationMessageCount);
 
@@ -1030,6 +1064,12 @@ public partial class Program
         return Results.NoContent();
     }
 
+    private static IResult MapWorkspaceAiHealthEndpoint(WorkspaceAiAssistantService assistantService, IJarvisHealthState jarvisHealth)
+    {
+        jarvisHealth.SetSemanticKernelAvailability(assistantService.IsSemanticKernelAvailable);
+        return Results.Ok(jarvisHealth.GetSnapshot());
+    }
+
     private static async Task<IResult> MapWorkspaceRecommendationHistoryEndpoint(
         [FromQuery] string? enterprise,
         [FromQuery] int? fiscalYear,
@@ -1051,7 +1091,8 @@ public partial class Program
 
     private static void MapWorkspaceNavigationTelemetryEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/navigation", MapWorkspaceNavigationTelemetryRequest);
+        app.MapPost("/api/workspace/navigation", MapWorkspaceNavigationTelemetryRequest)
+            .RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceNavigationTelemetryRequest(HttpRequest request, UserContext userContext, ILogger<Program> logger, CancellationToken cancellationToken)
@@ -1082,22 +1123,24 @@ public partial class Program
     {
         var principal = context.User;
         var headers = context.Request.Headers;
+        var configuration = context.RequestServices.GetRequiredService<IConfiguration>();
+        var allowHeaderIdentity = !configuration.GetValue<bool>($"{JwtAuthenticationOptions.SectionName}:Enabled");
 
         userContext.SetCurrentUser(
-            ResolveUserId(principal, headers),
-            ResolveUserDisplayName(principal, headers),
-            ResolveUserEmail(principal, headers));
+            ResolveUserId(principal, headers, allowHeaderIdentity),
+            ResolveUserDisplayName(principal, headers, allowHeaderIdentity),
+            ResolveUserEmail(principal, headers, allowHeaderIdentity));
     }
 
-    private static string ResolveUserId(ClaimsPrincipal principal, IHeaderDictionary headers)
+    private static string ResolveUserId(ClaimsPrincipal principal, IHeaderDictionary headers, bool allowHeaderIdentity)
     {
         return ResolveClaim(principal, "sub")
             ?? ResolveClaim(principal, ClaimTypes.NameIdentifier)
-            ?? ResolveHeaderValue(headers, "X-Wiley-User-Id")
+            ?? (allowHeaderIdentity ? ResolveHeaderValue(headers, "X-Wiley-User-Id") : null)
             ?? "anonymous";
     }
 
-    private static string ResolveUserDisplayName(ClaimsPrincipal principal, IHeaderDictionary headers)
+    private static string ResolveUserDisplayName(ClaimsPrincipal principal, IHeaderDictionary headers, bool allowHeaderIdentity)
     {
         var emailLocalPart = ResolveEmailLocalPart(ResolveClaim(principal, ClaimTypes.Email));
 
@@ -1105,15 +1148,15 @@ public partial class Program
             ?? ResolveClaim(principal, "preferred_username")
             ?? ResolveClaim(principal, ClaimTypes.Name)
             ?? emailLocalPart
-            ?? ResolveHeaderValue(headers, "X-Wiley-User-Name")
+            ?? (allowHeaderIdentity ? ResolveHeaderValue(headers, "X-Wiley-User-Name") : null)
             ?? "Guest";
     }
 
-    private static string? ResolveUserEmail(ClaimsPrincipal principal, IHeaderDictionary headers)
+    private static string? ResolveUserEmail(ClaimsPrincipal principal, IHeaderDictionary headers, bool allowHeaderIdentity)
     {
         return ResolveClaim(principal, ClaimTypes.Email)
             ?? ResolveClaim(principal, "email")
-            ?? ResolveHeaderValue(headers, "X-Wiley-User-Email");
+            ?? (allowHeaderIdentity ? ResolveHeaderValue(headers, "X-Wiley-User-Email") : null);
     }
 
     private static string? ResolveClaim(ClaimsPrincipal principal, string claimType)
@@ -1283,7 +1326,7 @@ public partial class Program
             {
                 CleanupTemporaryWorkspaceImportPath(endpointRequest?.TemporaryImportPath);
             }
-        });
+        }).RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     private static async Task<WorkspaceReferenceDataEndpointRequest?> ReadWorkspaceReferenceDataEndpointRequestAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -1388,7 +1431,7 @@ public partial class Program
         var customers = app.MapGroup("/api/utility-customers");
 
         MapUtilityCustomerReadEndpoints(customers);
-        MapUtilityCustomerWriteEndpoints(customers);
+        MapUtilityCustomerWriteEndpoints(customers, app.Configuration);
     }
 
     private static void MapUtilityCustomerReadEndpoints(RouteGroupBuilder customers)
@@ -1425,11 +1468,11 @@ public partial class Program
         });
     }
 
-    private static void MapUtilityCustomerWriteEndpoints(RouteGroupBuilder customers)
+    private static void MapUtilityCustomerWriteEndpoints(RouteGroupBuilder customers, IConfiguration configuration)
     {
-        customers.MapPost(string.Empty, MapUtilityCustomerCreateEndpoint);
-        customers.MapPut("/{id:int}", MapUtilityCustomerUpdateEndpoint);
-        customers.MapDelete("/{id:int}", MapUtilityCustomerDeleteEndpoint);
+        customers.MapPost(string.Empty, MapUtilityCustomerCreateEndpoint).RequireWorkspaceMutatingAuth(configuration);
+        customers.MapPut("/{id:int}", MapUtilityCustomerUpdateEndpoint).RequireWorkspaceMutatingAuth(configuration);
+        customers.MapDelete("/{id:int}", MapUtilityCustomerDeleteEndpoint).RequireWorkspaceMutatingAuth(configuration);
     }
 
     private static async Task<IResult> MapUtilityCustomerCreateEndpoint(
@@ -1597,7 +1640,10 @@ public partial class Program
             }
             catch (CapitalGapNotFoundException ex)
             {
-                return Results.NotFound(ex.Message);
+                return Results.Problem(
+                    title: "Insufficient budget data for capital gap analysis",
+                    detail: ex.Message,
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
             }
             catch (CapitalGapUnavailableException ex)
             {
@@ -1856,7 +1902,8 @@ public partial class Program
 
     private static void MapWorkspaceSnapshotPostEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/snapshot", MapWorkspaceSnapshotSaveAsync);
+        app.MapPost("/api/workspace/snapshot", MapWorkspaceSnapshotSaveAsync)
+            .RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceSnapshotSaveAsync(
@@ -1920,7 +1967,8 @@ public partial class Program
 
     private static void MapWorkspaceBaselinePutEndpoint(WebApplication app)
     {
-        app.MapPut("/api/workspace/baseline", MapWorkspaceBaselineUpdateAsync);
+        app.MapPut("/api/workspace/baseline", MapWorkspaceBaselineUpdateAsync)
+            .RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceBaselineUpdateAsync(
@@ -2129,7 +2177,8 @@ public partial class Program
 
     private static void MapWorkspaceScenarioPostEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/scenarios", MapWorkspaceScenarioSaveAsync);
+        app.MapPost("/api/workspace/scenarios", MapWorkspaceScenarioSaveAsync)
+            .RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceScenarioSaveAsync(
@@ -2199,7 +2248,8 @@ public partial class Program
 
     private static void MapWorkspaceSnapshotExportsPostEndpoint(WebApplication app)
     {
-        app.MapPost("/api/workspace/snapshot/{snapshotId:long}/exports", MapWorkspaceSnapshotExportsPostAsync);
+        app.MapPost("/api/workspace/snapshot/{snapshotId:long}/exports", MapWorkspaceSnapshotExportsPostAsync)
+            .RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceSnapshotExportsPostAsync(
@@ -2403,7 +2453,7 @@ public partial class Program
             }
 
             return Results.File(artifact.Payload, artifact.ContentType, artifact.FileName);
-        });
+        }).RequireWorkspaceMutatingAuth(app.Configuration);
     }
 
     internal static WorkspaceSnapshotArtifactSummary BuildArtifactSummary(BudgetSnapshotArtifact artifact)

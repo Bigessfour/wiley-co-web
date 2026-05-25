@@ -20,11 +20,19 @@ public sealed class WorkspaceKnowledgeApiService(HttpClient httpClient, ILogger<
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        LogKnowledgeRequest(request);
-        var payload = await SendKnowledgeRequestAsync(request, cancellationToken).ConfigureAwait(false);
-        var response = EnsureKnowledgeResponse(payload);
-        LogKnowledgeResponse(response);
-        return response;
+        try
+        {
+            LogKnowledgeRequest(request);
+            var payload = await SendKnowledgeRequestAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = EnsureKnowledgeResponse(payload);
+            LogKnowledgeResponse(response);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Workspace knowledge request failed; caller may apply deterministic fallback guidance.");
+            throw;
+        }
     }
 
     private void LogKnowledgeRequest(WorkspaceKnowledgeRequest request)

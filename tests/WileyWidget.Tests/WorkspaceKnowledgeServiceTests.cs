@@ -265,6 +265,10 @@ public sealed class WorkspaceKnowledgeServiceTests
 
         public Task<List<VarianceRecord>> GetVarianceDetailsAsync(int fiscalYear, CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public void InvalidateCache(int fiscalYear)
+        {
+        }
     }
 
     private sealed class StaticAnalyticsService : IAnalyticsService
@@ -358,6 +362,10 @@ public sealed class WorkspaceKnowledgeServiceTests
 
         public Task<List<VarianceRecord>> GetVarianceDetailsAsync(int fiscalYear, CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public void InvalidateCache(int fiscalYear)
+        {
+        }
     }
 
     private sealed class CancellationAwareAnalyticsService : IAnalyticsService
@@ -451,6 +459,10 @@ public sealed class WorkspaceKnowledgeServiceTests
 
         public Task<List<VarianceRecord>> GetVarianceDetailsAsync(int fiscalYear, CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public void InvalidateCache(int fiscalYear)
+        {
+        }
     }
 
     private sealed class NullEnterpriseRepository : IEnterpriseRepository

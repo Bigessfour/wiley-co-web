@@ -416,6 +416,24 @@ namespace WileyWidget.Data.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
+                    b.Property<long?>("AppliedAllocationProfileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applied_allocation_profile_id");
+
+                    b.Property<string>("AppliedAllocationProfileName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("applied_allocation_profile_name");
+
+                    b.Property<long?>("AppliedRoutingRuleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applied_routing_rule_id");
+
+                    b.Property<string>("AppliedRoutingRuleName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("applied_routing_rule_name");
+
                     b.Property<string>("ClearedFlag")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -446,10 +464,30 @@ namespace WileyWidget.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("OriginalEntryScope")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("original_entry_scope");
+
+                    b.Property<decimal?>("RoutingAllocationPercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("routing_allocation_percent");
+
+                    b.Property<string>("RoutingReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("routing_reason");
+
                     b.Property<decimal?>("RunningBalance")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("running_balance");
+
+                    b.Property<decimal?>("SourceAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("source_amount");
 
                     b.Property<long>("SourceFileId")
                         .HasColumnType("bigint")
@@ -470,6 +508,14 @@ namespace WileyWidget.Data.Migrations
                         .HasColumnName("transaction_number");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AppliedAllocationProfileId");
+
+                    b.HasIndex("AppliedRoutingRuleId");
+
+                    b.HasIndex("EntryDate");
+
+                    b.HasIndex("EntryScope");
 
                     b.HasIndex("SourceFileId");
 
@@ -629,6 +675,146 @@ namespace WileyWidget.Data.Migrations
                     b.ToTable("profit_loss_monthly_lines", (string)null);
                 });
 
+            modelBuilder.Entity("WileyWidget.Models.Amplify.QuickBooksAllocationProfile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.ToTable("quickbooks_allocation_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.Amplify.QuickBooksAllocationTarget", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AllocationPercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("allocation_percent");
+
+                    b.Property<long>("AllocationProfileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_profile_id");
+
+                    b.Property<string>("EnterpriseName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("enterprise_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllocationProfileId");
+
+                    b.ToTable("quickbooks_allocation_targets", (string)null);
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.Amplify.QuickBooksRoutingRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountPattern")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("account_pattern");
+
+                    b.Property<long?>("AllocationProfileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_profile_id");
+
+                    b.Property<string>("DefaultEnterprisePattern")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("default_enterprise_pattern");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("MemoPattern")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("memo_pattern");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NamePattern")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_pattern");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<string>("SourceFilePattern")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source_file_pattern");
+
+                    b.Property<string>("SplitAccountPattern")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("split_account_pattern");
+
+                    b.Property<string>("TargetEnterprise")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("target_enterprise");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllocationProfileId");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Priority");
+
+                    b.ToTable("quickbooks_routing_rules", (string)null);
+                });
+
             modelBuilder.Entity("WileyWidget.Models.Amplify.SourceFile", b =>
                 {
                     b.Property<long>("Id")
@@ -774,6 +960,61 @@ namespace WileyWidget.Data.Migrations
                     b.HasIndex("SourceFileId");
 
                     b.ToTable("trial_balance_lines", (string)null);
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.ApartmentUnitType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BedroomCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EnterpriseId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ModifiedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("UnitCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnterpriseId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ApartmentUnitTypes", (string)null);
                 });
 
             modelBuilder.Entity("WileyWidget.Models.AppSettings", b =>
@@ -1033,7 +1274,8 @@ namespace WileyWidget.Data.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Changes")
                         .HasColumnType("text");
@@ -1043,7 +1285,8 @@ namespace WileyWidget.Data.Migrations
 
                     b.Property<string>("EntityType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("NewValues")
                         .HasColumnType("text");
@@ -1059,6 +1302,10 @@ namespace WileyWidget.Data.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("EntityType", "EntityId", "Timestamp");
 
                     b.ToTable("AuditEntries");
                 });
@@ -1156,6 +1403,8 @@ namespace WileyWidget.Data.Migrations
                     b.HasIndex("MunicipalAccountId");
 
                     b.HasIndex("ParentId");
+
+                    b.HasIndex("SourceFilePath");
 
                     b.HasIndex("SourceRowNumber");
 
@@ -1563,9 +1812,6 @@ namespace WileyWidget.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<int?>("EnterpriseId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("InteractionDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -1592,8 +1838,6 @@ namespace WileyWidget.Data.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EnterpriseId");
 
                     b.HasIndex("PrimaryEnterpriseId");
 
@@ -1680,9 +1924,6 @@ namespace WileyWidget.Data.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("BillId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("ChargeType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1707,12 +1948,10 @@ namespace WileyWidget.Data.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<int?>("UtilityBillId")
+                    b.Property<int>("UtilityBillId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("BillId");
 
                     b.HasIndex("ChargeType");
 
@@ -3298,6 +3537,9 @@ namespace WileyWidget.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("EnterpriseId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -3383,6 +3625,8 @@ namespace WileyWidget.Data.Migrations
                         .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EnterpriseId");
 
                     b.ToTable("UtilityCustomers");
                 });
@@ -3571,7 +3815,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("Customers")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("SourceFile");
@@ -3582,7 +3826,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("Vendors")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("SourceFile");
@@ -3593,7 +3837,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("BudgetSnapshots")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("SourceFile");
                 });
@@ -3603,7 +3847,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.BudgetSnapshot", "BudgetSnapshot")
                         .WithMany("ExportArtifacts")
                         .HasForeignKey("BudgetSnapshotId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("BudgetSnapshot");
@@ -3614,7 +3858,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("ChartOfAccounts")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("SourceFile");
@@ -3625,7 +3869,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("LedgerEntries")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("SourceFile");
@@ -3636,7 +3880,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.LedgerEntry", "LedgerEntry")
                         .WithMany("Lines")
                         .HasForeignKey("LedgerEntryId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("LedgerEntry");
@@ -3647,10 +3891,31 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("ProfitLossMonthlyLines")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("SourceFile");
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.Amplify.QuickBooksAllocationTarget", b =>
+                {
+                    b.HasOne("WileyWidget.Models.Amplify.QuickBooksAllocationProfile", "AllocationProfile")
+                        .WithMany("Targets")
+                        .HasForeignKey("AllocationProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AllocationProfile");
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.Amplify.QuickBooksRoutingRule", b =>
+                {
+                    b.HasOne("WileyWidget.Models.Amplify.QuickBooksAllocationProfile", "AllocationProfile")
+                        .WithMany()
+                        .HasForeignKey("AllocationProfileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AllocationProfile");
                 });
 
             modelBuilder.Entity("WileyWidget.Models.Amplify.SourceFile", b =>
@@ -3658,13 +3923,13 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.ImportBatch", "Batch")
                         .WithMany("SourceFiles")
                         .HasForeignKey("BatchId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("WileyWidget.Models.Amplify.SourceFileVariant", "SourceFileVariant")
                         .WithMany("SourceFiles")
                         .HasForeignKey("SourceFileVariantId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Batch");
 
@@ -3676,10 +3941,21 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Amplify.SourceFile", "SourceFile")
                         .WithMany("TrialBalanceLines")
                         .HasForeignKey("SourceFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("SourceFile");
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.ApartmentUnitType", b =>
+                {
+                    b.HasOne("WileyWidget.Models.Enterprise", "Enterprise")
+                        .WithMany("ApartmentUnitTypes")
+                        .HasForeignKey("EnterpriseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Enterprise");
                 });
 
             modelBuilder.Entity("WileyWidget.Models.BudgetEntry", b =>
@@ -3687,13 +3963,13 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Department", "Department")
                         .WithMany("BudgetEntries")
                         .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("WileyWidget.Models.Entities.Fund", "Fund")
                         .WithMany("BudgetEntries")
                         .HasForeignKey("FundId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("WileyWidget.Models.MunicipalAccount", "MunicipalAccount")
                         .WithMany("BudgetEntries")
@@ -3716,15 +3992,10 @@ namespace WileyWidget.Data.Migrations
 
             modelBuilder.Entity("WileyWidget.Models.BudgetInteraction", b =>
                 {
-                    b.HasOne("WileyWidget.Models.Enterprise", null)
-                        .WithMany("BudgetInteractions")
-                        .HasForeignKey("EnterpriseId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("WileyWidget.Models.Enterprise", "PrimaryEnterprise")
-                        .WithMany()
+                        .WithMany("BudgetInteractions")
                         .HasForeignKey("PrimaryEnterpriseId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("WileyWidget.Models.Enterprise", "SecondaryEnterprise")
@@ -3740,15 +4011,10 @@ namespace WileyWidget.Data.Migrations
             modelBuilder.Entity("WileyWidget.Models.Charge", b =>
                 {
                     b.HasOne("WileyWidget.Models.UtilityBill", "Bill")
-                        .WithMany()
-                        .HasForeignKey("BillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("WileyWidget.Models.UtilityBill", null)
                         .WithMany("Charges")
                         .HasForeignKey("UtilityBillId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Bill");
                 });
@@ -3768,7 +4034,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.MunicipalAccount", "MunicipalAccount")
                         .WithMany("Invoices")
                         .HasForeignKey("MunicipalAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("WileyWidget.Models.Vendor", "Vendor")
@@ -3799,7 +4065,7 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Entities.Fund", "Fund")
                         .WithMany()
                         .HasForeignKey("FundId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("WileyWidget.Models.MunicipalAccount", "ParentAccount")
                         .WithMany("ChildAccounts")
@@ -3999,17 +4265,17 @@ namespace WileyWidget.Data.Migrations
                     b.HasOne("WileyWidget.Models.Invoice", "Invoice")
                         .WithMany()
                         .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("WileyWidget.Models.MunicipalAccount", "MunicipalAccount")
                         .WithMany()
                         .HasForeignKey("MunicipalAccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("WileyWidget.Models.Vendor", "Vendor")
                         .WithMany()
                         .HasForeignKey("VendorId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Invoice");
 
@@ -4026,12 +4292,14 @@ namespace WileyWidget.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("WileyWidget.Models.MunicipalAccount", null)
+                    b.HasOne("WileyWidget.Models.MunicipalAccount", "MunicipalAccount")
                         .WithMany("Transactions")
                         .HasForeignKey("MunicipalAccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("BudgetEntry");
+
+                    b.Navigation("MunicipalAccount");
                 });
 
             modelBuilder.Entity("WileyWidget.Models.UtilityBill", b =>
@@ -4043,6 +4311,16 @@ namespace WileyWidget.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.UtilityCustomer", b =>
+                {
+                    b.HasOne("WileyWidget.Models.Enterprise", "Enterprise")
+                        .WithMany()
+                        .HasForeignKey("EnterpriseId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Enterprise");
                 });
 
             modelBuilder.Entity("WileyWidget.Models.Amplify.BudgetSnapshot", b =>
@@ -4058,6 +4336,11 @@ namespace WileyWidget.Data.Migrations
             modelBuilder.Entity("WileyWidget.Models.Amplify.LedgerEntry", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("WileyWidget.Models.Amplify.QuickBooksAllocationProfile", b =>
+                {
+                    b.Navigation("Targets");
                 });
 
             modelBuilder.Entity("WileyWidget.Models.Amplify.SourceFile", b =>
@@ -4103,6 +4386,8 @@ namespace WileyWidget.Data.Migrations
 
             modelBuilder.Entity("WileyWidget.Models.Enterprise", b =>
                 {
+                    b.Navigation("ApartmentUnitTypes");
+
                     b.Navigation("BudgetInteractions");
                 });
 
