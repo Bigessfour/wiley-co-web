@@ -1024,6 +1024,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         {
             "overview" => "overview",
             "break-even" => "break-even",
+            "apartment-config" => "apartment-config",
             "rates" => "rates",
             "quickbooks-import" => "quickbooks-import",
             "scenario" => "scenario",

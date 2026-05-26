@@ -345,6 +345,30 @@ body {
   background: var(--wiley-surface-2);
 }
 
+/* Explicit token-based hover/focus for hero action buttons (both themes).
+   Prevents any legacy .btn hex leakage and gives clear, accessible states
+   consistent with the rest of the Fluent2 + wiley-surface design. */
+.home-hub-primary:hover,
+.home-hub-primary:focus-visible {
+  background: var(--wiley-accent-hover);
+  color: #fff;
+  outline: none;
+}
+
+.home-hub-secondary:hover,
+.home-hub-secondary:focus-visible {
+  background: var(--wiley-surface-1);
+  border-color: var(--wiley-accent);
+  color: var(--wiley-text);
+  outline: none;
+}
+
+.home-hub-primary:focus-visible,
+.home-hub-secondary:focus-visible {
+  box-shadow: 0 0 0 0.2rem
+    color-mix(in srgb, var(--wiley-accent) 30%, transparent);
+}
+
 .home-hub-grid {
   display: grid;
   gap: 0.75rem;
@@ -371,6 +395,14 @@ body {
   transform: translateY(-1px);
   border-color: var(--wiley-accent);
   box-shadow: var(--wiley-shadow-md);
+}
+
+/* Consistent Fluent2-style focus ring for keyboard navigation of the launcher cards
+   (matches the accent outline used on nav links, AppBar toggles, etc.). */
+.home-hub-card:focus-visible {
+  outline: 3px solid var(--wiley-accent);
+  outline-offset: 2px;
+  border-color: var(--wiley-accent);
 }
 
 .home-hub-card strong {
@@ -1107,6 +1139,78 @@ details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
   --bs-modal-header-border-color: rgba(148, 163, 184, 0.14);
 }
 
+/* Global dark theme fixes (un-nests critical app surfaces from mobile-only scope,
+   adds dark support for mobile stacked layout + common Tailwind alert/status
+   palettes used in Routes.razor + panels, and re-asserts focus/skeleton/toast).
+   This makes dark mode reliable across ALL pages (Home, WileyWorkspace, panels,
+   error states) while preserving all existing hover/lift/transition behavior.
+   Aligns with Syncfusion Fluent2 + data-attr theming pattern. */
+[data-wiley-theme="dark"] .wiley-mobile-context-rail,
+[data-wiley-theme="dark"] .wiley-mobile-main-content {
+  background: #1e293b;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+}
+
+/* Key surfaces, cards, workspace areas, skeleton, toast, focus (now global in dark) */
+[data-wiley-theme="dark"] .home-hub-card,
+[data-wiley-theme="dark"] .wiley-workspace,
+[data-wiley-theme="dark"] .wiley-surface-panel,
+[data-wiley-theme="dark"] .wiley-panel-card,
+[data-wiley-theme="dark"] .wiley-skeleton,
+[data-wiley-theme="dark"] .wiley-skeleton-row,
+[data-wiley-theme="dark"] .wiley-skeleton-card {
+  background: #1e293b;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+}
+
+[data-wiley-theme="dark"] .home-hub-card p,
+[data-wiley-theme="dark"] .home-hub-copy,
+[data-wiley-theme="dark"] .wiley-text-muted {
+  color: #94a3b8;
+}
+
+/* Dark variants for Tailwind alert/status palettes (rose/amber/slate) used in
+   Routes.razor NotFound/error + multiple panels (CapitalGap, DebtCoverage, etc.).
+   Prevents contrast/visibility failures in dark without per-file changes. */
+[data-wiley-theme="dark"] .bg-rose-50,
+[data-wiley-theme="dark"] .border-rose-200 {
+  background-color: #4c1d24;
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #fda4af;
+}
+
+[data-wiley-theme="dark"] .bg-amber-50,
+[data-wiley-theme="dark"] .border-amber-200,
+[data-wiley-theme="dark"] .bg-amber-100 {
+  background-color: #451a03;
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+[data-wiley-theme="dark"] .bg-slate-50,
+[data-wiley-theme="dark"] .border-slate-200,
+[data-wiley-theme="dark"] .bg-slate-100 {
+  background-color: #1e293b;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+}
+
+/* Re-assert toast + focus rings in dark (for all pages) */
+[data-wiley-theme="dark"] #wiley-global-toast .e-toast {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+[data-wiley-theme="dark"] .btn:focus,
+[data-wiley-theme="dark"] .form-control:focus,
+[data-wiley-theme="dark"] .form-check-input:focus {
+  box-shadow:
+    0 0 0 0.1rem #0f172a,
+    0 0 0 0.25rem #38bdf8;
+}
+
 /* ── Wiley custom element dark overrides ────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   html,
@@ -1432,9 +1536,11 @@ html[data-wiley-theme="dark"] body {
   outline-offset: 2px;
 }
 
-/* App nav links + toggle: Fluent2 theme-aware focus ring (uses accent var for light/dark consistency) */
+/* App nav links + AppBar toggles: Fluent2 theme-aware focus ring (uses accent var for light/dark consistency).
+   Covers the custom nav toggle and theme toggle buttons in the dense SfAppBar for full keyboard accessibility. */
 .app-nav-link:focus-visible,
-#app-shell-nav-toggle:focus-visible {
+#app-shell-nav-toggle:focus-visible,
+#app-shell-theme-toggle:focus-visible {
   outline: 3px solid var(--wiley-accent);
   outline-offset: 2px;
 }
