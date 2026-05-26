@@ -196,6 +196,65 @@
       "problemMatcher": "$msCompile"
     },
     {
+      "label": "Grok TUI (Cursor-safe)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoLogo",
+        "-NoExit",
+        "-File",
+        "${workspaceFolder}/Scripts/start-grok-tui.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "TERM": "xterm-256color",
+          "COLORTERM": "truecolor",
+          "TERM_PROGRAM": "vscode"
+        }
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "group": "grok",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Grok TUI (resume session)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoLogo",
+        "-NoExit",
+        "-File",
+        "${workspaceFolder}/Scripts/start-grok-tui.ps1",
+        "-Resume"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "TERM": "xterm-256color",
+          "COLORTERM": "truecolor",
+          "TERM_PROGRAM": "vscode"
+        }
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "group": "grok",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "🛑 Kill Local Debug Web Stack",
       "type": "shell",
       "command": "powershell",

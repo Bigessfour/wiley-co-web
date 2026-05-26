@@ -29,5 +29,42 @@
   },
   "[jsonc]": {
     "editor.tabSize": 2
-  }
+  },
+  "terminal.integrated.profiles.windows": {
+    "Grok TUI (Cursor-safe)": {
+      "path": "pwsh.exe",
+      "args": [
+        "-NoLogo",
+        "-NoExit",
+        "-File",
+        "${workspaceFolder}/Scripts/start-grok-tui.ps1"
+      ],
+      "icon": "sparkle",
+      "color": "terminal.ansiMagenta",
+      "env": {
+        "TERM": "xterm-256color",
+        "COLORTERM": "truecolor",
+        "TERM_PROGRAM": "vscode"
+      }
+    },
+    "Grok TUI (resume session)": {
+      "path": "pwsh.exe",
+      "args": [
+        "-NoLogo",
+        "-NoExit",
+        "-File",
+        "${workspaceFolder}/Scripts/start-grok-tui.ps1",
+        "-Resume"
+      ],
+      "icon": "history",
+      "color": "terminal.ansiMagenta",
+      "env": {
+        "TERM": "xterm-256color",
+        "COLORTERM": "truecolor",
+        "TERM_PROGRAM": "vscode"
+      }
+    }
+  },
+  "terminal.integrated.tabs.defaultColor": "terminal.ansiBlue",
+  "terminal.integrated.tabs.defaultIcon": "terminal"
 }
