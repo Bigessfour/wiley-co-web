@@ -90,6 +90,8 @@ Jarvis now follows a split transport model that matches the current xAI and Micr
 4. Direct retry from the proxy to `api.x.ai` is now opt-in through `XAI:AllowDirectRetry=true`; the safe default is disabled so App Runner does not stack unreachable internet retries behind the VPC-egress proxy path.
 5. All Jarvis/xAI traffic uses the named `IHttpClientFactory` client `WorkspaceAiTransport`, which applies pooled connections, a bounded connect timeout, response decompression, the App Runner TLS revocation workaround, and the standard .NET resilience handler.
 
+**Operator IAM (`copilot` user):** To grant least-privilege CLI access for inspecting the Jarvis API Gateway proxy (`w544vrvb3i`), `apigateway test-invoke`, signed `execute-api` calls, and read-only access to the App Runner xAI runtime secret, an admin can apply the JSON in [`iam/policies/wiley-copilot-jarvis-tools.json`](iam/policies/wiley-copilot-jarvis-tools.json) via [`iam/scripts/attach-wiley-copilot-jarvis-tools.sh`](iam/scripts/attach-wiley-copilot-jarvis-tools.sh). Signed invokes still require appending the statements in [`iam/policies/wiley-jarvis-api-resource-policy-copilot-statements.json`](iam/policies/wiley-jarvis-api-resource-policy-copilot-statements.json) to the API’s existing resource policy.
+
 ## Aurora Database
 
 The private Aurora PostgreSQL database is now provisioned in the dedicated `wiley-co-aurora-vpc` network and uses the canonical EF Core PostgreSQL migration under [src/WileyWidget.Data/Migrations](src/WileyWidget.Data/Migrations).

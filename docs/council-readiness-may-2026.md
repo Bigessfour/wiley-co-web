@@ -39,3 +39,28 @@ Client formulas live in `State/RateCalculator.cs`; server-side knowledge uses th
 
 - The widget is **decision-support and transparency** on real imported ledger data and saved scenarios.
 - For large structural rate changes or Prop 218–style filings, position consultant-grade COS studies as the formal complement; this tool supports **scenario communication** and **what-if** clarity.
+
+## 6. Staffing / FTE scenario (May 2026 council)
+
+Use the **Scenario Planner** (`/wiley-workspace/scenario`) to stack **annual dollar** adders on top of the enterprise’s current total costs. The math is revenue-requirement style: adjusted break-even uses `(TotalCosts + sum(scenario lines)) / ProjectedVolume` (see `State/RateCalculator.cs`).
+
+### Before the Meeting
+
+- Bring **annualized** figures from payroll/finance (loaded salary + benefits). Part-time city clerk time charged to an enterprise fund should appear as an **allocation** line (only the share that fund will carry), not necessarily the clerk’s full wage unless 100% is enterprise-funded.
+- **QuickBooks:** until the live import reflects up-to-the-minute activity, either delay the “base” totals discussion or agree on manual adjustments with finance so **Total costs** and **Projected volume** on each enterprise are credible before layering scenario lines.
+
+### During the Meeting
+
+1. Select the enterprise and fiscal year in the workspace header.
+2. Confirm the hero **Data source** / sidebar state reflects the snapshot you intend (API vs bootstrap fallback).
+3. Open **Scenario Planner**; set **Scenario name** in the sidebar (e.g. `Council staffing — May 2026`).
+4. **Add** rows such as:
+   - `PT City Clerk (allocated to enterprise)` — dollars = annual enterprise share.
+   - `FT utilities operator (Water/Sewer/Apts burden)` — dollars = full incremental annual cost for the new FTE attributed to that enterprise (or split across enterprises as separate lines if you model each fund separately).
+5. Read **Scenario Cost Total**, **Scenario Break-Even**, and **Scenario Delta** for the narrative; use **Rates** and **Break-Even** panels as needed for the same FY.
+6. Use **Export Council Rate Packet** when the scenario contains personnel/hire language such as `PT City Clerk` or `FT Field Employee` (otherwise the button reads **Download PDF rate packet**). The packet includes the scenario name, scenario description, financial summary, current-vs-scenario break-even bar visualization, full scenario-item table, new personnel allocation tables, rate impact summary, Wiley Widget/Semantic Kernel planning insight, and projection table. Use **Export scenario to Excel** when reviewers need spreadsheet-level detail.
+
+### Automated Check
+
+- `npx playwright test tests/playwright/staffing-scenario-council.spec.ts --project=chromium` (with the usual local `dotnet` web servers or `WILEYCO_E2E_BASE_URL` for hosted) exercises the two-line add pattern, asserts totals move correctly, and verifies the PDF packet download.
+- `dotnet test tests/WileyCoWeb.ComponentTests/WileyCoWeb.ComponentTests.csproj --filter "PdfPacketBuilderTests|WorkspaceExportServiceTests|WileyWorkspace_PersonnelScenario_UsesCouncilRatePacketExportLabel"` validates the PDF payload and extracts text from the generated PDF to prove the council packet contains the planned narrative, summary, visualization heading, scenario rows, personnel allocation/rate-impact sections, planning insight, and projection section.

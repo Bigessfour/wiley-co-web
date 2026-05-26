@@ -13,6 +13,7 @@
     "playwright:test": "playwright test",
     "playwright:test:progress": "playwright test --reporter=line",
     "playwright:test:progress:single": "playwright test --reporter=line --workers=1",
+    "playwright:test:layout": "playwright test tests/playwright/*layout*.spec.ts --project=chromium",
     "playwright:test:ci": "playwright test",
     "playwright:test:ci:smoke": "playwright test tests/playwright/workspace-smoke.spec.ts",
     "playwright:test:ci:highrisk": "playwright test tests/playwright/customer-export.spec.ts tests/playwright/decision-support-production-ready.spec.ts tests/playwright/quickbooks-import-duplicate-preview.spec.ts --project=chromium",

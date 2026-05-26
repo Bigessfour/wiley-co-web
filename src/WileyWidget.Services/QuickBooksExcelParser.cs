@@ -69,7 +69,7 @@ public sealed class QuickBooksExcelParser : IQuickBooksFileParser
             }
         }
 
-        return rows;
+        return QuickBooksImportLineDeduper.RemoveExactDuplicateLines(rows);
     }
 
     private static QuickBooksImportPreviewRow? TryCreatePreviewRow(int rowNumber, IReadOnlyList<string?> values, HeaderLookup headerLookup, ref string? currentAccountContext)

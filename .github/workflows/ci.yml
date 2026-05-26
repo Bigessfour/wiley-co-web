@@ -18,8 +18,25 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  secrets-guard:
+    name: Secret scan (TruffleHog)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (full history for PR diff)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog
+        uses: trufflesecurity/trufflehog@v3.88.7
+        with:
+          path: ./
+          extra_args: --only-verified
+
   test:
     runs-on: windows-latest
+    needs: [secrets-guard]
     timeout-minutes: 40
     strategy:
       fail-fast: false
