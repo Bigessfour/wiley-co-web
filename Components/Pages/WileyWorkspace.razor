@@ -754,10 +754,10 @@
         justify-content: center;
         gap: 0.4rem;
         font: inherit;
-        border-radius: 0.85rem;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        background: #ffffff;
-        color: #0f172a;
+        border-radius: var(--wiley-radius-md);
+        border: 1px solid var(--wiley-border);
+        background: var(--wiley-surface-1);
+        color: var(--wiley-text);
         font-size: 0.92rem;
         font-weight: 600;
         line-height: 1.2;
@@ -774,9 +774,9 @@
     .wiley-workspace .workspace-panel-link:hover,
     .wiley-workspace .workspace-card-link:hover,
     .wiley-workspace .workspace-panel-link.is-active {
-        background: #082f49;
-        border-color: #0ea5e9;
-        color: #f8fafc;
+        background: var(--wiley-surface-2);
+        border-color: var(--wiley-accent);
+        color: var(--wiley-text);
         transform: translateY(-1px);
     }
 
@@ -785,9 +785,9 @@
     }
 
     .wiley-workspace .workspace-card-link-primary {
-        background: #0f172a;
-        border-color: #0f172a;
-        color: #f8fafc;
+        background: var(--wiley-surface-2);
+        border-color: var(--wiley-accent);
+        color: var(--wiley-text);
     }
 
     .wiley-workspace .workspace-overview-grid {
