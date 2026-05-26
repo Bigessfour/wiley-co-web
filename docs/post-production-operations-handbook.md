@@ -98,6 +98,29 @@ For every production API deployment, record:
 - alarm state before and after deploy
 - rollback target
 
+### Amplify / App Runner Cutover & Council Smoke Commands (ops only, no secrets)
+
+**Cutover checklist (env-driven):**
+
+- Set `WILEY_WORKSPACE_API_BASE_ADDRESS` in Amplify (points client to App Runner public URL or custom domain).
+- Deploy Amplify with the env var present (amplify.yml + build already supports it for `appsettings.Workspace.local.json`).
+- App Runner service: update runtime env/secrets via console or IaC (database-url, xai-api-key, syncfusion-license-key); trigger deploy from ECR image.
+- Post-cutover validation (council smoke, run from ops workstation or CI):
+  ```powershell
+  dotnet build WileyCoWeb.csproj
+  dotnet build WileyCoWeb.Api/WileyCoWeb.Api.csproj
+  dotnet test tests/WileyCoWeb.ComponentTests --filter "Category=HighRisk"
+  dotnet test tests/WileyCoWeb.IntegrationTests --filter "Category=HighRisk"
+  dotnet test tests/WileyWidget.Tests --filter "Category=HighRisk"
+  npm run playwright:test:ci:highrisk
+  curl -s https://<app-runner-host>/api/ai/health | jq '.latestUsedFallback, .status'
+  curl -s https://<app-runner-host>/api/jarvis/health | jq '.latestUsedFallback, .status'
+  ```
+- Secret rotation: use `docs/secrets-and-config-rotation-runbook.md` (never commit values; rotate in Secrets Manager + App Runner/Amplify rebuilds only).
+- Rollback target: prior ECR image tag + prior Amplify version (record in release evidence template).
+
+All steps are ops-only; no secrets in source or this handbook.
+
 Use `docs/release-record-template.md` to keep this consistent across releases.
 
 ### Recommended best practice improvement

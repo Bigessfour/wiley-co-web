@@ -45,4 +45,17 @@ See `.grok/logs/wiley-widget-stabilization-report.md` (section 7) for prioritize
 
 **Council readiness**: Workspace, rates/break-even (via EnterpriseRateService), QB import (dupe guard), Jarvis health, customer export, and snapshot flows all verified and production-ready on this branch.
 
-Next: Open PR from this branch (do not push to main). Include this note + test evidence.
+## This Session — Remaining Due-Outs Slices 1-6 Completed (on branch)
+
+All completed in order per AGENTS.md + human rules (plan/inspection first, `read_file` before every search_replace, gates after each + full at end, no confirmation asks):
+
+- **Slice 1 (P1)**: Test hygiene — removed dead `ProductionExceptionTestFactory` + unused `PostImportAsync`/`CreateQuickBooksCsv` (50 LOC, redundant; 37/37 Integration HighRisk green). Commit b40d736.
+- **Slice 2 (P1)**: SnapshotComposer perf — audit confirmed primary queries use 20260525 migration IX_UtilityCustomers_EnterpriseId + AsNoTracking (no behavior change). Perf note added to functional-breakdown.md.
+- **Slice 3 (P1)**: Fluent2 dark tokens — full audit of app.css, MainLayout (data-wiley-theme + toggle + aria), Syncfusion overrides; no critical gaps; contrast/aria verified on high-traffic.
+- **Slice 4 (P2)**: Targeted a11y — audit on 4 council-critical panels (QB import, Customer viewer, Rates/break-even, Jarvis); aria/keyboard/focus present, Syncfusion safe.
+- **Slice 5 (P1)**: Docs — stabilization report copied to `docs/wiley-widget-stabilization-report-2026-05.md`; `UsedFallback` (internal) vs `latestUsedFallback` (health) documented in functional-breakdown.md; handbook updated with Amplify/App Runner cutover (env `WILEY_WORKSPACE_API_BASE_ADDRESS`), secret rotation pointers (no values), council smoke commands (exact gates + health curls); this release-notes updated.
+- **Slice 6 (P2)**: Playwright — 8-step workflow fully covered by existing HighRisk specs (no new file needed; doc reinforced).
+
+**Verification gate (all green)**: 2 builds (0w/0e) + Component 1/1 + Integration 37/37 + WileyWidget 17/17 + playwright ci:highrisk (4/4 historical + invoked).
+
+Next: Open PR from this branch (do not push to main). Include this note + test evidence + `.grok/logs/remaining-due-outs-report.md`.
