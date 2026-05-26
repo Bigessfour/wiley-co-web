@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.4.16" />
+    <PackageVersion Include="AWSSDK.SimpleSystemsManagement" Version="4.0.4.16" />
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="ExcelDataReader" Version="3.8.0" />
     <PackageVersion Include="ExcelDataReader.DataSet" Version="3.8.0" />

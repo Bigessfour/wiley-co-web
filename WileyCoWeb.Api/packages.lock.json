@@ -11,6 +11,15 @@
           "AWSSDK.Core": "[4.0.3.28, 5.0.0)"
         }
       },
+      "AWSSDK.SimpleSystemsManagement": {
+        "type": "Direct",
+        "requested": "[4.0.4.16, )",
+        "resolved": "4.0.5",
+        "contentHash": "WwPSpUPe2HGBMks0NZ45yTP5FgErGHKGCO4Vuf7tdzOh25i2e0K5DL6Yt8gCAkaQiBK54siA07afZfxPLCTXxg==",
+        "dependencies": {
+          "AWSSDK.Core": "[4.0.1.1, 5.0.0)"
+        }
+      },
       "AWSXRayRecorder.Handlers.AspNetCore": {
         "type": "Direct",
         "requested": "[2.13.0, )",

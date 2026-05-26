@@ -797,7 +797,9 @@ public partial class Program
             "XaiConfigNamedKeyPresent={XaiConfigNamedKeyPresent} XaiSecretFetchAttempted={XaiSecretFetchAttempted} " +
             "XaiSecretName={XaiSecretName} XaiAwsRegion={XaiAwsRegion} XaiSecretFetchStatus={XaiSecretFetchStatus} " +
             "XaiSecretFetchErrorCode={XaiSecretFetchErrorCode} XaiSecretFetchErrorMessage={XaiSecretFetchErrorMessage} " +
-            "XaiConfigurationInjected={XaiConfigurationInjected}",
+            "XaiConfigurationInjected={XaiConfigurationInjected} " +
+            "XaiSsmParameterName={XaiSsmParameterName} XaiSsmFetchAttempted={XaiSsmFetchAttempted} XaiSsmFetchStatus={XaiSsmFetchStatus} " +
+            "XaiSsmFetchErrorCode={XaiSsmFetchErrorCode} XaiSsmFetchErrorMessage={XaiSsmFetchErrorMessage}",
             environmentName,
             logData.SyncfusionKeySource,
             logData.SyncfusionKeyPresent,
@@ -814,7 +816,12 @@ public partial class Program
             logData.XaiSecretFetchStatus,
             logData.XaiSecretFetchErrorCode,
             logData.XaiSecretFetchErrorMessage,
-            logData.XaiConfigurationInjected);
+            logData.XaiConfigurationInjected,
+            logData.XaiSsmParameterName,
+            logData.XaiSsmFetchAttempted,
+            logData.XaiSsmFetchStatus,
+            logData.XaiSsmFetchErrorCode,
+            logData.XaiSsmFetchErrorMessage);
     }
 
     private static void LogXaiEndpointResolution(ILogger logger, XaiEndpointResolution resolution, string environmentName)
@@ -857,7 +864,12 @@ public partial class Program
             xaiSecretResolution.SecretFetchStatus,
             xaiSecretResolution.SecretFetchErrorCode,
             TruncateForLog(xaiSecretResolution.SecretFetchErrorMessage),
-            xaiSecretResolution.ConfigurationInjected);
+            xaiSecretResolution.ConfigurationInjected,
+            xaiSecretResolution.SsmParameterName,
+            xaiSecretResolution.SsmFetchAttempted,
+            xaiSecretResolution.SsmFetchStatus,
+            xaiSecretResolution.SsmFetchErrorCode,
+            TruncateForLog(xaiSecretResolution.SsmFetchErrorMessage));
     }
 
     private static string KeyFingerprint(string? key)
@@ -898,7 +910,13 @@ public partial class Program
         string XaiSecretFetchStatus,
         string? XaiSecretFetchErrorCode,
         string? XaiSecretFetchErrorMessage,
-        bool XaiConfigurationInjected);
+        bool XaiConfigurationInjected,
+        // SSM Parameter Store (mirrors Secret* fields; populated on XAI:ParameterName resolution path)
+        string? XaiSsmParameterName,
+        bool XaiSsmFetchAttempted,
+        string XaiSsmFetchStatus,
+        string? XaiSsmFetchErrorCode,
+        string? XaiSsmFetchErrorMessage);
 
     private sealed record XaiEndpointResolution(
         bool XaiChatEndpointPresent,

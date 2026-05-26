@@ -33,7 +33,7 @@ For this system:
 
 ### Runtime secrets
 
-- `XAI_API_KEY`
+- `XAI_API_KEY` (sourced from AWS Secrets Manager `Grok` or SSM Parameter Store via `XAI:ParameterName` e.g. `/wiley-widget/xai-api-key`; code falls back SSM before SM)
 - `DATABASE_URL`
 - `ConnectionStrings__DefaultConnection`
 - `SYNCFUSION_LICENSE_KEY`
@@ -56,7 +56,7 @@ Before changing anything:
 2. Identify the exact secret or config keys affected.
 3. Confirm the current service ARN and environment.
 4. Confirm the rollback value or previous secret reference.
-5. Confirm operator access to App Runner, Secrets Manager, and CloudWatch.
+5. Confirm operator access to App Runner, Secrets Manager, SSM (ssm:GetParameter on the xAI param ARN), and CloudWatch.
 6. Confirm a validation plan for `/health`, snapshot, knowledge, and Jarvis.
 
 ## Standard Rotation Workflow
@@ -112,11 +112,21 @@ Record:
 
 ### xAI key rotation
 
+xAI key may live in Secrets Manager (name from `XAI:SecretName`, default `Grok`) **or** SSM Parameter Store (name from `XAI:ParameterName` or `XAI:SSMParameterName` / `XAI_SSM_PARAMETER_NAME` env, e.g. `/wiley-widget/xai-api-key`; SecureString with decryption). Runtime code attempts env/config first, then SSM (if param configured), then Secrets Manager. App Runner instance role must allow ssm:GetParameter / ssm:GetParameters on the param ARN (or bind the param directly as env var `XAI_API_KEY` — preferred AWS pattern, code path is fallback).
+
+**SSM rotation steps (alongside Secrets Manager):**
+
+1. Update the parameter value in SSM (AWS Console / CLI / IaC). Use SecureString type.
+2. If using code fetch path (not direct env bind): no App Runner config change needed for value; but confirm instance role has ssm:GetParameter.
+3. Trigger App Runner deploy (image push or manual service update) so runtime picks fresh (even for SSM direct bind, service update recommended for consistency).
+4. Validate immediately (see below).
+
 Validate:
 
 - no auth-related xAI alarms
 - Jarvis normal turn completes
 - `Workspace AI request completed` logs do not show auth failure codes
+- Startup logs show `XaiKeySource=ssm:/...` or `secrets-manager:...` and `XaiSsmFetchStatus=success` (or Secret success) with no error codes.
 
 ### xAI endpoint or proxy routing change
 

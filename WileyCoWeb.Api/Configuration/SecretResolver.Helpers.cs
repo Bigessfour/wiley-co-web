@@ -2,6 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using Amazon;
+using Amazon.SimpleSystemsManagement;
+using Amazon.SimpleSystemsManagement.Model;
 
 namespace WileyCoWeb.Api.Configuration;
 
@@ -9,12 +11,26 @@ public sealed partial class SecretResolver
 {
     private SecretResolutionContext CreateResolutionContext()
     {
+        // Support XAI:ParameterName (preferred), XAI:SSMParameterName, and XAI_SSM_PARAMETER_NAME env var.
+        var ssmParam = _configuration["XAI:ParameterName"]
+            ?? _configuration["XAI:SSMParameterName"]
+            ?? Environment.GetEnvironmentVariable("XAI_SSM_PARAMETER_NAME")
+            ?? Environment.GetEnvironmentVariable("XAI_SSM_PARAMETER");
+
+        // Region: config AWS:Region or WILEY_AWS_REGION (appsettings), plus common envs, default us-east-2 (matches App Runner).
+        var region = _configuration["AWS:Region"]
+            ?? _configuration["WILEY_AWS_REGION"]
+            ?? Environment.GetEnvironmentVariable("AWS_REGION")
+            ?? Environment.GetEnvironmentVariable("WILEY_AWS_REGION")
+            ?? "us-east-2";
+
         return new SecretResolutionContext(
             SecretName: _configuration["XAI:SecretName"] ?? "Grok",
-            RegionName: _configuration["AWS:Region"] ?? "us-east-2",
+            RegionName: region,
             EnvironmentApiKey: Environment.GetEnvironmentVariable("XAI_API_KEY"),
             ConfigDirectApiKey: _configuration["XAI_API_KEY"],
-            ConfigNamedApiKey: _configuration["XAI:ApiKey"]);
+            ConfigNamedApiKey: _configuration["XAI:ApiKey"],
+            SsmParameterName: string.IsNullOrWhiteSpace(ssmParam) ? null : ssmParam.Trim());
     }
 
     private static XaiSecretResolutionResult? TryResolveConfiguredKey(SecretResolutionContext context)
@@ -123,7 +139,10 @@ public sealed partial class SecretResolver
         {
             ["XAI_API_KEY"] = apiKey,
             ["XAI:ApiKey"] = apiKey,
-            ["XAI:SecretName"] = context.SecretName
+            ["XAI:SecretName"] = context.SecretName,
+            // Gap fix: ensure XAI:Enabled when key resolved via SSM/Secrets (prod path without persisted AppSettings EnableAI=true).
+            ["XAI:Enabled"] = "true",
+            ["EnableAI"] = "true"
         });
     }
 
@@ -146,7 +165,12 @@ public sealed partial class SecretResolver
             SecretFetchStatus: secretFetchStatus,
             SecretFetchErrorCode: null,
             SecretFetchErrorMessage: null,
-            ConfigurationInjected: false);
+            ConfigurationInjected: false,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: false,
+            SsmFetchStatus: "not-attempted",
+            SsmFetchErrorCode: null,
+            SsmFetchErrorMessage: null);
     }
 
     private static XaiSecretResolutionResult BuildFailureResult(
@@ -166,7 +190,12 @@ public sealed partial class SecretResolver
             SecretFetchStatus: secretFetchStatus,
             SecretFetchErrorCode: secretFetchErrorCode,
             SecretFetchErrorMessage: secretFetchErrorMessage,
-            ConfigurationInjected: false);
+            ConfigurationInjected: false,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: false,
+            SsmFetchStatus: "not-attempted",
+            SsmFetchErrorCode: null,
+            SsmFetchErrorMessage: null);
     }
 
     private static XaiSecretResolutionResult BuildSuccessResult(SecretResolutionContext context)
@@ -182,7 +211,130 @@ public sealed partial class SecretResolver
             SecretFetchStatus: "success",
             SecretFetchErrorCode: null,
             SecretFetchErrorMessage: null,
-            ConfigurationInjected: true);
+            ConfigurationInjected: true,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: false,
+            SsmFetchStatus: "not-attempted",
+            SsmFetchErrorCode: null,
+            SsmFetchErrorMessage: null);
+    }
+
+    // --- SSM Parameter Store support (inserted after env/config, before Secrets Manager; mirrors SM pattern) ---
+    private async Task<XaiSecretResolutionResult?> TryResolveFromSsmAsync(SecretResolutionContext context)
+    {
+        if (string.IsNullOrWhiteSpace(context.SsmParameterName))
+        {
+            return null; // no SSM configured -> fall through to Secrets Manager
+        }
+
+        if (IsIntegrationTestEnvironment())
+        {
+            return BuildSsmSkippedResult(context);
+        }
+
+        try
+        {
+            var apiKey = await TryLoadSsmParameterApiKeyAsync(context).ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return BuildSsmFailureResult(context, "ssm_empty_or_invalid", null, "The SSM parameter was retrieved but did not contain a valid API key.");
+            }
+
+            InjectResolvedApiKey(context, apiKey);
+
+            return BuildSsmSuccessResult(context);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[API Startup] Failed to resolve xAI API key from SSM Parameter Store: {ex.Message}");
+            return BuildSsmFailureResult(context, "failed", ex.GetType().Name, ex.Message);
+        }
+    }
+
+    private async Task<string?> TryLoadSsmParameterApiKeyAsync(SecretResolutionContext context)
+    {
+        var parameterValue = await LoadSsmParameterValueAsync(context).ConfigureAwait(false);
+        return TryExtractApiKey(parameterValue);
+    }
+
+    private async Task<string?> LoadSsmParameterValueAsync(SecretResolutionContext context)
+    {
+        using var client = new AmazonSimpleSystemsManagementClient(RegionEndpoint.GetBySystemName(context.RegionName));
+        var response = await client.GetParameterAsync(new GetParameterRequest
+        {
+            Name = context.SsmParameterName,
+            WithDecryption = true
+        }).ConfigureAwait(false);
+
+        return response.Parameter?.Value;
+    }
+
+    private static XaiSecretResolutionResult BuildSsmSuccessResult(SecretResolutionContext context)
+    {
+        return new XaiSecretResolutionResult(
+            ResolvedKeySource: $"ssm:{context.SsmParameterName}",
+            EnvironmentKeyPresent: false,
+            ConfigDirectKeyPresent: false,
+            ConfigNamedKeyPresent: false,
+            SecretFetchAttempted: false,
+            SecretName: context.SecretName,
+            RegionName: context.RegionName,
+            SecretFetchStatus: "skipped_ssm_preferred",
+            SecretFetchErrorCode: null,
+            SecretFetchErrorMessage: null,
+            ConfigurationInjected: true,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: true,
+            SsmFetchStatus: "success",
+            SsmFetchErrorCode: null,
+            SsmFetchErrorMessage: null);
+    }
+
+    private static XaiSecretResolutionResult BuildSsmFailureResult(
+        SecretResolutionContext context,
+        string ssmFetchStatus,
+        string? ssmFetchErrorCode,
+        string? ssmFetchErrorMessage)
+    {
+        return new XaiSecretResolutionResult(
+            ResolvedKeySource: "not-found",
+            EnvironmentKeyPresent: false,
+            ConfigDirectKeyPresent: false,
+            ConfigNamedKeyPresent: false,
+            SecretFetchAttempted: false,
+            SecretName: context.SecretName,
+            RegionName: context.RegionName,
+            SecretFetchStatus: ssmFetchStatus,
+            SecretFetchErrorCode: ssmFetchErrorCode,
+            SecretFetchErrorMessage: ssmFetchErrorMessage,
+            ConfigurationInjected: false,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: true,
+            SsmFetchStatus: ssmFetchStatus,
+            SsmFetchErrorCode: ssmFetchErrorCode,
+            SsmFetchErrorMessage: ssmFetchErrorMessage);
+    }
+
+    private static XaiSecretResolutionResult BuildSsmSkippedResult(SecretResolutionContext context)
+    {
+        return new XaiSecretResolutionResult(
+            ResolvedKeySource: "not-found",
+            EnvironmentKeyPresent: false,
+            ConfigDirectKeyPresent: false,
+            ConfigNamedKeyPresent: false,
+            SecretFetchAttempted: false,
+            SecretName: context.SecretName,
+            RegionName: context.RegionName,
+            SecretFetchStatus: "skipped_integration_test",
+            SecretFetchErrorCode: null,
+            SecretFetchErrorMessage: null,
+            ConfigurationInjected: false,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: false,
+            SsmFetchStatus: "skipped",
+            SsmFetchErrorCode: null,
+            SsmFetchErrorMessage: null);
     }
 
     private static ConfiguredKeyResolution? ResolveConfiguredKey(SecretResolutionContext context)
@@ -229,7 +381,8 @@ public sealed partial class SecretResolver
         string RegionName,
         string? EnvironmentApiKey,
         string? ConfigDirectApiKey,
-        string? ConfigNamedApiKey);
+        string? ConfigNamedApiKey,
+        string? SsmParameterName);
 
     private sealed record ConfiguredKeyResolution(
         string ResolvedKeySource,

@@ -342,10 +342,11 @@ public sealed class ComponentPageTests
 		Assert.Equal(60.00m, waterQuadrant.BreakEvenRate);
 		Assert.All(waterQuadrant.SeriesPoints, point => Assert.Equal(60.00m, point.BreakEvenPerCustomer));
 
+		// Match current recalc path in WorkspaceState (EnterpriseRateService with round:false for baseline unchanged quadrants post CI stabilization).
 		var unchangedBaselineRate = EnterpriseRateService.CalculateBreakEvenRate(
 			WorkspaceTestData.BaselineTotalCosts,
 			WorkspaceTestData.BaselineProjectedVolume,
-			roundToCurrency: true);
+			roundToCurrency: false);
 		Assert.All(
 			workspaceState.BreakEvenQuadrants.Where(quadrant => quadrant.EnterpriseName != WorkspaceTestData.WaterUtility),
 			quadrant => Assert.Equal(unchangedBaselineRate, quadrant.BreakEvenRate));

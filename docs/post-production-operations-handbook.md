@@ -28,7 +28,7 @@ The live production path currently depends on these services:
 - Amplify hosts the static Blazor WebAssembly client.
 - App Runner hosts the thin ASP.NET Core API.
 - Aurora PostgreSQL is the system of record.
-- Secrets Manager holds runtime secrets for database access, xAI, and Syncfusion.
+- Secrets Manager holds runtime secrets for database access, Syncfusion, and fallback xAI; primary xAI key now in SSM Parameter Store (path `/wiley-widget/xai-api-key` or configured via `XAI:ParameterName`; App Runner instance role `WileyWidgetAppRunnerInstanceRole` requires `ssm:GetParameter` + `ssm:GetParameters` on the param ARN — or bind SSM param directly to runtime env `XAI_API_KEY`).
 - API Gateway `w544vrvb3i` is the xAI proxy path used by Jarvis.
 - CloudWatch Logs and CloudWatch Alarms are the current operational monitoring surfaces.
 
@@ -116,7 +116,7 @@ For every production API deployment, record:
   curl -s https://<app-runner-host>/api/ai/health | jq '.latestUsedFallback, .status'
   curl -s https://<app-runner-host>/api/jarvis/health | jq '.latestUsedFallback, .status'
   ```
-- Secret rotation: use `docs/secrets-and-config-rotation-runbook.md` (never commit values; rotate in Secrets Manager + App Runner/Amplify rebuilds only).
+- Secret/SSM rotation: use `docs/secrets-and-config-rotation-runbook.md` (never commit values; xAI primary now SSM Parameter Store with code fallback or direct App Runner env bind; Secrets Manager for other secrets; always trigger App Runner deploy after change).
 - Rollback target: prior ECR image tag + prior Amplify version (record in release evidence template).
 
 All steps are ops-only; no secrets in source or this handbook.
