@@ -132,3 +132,31 @@ globalThis.wileyNetworkStatus = (function () {
     },
   };
 })();
+
+// QuickBooks import: read staged files from the native input when Syncfusion's
+// IBrowserFile stream does not become readable (Playwright automation, some WASM edge cases).
+globalThis.wileyQuickBooks = {
+  readSelectedFile: async function (inputId, maxBytes) {
+    const input =
+      document.querySelector(`input#${CSS.escape(inputId)}`) ??
+      document.getElementById(inputId);
+    if (!input || !input.files || input.files.length === 0) {
+      return null;
+    }
+
+    const fileCount = input.files.length;
+    const file = input.files[fileCount - 1];
+    if (file.size > maxBytes) {
+      throw new Error(
+        "Selected file exceeds the QuickBooks import size limit.",
+      );
+    }
+
+    const buffer = await file.arrayBuffer();
+    return {
+      name: file.name,
+      bytes: new Uint8Array(buffer),
+      fileCount: fileCount,
+    };
+  },
+};

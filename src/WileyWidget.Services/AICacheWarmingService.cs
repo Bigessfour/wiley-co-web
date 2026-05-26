@@ -15,7 +15,7 @@ namespace WileyWidget.Services;
 /// Background service that warms AI service caches with common queries on startup
 /// to improve initial response times and reduce cold-start latency
 /// </summary>
-public class AICacheWarmingService : IHostedService
+public class AICacheWarmingService : BackgroundService
 {
     private readonly IAIService _aiService;
     private readonly IGrokRecommendationService? _recommendationService;
@@ -43,14 +43,15 @@ public class AICacheWarmingService : IHostedService
         _recommendationService = recommendationService;
 
         // Check if cache warming is enabled
-        _enabled = bool.Parse(configuration["AI:CacheWarming:Enabled"] ?? "true");
+        // Default "false" so AI:CacheWarming:Enabled does not force registration/execution when AI stack absent (e.g. IntegrationTest factories).
+        _enabled = bool.Parse(configuration["AI:CacheWarming:Enabled"] ?? "false");
         _delaySeconds = int.Parse(configuration["AI:CacheWarming:DelaySeconds"] ?? "10", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     /// <summary>
-    /// Starts the cache warming process after application startup
+    /// Executes the cache warming once after configured delay (proper BackgroundService, no fire-and-forget Task.Run).
     /// </summary>
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_enabled)
         {
@@ -60,42 +61,26 @@ public class AICacheWarmingService : IHostedService
 
         _logger.LogInformation("AI cache warming scheduled to start in {Delay} seconds", _delaySeconds);
 
-        // Run cache warming in background after delay to not block startup
-        _ = Task.Run(async () =>
+        try
         {
-            try
+            await Task.Delay(TimeSpan.FromSeconds(_delaySeconds), stoppingToken);
+
+            if (stoppingToken.IsCancellationRequested)
             {
-                // Wait for application to finish initializing
-                await Task.Delay(TimeSpan.FromSeconds(_delaySeconds), cancellationToken);
-
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    _logger.LogInformation("Cache warming cancelled before start");
-                    return;
-                }
-
-                await WarmCachesAsync(cancellationToken);
+                _logger.LogInformation("Cache warming cancelled before start");
+                return;
             }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("Cache warming cancelled");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Cache warming failed with exception");
-            }
-        }, cancellationToken);
 
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Stops the cache warming service
-    /// </summary>
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Cache warming service stopped");
-        return Task.CompletedTask;
+            await WarmCachesAsync(stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Cache warming cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cache warming failed with exception");
+        }
     }
 
     /// <summary>

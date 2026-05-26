@@ -23,6 +23,8 @@ public sealed record WorkspaceChatResponse(
 	public int ConversationMessageCount { get; init; }
 	public bool IsFirstConversation { get; init; }
 	public bool CanResetConversation { get; init; }
+	public string? AnswerSource { get; init; }
+	public string? FailureCode { get; init; }
 }
 
 public sealed record WorkspaceUserContext(
@@ -52,3 +54,11 @@ public sealed record WorkspaceRecommendationHistoryItem(
 
 public sealed record WorkspaceRecommendationHistoryResponse(
 	IReadOnlyList<WorkspaceRecommendationHistoryItem> Items);
+
+public sealed record JarvisHealthResponse(
+	string Status,
+	bool SemanticKernelAvailable,
+	string? LatestAnswerSource,
+	bool LatestUsedFallback,
+	string? LatestFailureCode,
+	string? LastTurnAtUtc);

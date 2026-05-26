@@ -42,20 +42,18 @@
         }
       })();
     </script>
-    <script>
-      tailwind = {
-        config: {
-          corePlugins: {
-            preflight: false,
-          },
-        },
-      };
-    </script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <!--
+      Syncfusion 33.x Fluent2 theme (light base) for native Fluent2 look and
+      proper dark/light inheritance via data-bs-theme + data-wiley-theme.
+      The id enables the theme toggle in MainLayout to swap to fluent2-dark.css
+      (and back) for full Syncfusion control surfaces (grids, cards, inputs, charts,
+      sidebar, appbar) in both modes. No hard-coded light-only assumptions.
+    -->
     <link
+      id="syncfusion-theme"
       rel="stylesheet"
-      href="_content/Syncfusion.Blazor.Themes/bootstrap5.css"
+      href="_content/Syncfusion.Blazor.Themes/fluent2.css"
     />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="WileyCoWeb.styles.css" />
@@ -65,25 +63,28 @@
   <body>
     <div id="app">
       <div
-        class="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-center text-white"
+        class="d-flex min-vh-100 align-items-center justify-content-center bg-dark px-3 text-center text-white"
       >
-        <div class="max-w-md space-y-5">
-          <div
-            class="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-sky-300 border-t-transparent"
-          ></div>
+        <div class="w-100" style="max-width: 28rem">
+          <div class="d-flex justify-content-center mb-4">
+            <div
+              class="spinner-border text-primary"
+              role="status"
+              style="width: 3.5rem; height: 3.5rem; border-width: 0.35rem"
+              aria-hidden="true"
+            ></div>
+          </div>
           <div>
             <div
-              class="text-sm font-semibold uppercase tracking-[0.28em] text-sky-300"
+              class="text-uppercase fw-semibold small text-primary"
+              style="letter-spacing: 0.28em"
             >
               Starting client
             </div>
-            <div
-              id="wiley-static-boot-headline"
-              class="mt-2 text-2xl font-semibold tracking-tight"
-            >
+            <div id="wiley-static-boot-headline" class="mt-2 h4 fw-semibold">
               Starting Wiley Widget
             </div>
-            <div class="mt-3 text-sm leading-6 text-slate-300">
+            <div class="mt-3 small text-white-50">
               Downloading the Blazor WebAssembly runtime. After this screen, the
               workspace loads its snapshot from your configured API (or bundled
               fallback if the API is unreachable).

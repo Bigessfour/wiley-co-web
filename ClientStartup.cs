@@ -1,3 +1,4 @@
+using WileyCoWeb;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Syncfusion.Blazor;
@@ -45,7 +46,7 @@ namespace WileyCoWeb.Services
 
             var startupState = await ResolveClientStartupStateAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
 
-            ConfigureClientBuilder(builder, startupState.ResolvedApiBaseAddress);
+            ConfigureClientBuilder(builder, startupState.ResolvedApiBaseAddress!);
 
             var host = builder.Build();
             var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WileyCoWeb.Startup");
@@ -57,7 +58,7 @@ namespace WileyCoWeb.Services
                 startupState.SyncfusionKeySource,
                 startupState.WorkspaceApiSource,
                 clientBaseAddress,
-                startupState.ResolvedApiBaseAddress,
+                startupState.ResolvedApiBaseAddress!,
                 builder.HostEnvironment.Environment);
 
             StartWorkspaceBootstrapTask(host.Services, startupLogger);

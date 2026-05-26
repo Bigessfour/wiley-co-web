@@ -1,6 +1,7 @@
 {
   "recommendations": [
     "amazonwebservices.aws-toolkit-vscode",
+    "anysphere.csharp",
     "ms-dotnettools.csdevkit",
     "ms-dotnettools.vscode-dotnet-runtime",
     "ms-dotnettools.csharp",

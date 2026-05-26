@@ -14,6 +14,9 @@ permissions:
   contents: read
   id-token: write # required for GitHub OIDC — deployment-guard assumes role via federation
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   secrets-guard:
     name: Secret scan (TruffleHog)
@@ -52,6 +55,9 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
+      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
+      # Minimal, non-breaking; playwright job already pins Node 24 via setup-node.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
@@ -208,14 +214,51 @@ jobs:
             TestResults/${{ matrix.name }}/source-coverage-summary.md
           if-no-files-found: warn
 
-  build-and-publish:
+  highrisk-tests:
     runs-on: windows-latest
-    needs: test
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - tests/WileyCoWeb.ComponentTests/WileyCoWeb.ComponentTests.csproj
+          - tests/WileyCoWeb.IntegrationTests/WileyCoWeb.IntegrationTests.csproj
+          - tests/WileyWidget.Tests/WileyWidget.Tests.csproj
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup .NET 9.0.313
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.313
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ matrix.project }} --locked-mode
+
+      - name: Build
+        run: dotnet build ${{ matrix.project }} --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Run HighRisk tests
+        run: dotnet test ${{ matrix.project }} --configuration Release --no-build --no-restore --filter "Category=HighRisk" --verbosity normal
+
+  build-and-publish:
+    runs-on: windows-latest
+    needs: [test, highrisk-tests]
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
+      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
+      # Minimal, non-breaking; playwright job already pins Node 24 via setup-node.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
@@ -268,6 +311,9 @@ jobs:
       # Full Chromium + WebKit roughly doubles wall time on ubuntu-latest; CI gates on Chromium only.
       # Run both locally: unset PLAYWRIGHT_CI_BROWSERS or `npm run playwright:test:strict`.
       PLAYWRIGHT_CI_BROWSERS: chromium
+      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
+      # Minimal, non-breaking; this job already pins Node 24 via setup-node.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
@@ -315,6 +361,9 @@ jobs:
 
       - name: Run Playwright UI smoke (curated specs)
         run: npm run playwright:test:ci:smoke
+
+      - name: Run Playwright HighRisk specs
+        run: npm run playwright:test:ci:highrisk
 
       - name: Enforce Playwright pass-rate gate
         run: node ./Scripts/assert-playwright-results.mjs

@@ -27,7 +27,7 @@ public sealed class WorkspaceAiApiService(HttpClient httpClient, ILogger<Workspa
 				: responseBody);
 		}
 
-		logger?.LogInformation("Workspace AI response received (usedFallback={UsedFallback}, conversationId={ConversationId}, turnCount={TurnCount}).", payload?.UsedFallback ?? false, payload?.ConversationId ?? "N/A", payload?.ConversationMessageCount ?? 0);
+		logger?.LogInformation("Workspace AI response received (usedFallback={UsedFallback}, answerSource={AnswerSource}, failureCode={FailureCode}, conversationId={ConversationId}, turnCount={TurnCount}).", payload?.UsedFallback ?? false, payload?.AnswerSource ?? "unknown", payload?.FailureCode ?? "none", payload?.ConversationId ?? "N/A", payload?.ConversationMessageCount ?? 0);
 		return payload ?? throw new InvalidOperationException("The workspace AI response was empty.");
 	}
 

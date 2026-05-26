@@ -1,11 +1,13 @@
 [CmdletBinding()]
 param(
     [string]$Region = "us-east-2",
-    [string]$ClusterIdentifier = "wiley-co-aurora-db",
+    [string]$ClusterIdentifier = "wiley-co-aurora-db-encrypted",
+    [string]$SecretArn = "arn:aws:secretsmanager:us-east-2:570912405222:secret:wiley-widget/temp/copilot-data-api-readonly-sbIHYu",
     [string]$Project = "src/WileyWidget.Data/WileyWidget.Data.csproj",
     [string]$StartupProject = "WileyCoWeb.Api/WileyCoWeb.Api.csproj",
     [string]$Context = "AppDbContext",
-    [string]$Migration = "InitialCreate",
+    [string]$FromMigration = "0",
+    [string]$ToMigration = "SchemaAlignmentProductionReadiness",
     [switch]$NoBuild
 )
 
@@ -34,8 +36,16 @@ function Get-ClusterConfiguration {
         throw "Aurora cluster '$Identifier' does not have the HTTP endpoint enabled. Data API apply is unavailable."
     }
 
-    if ([string]::IsNullOrWhiteSpace($cluster.Arn) -or [string]::IsNullOrWhiteSpace($cluster.SecretArn) -or [string]::IsNullOrWhiteSpace($cluster.DatabaseName)) {
-        throw "Aurora cluster '$Identifier' is missing the ARN, master secret ARN, or database name required for Data API access."
+    if ([string]::IsNullOrWhiteSpace($cluster.Arn) -or [string]::IsNullOrWhiteSpace($cluster.DatabaseName)) {
+        throw "Aurora cluster '$Identifier' is missing the ARN or database name required for Data API access."
+    }
+
+    if ([string]::IsNullOrWhiteSpace($cluster.SecretArn)) {
+        $cluster | Add-Member -NotePropertyName SecretArn -NotePropertyValue $SecretArn -Force
+    }
+
+    if ([string]::IsNullOrWhiteSpace($cluster.SecretArn)) {
+        throw "Aurora cluster '$Identifier' has no master user secret; pass -SecretArn with a JSON RDS credential secret."
     }
 
     return $cluster
@@ -105,7 +115,18 @@ function Invoke-DataApiStatement {
         [string]$Sql
     )
 
-    $output = & aws rds-data execute-statement --resource-arn $Cluster.Arn --secret-arn $Cluster.SecretArn --database $Cluster.DatabaseName --region $AwsRegion --sql $Sql --output json 2>&1
+    $inputObject = [ordered]@{
+        resourceArn = $Cluster.Arn
+        secretArn   = $Cluster.SecretArn
+        database    = $Cluster.DatabaseName
+        sql         = $Sql
+    }
+    $inputPath = Join-Path $env:TEMP ("rds-data-{0}.json" -f [Guid]::NewGuid().ToString("N"))
+    $inputObject | ConvertTo-Json -Compress | Set-Content -Path $inputPath -Encoding utf8
+    $inputUri = "file://" + ($inputPath -replace '\\', '/')
+
+    $output = & aws rds-data execute-statement --region $AwsRegion --cli-input-json $inputUri --output json 2>&1
+    Remove-Item -Path $inputPath -Force -ErrorAction SilentlyContinue
     if ($LASTEXITCODE -eq 0) {
         return "executed"
     }
@@ -120,7 +141,7 @@ function Invoke-DataApiStatement {
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $cluster = Get-ClusterConfiguration -Identifier $ClusterIdentifier -AwsRegion $Region
-$scriptPath = Join-Path $repoRoot ("obj\aurora-{0}.sql" -f $Migration)
+$scriptPath = Join-Path $repoRoot ("obj\aurora-{0}-to-{1}.sql" -f $FromMigration, $ToMigration)
 
 Push-Location $repoRoot
 try {
@@ -128,8 +149,8 @@ try {
         "ef",
         "migrations",
         "script",
-        "0",
-        $Migration,
+        $FromMigration,
+        $ToMigration,
         "--project", $Project,
         "--startup-project", $StartupProject,
         "--context", $Context
@@ -141,7 +162,7 @@ try {
 
     & dotnet @arguments | Set-Content -Path $scriptPath
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $scriptPath)) {
-        throw "Unable to generate the EF migration SQL for '$Migration'."
+        throw "Unable to generate the EF migration SQL from '$FromMigration' to '$ToMigration'."
     }
 
     $sqlText = Get-Content -Path $scriptPath -Raw

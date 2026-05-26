@@ -8,12 +8,14 @@
   <ItemGroup>
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.4.16" />
+    <PackageVersion Include="AWSSDK.SimpleSystemsManagement" Version="4.0.4.16" />
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="ExcelDataReader" Version="3.8.0" />
     <PackageVersion Include="ExcelDataReader.DataSet" Version="3.8.0" />
     <PackageVersion Include="AWSXRayRecorder.Handlers.AspNetCore" Version="2.13.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.14" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.14" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4" />
@@ -75,6 +77,7 @@
     <PackageVersion Include="Syncfusion.Blazor.WordProcessor" Version="33.2.3" />
     <PackageVersion Include="Syncfusion.Pdf.Net.Core" Version="33.2.3" />
     <PackageVersion Include="Syncfusion.XlsIO.Net.Core" Version="33.2.3" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.4.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />

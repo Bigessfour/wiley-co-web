@@ -22,6 +22,7 @@ using Syncfusion.Blazor.Popups;
 using Syncfusion.Blazor.ProgressBar;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Components;
+using WileyWidget.Abstractions;
 using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Components.Panels;
 using WileyCoWeb.Components.Pages;
@@ -336,8 +337,19 @@ public sealed class ComponentPageTests
 
 		Assert.Equal(4, workspaceState.BreakEvenQuadrants.Count);
 		Assert.Contains(workspaceState.BreakEvenQuadrants, quadrant => quadrant.EnterpriseName == WorkspaceTestData.WaterUtility);
-		Assert.All(workspaceState.BreakEvenQuadrants, quadrant => Assert.Equal(60.00m, quadrant.BreakEvenRate));
-		Assert.All(workspaceState.BreakEvenQuadrants, quadrant => Assert.All(quadrant.SeriesPoints, point => Assert.Equal(60.00m, point.BreakEvenPerCustomer)));
+
+		var waterQuadrant = workspaceState.BreakEvenQuadrants.Single(quadrant => quadrant.EnterpriseName == WorkspaceTestData.WaterUtility);
+		Assert.Equal(60.00m, waterQuadrant.BreakEvenRate);
+		Assert.All(waterQuadrant.SeriesPoints, point => Assert.Equal(60.00m, point.BreakEvenPerCustomer));
+
+		// Match current recalc path in WorkspaceState (EnterpriseRateService with round:false for baseline unchanged quadrants post CI stabilization).
+		var unchangedBaselineRate = EnterpriseRateService.CalculateBreakEvenRate(
+			WorkspaceTestData.BaselineTotalCosts,
+			WorkspaceTestData.BaselineProjectedVolume,
+			roundToCurrency: false);
+		Assert.All(
+			workspaceState.BreakEvenQuadrants.Where(quadrant => quadrant.EnterpriseName != WorkspaceTestData.WaterUtility),
+			quadrant => Assert.Equal(unchangedBaselineRate, quadrant.BreakEvenRate));
 	}
 
 	[Fact]

@@ -1,8 +1,10 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using WileyWidget.Business.Interfaces;
 using WileyWidget.Models;
 using WileyWidget.Services.Abstractions;
+using WileyWidget.Services.Configuration;
 
 namespace WileyWidget.Services;
 
@@ -14,17 +16,20 @@ public sealed class DebtCoverageService : IDebtCoverageService
     private readonly IAccountsRepository accountsRepository;
     private readonly IBudgetRepository budgetRepository;
     private readonly ILogger<DebtCoverageService> logger;
+    private readonly IOptions<WorkspacePanelFallbackOptions> fallbackOptions;
 
     public DebtCoverageService(
         IEnterpriseRepository enterpriseRepository,
         IAccountsRepository accountsRepository,
         IBudgetRepository budgetRepository,
-        ILogger<DebtCoverageService> logger)
+        ILogger<DebtCoverageService> logger,
+        IOptions<WorkspacePanelFallbackOptions> fallbackOptions)
     {
         this.enterpriseRepository = enterpriseRepository ?? throw new ArgumentNullException(nameof(enterpriseRepository));
         this.accountsRepository = accountsRepository ?? throw new ArgumentNullException(nameof(accountsRepository));
         this.budgetRepository = budgetRepository ?? throw new ArgumentNullException(nameof(budgetRepository));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.fallbackOptions = fallbackOptions ?? throw new ArgumentNullException(nameof(fallbackOptions));
     }
 
     public async Task<DebtCoverageResult> BuildAsync(string enterpriseName, int fiscalYear, CancellationToken cancellationToken = default)
@@ -41,6 +46,26 @@ public sealed class DebtCoverageService : IDebtCoverageService
 
         var normalizedEnterprise = enterpriseName.Trim();
 
+        try
+        {
+            return await BuildFromLiveDataAsync(normalizedEnterprise, fiscalYear, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DebtCoverageNotFoundException ex) when (fallbackOptions.Value.UseSyntheticDebtCoverageWhenEnterpriseMissing)
+        {
+            logger.LogWarning(
+                ex,
+                "Returning synthetic debt coverage for {Enterprise} FY {FiscalYear} because the enterprise was not found in the live data store.",
+                normalizedEnterprise,
+                fiscalYear);
+            return WorkspaceSyntheticPanelData.BuildDebtCoverage(normalizedEnterprise, fiscalYear);
+        }
+    }
+
+    private async Task<DebtCoverageResult> BuildFromLiveDataAsync(
+        string normalizedEnterprise,
+        int fiscalYear,
+        CancellationToken cancellationToken)
+    {
         List<Enterprise> enterprises;
         try
         {

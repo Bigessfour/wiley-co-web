@@ -28,7 +28,7 @@ The live production path currently depends on these services:
 - Amplify hosts the static Blazor WebAssembly client.
 - App Runner hosts the thin ASP.NET Core API.
 - Aurora PostgreSQL is the system of record.
-- Secrets Manager holds runtime secrets for database access, xAI, and Syncfusion.
+- Secrets Manager holds runtime secrets for database access, Syncfusion, and fallback xAI; primary xAI key now in SSM Parameter Store (path `/wiley-widget/xai-api-key` or configured via `XAI:ParameterName`; App Runner instance role `WileyWidgetAppRunnerInstanceRole` requires `ssm:GetParameter` + `ssm:GetParameters` on the param ARN — or bind SSM param directly to runtime env `XAI_API_KEY`).
 - API Gateway `w544vrvb3i` is the xAI proxy path used by Jarvis.
 - CloudWatch Logs and CloudWatch Alarms are the current operational monitoring surfaces.
 
@@ -65,7 +65,7 @@ Current platform note:
 
 - Execute the normal QuickBooks import flow through the upload panel.
 - Retain import evidence: operator, enterprise, fiscal year, filenames, counts, and follow-up validation results.
-- Reconfirm that workspace snapshot, workspace knowledge, and one non-onboarding Jarvis turn still reflect current live data.
+- Reconfirm that workspace snapshot, workspace knowledge, `/api/ai/health`, and one non-onboarding Jarvis turn still reflect current live data.
 - Review runtime sizing and alarm thresholds against the last month of traffic and import activity.
 
 ## 4. Normal Release Workflow
@@ -97,6 +97,29 @@ For every production API deployment, record:
 - smoke-check results for `/api/workspace/snapshot`, `/api/workspace/knowledge`, and `/api/ai/chat`
 - alarm state before and after deploy
 - rollback target
+
+### Amplify / App Runner Cutover & Council Smoke Commands (ops only, no secrets)
+
+**Cutover checklist (env-driven):**
+
+- Set `WILEY_WORKSPACE_API_BASE_ADDRESS` in Amplify (points client to App Runner public URL or custom domain).
+- Deploy Amplify with the env var present (amplify.yml + build already supports it for `appsettings.Workspace.local.json`).
+- App Runner service: update runtime env/secrets via console or IaC (database-url, xai-api-key, syncfusion-license-key); trigger deploy from ECR image.
+- Post-cutover validation (council smoke, run from ops workstation or CI):
+  ```powershell
+  dotnet build WileyCoWeb.csproj
+  dotnet build WileyCoWeb.Api/WileyCoWeb.Api.csproj
+  dotnet test tests/WileyCoWeb.ComponentTests --filter "Category=HighRisk"
+  dotnet test tests/WileyCoWeb.IntegrationTests --filter "Category=HighRisk"
+  dotnet test tests/WileyWidget.Tests --filter "Category=HighRisk"
+  npm run playwright:test:ci:highrisk
+  curl -s https://<app-runner-host>/api/ai/health | jq '.latestUsedFallback, .status'
+  curl -s https://<app-runner-host>/api/jarvis/health | jq '.latestUsedFallback, .status'
+  ```
+- Secret/SSM rotation: use `docs/secrets-and-config-rotation-runbook.md` (never commit values; xAI primary now SSM Parameter Store with code fallback or direct App Runner env bind; Secrets Manager for other secrets; always trigger App Runner deploy after change).
+- Rollback target: prior ECR image tag + prior Amplify version (record in release evidence template).
+
+All steps are ops-only; no secrets in source or this handbook.
 
 Use `docs/release-record-template.md` to keep this consistent across releases.
 
@@ -192,6 +215,18 @@ Current alarms documented for the production runtime include:
 Operational note:
 
 - `WileyCo-Jarvis-FallbackUsed` and `WileyCo-Jarvis-Legacy403Forbidden` are currently diagnostic-only unless re-promoted to notification actions.
+
+### Jarvis health endpoint
+
+`GET /api/ai/health` (alias: `GET /api/jarvis/health`) returns the latest Jarvis turn metadata:
+
+- `semanticKernelAvailable`
+- `latestAnswerSource`
+- `latestUsedFallback`
+- `latestFailureCode`
+- `lastTurnAtUtc`
+
+Use this endpoint during release validation alongside CloudWatch `AnswerSource` queries. A council-ready release should show at least one non-onboarding turn with `latestAnswerSource=semantic_kernel` and `latestUsedFallback=false`.
 
 ### Jarvis completion log
 
@@ -362,6 +397,16 @@ Best-practice cadence:
 - Keep operator access limited to named deployment and support owners.
 - Review alarm actions and notification recipients after team or ownership changes.
 - Keep production domain, API host, and data-store changes out of the same release window unless there is a documented rollback plan for the combined change.
+- **API JWT scaffolding:** `Authentication:Jwt:Enabled` gates mutating routes (POST/PUT/DELETE + commit/reroute) and now also read paths via `RequireWorkspaceReadAuth`: snapshot GET, knowledge POST, export list/download, QuickBooks routing/history GET. Production values (Town of Wiley Cognito):
+  - `Authentication__Jwt__Enabled=true`
+  - `Authentication__Jwt__Authority=https://cognito-idp.us-east-2.amazonaws.com/us-east-2_DmY7BCBIp`
+  - `Authentication__Jwt__Audience=2m6vp91m9938jpbg2efivr2p8k` (Amplify web app client)
+  - Amplify Auth must send `Authorization: Bearer` tokens on protected calls (mutating + the listed reads). When JWT is disabled (local dev / integration tests), endpoints remain open and identity falls back to `X-Wiley-User-*` headers only — never rely on those headers in production with JWT disabled on a public host.
+  - Integration tests prove 401 on read endpoints when JWT enabled in test factory (no token).
+- **Copilot / operator Cognito smoke tests:** IAM user `copilot` has managed policy `WileyWidgetCopilotCognitoSmokeTest` (Cognito admin auth on pool `us-east-2_DmY7BCBIp` + read secret `wiley-widget/temp/copilot-cognito-smoke`). With `copilot` AWS credentials configured:
+  - `pwsh Scripts/get-cognito-smoke-token.ps1` — returns a Bearer access token
+  - `pwsh Scripts/smoke-test-jarvis-production.ps1` — exercises `/api/ai/health` and `/api/ai/chat` on App Runner
+  - Requires the current API image (Jarvis routes + JWT). Rotate the smoke-test Cognito password via Secrets Manager after use.
 
 ## 13. Standing Follow-Up Work
 

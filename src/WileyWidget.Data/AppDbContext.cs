@@ -118,6 +118,7 @@ namespace WileyWidget.Data
                 entity.HasIndex(e => e.MunicipalAccountId);
                 entity.HasIndex(e => e.SourceRowNumber); // New: Excel import queries
                 entity.HasIndex(e => e.ActivityCode); // New: GASB reporting
+                entity.HasIndex(e => e.SourceFilePath); // p2-schema: for import traceability
                 entity.Property(e => e.BudgetedAmount).HasColumnType(Decimal18_2).HasDefaultValue(0);
                 entity.Property(e => e.ActualAmount).HasColumnType(Decimal18_2);
                 entity.Property(e => e.EncumbranceAmount).HasColumnType(Decimal18_2);
@@ -198,11 +199,25 @@ namespace WileyWidget.Data
                       .WithMany(be => be.Transactions)
                       .HasForeignKey(t => t.BudgetEntryId)
                 .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(t => t.MunicipalAccount)
+                      .WithMany(ma => ma.Transactions)
+                      .HasForeignKey(t => t.MunicipalAccountId)
+                      .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(t => t.TransactionDate);
+                entity.HasIndex(t => t.MunicipalAccountId);
                 entity.Property(t => t.Amount).HasColumnType(Decimal18_2);
                 entity.Property(t => t.Type).HasMaxLength(50);
                 entity.Property(t => t.Description).HasMaxLength(200);
                 entity.ToTable(t => t.HasCheckConstraint("CK_Transaction_NonZero", TransactionNonZeroConstraintSql));
+            });
+
+            // p2-schema: AuditEntry indexes
+            modelBuilder.Entity<AuditEntry>(entity =>
+            {
+                entity.HasIndex(e => e.Timestamp);
+                entity.HasIndex(e => new { e.EntityType, e.EntityId, e.Timestamp });
+                entity.Property(e => e.EntityType).HasMaxLength(100);
+                entity.Property(e => e.Action).HasMaxLength(50);
             });
 
             modelBuilder.Entity<Enterprise>(entity =>
@@ -522,6 +537,8 @@ namespace WileyWidget.Data
                 entity.Property(e => e.RoutingReason).HasMaxLength(500);
                 entity.HasIndex(e => e.AppliedRoutingRuleId);
                 entity.HasIndex(e => e.AppliedAllocationProfileId);
+                entity.HasIndex(e => e.EntryDate); // p2-schema
+                entity.HasIndex(e => e.EntryScope); // p2-schema
             });
 
             modelBuilder.Entity<QuickBooksRoutingRule>(entity =>
@@ -662,11 +679,11 @@ namespace WileyWidget.Data
                 entity.HasIndex(e => e.MappedDepartment);
             });
 
-            // New: BudgetInteraction relationships
+            // BudgetInteraction: PrimaryEnterpriseId is canonical; legacy EnterpriseId column dropped in migration.
             modelBuilder.Entity<BudgetInteraction>(entity =>
             {
                 entity.HasOne(bi => bi.PrimaryEnterprise)
-                      .WithMany()
+                      .WithMany(e => e.BudgetInteractions)
                       .HasForeignKey(bi => bi.PrimaryEnterpriseId)
                       .OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne(bi => bi.SecondaryEnterprise)
@@ -712,6 +729,11 @@ namespace WileyWidget.Data
             // UtilityCustomer configuration
             modelBuilder.Entity<UtilityCustomer>(entity =>
             {
+                entity.HasOne(uc => uc.Enterprise)
+                      .WithMany()
+                      .HasForeignKey(uc => uc.EnterpriseId)
+                      .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(uc => uc.EnterpriseId);
                 entity.Property(uc => uc.RowVersion)
                       .HasColumnType(ByteArrayColumnType)
                       .IsConcurrencyToken()
@@ -724,10 +746,10 @@ namespace WileyWidget.Data
             {
                 entity.HasKey(c => c.Id);
                 entity.HasOne(c => c.Bill)
-                      .WithMany()
-                      .HasForeignKey(c => c.BillId)
+                      .WithMany(b => b.Charges!)
+                      .HasForeignKey(c => c.UtilityBillId)
                       .OnDelete(DeleteBehavior.Cascade);
-                entity.HasIndex(c => c.BillId);
+                entity.HasIndex(c => c.UtilityBillId);
                 entity.HasIndex(c => c.ChargeType);
                 entity.Property(c => c.ChargeType).HasMaxLength(50).IsRequired();
                 entity.Property(c => c.Description).HasMaxLength(200).IsRequired();
@@ -769,12 +791,7 @@ namespace WileyWidget.Data
                 modelBuilder.Entity(entityType.ClrType).Property("UpdatedAt").ValueGeneratedOnAddOrUpdate();
             }
 
-            // Set all foreign keys to Restrict to avoid cascade path issues in Aurora PostgreSQL
-            foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
-            {
-                relationship.DeleteBehavior = DeleteBehavior.Restrict;
-            }
-            // Do NOT override with Cascade anywhere. All FKs are Restrict for PostgreSQL safety.
+            // Per-relationship DeleteBehavior is configured above; do not override with a global Restrict loop.
 
             // Seed: BudgetPeriod required for MunicipalAccount FK
             modelBuilder.Entity<BudgetPeriod>().HasData(

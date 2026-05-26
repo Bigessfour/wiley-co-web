@@ -23,14 +23,14 @@ public class Charge : INotifyPropertyChanged
     public int Id { get; set; }
 
     /// <summary>
-    /// Foreign key to the bill this charge belongs to
+    /// Foreign key to the bill this charge belongs to (reconciled to UtilityBillId for schema alignment)
     /// </summary>
-    public int BillId { get; set; }
+    public int UtilityBillId { get; set; }
 
     /// <summary>
     /// Navigation property to the bill
     /// </summary>
-    [ForeignKey(nameof(BillId))]
+    [ForeignKey(nameof(UtilityBillId))]
     public UtilityBill? Bill { get; set; }
 
     private string _chargeType = string.Empty;

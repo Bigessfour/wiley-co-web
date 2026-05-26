@@ -114,6 +114,7 @@ public sealed class QuickBooksImportServiceTests
     }
 
     [Fact]
+    [Trait("Category", "HighRisk")]
     public async Task CommitAsync_BlocksDuplicateHash_AndMarksSubsequentPreviewAsDuplicate()
     {
         var contextFactory = CreateContextFactory($"QuickBooksImportServiceTests-{Guid.NewGuid():N}");

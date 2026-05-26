@@ -16,6 +16,7 @@
     "playwright:test:layout": "playwright test tests/playwright/*layout*.spec.ts --project=chromium",
     "playwright:test:ci": "playwright test",
     "playwright:test:ci:smoke": "playwright test tests/playwright/workspace-smoke.spec.ts",
+    "playwright:test:ci:highrisk": "playwright test tests/playwright/customer-export.spec.ts tests/playwright/decision-support-production-ready.spec.ts tests/playwright/quickbooks-import-duplicate-preview.spec.ts --project=chromium",
     "playwright:test:last-fixes": "playwright test tests/playwright/break-even-production-ready.spec.ts tests/playwright/scenario-production-ready.spec.ts tests/playwright/wiley-workspace-browser-depth.spec.ts:57 tests/playwright/workspace-baseline-save.spec.ts tests/playwright/workspace-syncfusion-controls.spec.ts:204 --project=chromium --project=webkit",
     "playwright:test:strict": "playwright test && node ./Scripts/assert-playwright-results.mjs",
     "playwright:test:hosted": "node scripts/run-playwright-hosted.js",

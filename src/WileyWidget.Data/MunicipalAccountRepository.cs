@@ -162,13 +162,13 @@ namespace WileyWidget.Data
         }
 
         /// <summary>
-        /// Gets an IQueryable for flexible querying and paging
-        /// NOTE: This returns an IQueryable tied to a DbContext created here; caller is responsible for materializing results promptly.
+        /// Gets an IQueryable for flexible querying and paging.
+        /// Throws — use GetPagedAsync or scoped query methods to avoid undisposed DbContext leaks.
         /// </summary>
         public Task<IQueryable<MunicipalAccount>> GetQueryableAsync(CancellationToken cancellationToken = default)
         {
-            var context = _contextFactory.CreateDbContext();
-            return Task.FromResult(context.MunicipalAccounts.AsQueryable());
+            throw new NotSupportedException(
+                "GetQueryableAsync returns an undisposed DbContext-bound IQueryable. Use GetPagedAsync or GetAllAsync instead.");
         }
 
         public async Task<IEnumerable<MunicipalAccount>> GetAllWithRelatedAsync(CancellationToken cancellationToken = default)
@@ -224,7 +224,7 @@ namespace WileyWidget.Data
 
         public async Task<MunicipalAccount?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
-            var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+            await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
             // Compiled + NoTracking for fast first-hit performance
             var entity = CQ_GetById_NoTracking(context, id);
             return await Task.FromResult(entity);

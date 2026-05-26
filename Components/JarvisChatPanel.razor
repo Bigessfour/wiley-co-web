@@ -16,14 +16,14 @@
                     <SfCard ID="jarvis-operational-status-card">
                         <CardHeader Title="Operational status" SubTitle="@StatusText" />
                         <CardContent>
-                            <div class="text-sm text-slate-600">Workspace metrics, recommendations, and Jarvis chat all update from the same current snapshot.</div>
+                            <div class="text-sm wiley-text-muted">Workspace metrics, recommendations, and Jarvis chat all update from the same current snapshot.</div>
                         </CardContent>
                     </SfCard>
 
                     <SfCard ID="jarvis-primary-brief-card">
                         <CardHeader Title="Current brief" SubTitle="Live workspace summary" />
                         <CardContent>
-                            <div class="text-sm leading-6 text-slate-700">@PrimaryBrief</div>
+                            <div class="text-sm leading-6 wiley-text-muted">@PrimaryBrief</div>
                         </CardContent>
                     </SfCard>
                 </div>
@@ -36,8 +36,8 @@
                         <SfCard>
                             <CardHeader Title="@insight.Label" SubTitle="Decision-support metric" />
                             <CardContent>
-                                <div class="text-2xl font-semibold text-slate-900">@insight.Value</div>
-                                <div class="mt-2 text-sm leading-5 text-slate-600">@insight.Description</div>
+                                <div class="text-2xl font-semibold wiley-text-muted">@insight.Value</div>
+                                <div class="mt-2 text-sm leading-5 wiley-text-muted">@insight.Description</div>
                             </CardContent>
                         </SfCard>
                     }
@@ -54,7 +54,7 @@
                                     <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
                                         <SfSpinner Visible="@IsKnowledgeBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                     </div>
-                                    <div class="text-sm text-slate-600">Refresh live workspace knowledge and recommendation cards without leaving the rail.</div>
+                                    <div class="text-sm wiley-text-muted">Refresh live workspace knowledge and recommendation cards without leaving the rail.</div>
                                 </div>
 
                                 <SfTooltip Content="Refresh the live knowledge response that drives the executive brief, insights, and action recommendations."
@@ -73,7 +73,7 @@
                                 <SfCard>
                                     <CardHeader Title="@action.Title" SubTitle="Recommended next step" />
                                     <CardContent>
-                                        <div class="text-sm leading-5 text-slate-600">@action.Description</div>
+                                        <div class="text-sm leading-5 wiley-text-muted">@action.Description</div>
                                     </CardContent>
                                 </SfCard>
                             }
@@ -99,9 +99,9 @@
                                                     <SfSpinner Visible="@IsChatBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                                 </div>
                                                 <div class="space-y-2">
-                                                    <div class="text-sm leading-5 text-slate-700">@ChatRuntimeStatusDetail</div>
-                                                    <div class="text-xs text-slate-500">Turn count: @ChatTranscript.Count</div>
-                                                    <div class="text-xs text-slate-500">Profile summary: @CurrentProfileSummary</div>
+                                                    <div class="text-sm leading-5 wiley-text-muted">@ChatRuntimeStatusDetail</div>
+                                                    <div class="text-xs wiley-text-muted">Turn count: @ChatTranscript.Count</div>
+                                                    <div class="text-xs wiley-text-muted">Profile summary: @CurrentProfileSummary</div>
                                                 </div>
                                             </div>
 
@@ -128,7 +128,7 @@
 
                                 @* Removed: extra custom chat shell blocks that duplicated the assist surface.
                                    Replacement: the assist rail now owns the premium conversation experience, while surrounding cards focus on runtime and audit context. *@
-                                <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-busy="@IsChatBusy">
+                                <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel" aria-busy="@IsChatBusy">
                                     <SfAIAssistView ID="jarvis-chat-surface"
                                                     @ref="JarvisAssistView"
                                                     Height="100%"
@@ -155,15 +155,15 @@
                                                             <SfCard>
                                                                 <CardHeader Title="Workspace context" SubTitle="Live scope shared with the rest of the shell" />
                                                                 <CardContent>
-                                                                    <div class="text-sm leading-6 text-slate-700">@ChatContextSummary</div>
+                                                                    <div class="text-sm leading-6 wiley-text-muted">@ChatContextSummary</div>
                                                                 </CardContent>
                                                             </SfCard>
 
                                                             <SfCard>
                                                                 <CardHeader Title="Operator profile" SubTitle="User-context plugin summary" />
                                                                 <CardContent>
-                                                                    <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Profile summary</div>
-                                                                    <div class="text-sm leading-6 text-slate-700">@CurrentProfileSummary</div>
+                                                                    <div class="text-xs font-semibold uppercase tracking-[0.22em] wiley-text-muted">Profile summary</div>
+                                                                    <div class="text-sm leading-6 wiley-text-muted">@CurrentProfileSummary</div>
                                                                 </CardContent>
                                                             </SfCard>
                                                         </div>
@@ -173,7 +173,7 @@
                                                         <SfCard>
                                                             <CardHeader Title="You" SubTitle="@($"Prompt {context.Index + 1}")" />
                                                             <CardContent>
-                                                                <div class="whitespace-pre-line text-sm text-slate-700">@context.Prompt</div>
+                                                                <div class="whitespace-pre-line text-sm wiley-text-muted">@context.Prompt</div>
                                                             </CardContent>
                                                         </SfCard>
                                                     </PromptItemTemplate>
@@ -183,8 +183,8 @@
                                                             <CardHeader Title="Jarvis" SubTitle="@($"Response {context.Index + 1}")" />
                                                             <CardContent>
                                                                 <div class="space-y-2">
-                                                                    <div class="text-xs text-slate-500">Premium assist output grounded in the current workspace snapshot and conversation scope.</div>
-                                                                    <div class="whitespace-pre-line text-sm leading-6 text-slate-700">@context.Response</div>
+                                                                    <div class="text-xs wiley-text-muted">Premium assist output grounded in the current workspace snapshot and conversation scope.</div>
+                                                                    <div class="whitespace-pre-line text-sm leading-6 wiley-text-muted">@context.Response</div>
                                                                 </div>
                                                             </CardContent>
                                                         </SfCard>
@@ -236,7 +236,7 @@
                                         <CardContent>
                                             @if (ChatTranscript.Count == 0)
                                             {
-                                                <div class="text-sm text-slate-500">No prior Jarvis turns yet.</div>
+                                                <div class="text-sm wiley-text-muted">No prior Jarvis turns yet.</div>
                                             }
                                             else
                                             {
@@ -247,7 +247,7 @@
                                                             <CardHeader Title="@(IsAssistantMessage(message.Role) ? "Jarvis" : "You")"
                                                                         SubTitle="Conversation history" />
                                                             <CardContent>
-                                                                <div class="whitespace-pre-line text-sm text-slate-700">@message.Content</div>
+                                                                <div class="whitespace-pre-line text-sm wiley-text-muted">@message.Content</div>
                                                             </CardContent>
                                                         </SfCard>
                                                     }
@@ -264,7 +264,7 @@
                                         <CardContent>
                                             @if (RecommendationHistory.Count == 0)
                                             {
-                                                <div class="text-sm text-slate-500">No saved recommendations yet for this workspace scope.</div>
+                                                <div class="text-sm wiley-text-muted">No saved recommendations yet for this workspace scope.</div>
                                             }
                                             else
                                             {
@@ -276,8 +276,8 @@
                                                                         SubTitle="@FormatRecommendationTimestamp(entry.CreatedAtUtc)" />
                                                             <CardContent>
                                                                 <div class="space-y-2">
-                                                                    <div class="text-xs text-slate-500">Q: @entry.Question</div>
-                                                                    <div class="whitespace-pre-line text-sm text-slate-700">@entry.Recommendation</div>
+                                                                    <div class="text-xs wiley-text-muted">Q: @entry.Question</div>
+                                                                    <div class="whitespace-pre-line text-sm wiley-text-muted">@entry.Recommendation</div>
                                                                 </div>
                                                             </CardContent>
                                                         </SfCard>
@@ -295,10 +295,10 @@
                                     <CardContent>
                                         <div class="space-y-3" role="status" aria-live="polite" aria-busy="@IsChatBusy">
                                             <div>
-                                                <div class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Context</div>
-                                                <div class="mt-1 text-sm leading-6 text-slate-700">@ChatContextSummary</div>
+                                                <div class="text-xs font-semibold uppercase tracking-[0.22em] wiley-text-muted">Context</div>
+                                                <div class="mt-1 text-sm leading-6 wiley-text-muted">@ChatContextSummary</div>
                                             </div>
-                                            <div class="whitespace-pre-line text-sm leading-6 text-slate-700">@ChatAnswer</div>
+                                            <div class="whitespace-pre-line text-sm leading-6 wiley-text-muted">@ChatAnswer</div>
                                         </div>
                                     </CardContent>
                                 </SfCard>
@@ -311,7 +311,7 @@
                     <SfCard>
                         <CardHeader Title="Delivery note" SubTitle="Secure Jarvis is disabled for this host." />
                         <CardContent>
-                            <div class="text-sm text-slate-600">This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.</div>
+                            <div class="text-sm wiley-text-muted">This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.</div>
                         </CardContent>
                     </SfCard>
                 }

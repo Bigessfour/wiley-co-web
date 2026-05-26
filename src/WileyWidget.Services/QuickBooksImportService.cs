@@ -44,6 +44,11 @@ public sealed class QuickBooksImportService
 	{
 		logger.LogInformation("Previewing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var preview = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
+
+		// Slice 2c: proactive structural validation (max rows, amount bounds, allowed enterprises).
+		// Throws ArgumentException -> 400 via GlobalExceptionHandler (consistent with other invalid input paths).
+		ValidateStructuralLimits(preview, selectedEnterprise);
+
 		var routedPreview = await routingService.ApplyRoutingAsync(preview, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
@@ -75,6 +80,10 @@ public sealed class QuickBooksImportService
 	{
 		logger.LogInformation("Committing QuickBooks import for {FileName} in {Enterprise} FY {FiscalYear} ({ByteCount} bytes)", Path.GetFileName(fileName), selectedEnterprise, selectedFiscalYear, fileBytes.LongLength);
 		var parsedRows = await ParseAsync(fileBytes, fileName).ConfigureAwait(false);
+
+		// Slice 2c: proactive structural validation (same limits as preview for defense-in-depth).
+		ValidateStructuralLimits(parsedRows, selectedEnterprise);
+
 		var routedRows = await routingService.ApplyRoutingAsync(parsedRows, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
@@ -137,14 +146,40 @@ public sealed class QuickBooksImportService
 
 		context.ImportBatches.Add(batch);
 		context.SourceFiles.Add(sourceFile);
-		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-		foreach (var row in routedRows)
+		if (context.Database.IsRelational())
 		{
-			context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
+			await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+			try
+			{
+				await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+				foreach (var row in routedRows)
+				{
+					context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
+				}
+
+				await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+				await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+			}
+			catch
+			{
+				await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+				throw;
+			}
+		}
+		else
+		{
+			await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+			foreach (var row in routedRows)
+			{
+				context.LedgerEntries.Add(routingService.CreateLedgerEntry(sourceFile.Id, row, selectedEnterprise));
+			}
+
+			await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		}
 
-		await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, routedRows.Count);
 
 		return new QuickBooksImportCommitResponse(
@@ -226,6 +261,27 @@ public sealed class QuickBooksImportService
 
 	private static string ComputeFileHash(byte[] fileBytes)
 		=> Convert.ToHexString(SHA256.HashData(fileBytes));
+
+	private void ValidateStructuralLimits(IReadOnlyList<QuickBooksImportPreviewRow> rows, string selectedEnterprise)
+	{
+		const int MaxRows = 10000;
+		const decimal MaxAmount = 999_999_999.99m;
+		var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		{
+			"Water Utility", "Electric Utility", "Sewer Utility", "General Fund", "Town of Wiley",
+			// Core enterprises used throughout model, tests, bootstrap data, and sample imports (WSD = sanitation/sewer).
+			"Wiley Sanitation District", "Trash", "Apartments"
+		};
+
+		if (rows.Count > MaxRows)
+			throw new ArgumentException($"QuickBooks row count ({rows.Count}) exceeds maximum allowed for preview/commit ({MaxRows}).");
+
+		if (rows.Any(r => r.Amount.HasValue && Math.Abs(r.Amount.Value) > MaxAmount))
+			throw new ArgumentException($"QuickBooks contains amount(s) exceeding allowed bound (+/-{MaxAmount:N2}).");
+
+		if (!allowed.Contains(selectedEnterprise))
+			throw new ArgumentException($"Enterprise '{selectedEnterprise}' is not permitted for QuickBooks imports in this environment.");
+	}
 
 	private sealed record DuplicateRowAnalysis(int DuplicateRows, IReadOnlyList<QuickBooksImportPreviewRow> Rows);
 

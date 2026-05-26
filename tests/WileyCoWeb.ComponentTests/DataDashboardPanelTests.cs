@@ -135,6 +135,28 @@ public sealed class DataDashboardPanelTests
         Assert.Equal(expectedColor, color);
     }
 
+    // p1-rate-consolidation: scenario-adjusted KPIs (non-empty scenarioItems drive Adjusted* values)
+    [Fact]
+    public void ScenarioAdjusted_Kpis_ReflectScenarioCostTotal()
+    {
+        var state = new WorkspaceState();
+        var scenarioItems = new List<WorkspaceScenarioItemData>
+        {
+            new WorkspaceScenarioItemData(Guid.NewGuid(), "Test scenario cost", 1200m)
+        };
+        state.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+            WorkspaceTestData.CouncilReviewScenario,
+            55.25m,
+            13250m,
+            240m,
+            scenarioItems: scenarioItems));
+
+        // With scenario, adjusted total = 13250 + 1200 = 14450; adjusted rate ~60.208
+        Assert.True(state.ScenarioCostTotal > 0);
+        Assert.True(state.AdjustedRecommendedRate > state.RecommendedRate);
+        Assert.True(state.AdjustedRateDelta != state.RateDelta); // shift from scenario
+    }
+
     // ── Gauge pointer clamping ────────────────────────────────────────────────
 
     [Theory]

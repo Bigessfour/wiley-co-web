@@ -238,6 +238,11 @@ $env:WILEYCO_E2E_BASE_URL = 'https://main.d2ellat1y3ljd9.amplifyapp.com'
 dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "FullyQualifiedName~Visual_WorkspaceOverview_MatchesBaseline"
 ```
 
+## Cursor / VS Code debugging (Blazor + API)
+
+- Launch configurations live in [`.vscode/launch.json`](.vscode/launch.json) (e.g. **Debug Full Stack (Client + API)** on ports `5230` / `5231`).
+- Step-by-step and **agent playbook**: [docs/debugging-wiley-widget-cursor.md](docs/debugging-wiley-widget-cursor.md).
+
 ## VS Code Playwright Setup
 
 This workspace now carries a separate Node-based Playwright setup for the VS Code Playwright extension and agent workflows.

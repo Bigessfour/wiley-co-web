@@ -4,6 +4,7 @@ using Syncfusion.Pdf;
 using Syncfusion.Pdf.Graphics;
 using Syncfusion.Pdf.Grid;
 using Syncfusion.XlsIO;
+using WileyWidget.Abstractions;
 
 namespace WileyWidget.Services;
 
@@ -708,9 +709,12 @@ public sealed class WorkspaceSnapshotExportArchiveService
 
         public decimal ScenarioCostTotal => ScenarioItems.Sum(item => item.Cost);
         public decimal AdjustedTotalCosts => (TotalCosts ?? 0m) + ScenarioCostTotal;
-        public decimal RecommendedRate => ProjectedVolume is null or 0 ? 0m : (TotalCosts ?? 0m) / ProjectedVolume.Value;
-        public decimal AdjustedRecommendedRate => ProjectedVolume is null or 0 ? 0m : AdjustedTotalCosts / ProjectedVolume.Value;
-        public decimal AdjustedRateDelta => (CurrentRate ?? 0m) - AdjustedRecommendedRate;
+        public decimal RecommendedRate => EnterpriseRateService.CalculateBreakEvenRate(TotalCosts ?? 0m, ProjectedVolume ?? 0m);
+        public decimal AdjustedRecommendedRate => EnterpriseRateService.CalculateAdjustedBreakEvenRate(
+            TotalCosts ?? 0m,
+            ScenarioCostTotal,
+            ProjectedVolume ?? 0m);
+        public decimal AdjustedRateDelta => EnterpriseRateService.CalculateAdjustedRateDelta(CurrentRate ?? 0m, AdjustedRecommendedRate);
         public string ContextSummary => $"{SelectedEnterprise} FY {SelectedFiscalYear} | {ActiveScenarioName}";
     }
 

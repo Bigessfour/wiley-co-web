@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using WileyWidget.Abstractions;
 using WileyWidget.Business.Interfaces;
 using WileyWidget.Services.Abstractions;
 
@@ -92,12 +93,16 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
 
         var normalizedEnterprise = input.SelectedEnterprise.Trim();
         var scenarioCostTotal = Math.Max(0m, input.ScenarioCostTotal);
-        var breakEvenRate = decimal.Round(input.TotalCosts / input.ProjectedVolume, 2, MidpointRounding.AwayFromZero);
-        var adjustedBreakEvenRate = decimal.Round((input.TotalCosts + scenarioCostTotal) / input.ProjectedVolume, 2, MidpointRounding.AwayFromZero);
-        var monthlyRevenue = decimal.Round(input.CurrentRate * input.ProjectedVolume, 2, MidpointRounding.AwayFromZero);
-        var netPosition = decimal.Round(monthlyRevenue - (input.TotalCosts + scenarioCostTotal), 2, MidpointRounding.AwayFromZero);
-        var rateGap = decimal.Round(breakEvenRate - input.CurrentRate, 2, MidpointRounding.AwayFromZero);
-        var adjustedRateGap = decimal.Round(adjustedBreakEvenRate - input.CurrentRate, 2, MidpointRounding.AwayFromZero);
+        var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(input.TotalCosts, input.ProjectedVolume, roundToCurrency: false);
+        var adjustedBreakEvenRate = EnterpriseRateService.CalculateAdjustedBreakEvenRate(
+            input.TotalCosts,
+            scenarioCostTotal,
+            input.ProjectedVolume,
+            roundToCurrency: false);
+        var monthlyRevenue = EnterpriseRateService.CalculateMonthlyRevenue(input.CurrentRate, input.ProjectedVolume);
+        var netPosition = EnterpriseRateService.CalculateMonthlyBalance(monthlyRevenue, input.TotalCosts + scenarioCostTotal);
+        var rateGap = decimal.Round(-EnterpriseRateService.CalculateRateDelta(input.CurrentRate, breakEvenRate), 2, MidpointRounding.AwayFromZero);
+        var adjustedRateGap = decimal.Round(-EnterpriseRateService.CalculateRateDelta(input.CurrentRate, adjustedBreakEvenRate), 2, MidpointRounding.AwayFromZero);
         var coverageRatio = input.TotalCosts + scenarioCostTotal > 0
             ? decimal.Round(monthlyRevenue / (input.TotalCosts + scenarioCostTotal), 2, MidpointRounding.AwayFromZero)
             : 0m;

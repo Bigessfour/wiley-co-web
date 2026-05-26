@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API Host",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "🔨 Debug Build API",
+      "program": "${workspaceFolder}/WileyCoWeb.Api/bin/Debug/net9.0/WileyCoWeb.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/WileyCoWeb.Api",
+      "stopAtEntry": false,
+      "console": "integratedTerminal",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5231"
+      }
+    },
+    {
+      "name": "Debug Blazor Client (http)",
+      "type": "blazorwasm",
+      "request": "launch",
+      "preLaunchTask": "🔨 Debug Build",
+      "cwd": "${workspaceFolder}",
+      "hosted": false,
+      "program": "${workspaceFolder}/bin/Debug/net9.0/WileyCoWeb.dll",
+      "browser": "edge",
+      "url": "http://localhost:5230",
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "WILEY_WORKSPACE_API_BASE_ADDRESS": "http://localhost:5231"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Full Stack (Client + API)",
+      "configurations": ["Debug API Host", "Debug Blazor Client (http)"],
+      "stopAll": true
+    }
+  ]
+}

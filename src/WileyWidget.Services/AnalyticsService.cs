@@ -71,7 +71,8 @@ namespace WileyWidget.Services
         }
 
         /// <summary>
-        /// Runs a what-if scenario for rate adjustments
+        /// Portfolio-level what-if scenario (budget aggregates). Not council-facing rate guidance —
+        /// Jarvis council math uses <see cref="EnterpriseRateService"/> via workspace knowledge.
         /// </summary>
         public async Task<RateScenarioResult> RunRateScenarioAsync(RateScenarioParameters parameters, CancellationToken cancellationToken = default)
         {

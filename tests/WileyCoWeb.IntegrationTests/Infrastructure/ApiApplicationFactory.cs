@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using WileyCoWeb.Api;
 
 namespace WileyCoWeb.IntegrationTests.Infrastructure;
@@ -11,6 +12,19 @@ public sealed class ApiApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {
         builder.UseEnvironment("IntegrationTest");
+
+        // Inject stub XAI key so Jarvis health + AI assistant initialize as available (no AWS Secrets Manager dependency in CI).
+        // Production auth/secret paths untouched; only test host customization.
+        builder.ConfigureAppConfiguration((context, configBuilder) =>
+        {
+            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["XAI_API_KEY"] = "test-xai-key-integration-7f3a9b2c1d4e5f6a7b8c9d0e",
+                ["XAI:ApiKey"] = "test-xai-key-integration-7f3a9b2c1d4e5f6a7b8c9d0e",
+                ["XAI:Enabled"] = "true",
+                ["XAI:TimeoutSeconds"] = "5"
+            });
+        });
 
         builder.ConfigureServices(services =>
         {

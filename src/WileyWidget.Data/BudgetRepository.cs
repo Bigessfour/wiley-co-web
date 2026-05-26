@@ -87,6 +87,17 @@ public class BudgetRepository : IBudgetRepository
     {
         try { _cache.Remove($"BudgetEntries_FiscalYear_{fiscalYear}"); } catch { }
         try { _cache.Remove($"BudgetEntries_Sewer_Year_{fiscalYear}"); } catch { }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var analytics = scope.ServiceProvider.GetService<IBudgetAnalyticsRepository>();
+            analytics?.InvalidateCache(fiscalYear);
+        }
+        catch
+        {
+            // Analytics cache invalidation is best-effort when repository is not registered.
+        }
     }
 
     /// <summary>
@@ -636,114 +647,17 @@ public class BudgetRepository : IBudgetRepository
         return await GetBudgetSummaryAsync(startDate, endDate, cancellationToken);
     }
 
-    public async Task<BudgetVarianceAnalysis> GetBudgetSummaryByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    public Task<BudgetVarianceAnalysis> GetBudgetSummaryByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Enterprise-scoped budget summaries require schema support for Department/Fund EnterpriseId. Use GetBudgetSummaryAsync until that migration lands.");
 
-        // Try to filter by Department.EnterpriseId or Fund.EnterpriseId if such properties exist.
-        var query = context.BudgetEntries
-            .Include(be => be.Department)
-            .Include(be => be.Fund)
-            .Include(be => be.MunicipalAccount)
-            .Where(be => be.StartPeriod >= startDate && be.EndPeriod <= endDate);
+    public Task<List<DepartmentSummary>> GetDepartmentBreakdownByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Enterprise-scoped department breakdown requires schema support for Department/Fund EnterpriseId.");
 
-        // Dynamic enterprise filter if present on Department or Fund
-        // Note: Model does not currently expose EnterpriseId on Department/Fund.
-        // Keeping the hook for future schema support; currently acts as no-op.
-
-        var budgetEntries = await query.ToListAsync(cancellationToken);
-        // Reuse existing aggregation logic via in-memory projection
-        var analysis = new BudgetVarianceAnalysis
-        {
-            AnalysisDate = DateTime.UtcNow,
-            BudgetPeriod = $"{startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}",
-            TotalBudgeted = budgetEntries.Sum(be => be.BudgetedAmount),
-            TotalActual = budgetEntries.Sum(be => be.ActualAmount),
-        };
-        analysis.TotalVariance = analysis.TotalBudgeted - analysis.TotalActual;
-        analysis.TotalVariancePercentage = analysis.TotalBudgeted != 0
-            ? (analysis.TotalVariance / analysis.TotalBudgeted) * 100
-            : 0;
-
-        analysis.FundSummaries = budgetEntries
-            .GroupBy(be => be.Fund)
-            .Where(g => g.Key != null)
-            .Select(g => new FundSummary
-            {
-                Fund = new BudgetFundType { Code = g.Key!.FundCode, Name = g.Key.Name },
-                FundName = g.Key?.Name ?? "Unknown",
-                TotalBudgeted = g.Sum(be => be.BudgetedAmount),
-                TotalActual = g.Sum(be => be.ActualAmount),
-                AccountCount = g.Count()
-            })
-            .ToList();
-
-        foreach (var fundSummary in analysis.FundSummaries)
-        {
-            fundSummary.Variance = fundSummary.TotalBudgeted - fundSummary.TotalActual;
-            fundSummary.VariancePercentage = fundSummary.TotalBudgeted != 0
-                ? (fundSummary.Variance / fundSummary.TotalBudgeted) * 100
-                : 0;
-        }
-
-        return analysis;
-    }
+    public Task<List<FundSummary>> GetFundAllocationsByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Enterprise-scoped fund allocations require schema support for Department/Fund EnterpriseId.");
 
     public Task<BudgetVarianceAnalysis> GetVarianceAnalysisByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
         => GetBudgetSummaryByEnterpriseAsync(enterpriseId, startDate, endDate, cancellationToken);
-
-    public async Task<List<DepartmentSummary>> GetDepartmentBreakdownByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var query = context.BudgetEntries
-            .Include(be => be.Department)
-            .Include(be => be.Fund)
-            .Include(be => be.MunicipalAccount)
-            .Where(be => be.StartPeriod >= startDate && be.EndPeriod <= endDate);
-
-        var budgetEntries = await query.ToListAsync(cancellationToken);
-        return budgetEntries
-            .GroupBy(be => be.Department)
-            .Where(g => g.Key != null)
-            .Select(g => new DepartmentSummary
-            {
-                Department = g.Key,
-                DepartmentName = g.Key?.Name ?? "Unknown",
-                TotalBudgeted = g.Sum(be => be.BudgetedAmount),
-                TotalActual = g.Sum(be => be.ActualAmount),
-                AccountCount = g.Count()
-            })
-            .ToList();
-    }
-
-    public async Task<List<FundSummary>> GetFundAllocationsByEnterpriseAsync(int enterpriseId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var query = context.BudgetEntries
-            .Include(be => be.Department)
-            .Include(be => be.Fund)
-            .Include(be => be.MunicipalAccount)
-            .Where(be => be.StartPeriod >= startDate && be.EndPeriod <= endDate);
-
-        var budgetEntries = await query.ToListAsync(cancellationToken);
-        return budgetEntries
-            .GroupBy(be => be.Fund)
-            .Where(g => g.Key != null)
-            .Select(g => new FundSummary
-            {
-                Fund = new BudgetFundType { Code = g.Key!.FundCode, Name = g.Key.Name },
-                FundName = g.Key?.Name ?? "Unknown",
-                TotalBudgeted = g.Sum(be => be.BudgetedAmount),
-                TotalActual = g.Sum(be => be.ActualAmount),
-                AccountCount = g.Count()
-            })
-            .ToList();
-    }
 
     private IQueryable<BudgetEntry> ApplySorting(IQueryable<BudgetEntry> query, string? sortBy, bool sortDescending)
     {
@@ -910,7 +824,6 @@ public class BudgetRepository : IBudgetRepository
         {
             activity?.SetTag("cache.hit", true);
             activity?.SetTag("result.count", cachedData?.Count ?? 0);
-            Console.WriteLine($"[TEST] Repository: Retrieved {cachedData?.Count ?? 0} rows from CACHE");
             return cachedData ?? Array.Empty<TownOfWileyBudget2026>();
         }
 
@@ -921,19 +834,9 @@ public class BudgetRepository : IBudgetRepository
             using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            // DEBUG: Check if DbSet exists
-            var dbSet = context.Set<TownOfWileyBudget2026>();
-            Console.WriteLine($"[TEST] Repository: DbSet<TownOfWileyBudget2026> exists");
-
-            var result = await dbSet
+            var result = await context.Set<TownOfWileyBudget2026>()
                 .AsNoTracking()
                 .ToListAsync(cancellationToken) ?? new List<TownOfWileyBudget2026>();
-
-            Console.WriteLine($"[TEST] Repository: Fetched {result.Count} rows from DB");
-            Console.WriteLine($"[TEST] Repository: Query completed successfully, result is not null={result != null}");
-
-            // No more debug injection - if DB is empty, results are empty
-            // Data must be populated via SQL import script
 
             // Cache the result for 1 hour
             var readOnlyResult = result!.AsReadOnly();
@@ -949,7 +852,6 @@ public class BudgetRepository : IBudgetRepository
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[TEST] Repository: ERROR fetching TownOfWileyBudget2026: {ex.Message}");
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _telemetryService?.RecordException(ex);
             throw;

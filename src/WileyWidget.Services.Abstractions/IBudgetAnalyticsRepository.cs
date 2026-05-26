@@ -50,5 +50,10 @@ namespace WileyWidget.Services.Abstractions
         /// Gets detailed variance records for a fiscal year.
         /// </summary>
         Task<List<VarianceRecord>> GetVarianceDetailsAsync(int fiscalYear, CancellationToken ct = default);
+
+        /// <summary>
+        /// Clears cached analytics for a fiscal year after budget writes.
+        /// </summary>
+        void InvalidateCache(int fiscalYear);
     }
 }

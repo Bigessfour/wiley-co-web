@@ -5,6 +5,7 @@ using WileyWidget.Models.Amplify;
 
 namespace WileyCoWeb.IntegrationTests;
 
+[Trait("Category", "HighRisk")]
 public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFactory>
 {
     private readonly ApiApplicationFactory _factory;

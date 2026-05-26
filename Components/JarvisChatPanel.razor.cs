@@ -317,18 +317,22 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         return $"{WorkspaceState.SelectedEnterprise.Trim()}|{WorkspaceState.SelectedFiscalYear.ToString(CultureInfo.InvariantCulture)}";
     }
 
-    private void UpdateChatRuntimeStatus(bool usedFallback)
+    private void UpdateChatRuntimeStatus(bool usedFallback, string? answerSource = null)
     {
         IsChatFallbackActive = usedFallback;
 
         if (usedFallback)
         {
-            ChatRuntimeStatusTitle = "AI runtime unavailable";
+            ChatRuntimeStatusTitle = string.IsNullOrWhiteSpace(answerSource)
+                ? "AI runtime unavailable"
+                : $"Deterministic fallback ({answerSource})";
             ChatRuntimeStatusDetail = "Jarvis is reaching the server, but the server is returning fallback guidance instead of a live xAI or Semantic Kernel response. Check xAI key and endpoint configuration.";
             return;
         }
 
-        ChatRuntimeStatusTitle = "Live AI available";
+        ChatRuntimeStatusTitle = string.IsNullOrWhiteSpace(answerSource)
+            ? "Live AI available"
+            : $"Live AI ({answerSource})";
         ChatRuntimeStatusDetail = "Jarvis returned a live AI response for this workspace scope.";
     }
 
@@ -502,7 +506,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
         AppendUserMessage(question);
 
         var response = await AiApi.AskAsync(BuildChatRequest(question)).ConfigureAwait(false);
-        UpdateChatRuntimeStatus(response.UsedFallback);
+        UpdateChatRuntimeStatus(response.UsedFallback, response.AnswerSource);
 
         ApplyPromptResponse(question, response, args);
         await LoadRecommendationHistoryAsync(force: true).ConfigureAwait(false);
@@ -610,6 +614,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
     private void HandleKnowledgeRefreshFailure(Exception ex, string fingerprint)
     {
+        Console.WriteLine($"[jarvis-knowledge] Using deterministic fallback guidance: {ex.Message}");
         ApplyKnowledgeFallback($"Live guidance unavailable: {ex.Message}", fingerprint);
     }
 

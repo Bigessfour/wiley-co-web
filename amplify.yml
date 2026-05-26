@@ -3,6 +3,11 @@ frontend:
   phases:
     preBuild:
       commands:
+        # Visible in Amplify Console build logs (and CloudWatch when build project logs there)
+        - echo "=== Amplify preBuild (AWS/build context) ==="
+        - 'echo "AWS_REGION=${AWS_REGION:-unset} AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-unset}"'
+        - 'echo "AWS_BRANCH=${AWS_BRANCH:-unset} AWS_APP_ID=${AWS_APP_ID:-unset}"'
+        - 'echo "CODEBUILD_BUILD_ID=${CODEBUILD_BUILD_ID:-unset}"'
         - curl -fsSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
         - export DOTNET_SDK_VERSION=$(node -p 'require("./global.json").sdk.version')
         - bash dotnet-install.sh --version "$DOTNET_SDK_VERSION" --install-dir $HOME/.dotnet
@@ -11,6 +16,7 @@ frontend:
         - dotnet restore WileyCoWeb.slnx
     build:
       commands:
+        - echo "=== Amplify build (Release publish; logs stream to Amplify Console) ==="
         - export PATH="$HOME/.dotnet:$PATH"
         - |
           read_secret_field() {
@@ -87,7 +93,7 @@ frontend:
             echo "Cognito environment secrets are not configured; continuing without hosted auth variables."
           fi
 
-        - dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore
+        - dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore -v minimal
   artifacts:
     baseDirectory: publish_output/wwwroot
     files:
