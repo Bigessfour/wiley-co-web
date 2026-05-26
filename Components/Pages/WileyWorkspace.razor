@@ -563,7 +563,9 @@
                 </SplitterPane>
 
                 @* Jarvis Rail – pane 2: AI chat, starts collapsed *@
-                <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true" Collapsed="true">
+                <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true"
+                              Collapsed="@(!IsJarvisOpen)"
+                              CollapsedChanged="HandleJarvisPaneCollapsedChanged">
                     <ContentTemplate>
                         <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
                             <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b border-[var(--wiley-border)] px-4 py-3 flex-shrink-0 wiley-surface-panel-secondary">
@@ -588,7 +590,8 @@
                       CssClass="e-primary fixed bottom-6 right-6 z-40 shadow-xl"
                       IsPrimary="true"
                       OnClick="ToggleJarvisAsync"
-                      title="Open Jarvis AI guidance rail">
+                      title="Open Jarvis AI guidance rail"
+                      aria-expanded="false">
                 <span class="e-icons e-ai-chat" aria-hidden="true"></span>
                 Jarvis
             </SfButton>
@@ -665,6 +668,14 @@
         box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
 
+    /* Dark mode support for the main content shell (respects Blazor CSS isolation).
+       Matches the global wiley-surface-1 token behavior added in app.css. */
+    [data-wiley-theme="dark"] .workspace-main-shell {
+        background: #1e293b;
+        border-color: rgba(148, 163, 184, 0.28);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
     /* Jarvis rail – pane 2 */
     .workspace-pane-jarvis {
         height: 100%;
@@ -674,6 +685,12 @@
     .workspace-jarvis-rail-header {
         background: linear-gradient(180deg, #f8fafc, #ffffff);
         flex-shrink: 0;
+    }
+
+    /* Dark support for the Jarvis rail header (micro polish for shell consistency).
+       Uses the same surface tokens as the rest of the workspace now that global dark is reliable. */
+    [data-wiley-theme="dark"] .workspace-jarvis-rail-header {
+        background: linear-gradient(180deg, #1e293b, #0f172a);
     }
 
     /* Workspace design tokens (Syncfusion + shell alignment) */
@@ -888,20 +905,30 @@
     private SfSplitter? _workspaceSplitter;
 
     /// <summary>
-    /// Expands or collapses the Jarvis AI chat pane (pane 2) in the SfSplitter
-    /// and keeps <see cref="WorkspaceLayoutContext.IsJarvisOpen"/> in sync via
-    /// the layout context so every subscriber observes the change.
+    /// Toggles the Jarvis AI chat pane by flipping the layout context flag.
+    /// The pane itself is now declaratively bound to IsJarvisOpen (official
+    /// Syncfusion controlled-state pattern for SplitterPane), so no imperative
+    /// Expand/Collapse calls are needed. This eliminates the previous race
+    /// condition that caused the launcher click to appear as a no-op.
     /// </summary>
-    private async Task ToggleJarvisAsync()
+    private void ToggleJarvisAsync()
     {
         // ToggleJarvis() calls LayoutContext.SetJarvisOpen(!current) which fires
         // OnChange — any subscriber (e.g. a decision-support badge) re-renders.
+        // The SplitterPane for Jarvis (pane 2) reacts automatically via its
+        // Collapsed binding.
         ToggleJarvis();
+    }
 
-        if (IsJarvisOpen)
-            await (_workspaceSplitter?.ExpandAsync(2) ?? Task.CompletedTask);
-        else
-            await (_workspaceSplitter?.CollapseAsync(2) ?? Task.CompletedTask);
+    /// <summary>
+    /// Keeps the layout context in sync when the user manually collapses or
+    /// expands the Jarvis rail via the splitter handle. Called from the
+    /// CollapsedChanged event on the Jarvis SplitterPane.
+    /// </summary>
+    private void HandleJarvisPaneCollapsedChanged(bool collapsed)
+    {
+        LayoutContext?.SetJarvisOpen(!collapsed);
+        StateHasChanged();
     }
 
     /// <summary>

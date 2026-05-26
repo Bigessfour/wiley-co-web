@@ -47,10 +47,16 @@ Verify discovery:
 
 ## 3. Interactive TUI
 
+In **Cursor / VS Code integrated terminals**, use the repo launcher so the UI does not take over the alternate screen (which renders misaligned on Windows):
+
 ```powershell
 cd "C:\Users\biges\Desktop\Personal Github\WW AWS"
-grok
+.\Scripts\start-grok-tui.ps1
 ```
+
+Equivalent manual flag: `grok --no-alt-screen --cwd .`
+
+In a full terminal (Windows Terminal, etc.), plain `grok` is fine.
 
 Useful first prompts:
 

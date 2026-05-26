@@ -124,6 +124,10 @@ if ($InspectOnly) {
 }
 
 Write-Host ""
+Write-Host "=== Next: interactive TUI (Cursor-safe) ==="
+Write-Host "  .\Scripts\start-grok-tui.ps1"
+Write-Host "  .\Scripts\start-grok-tui.ps1 -WindowsTerminal   # best fullscreen UI"
+Write-Host ""
 Write-Host "=== Next: headless backend plan ==="
 Write-Host "  .\Scripts\run-grok-backend-plan.ps1 -Remaining -Foreground"
 Write-Host "  .\Scripts\run-grok-backend-plan.ps1 -Continue -Foreground"
