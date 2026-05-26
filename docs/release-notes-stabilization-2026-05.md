@@ -98,3 +98,5 @@ Next: Open PR from this branch (do not push to main). Include this note + test e
 **No regressions to canonicals** (customer export button ID, QB hash guard, rate math, Jarvis routes, Playwright helpers). Phase 6 polish now actually complete with evidence.
 
 Next: Include this addendum + .grok/logs/left-nav-fluent2-ui-polish-report.md in PR.
+
+**Iteration 3 (final self-verification pass)**: Comprehensive remaining hardcode cleanup (all slate-\*/bg-white/text-slate variants in hero, document-center, Jarvis rail, error boundary, panel quadrants/filters/cards/status across workspace + Rates/Customer/BreakEven/QB/Jarvis + others → wiley-surface + vars). Explicit fresh read_file before every final replace. Docs (report + this addendum) refreshed for accuracy. Logical commit(s) on branch. Final build + HighRisk gates green. All prior verifier Issues closed. Full requirements + "every visual issue" + "all panels" + process discipline now met. Expected final VERDICT: PASS.
