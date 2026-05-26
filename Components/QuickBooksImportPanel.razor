@@ -110,8 +110,8 @@
                                     <SfSpinner Visible="@IsBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                 </div>
                                 <div class="space-y-1">
-                                    <div id="quickbooks-import-status-headline" class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">@StatusHeadline</div>
-                                    <div id="quickbooks-import-status-message" class="whitespace-pre-line text-sm text-slate-700">@StatusMessage</div>
+                                    <div id="quickbooks-import-status-headline" class="text-xs font-semibold uppercase tracking-[0.24em] wiley-text-muted">@StatusHeadline</div>
+                                    <div id="quickbooks-import-status-message" class="whitespace-pre-line text-sm wiley-text-muted">@StatusMessage</div>
                                 </div>
                             </div>
                         </CardContent>
@@ -151,9 +151,9 @@
                                                 <SfSpinner Visible="@IsAskingAssistant" Size="18" Label="" Type="SpinnerType.Material" />
                                             </div>
                                             <div class="space-y-3">
-                                                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Context</p>
-                                                <p id="quickbooks-assistant-context-summary" class="text-sm text-slate-900">@AssistantContextSummary</p>
-                                                <p id="quickbooks-assistant-answer" class="whitespace-pre-line text-sm text-slate-700">@AssistantAnswer</p>
+                                                <p class="text-xs font-semibold uppercase tracking-[0.24em] wiley-text-muted">Context</p>
+                                                <p id="quickbooks-assistant-context-summary" class="text-sm wiley-text-muted">@AssistantContextSummary</p>
+                                                <p id="quickbooks-assistant-answer" class="whitespace-pre-line text-sm wiley-text-muted">@AssistantAnswer</p>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -261,7 +261,7 @@
                                             <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
                                                 <SfSpinner Visible="@IsRoutingBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                             </div>
-                                            <div class="whitespace-pre-line text-sm text-slate-700">@RoutingStatusMessage</div>
+                                            <div class="whitespace-pre-line text-sm wiley-text-muted">@RoutingStatusMessage</div>
                                         </div>
                                     </CardContent>
                                 </SfCard>
@@ -363,7 +363,7 @@
                                                         @foreach (var target in currentProfile.Targets.OrderBy(item => item.EnterpriseName, StringComparer.OrdinalIgnoreCase))
                                                         {
                                                             var currentTarget = target;
-                                                            <div class="grid gap-3 rounded-2xl border border-slate-200 p-3 md:grid-cols-[1fr_180px_auto]">
+                                                            <div class="grid gap-3 rounded-2xl border border-[var(--wiley-border)] p-3 md:grid-cols-[1fr_180px_auto]">
                                                                 <SfDropDownList TValue="string" TItem="string" DataSource="@RoutingEnterpriseOptions" @bind-Value="currentTarget.EnterpriseName" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" Width="100%" />
                                                                 <SfNumericTextBox TValue="decimal" Placeholder="Percent" FloatLabelType="FloatLabelType.Auto" Min="0" Max="100" Step="5" Decimals="2" Format="n2" @bind-Value="currentTarget.AllocationPercent" />
                                                                 <div class="flex items-center pt-2">
@@ -375,7 +375,7 @@
 
                                                     <div class="flex flex-wrap items-center gap-3">
                                                         <SfButton Disabled="@IsRoutingBusy" OnClick="@(() => AddAllocationTarget(currentProfile))">Add target</SfButton>
-                                                        <span class="text-sm text-slate-500">Current total: @GetAllocationPercentDisplay(currentProfile)</span>
+                                                        <span class="text-sm wiley-text-muted">Current total: @GetAllocationPercentDisplay(currentProfile)</span>
                                                     </div>
                                                 </div>
                                             </CardContent>
@@ -404,7 +404,7 @@
                                             <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
                                                 <SfSpinner Visible="@IsRoutingBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                             </div>
-                                            <div class="whitespace-pre-line text-sm text-slate-700">@ImportHistoryStatusMessage</div>
+                                            <div class="whitespace-pre-line text-sm wiley-text-muted">@ImportHistoryStatusMessage</div>
                                         </div>
                                     </CardContent>
                                 </SfCard>
@@ -425,8 +425,8 @@
                                             <CardHeader Title="@currentItem.FileName" SubTitle="@GetHistorySubtitle(currentItem)" />
                                             <CardContent>
                                                 <div class="flex flex-wrap items-center gap-3">
-                                                    <span class="text-sm text-slate-600">Source file ID: @currentItem.SourceFileId</span>
-                                                    <span class="text-sm text-slate-600">Batch ID: @currentItem.BatchId</span>
+                                                    <span class="text-sm wiley-text-muted">Source file ID: @currentItem.SourceFileId</span>
+                                                    <span class="text-sm wiley-text-muted">Batch ID: @currentItem.BatchId</span>
                                                     <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(IsRoutingBusy || ReroutingSourceFileId == currentItem.SourceFileId)" OnClick="@(() => ReapplyRoutingAsync(currentItem))">
                                                         @(ReroutingSourceFileId == currentItem.SourceFileId ? "Reapplying..." : "Reapply routing")
                                                     </SfButton>
@@ -458,7 +458,7 @@
         <Content>
             <div class="space-y-3">
                 <p>This will commit @RowCountDisplay rows for @WorkspaceState.SelectedEnterprise FY @WorkspaceState.SelectedFiscalYear.</p>
-                <p class="text-sm text-slate-600">QuickBooks actuals remain canonical. The import is blocked only if the same file has already been imported.</p>
+                <p class="text-sm wiley-text-muted">QuickBooks actuals remain canonical. The import is blocked only if the same file has already been imported.</p>
             </div>
         </Content>
     </DialogTemplates>

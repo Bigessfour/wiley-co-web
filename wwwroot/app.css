@@ -1156,16 +1156,12 @@ details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
     color: #f1f5f9;
   }
 
-  /* Breadcrumb text */
+  /* Breadcrumb text (Fluent2 via vars, no slate hardcodes) */
   #workspace-breadcrumb {
     border-bottom-color: rgba(148, 163, 184, 0.14);
   }
-  #workspace-breadcrumb .text-slate-500,
-  #workspace-breadcrumb .text-slate-800 {
-    color: #94a3b8 !important;
-  }
-  #workspace-breadcrumb .font-semibold.text-slate-800 {
-    color: #f1f5f9 !important;
+  #workspace-breadcrumb .wiley-text-muted {
+    color: var(--wiley-text-muted) !important;
   }
 
   /* Workspace navigation links in context rail */
@@ -1209,10 +1205,10 @@ details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
     color: #64748b !important;
   }
 
-  /* Export status strip */
-  #workspace-document-center .rounded-xl.bg-slate-50 {
-    background-color: #1e293b !important;
-    color: #cbd5e1;
+  /* Export status strip (Fluent2 surface, no bg-slate-50) */
+  #workspace-document-center .rounded-xl {
+    background-color: var(--wiley-surface-2) !important;
+    color: var(--wiley-text-muted);
   }
 
   /* Home hub cards */

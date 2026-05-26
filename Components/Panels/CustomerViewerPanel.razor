@@ -11,7 +11,7 @@
 <div id="customer-viewer-panel" aria-busy="@IsBusy()" class="space-y-4">
     <div id="customer-viewer-dashboard" class="space-y-4">
         <section id="customer-summary-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Summary</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Summary</p>
         <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SfCard>
                 <CardHeader Title="Visible Customers" SubTitle="@GetLiveFilteredCustomerCountDisplay()" />
@@ -33,16 +33,16 @@
     </section>
 
     <section id="customer-filters-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Filters</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Filters</p>
         <div class="mt-3 grid gap-3 md:grid-cols-3">
             <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
             <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@GetCustomerServiceOptions()" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Customer Type" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
             <SfDropDownList ID="customer-city-limits-filter" TValue="string" TItem="string" DataSource="@GetCustomerCityLimitOptions()" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
         </div>
 
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 wiley-surface-panel-secondary px-4 py-3">
-            <div id="customer-directory-status" role="status" aria-live="polite" class="text-sm text-slate-600">
-                <span class="font-semibold text-slate-700">Directory status:</span> @GetCustomerDirectoryStatus()
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel-secondary px-4 py-3">
+            <div id="customer-directory-status" role="status" aria-live="polite" class="text-sm wiley-text-muted">
+                <span class="font-semibold wiley-text-muted">Directory status:</span> @GetCustomerDirectoryStatus()
             </div>
             <div class="flex flex-wrap gap-2">
                 <SfButton ID="refresh-customer-directory-button" IconCss="e-icons e-refresh" Disabled="@IsBusy()" OnClick="RefreshCustomerDirectoryAsync">Refresh</SfButton>
@@ -54,7 +54,7 @@
     </section>
 
     <section id="customer-grid-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Directory</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Directory</p>
         @if (isLoadingCustomers)
         {
             @* Loading skeleton: shows while the API call resolves on first mount
@@ -86,15 +86,15 @@
                 <GridPageSettings PageSize="10" PageCount="5" />
                 <GridTemplates>
                     <EmptyRecordTemplate>
-                        <div class="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 wiley-surface-panel-secondary px-6 py-10 text-center">
+                        <div class="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--wiley-border)] wiley-surface-panel-secondary px-6 py-10 text-center">
                             <div>
-                                <div class="text-sm font-semibold text-slate-900">No utility customers found</div>
-                                <div class="mt-2 text-sm text-slate-600">Use QuickBooks Import to load live records, or add a customer manually to seed this workspace.</div>
+                                <div class="text-sm font-semibold wiley-text-muted">No utility customers found</div>
+                                <div class="mt-2 text-sm wiley-text-muted">Use QuickBooks Import to load live records, or add a customer manually to seed this workspace.</div>
                             </div>
-                            <div class="flex flex-wrap justify-center gap-2 text-xs text-slate-500">
-                                <span class="rounded-full bg-white px-3 py-1 shadow-sm">QuickBooks Import</span>
-                                <span class="rounded-full bg-white px-3 py-1 shadow-sm">Load sample data</span>
-                                <span class="rounded-full bg-white px-3 py-1 shadow-sm">Add customer</span>
+                            <div class="flex flex-wrap justify-center gap-2 text-xs wiley-text-muted">
+                                <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">QuickBooks Import</span>
+                                <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">Load sample data</span>
+                                <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">Add customer</span>
                             </div>
                         </div>
                     </EmptyRecordTemplate>
@@ -140,7 +140,7 @@
         </div>
     }
 
-    <p class="text-xs text-slate-500">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
+    <p class="text-xs wiley-text-muted">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
 
     @if (IsEditorDialogOpen())
     {
@@ -265,7 +265,7 @@
             <DialogTemplates>
                 <Header>Delete Customer</Header>
                 <Content>
-                    <p class="text-sm text-slate-700">Delete @GetPendingDeleteCustomer()!.DisplayName from the utility-customer directory? This saves immediately and cannot be undone from the workspace.</p>
+                    <p class="text-sm wiley-text-muted">Delete @GetPendingDeleteCustomer()!.DisplayName from the utility-customer directory? This saves immediately and cannot be undone from the workspace.</p>
                 </Content>
                 <FooterTemplate>
                     <div class="flex justify-end gap-2">
