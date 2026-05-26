@@ -341,7 +341,9 @@ public sealed class QuickBooksImportService
 		const decimal MaxAmount = 999_999_999.99m;
 		var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 		{
-			"Water Utility", "Electric Utility", "Sewer Utility", "General Fund", "Town of Wiley"
+			"Water Utility", "Electric Utility", "Sewer Utility", "General Fund", "Town of Wiley",
+			// Core enterprises used throughout model, tests, bootstrap data, and sample imports (WSD = sanitation/sewer).
+			"Wiley Sanitation District", "Trash", "Apartments"
 		};
 
 		if (rows.Count > MaxRows)

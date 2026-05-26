@@ -22,6 +22,7 @@ using Syncfusion.Blazor.Popups;
 using Syncfusion.Blazor.ProgressBar;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Components;
+using WileyWidget.Abstractions;
 using WileyCoWeb.Components.Layout;
 using WileyCoWeb.Components.Panels;
 using WileyCoWeb.Components.Pages;
@@ -341,7 +342,10 @@ public sealed class ComponentPageTests
 		Assert.Equal(60.00m, waterQuadrant.BreakEvenRate);
 		Assert.All(waterQuadrant.SeriesPoints, point => Assert.Equal(60.00m, point.BreakEvenPerCustomer));
 
-		var unchangedBaselineRate = Math.Round(WorkspaceTestData.BaselineTotalCosts / WorkspaceTestData.BaselineProjectedVolume, 2, MidpointRounding.AwayFromZero);
+		var unchangedBaselineRate = EnterpriseRateService.CalculateBreakEvenRate(
+			WorkspaceTestData.BaselineTotalCosts,
+			WorkspaceTestData.BaselineProjectedVolume,
+			roundToCurrency: true);
 		Assert.All(
 			workspaceState.BreakEvenQuadrants.Where(quadrant => quadrant.EnterpriseName != WorkspaceTestData.WaterUtility),
 			quadrant => Assert.Equal(unchangedBaselineRate, quadrant.BreakEvenRate));
