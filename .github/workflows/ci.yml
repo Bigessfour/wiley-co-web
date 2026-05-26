@@ -205,7 +205,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.name }}
           path: |
@@ -290,7 +290,7 @@ jobs:
         run: dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Upload build artifact for Amplify
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: blazor-publish
           path: publish_output/wwwroot
@@ -333,7 +333,7 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Download published Blazor build
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: blazor-publish
           path: publish_output/wwwroot
@@ -370,7 +370,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-ui-report
           path: |
