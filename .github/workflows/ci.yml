@@ -14,6 +14,9 @@ permissions:
   contents: read
   id-token: write # required for GitHub OIDC — deployment-guard assumes role via federation
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: windows-latest
@@ -35,6 +38,9 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
+      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
+      # Minimal, non-breaking; playwright job already pins Node 24 via setup-node.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
@@ -233,6 +239,9 @@ jobs:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
+      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
+      # Minimal, non-breaking; playwright job already pins Node 24 via setup-node.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
@@ -285,6 +294,9 @@ jobs:
       # Full Chromium + WebKit roughly doubles wall time on ubuntu-latest; CI gates on Chromium only.
       # Run both locally: unset PLAYWRIGHT_CI_BROWSERS or `npm run playwright:test:strict`.
       PLAYWRIGHT_CI_BROWSERS: chromium
+      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
+      # Minimal, non-breaking; this job already pins Node 24 via setup-node.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
