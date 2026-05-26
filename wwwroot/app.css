@@ -418,68 +418,6 @@ body {
   color: #94a3b8;
 }
 
-.app-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.app-nav-link {
-  display: grid;
-  grid-template-columns: 2rem 1fr;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem 1rem;
-  border-radius: 1rem;
-  color: #cbd5e1;
-  text-decoration: none;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(30, 41, 59, 0.58);
-  transition:
-    transform 120ms ease,
-    background-color 120ms ease,
-    border-color 120ms ease;
-}
-
-.app-nav-link:hover,
-.app-nav-link.active {
-  transform: translateX(2px);
-  color: #f8fafc;
-  background: rgba(8, 47, 73, 0.9);
-  border-color: rgba(56, 189, 248, 0.45);
-}
-
-.app-sidebar-footer {
-  margin-top: 2rem;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.app-sidebar-stat {
-  padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  background: rgba(15, 23, 42, 0.64);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.app-sidebar-stat span,
-.app-sidebar-stat strong {
-  display: block;
-}
-
-.app-sidebar-stat span {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: #94a3b8;
-}
-
-.app-sidebar-stat strong {
-  margin-top: 0.35rem;
-  font-size: 0.95rem;
-  color: #f8fafc;
-}
-
 a,
 .btn-link {
   color: #006bb7;
@@ -1498,16 +1436,11 @@ html[data-wiley-theme="dark"] body {
   outline-offset: 2px;
 }
 
-/* App nav links: focus ring within the dark sidebar */
-.app-nav-link:focus-visible {
-  outline: 3px solid #38bdf8;
-  outline-offset: 2px;
-}
-
-/* Nav toggle button focus ring */
+/* App nav links + toggle: Fluent2 theme-aware focus ring (uses accent var for light/dark consistency) */
+.app-nav-link:focus-visible,
 #app-shell-nav-toggle:focus-visible {
-  outline: 3px solid #38bdf8;
-  outline-offset: 3px;
+  outline: 3px solid var(--wiley-accent);
+  outline-offset: 2px;
 }
 
 /* Workspace card-link buttons */
