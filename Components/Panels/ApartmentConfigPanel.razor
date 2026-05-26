@@ -25,13 +25,7 @@
     </div>
 
     <SfCard ID="apartment-config-grid-card" CssClass="wiley-panel-card mt-4">
-        @* ── Apartment Config Grid (Safe Panel) ─────────────────────────────────
-           Small in-memory dataset → no paging or virtualization needed.
-           Dialog editing keeps the form clean on small screens.
-           Persistence + hover/resize/reorder for good UX in config workflows.
-           EmptyRecordTemplate follows the canonical pattern used in ScenarioPlannerPanel.
-        ───────────────────────────────────────────────────────────────────── *@
-        <SfGrid ID="apartment-config-grid" TValue="ApartmentUnitTypeData" DataSource="@editableUnitTypes" Toolbar="@ToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" EnableHover="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="420" EnablePersistence="true" PersistenceKey="wiley.apartment-config-grid.v1">
+        <SfGrid ID="apartment-config-grid" TValue="ApartmentUnitTypeData" DataSource="@editableUnitTypes" Toolbar="@ToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" EnableHover="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="420" EnablePersistence="true" PersistenceKey="wiley.apartment-config-grid.v1">
             <GridEvents TValue="ApartmentUnitTypeData" OnActionComplete="HandleActionComplete" />
             <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
             <GridColumns>
@@ -43,10 +37,10 @@
             </GridColumns>
             <GridTemplates>
                 <EmptyRecordTemplate>
-                    <SfCard ID="apartment-config-empty-card" CssClass="wiley-panel-card">
-                        <CardHeader Title="No unit types defined" SubTitle="Add apartment configurations to model revenue." />
-                        <CardContent Content="Use the toolbar above to add your first unit type (e.g., Studio, 1BR, 2BR). Changes save instantly to the active workspace scenario." />
-                    </SfCard>
+                    <div class="p-4 text-sm wiley-text-muted">
+                        <p class="font-semibold wiley-text-primary">No unit types defined</p>
+                        <p class="mt-1">Add apartment configurations to model revenue. Use the toolbar above to add your first unit type.</p>
+                    </div>
                 </EmptyRecordTemplate>
             </GridTemplates>
         </SfGrid>
