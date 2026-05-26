@@ -82,7 +82,7 @@
                                                     ValueChange="HandleUploaderValueChangeAsync" />
                                 </SfUploader>
 
-                                <span id="quickbooks-import-uploader-help" class="text-xs text-slate-500">
+                                <span id="quickbooks-import-uploader-help" class="text-xs wiley-text-muted">
                                     CSV or Excel, up to 50 MB per file. Multiple files can be staged in the uploader list, and the most recently selected file becomes the active preview candidate.
                                 </span>
                             </div>
@@ -354,7 +354,7 @@
 
                                                     @if (currentProfile.Targets.Count == 0)
                                                     {
-                                                        <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">
+                                                        <div class="rounded-2xl border border-dashed p-3 text-sm wiley-surface-panel-secondary wiley-text-muted">
                                                             Add one or more enterprise targets. If the total is under 100%, the remainder stays with the rule target enterprise.
                                                         </div>
                                                     }

@@ -16,7 +16,7 @@
                     <SfCard ID="jarvis-operational-status-card">
                         <CardHeader Title="Operational status" SubTitle="@StatusText" />
                         <CardContent>
-                            <div class="text-sm text-slate-600">Workspace metrics, recommendations, and Jarvis chat all update from the same current snapshot.</div>
+                            <div class="text-sm wiley-text-muted">Workspace metrics, recommendations, and Jarvis chat all update from the same current snapshot.</div>
                         </CardContent>
                     </SfCard>
 
@@ -37,7 +37,7 @@
                             <CardHeader Title="@insight.Label" SubTitle="Decision-support metric" />
                             <CardContent>
                                 <div class="text-2xl font-semibold text-slate-900">@insight.Value</div>
-                                <div class="mt-2 text-sm leading-5 text-slate-600">@insight.Description</div>
+                                <div class="mt-2 text-sm leading-5 wiley-text-muted">@insight.Description</div>
                             </CardContent>
                         </SfCard>
                     }
@@ -54,7 +54,7 @@
                                     <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
                                         <SfSpinner Visible="@IsKnowledgeBusy" Size="18" Label="" Type="SpinnerType.Material" />
                                     </div>
-                                    <div class="text-sm text-slate-600">Refresh live workspace knowledge and recommendation cards without leaving the rail.</div>
+                                    <div class="text-sm wiley-text-muted">Refresh live workspace knowledge and recommendation cards without leaving the rail.</div>
                                 </div>
 
                                 <SfTooltip Content="Refresh the live knowledge response that drives the executive brief, insights, and action recommendations."
@@ -73,7 +73,7 @@
                                 <SfCard>
                                     <CardHeader Title="@action.Title" SubTitle="Recommended next step" />
                                     <CardContent>
-                                        <div class="text-sm leading-5 text-slate-600">@action.Description</div>
+                                        <div class="text-sm leading-5 wiley-text-muted">@action.Description</div>
                                     </CardContent>
                                 </SfCard>
                             }
@@ -311,7 +311,7 @@
                     <SfCard>
                         <CardHeader Title="Delivery note" SubTitle="Secure Jarvis is disabled for this host." />
                         <CardContent>
-                            <div class="text-sm text-slate-600">This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.</div>
+                            <div class="text-sm wiley-text-muted">This panel uses the same workspace state the rest of the UI reads and can call the server-side Semantic Kernel assistant when the xAI key is configured.</div>
                         </CardContent>
                     </SfCard>
                 }

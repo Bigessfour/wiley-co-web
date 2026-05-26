@@ -554,6 +554,14 @@
                 $"document.documentElement.setAttribute('data-wiley-theme', '{newTheme}');" +
                 $"document.documentElement.setAttribute('data-bs-theme', '{newTheme}');");
 
+            // Swap Syncfusion Fluent2 stylesheet for proper control backgrounds/surfaces in dark/light.
+            // fluent2.css (light) <-> fluent2-dark.css (dark) — matches index.html id and package assets.
+            var themeHref = newTheme == "dark"
+                ? "_content/Syncfusion.Blazor.Themes/fluent2-dark.css"
+                : "_content/Syncfusion.Blazor.Themes/fluent2.css";
+            await JSRuntime.InvokeVoidAsync("eval",
+                $"var l=document.getElementById('syncfusion-theme'); if(l) l.href='{themeHref}';");
+
             // Persist user choice (independent of OS).
             await JSRuntime.InvokeVoidAsync(
                 "wileyWorkspaceStorage.setItem", ThemeStorageKey, newTheme);
@@ -583,11 +591,18 @@
                 await JSRuntime.InvokeVoidAsync("eval",
                     $"document.documentElement.setAttribute('data-wiley-theme', '{stored}');" +
                     $"document.documentElement.setAttribute('data-bs-theme', '{stored}');");
+
+                // Ensure initial Fluent2 stylesheet matches persisted preference (prevents flash of wrong control bgs).
+                var themeHref = stored == "dark"
+                    ? "_content/Syncfusion.Blazor.Themes/fluent2-dark.css"
+                    : "_content/Syncfusion.Blazor.Themes/fluent2.css";
+                await JSRuntime.InvokeVoidAsync("eval",
+                    $"var l=document.getElementById('syncfusion-theme'); if(l) l.href='{themeHref}';");
             }
         }
         catch
         {
-            // OS default (set by the early script in index.html) remains.
+            // OS default (set by the early script in index.html) remains; link stays fluent2.css (light).
         }
     }
 

@@ -2,17 +2,52 @@ html,
 body {
   font-family: Aptos, "Segoe UI", "Trebuchet MS", sans-serif;
   margin: 0;
-  background:
-    radial-gradient(
-      circle at top left,
-      rgba(14, 165, 233, 0.08),
-      transparent 32%
-    ),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
-  color: #0f172a;
+  color: var(--wiley-text, #0f172a);
 }
+
+/* Fluent2-inspired design tokens (light/dark via data attrs set by index.html early script + MainLayout toggle).
+   Consumed by app-shell, nav, panels, and Sf controls via data-bs-theme/data-wiley-theme.
+   Removes hard-coded slate/light-only colors for full dark/light consistency. */
+:root,
+[data-wiley-theme="light"],
+[data-bs-theme="light"] {
+  --wiley-bg: #f8fafc;
+  --wiley-surface-1: #ffffff;
+  --wiley-surface-2: #f1f5f9;
+  --wiley-text: #0f172a;
+  --wiley-text-muted: #475569;
+  --wiley-border: #e2e8f0;
+  --wiley-accent: #0284c8;
+  --wiley-accent-hover: #0369a1;
+  --wiley-radius-sm: 0.25rem;
+  --wiley-radius-md: 0.5rem;
+  --wiley-radius-lg: 0.75rem;
+  --wiley-radius-xl: 1rem;
+  --wiley-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --wiley-shadow-md: 0 4px 12px rgb(15 23 42 / 0.08);
+}
+
+[data-wiley-theme="dark"],
+[data-bs-theme="dark"] {
+  --wiley-bg: #0b1120;
+  --wiley-surface-1: #1e293b;
+  --wiley-surface-2: #334155;
+  --wiley-text: #e2e8f0;
+  --wiley-text-muted: #94a3b8;
+  --wiley-border: #475569;
+  --wiley-accent: #38bdf8;
+  --wiley-accent-hover: #0ea5e9;
+  --wiley-radius-sm: 0.25rem;
+  --wiley-radius-md: 0.5rem;
+  --wiley-radius-lg: 0.75rem;
+  --wiley-radius-xl: 1rem;
+  --wiley-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --wiley-shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
+}
+
 body {
   min-height: 100vh;
+  background: var(--wiley-bg);
 }
 
 .app-shell {
@@ -25,24 +60,23 @@ body {
 }
 
 .app-shell-appbar.e-appbar {
-  background:
-    linear-gradient(90deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.98)),
-    linear-gradient(135deg, rgba(14, 165, 233, 0.12), transparent 42%);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-  color: #f8fafc;
+  background: var(--wiley-surface-1);
+  border-bottom: 1px solid var(--wiley-border);
+  color: var(--wiley-text);
+  box-shadow: var(--wiley-shadow-sm);
 }
 
 .app-shell-appbar .e-btn.e-inherit,
 .app-shell-appbar .e-btn.e-inherit:hover,
 .app-shell-appbar .e-btn.e-inherit:focus {
-  color: #f8fafc;
+  color: var(--wiley-text);
 }
 
 .app-shell-appbar-copy {
-  font-size: 0.8rem;
-  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #93c5fd;
+  color: var(--wiley-accent);
   white-space: nowrap;
 }
 
@@ -50,17 +84,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  margin-left: 0.85rem;
+  margin-left: 0.75rem;
 }
 
 .app-shell-brand .app-eyebrow {
-  color: #7dd3fc;
+  color: var(--wiley-accent);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
 }
 
 .app-shell-brand .app-title {
   margin: 0;
-  line-height: 1.1;
-  color: #f8fafc;
+  line-height: 1.05;
+  color: var(--wiley-text);
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .app-shell-body {
@@ -70,24 +108,25 @@ body {
 }
 
 #app-shell-sidebar.e-sidebar {
-  background-color: #020617;
-  background-image:
-    linear-gradient(180deg, rgba(2, 6, 23, 1), rgba(15, 23, 42, 0.98)),
-    linear-gradient(135deg, rgba(14, 165, 233, 0.16), transparent 40%);
-  color: #f8fafc;
-  border-right: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--wiley-surface-1);
+  color: var(--wiley-text);
+  border-right: 1px solid var(--wiley-border);
+  box-shadow: var(--wiley-shadow-sm);
 }
 
 #app-shell-sidebar .e-sidebar-content {
   min-height: 100%;
 }
 
+/* Left nav: Fluent2-native metrics (smaller radius, tighter padding, accent hover, icon rail on collapse).
+   Uses CSS vars for full dark/light. No layout jump on SfSidebar dock (Animate + DockSize in razor). */
 .app-nav-shell {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   height: 100%;
-  padding: 1.5rem 1.1rem 1.25rem;
+  padding: 1rem 0.75rem 0.875rem;
+  overflow-y: auto;
 }
 
 .app-nav-list.e-listview {
@@ -97,13 +136,13 @@ body {
 }
 
 .app-nav-list .e-list-header {
-  padding: 0 0 0.85rem;
+  padding: 0 0 0.625rem;
   border: 0;
   background: transparent;
-  color: #94a3b8;
-  font-size: 0.72rem;
+  color: var(--wiley-text-muted);
+  font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 0.26em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
 }
 
@@ -114,52 +153,56 @@ body {
 }
 
 .app-nav-list .e-list-item + .e-list-item {
-  margin-top: 0.55rem;
+  margin-top: 0.25rem;
 }
 
 .app-nav-link {
   display: grid;
-  grid-template-columns: 2rem 1fr;
+  grid-template-columns: 2.25rem 1fr;
   align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem 1rem;
-  border-radius: 1rem;
-  color: #cbd5e1;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--wiley-radius-md);
+  color: var(--wiley-text);
   text-decoration: none;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(30, 41, 59, 0.58);
+  border: 1px solid transparent;
+  background: transparent;
   transition:
-    transform 120ms ease,
-    background-color 120ms ease,
-    border-color 120ms ease;
+    background-color 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease;
 }
 
-.app-nav-link:hover,
+.app-nav-link:hover {
+  background: var(--wiley-surface-2);
+  color: var(--wiley-text);
+}
+
 .app-nav-link.active {
-  transform: translateX(2px);
-  color: #f8fafc;
-  background: rgba(8, 47, 73, 0.9);
-  border-color: rgba(56, 189, 248, 0.45);
+  background: var(--wiley-surface-2);
+  color: var(--wiley-text);
+  border-color: var(--wiley-accent);
+  font-weight: 600;
 }
 
 .app-nav-link-index {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   flex: 0 0 auto;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.9);
-  font-size: 0.78rem;
+  border-radius: var(--wiley-radius-md);
+  background: var(--wiley-surface-2);
+  font-size: 0.7rem;
   font-weight: 700;
-  color: #7dd3fc;
+  color: var(--wiley-accent);
 }
 
 .app-nav-link-label {
   min-width: 0;
-  font-size: 0.96rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .app-sidebar-footer {
@@ -181,18 +224,18 @@ body {
 }
 
 .app-shell-nav-collapsed .app-nav-list .e-list-item + .e-list-item {
-  margin-top: 0.45rem;
+  margin-top: 0.25rem;
 }
 
 .app-shell-nav-collapsed .app-nav-link {
   grid-template-columns: 1fr;
   justify-items: center;
-  padding-inline: 0.65rem;
+  padding: 0.5rem 0.25rem;
 }
 
 .app-shell-nav-collapsed .app-nav-link-index {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2rem;
+  height: 2rem;
 }
 
 .app-shell-content {
@@ -201,7 +244,32 @@ body {
 
 .app-content {
   min-width: 0;
-  padding: 1.5rem;
+  padding: 1rem 1.25rem;
+}
+
+/* Reusable Fluent2-aware panel/card surfaces for workspace + all panels.
+   Replaces hard-coded bg-white / border-slate-200 / text-slate-* so dark/light + Sf controls consistent. */
+.wiley-surface-panel,
+.wiley-panel-card {
+  background: var(--wiley-surface-1);
+  border: 1px solid var(--wiley-border);
+  border-radius: var(--wiley-radius-lg);
+  color: var(--wiley-text);
+  box-shadow: var(--wiley-shadow-sm);
+}
+
+.wiley-surface-panel-secondary {
+  background: var(--wiley-surface-2);
+  border-color: var(--wiley-border);
+  color: var(--wiley-text);
+}
+
+.wiley-text-muted {
+  color: var(--wiley-text-muted);
+}
+
+.wiley-accent {
+  color: var(--wiley-accent);
 }
 
 .home-hub {
@@ -210,44 +278,42 @@ body {
 }
 
 .home-hub-hero {
-  padding: 1.75rem;
-  border-radius: 1.5rem;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background:
-    linear-gradient(135deg, rgba(2, 6, 23, 0.96), rgba(12, 74, 110, 0.92)),
-    linear-gradient(180deg, rgba(14, 165, 233, 0.14), transparent 55%);
-  color: #f8fafc;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--wiley-radius-xl);
+  border: 1px solid var(--wiley-border);
+  background: var(--wiley-surface-1);
+  color: var(--wiley-text);
+  box-shadow: var(--wiley-shadow-md);
 }
 
 .home-hub-hero h1 {
-  margin: 0.4rem 0 0;
-  font-size: clamp(2rem, 3.2vw, 3.2rem);
-  line-height: 1.05;
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+  line-height: 1.1;
 }
 
 .home-hub-kicker {
   margin: 0;
-  color: #7dd3fc;
-  font-size: 0.74rem;
+  color: var(--wiley-accent);
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
 }
 
 .home-hub-copy {
   max-width: 48rem;
-  margin: 1rem 0 0;
-  color: #cbd5e1;
-  font-size: 1rem;
-  line-height: 1.7;
+  margin: 0.75rem 0 0;
+  color: var(--wiley-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .home-hub-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.85rem;
-  margin-top: 1.25rem;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .home-hub-primary,
@@ -261,72 +327,74 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 3rem;
-  padding: 0.75rem 1.1rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
   border-radius: 999px;
-  font-weight: 700;
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 
 .home-hub-primary {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--wiley-accent);
+  color: #fff;
 }
 
 .home-hub-secondary {
-  border: 1px solid rgba(125, 211, 252, 0.45);
-  color: #e0f2fe;
-  background: rgba(15, 23, 42, 0.28);
+  border: 1px solid var(--wiley-border);
+  color: var(--wiley-text);
+  background: var(--wiley-surface-2);
 }
 
 .home-hub-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
 }
 
 .home-hub-card {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.15rem;
-  border-radius: 1.25rem;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(255, 255, 255, 0.82);
-  color: #0f172a;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--wiley-radius-lg);
+  border: 1px solid var(--wiley-border);
+  background: var(--wiley-surface-1);
+  color: var(--wiley-text);
+  box-shadow: var(--wiley-shadow-sm);
   transition:
-    transform 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+    transform 80ms ease,
+    border-color 80ms ease,
+    box-shadow 80ms ease;
 }
 
 .home-hub-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(14, 165, 233, 0.45);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+  border-color: var(--wiley-accent);
+  box-shadow: var(--wiley-shadow-md);
 }
 
 .home-hub-card strong {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
 }
 
 .home-hub-card p {
   margin: 0;
-  color: #475569;
-  line-height: 1.55;
+  color: var(--wiley-text-muted);
+  line-height: 1.5;
+  font-size: 0.8rem;
 }
 
 .home-hub-card-index {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 999px;
-  background: #e0f2fe;
-  color: #075985;
-  font-size: 0.78rem;
-  font-weight: 800;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: var(--wiley-radius-md);
+  background: var(--wiley-surface-2);
+  color: var(--wiley-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .app-brand {
@@ -1481,9 +1549,20 @@ html[data-wiley-theme="dark"] body {
 }
 :root[dir="rtl"] #app-shell-sidebar.e-sidebar {
   border-right: none;
-  border-left: 1px solid rgba(148, 163, 184, 0.16);
+  border-left: 1px solid var(--wiley-border);
 }
 :root[dir="rtl"] .app-shell-brand {
   margin-left: 0;
-  margin-right: 0.85rem;
+  margin-right: 0.75rem;
+}
+
+/* Workspace hero (replaces tailwind slate gradient in WileyWorkspace.razor for theme consistency) */
+.wiley-hero {
+  background: linear-gradient(
+    135deg,
+    var(--wiley-surface-2),
+    var(--wiley-surface-1)
+  );
+  border-color: var(--wiley-border);
+  color: var(--wiley-text);
 }
