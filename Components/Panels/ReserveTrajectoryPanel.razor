@@ -5,10 +5,10 @@
 
 @* Reserve trajectory is fed from WorkspaceReserveTrajectoryData on the workspace snapshot (API WorkspaceSnapshotComposer), not a standalone REST endpoint. *@
 <section id="reserve-trajectory-panel" class="space-y-4">
-    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-2">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Reserve Trajectory</p>
-            <p class="text-sm text-slate-600">A live reserve forecast with a shaded stress band and policy floor carried through the workspace snapshot.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Reserve Trajectory</p>
+            <p class="text-sm wiley-text-muted">A live reserve forecast with a shaded stress band and policy floor carried through the workspace snapshot.</p>
         </div>
 
         <div class="mt-4 grid gap-4 md:grid-cols-3">
@@ -42,15 +42,15 @@
         </div>
     </section>
 
-    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-2">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Forecast Chart</p>
-            <p class="text-sm text-slate-600">Projected reserve balance versus the recommended reserve line.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Forecast Chart</p>
+            <p class="text-sm wiley-text-muted">Projected reserve balance versus the recommended reserve line.</p>
         </div>
 
         @if (HasTrajectory)
         {
-            <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div class="mt-4 rounded-2xl wiley-surface-panel-secondary p-3">
                 @* Theme Fluent2: chart palette aligned with app-wide Syncfusion theme *@
                 @* ChartZoomSettings: reserve trajectory is the most analytical chart in the workspace; scroll zoom allows multi-year drill-down *@
                 <SfChart ID="@ChartId"
@@ -121,20 +121,20 @@
                     </ChartSeriesCollection>
                 </SfChart>
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
-                    <div class="rounded-xl bg-white/80 px-3 py-2 text-xs text-slate-600">
-                        <span class="font-semibold text-slate-900">Stress band:</span> Forecast plus or minus the current confidence interval.
+                    <div class="rounded-xl wiley-surface-panel-secondary px-3 py-2 text-xs wiley-text-muted">
+                        <span class="font-semibold wiley-text">Stress band:</span> Forecast plus or minus the current confidence interval.
                     </div>
                     <div class="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
                         <span class="font-semibold text-amber-950">Policy minimum:</span> @PolicyMinimumDisplay
                     </div>
                 </div>
-                <p class="mt-2 text-xs text-slate-500">Risk assessment: @RiskAssessmentDisplay</p>
-                <p class="mt-3 text-xs text-slate-500">Latest confidence interval: @LatestConfidenceIntervalDisplay</p>
+                <p class="mt-2 text-xs wiley-text-muted">Risk assessment: @RiskAssessmentDisplay</p>
+                <p class="mt-3 text-xs wiley-text-muted">Latest confidence interval: @LatestConfidenceIntervalDisplay</p>
             </div>
         }
         else
         {
-            <div class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+            <div class="mt-4 rounded-2xl border border-dashed border-[var(--wiley-border)] wiley-surface-panel-secondary p-6 text-sm wiley-text-muted">
                 Reserve forecast data is not available yet. Once the workspace snapshot includes forecast points, the chart will appear here.
             </div>
         }

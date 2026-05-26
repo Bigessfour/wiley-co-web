@@ -3,10 +3,10 @@
 @using Syncfusion.Blazor.Grids
 @using WileyCoWeb.Contracts
 
-<section id="apartment-config-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+<section id="apartment-config-panel" class="rounded-2xl wiley-surface-panel p-4">
     <div class="flex flex-col gap-2">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Apartment Configuration</p>
-        <p class="text-sm text-slate-600">Edit unit types, monthly rents, and bedroom weighting for the Apartments enterprise.</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Apartment Configuration</p>
+        <p class="text-sm wiley-text-muted">Edit unit types, monthly rents, and bedroom weighting for the Apartments enterprise.</p>
     </div>
 
     <div class="mt-4 grid gap-4 md:grid-cols-3">
@@ -24,7 +24,7 @@
         </SfCard>
     </div>
 
-    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+    <div class="mt-4 rounded-2xl wiley-surface-panel-secondary p-3">
         @* ID: enables test targeting for the apartment unit-type editor grid *@
         @* EnablePersistence: preserves sort order for the unit-type mix across sessions *@
         <SfGrid ID="apartment-config-grid" TValue="ApartmentUnitTypeData" DataSource="@editableUnitTypes" Toolbar="@ToolbarItems" AllowPaging="false" AllowSorting="true" AllowEditing="true" AllowAdding="true" AllowDeleting="true" AllowTextWrap="true" Height="420" EnablePersistence="true" PersistenceKey="wiley.apartment-config-grid.v1">

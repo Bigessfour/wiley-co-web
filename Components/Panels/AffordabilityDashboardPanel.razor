@@ -18,27 +18,27 @@
             </div>
             <div class="grid grid-cols-2 gap-3 text-right text-xs text-slate-300 sm:grid-cols-4 lg:text-sm">
                 <div>
-                    <div class="text-slate-400">Enterprise</div>
+                    <div class="wiley-text-muted">Enterprise</div>
                     <div class="font-semibold text-white">@SelectedEnterprise</div>
                 </div>
                 <div>
-                    <div class="text-slate-400">Fiscal Year</div>
+                    <div class="wiley-text-muted">Fiscal Year</div>
                     <div class="font-semibold text-white">@SelectedFiscalYear</div>
                 </div>
                 <div>
-                    <div class="text-slate-400">Households</div>
+                    <div class="wiley-text-muted">Households</div>
                     <div class="font-semibold text-white">@AffordabilitySnapshot.Summary.CustomerCount.ToString("N0")</div>
                 </div>
                 <div>
-                    <div class="text-slate-400">Risk Band</div>
+                    <div class="wiley-text-muted">Risk Band</div>
                     <div class="font-semibold text-cyan-300">@AffordabilitySnapshot.Summary.RiskBand</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="affordability-inputs" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Scenario Inputs</p>
+    <section id="affordability-inputs" class="rounded-2xl wiley-surface-panel p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Scenario Inputs</p>
         <div class="mt-3 grid gap-4 lg:grid-cols-[1fr_1fr]">
             <SfNumericTextBox TValue="decimal"
                               ID="affordability-monthly-mhi-input"
@@ -76,12 +76,12 @@
         </SfCard>
     </section>
 
-    <section id="affordability-gauge-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="affordability-gauge-panel" class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Affordability Gauge</p>
-            <p class="text-sm text-slate-600">Average monthly bill as a percentage of MHI.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Affordability Gauge</p>
+            <p class="text-sm wiley-text-muted">Average monthly bill as a percentage of MHI.</p>
         </div>
-        <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
+        <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
             @* AnimationDuration: smooth gauge needle animation consistent with DataDashboard gauge baseline *@
             <SfCircularGauge ID="affordability-gauge"
                              AllowMargin="true"
@@ -109,10 +109,10 @@
         </div>
     </section>
 
-    <section id="affordability-class-chart" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="affordability-class-chart" class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Customer Class Impact</p>
-            <p class="text-sm text-slate-600">Stacked monthly bill comparison across the modeled rate scenarios.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Class Impact</p>
+            <p class="text-sm wiley-text-muted">Stacked monthly bill comparison across the modeled rate scenarios.</p>
         </div>
         <div class="mt-3">
             @* Theme Fluent2: consistent palette; ZoomSettings: class-impact chart is analytical; selection zoom allows per-class drill-down *@
@@ -157,28 +157,28 @@
         </div>
     </section>
 
-    <section id="affordability-heatmap-panel" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="affordability-heatmap-panel" class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Bill Burden Heatmap</p>
-            <p class="text-sm text-slate-600">Customer class by rate scenario, shaded by bill as a percentage of MHI.</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Bill Burden Heatmap</p>
+            <p class="text-sm wiley-text-muted">Customer class by rate scenario, shaded by bill as a percentage of MHI.</p>
         </div>
 
         <div class="mt-4 overflow-auto">
             <div class="min-w-[52rem] space-y-2">
                 <div class="grid gap-2" style="grid-template-columns: 12rem repeat(@AffordabilitySnapshot.RateScenarios.Count, minmax(0, 1fr));">
-                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Customer class</div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">Customer class</div>
                     @foreach (var scenario in AffordabilitySnapshot.RateScenarios)
                     {
-                        <div class="rounded-lg bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-700">@scenario.ScenarioName</div>
+                        <div class="rounded-lg wiley-surface-2 px-3 py-2 text-center text-xs font-semibold wiley-text">@scenario.ScenarioName</div>
                     }
                 </div>
 
                 @foreach (var classSnapshot in AffordabilitySnapshot.CustomerClasses)
                 {
                     <div class="grid gap-2" style="grid-template-columns: 12rem repeat(@AffordabilitySnapshot.RateScenarios.Count, minmax(0, 1fr));">
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                            <div class="text-sm font-semibold text-slate-900">@classSnapshot.ClassName</div>
-                            <div class="mt-1 text-xs text-slate-500">~@classSnapshot.EstimatedCustomerCount.ToString("N0") customers</div>
+                        <div class="rounded-lg wiley-surface-panel-secondary px-3 py-3">
+                            <div class="text-sm font-semibold wiley-text">@classSnapshot.ClassName</div>
+                            <div class="mt-1 text-xs wiley-text-muted">~@classSnapshot.EstimatedCustomerCount.ToString("N0") customers</div>
                         </div>
 
                         @foreach (var scenario in AffordabilitySnapshot.RateScenarios)
@@ -195,7 +195,7 @@
         </div>
     </section>
 
-    <p class="text-xs text-slate-500">This first slice uses modeled class baselines and workspace customer counts. The panel can later be switched to persisted bill history without changing the dashboard shape.</p>
+    <p class="text-xs wiley-text-muted">This first slice uses modeled class baselines and workspace customer counts. The panel can later be switched to persisted bill history without changing the dashboard shape.</p>
 </div>
 
 @code {

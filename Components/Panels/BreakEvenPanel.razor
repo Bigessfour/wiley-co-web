@@ -153,7 +153,7 @@
     <section id="break-even-quadrant-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
         <div class="mb-4 flex flex-col gap-1">
             <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Break-Even Quadrants</p>
-            <p class="text-sm text-slate-600">Normalized to $/customer · Water · Sewer · Trash · Apartments</p>
+            <p class="text-sm wiley-text-muted">Normalized to $/customer · Water · Sewer · Trash · Apartments</p>
         </div>
 
         <div id="break-even-quadrant-grid" class="grid gap-4 lg:grid-cols-2 auto-rows-fr">
@@ -168,7 +168,7 @@
                     
                     <div class="flex items-center justify-between bg-[#0f172a] px-4 py-3">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">@quadrant.EnterpriseType</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">@quadrant.EnterpriseType</p>
                             <h3 class="text-base font-semibold text-white">@quadrant.EnterpriseName</h3>
                         </div>
                         <span class="rounded-full px-2 py-0.5 text-xs font-semibold @adequacyCss bg-white/10 text-white">
@@ -185,9 +185,9 @@
                                        OpensOn="Hover Focus"
                                        ShowTipPointer="true"
                                        CloseDelay="200">
-                                <div class="rounded-xl border border-[var(--wiley-border)] bg-white p-2 shadow-sm">
+                                <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2 shadow-sm">
                                     <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Current</p>
-                                    <p class="mt-0.5 text-sm font-bold text-slate-900">@quadrant.CurrentRate.ToString("C2")</p>
+                                    <p class="mt-0.5 text-sm font-bold wiley-text">@quadrant.CurrentRate.ToString("C2")</p>
                                 </div>
                             </SfTooltip>
                             <SfTooltip Content="Rate required to exactly cover all operating expenses."
@@ -195,9 +195,9 @@
                                        OpensOn="Hover Focus"
                                        ShowTipPointer="true"
                                        CloseDelay="200">
-                                <div class="rounded-xl border border-[var(--wiley-border)] bg-white p-2 shadow-sm">
+                                <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2 shadow-sm">
                                     <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Break-Even</p>
-                                    <p class="mt-0.5 text-sm font-bold text-slate-900">@quadrant.BreakEvenRate.ToString("C2")</p>
+                                    <p class="mt-0.5 text-sm font-bold wiley-text">@quadrant.BreakEvenRate.ToString("C2")</p>
                                 </div>
                             </SfTooltip>
                             <SfTooltip Content="Net surplus or deficit per customer per month at current rate."
@@ -205,7 +205,7 @@
                                        OpensOn="Hover Focus"
                                        ShowTipPointer="true"
                                        CloseDelay="200">
-                                <div class="rounded-xl border border-[var(--wiley-border)] bg-white p-2 shadow-sm">
+                                <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2 shadow-sm">
                                     <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Balance</p>
                                     <p class="mt-0.5 text-sm font-bold @(quadrant.MonthlyBalance >= 0 ? "text-emerald-600" : "text-rose-600")">
                                         @quadrant.MonthlyBalance.ToString("C0")
@@ -250,11 +250,11 @@
                                 </CircularGaugeAxes>
                             </SfCircularGauge>
                             <p class="text-xs font-medium @adequacyCss">@adequacyLabel</p>
-                            <p class="text-[10px] text-slate-400">@adequacy.ToString("N0")% of break-even covered</p>
+                            <p class="text-[10px] wiley-text-muted">@adequacy.ToString("N0")% of break-even covered</p>
                         </div>
 
                         
-                        <div class="rounded-xl border border-[var(--wiley-border)] bg-white p-2">
+                        <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2">
                             <SfChart ID="@GetQuadrantChartId(quadrant)"
                                      Title="@($"{quadrant.EnterpriseName} break-even")"
                                      AccessibilityDescription="@($"Line chart showing revenue, expenses, and break-even for {quadrant.EnterpriseName}.")"

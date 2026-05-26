@@ -1485,13 +1485,10 @@ html[data-wiley-theme="dark"] body {
   margin-right: 0.75rem;
 }
 
-/* Workspace hero (replaces tailwind slate gradient in WileyWorkspace.razor for theme consistency) */
+/* Workspace hero — dark brand header (always dark for visual impact + contrast with glass overlays and accent text).
+   Replaces previous var() that broke text-white and white/ glass in light mode. */
 .wiley-hero {
-  background: linear-gradient(
-    135deg,
-    var(--wiley-surface-2),
-    var(--wiley-surface-1)
-  );
-  border-color: var(--wiley-border);
-  color: var(--wiley-text);
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-color: #334155;
+  color: #e2e8f0;
 }
