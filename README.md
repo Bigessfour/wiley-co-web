@@ -143,6 +143,17 @@ The AWS server-side closure sequence for connecting the thin API to the widget i
 
 The workspace client prefers a live snapshot endpoint at `api/workspace/snapshot` when it is available. Set `WILEY_WORKSPACE_API_BASE_ADDRESS` to point the Blazor client at the thin API host during local development, for example when running `WileyCoWeb.Api` separately. Amplify now writes that value into `wwwroot/appsettings.Workspace.local.json` during build; if no value is provided, the client falls back to same-origin API routing instead of the Grok gateway.
 
+## Local Windows Machine / AWS-Decoupled Operation
+
+Full local operation on Windows 11 (no AWS Amplify / App Runner / Aurora costs) is supported and documented in [docs/wiley-widget-local-windows-machine-alternatives.md](docs/wiley-widget-local-windows-machine-alternatives.md).
+
+Key artifacts for immediate local use:
+- `docker-compose.yml` — managed local PostgreSQL (recommended for fidelity; replaces Aurora).
+- `Scripts/start-wiley-widget-local.ps1` — one-command starter (ensures DB, runs API; client in separate terminal or VS launch).
+- Existing dev paths (`.local.json`, env `XAI_API_KEY` + `SYNCFUSION_LICENSE_KEY`, degraded InMemory, EncryptedLocalSecretVaultService) continue to work.
+
+See the guide for packaging self-contained exes, SQLite alternative, secrets on a single machine, same-origin hosting option, and migration steps that preserve all HighRisk behavior (QB dedup, Jarvis contracts, exports, rate math, workspace panels).
+
 ## QuickBooks Desktop Import
 
 The current clerk-facing QuickBooks import path is the QuickBooks Import panel in the Wiley Widget workspace.

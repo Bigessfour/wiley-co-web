@@ -1,0 +1,40 @@
+# Local development / machine-based Postgres for Wiley Widget (replaces Aurora).
+# Usage (pwsh):
+#   docker compose up -d
+#   # Wait for healthy, then:
+#   dotnet ef database update --project src/WileyWidget.Data --startup-project WileyCoWeb.Api
+#   # Or let dev startup seeds handle it when Database:SeedDevelopmentData=true
+#
+# Connection for appsettings.Development.local.json or DATABASE_URL:
+#   Host=localhost;Port=5432;Database=wileyco_local;Username=postgres;Password=localdevpw
+#
+# Data persists in named volume "wiley_pgdata". To reset: docker compose down -v
+# This is the recommended zero-cost local replacement for Aurora on Windows 11.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wiley-widget-local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wileyco_local
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localdevpw
+      # TZ for consistency with timestamptz expectations
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - wiley_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wileyco_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Uncomment if you need to tune shared_buffers etc. for large QB imports on modest hardware
+    # command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=100"]
+
+volumes:
+  wiley_pgdata:
+    driver: local
