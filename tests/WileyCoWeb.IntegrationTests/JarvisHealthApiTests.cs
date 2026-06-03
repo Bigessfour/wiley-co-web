@@ -90,7 +90,7 @@ public sealed class JarvisHealthApiTests : IClassFixture<ApiApplicationFactory>
         Assert.False(string.IsNullOrWhiteSpace(healthPayload.LastTurnAtUtc));
     }
 
-    // --- SSM resolution tests (minimal, non-HighRisk; verify skip + param parsing without AWS calls or secrets) ---
+    // --- Local-only SecretResolver tests (minimal, non-HighRisk; verify env/config precedence + param parsing after AWS/SSM removal for machine hosting) ---
     [Fact]
     public async Task SecretResolver_SkipsSsmFetch_WhenEnvOrConfigKeyPresent_EvenIfSsmParameterNameConfigured()
     {
@@ -108,8 +108,8 @@ public sealed class JarvisHealthApiTests : IClassFixture<ApiApplicationFactory>
         Assert.NotNull(result);
         Assert.True(result.ResolvedKeySource.StartsWith("env:") || result.ResolvedKeySource.StartsWith("config:"), $"Expected env or config source when key present, got {result.ResolvedKeySource}");
         Assert.False(result.SsmFetchAttempted, "SSM must be skipped when a key is already present in env/config (per requirements).");
-        Assert.Equal("not-attempted", result.SsmFetchStatus);
-        // Param name still parsed from config for logging/ops visibility.
+        Assert.Equal("skipped", result.SsmFetchStatus);
+        // Param name still parsed from config for logging/ops visibility (compat in result shape post-AWS removal).
         Assert.Equal("/wiley-widget/xai-api-key", result.SsmParameterName);
     }
 

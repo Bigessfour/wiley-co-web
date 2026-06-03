@@ -6,11 +6,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Amazon;
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
-using Amazon.XRay.Recorder.Core;
-using Amazon.XRay.Recorder.Handlers.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +15,6 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Http.Resilience;
-using Npgsql;
 using Syncfusion.Licensing;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
@@ -98,7 +92,8 @@ public partial class Program
                 builder.Environment.ApplicationName,
                 Environment.CurrentDirectory);
 
-            TracingBootstrapper.InitializeTracing(builder);
+            // AWS X-Ray tracing removed for local machine hosting / cost decoupling (TracingBootstrapper.cs deleted).
+            // Use Serilog + optional OTEL for local observability. (no Amazon refs remain in source)
 
             var startupOptions = await PrepareStartupRuntimeOptionsAsync(builder, bootstrapLogger).ConfigureAwait(false);
 
@@ -134,7 +129,13 @@ public partial class Program
 
     private static async Task<(SyncfusionLicenseResult SyncfusionResult, XaiSecretResolutionResult XaiResult)> ResolveSecretsAsync(WebApplicationBuilder builder)
     {
-        var secretResolver = new SecretResolver(builder.Configuration);
+        // Create short-lived vault (with bootstrap logger) for early secret resolve. The DI singleton (registered in ConfigureServices)
+        // will be the long-lived instance used by app code after build. Vault init is idempotent (dir + entropy).
+        using var vaultLoggerFactory = LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: false));
+        var vaultLogger = vaultLoggerFactory.CreateLogger<EncryptedLocalSecretVaultService>();
+        var localVault = new EncryptedLocalSecretVaultService(vaultLogger);
+
+        var secretResolver = new SecretResolver(builder.Configuration, localVault);
         var xaiSecretResolution = await secretResolver.ResolveXaiSecretAsync().ConfigureAwait(false);
         var syncfusionLicenseResult = await LicenseBootstrapper.RegisterSyncfusionLicenseAsync(builder).ConfigureAwait(false);
         return (syncfusionLicenseResult, xaiSecretResolution);
@@ -183,7 +184,7 @@ public partial class Program
             else if (!string.IsNullOrWhiteSpace(settings.XaiApiKey))
             {
                 bootstrapLogger.LogInformation(
-                    "Skipping AppSettings.XaiApiKey promotion: {Reason}. AWS Secrets Manager / XAI_API_KEY environment is the key source.",
+                    "Skipping AppSettings.XaiApiKey promotion: {Reason}. AWS Secrets Manager / XAI_API_KEY environment is the key source (AWS path removed; env/config/vault used for local machine).",
                     builder.Environment.IsProduction()
                         ? "host is Production"
                         : "XAI_API_KEY is already set in the environment");
@@ -302,7 +303,7 @@ public partial class Program
             if (builder.Environment.IsProduction())
             {
                 throw new InvalidOperationException(
-                    "AI is enabled but no XAI_API_KEY was resolved. Configure the App Runner / Secrets Manager runtime secret.");
+                    "AI is enabled but no XAI_API_KEY was resolved. Configure via XAI_API_KEY env, config (XAI:ApiKey), or EncryptedLocalSecretVaultService (local machine).");
             }
 
             bootstrapLogger.LogWarning("AI is enabled but no XAI_API_KEY is configured; Jarvis will use fallbacks outside Production.");
@@ -644,6 +645,12 @@ public partial class Program
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
         builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
 
+        // EncryptedLocalSecretVaultService (DPAPI LocalMachine on Windows) registered for pure local machine hosting / AWS cost decoupling.
+        // Provides secure (encrypted-at-rest) storage for secrets like XAI_API_KEY without env, .local.json, or remote AWS.
+        // Used by SecretResolver (enhanced) and available for other services (e.g. future promotion/migrate flows).
+        // Note: uses AppData or fallback; implements IDisposable but singleton lifetime is acceptable for app lifetime.
+        builder.Services.AddSingleton<ISecretVaultService, EncryptedLocalSecretVaultService>();
+
         // Fix 1 (P0 AICache DI regression): Always wire safe NullAIService fallback so any host (incl. ApiApplicationFactory IntegrationTest) can resolve IAIService.
         // Mirrors TelemetryStartupService config-gate pattern but defaults *off* for AICache in test factories; real AI stack (when XAI keys present) can override or condition later.
         builder.Services.AddSingleton<IAIService, NullAIService>();
@@ -734,7 +741,7 @@ public partial class Program
             }
         });
 
-        app.UseXRay("WileyCoWeb.Api");
+        // AWS X-Ray removed for local machine hosting (no middleware; local observability via Serilog/OTEL).
         app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
         app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
@@ -1365,9 +1372,9 @@ public partial class Program
         var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
         await using var context = await contextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-        if (!context.Database.IsRelational())
+        if (!context.Database.IsRelational() || !context.Database.IsNpgsql())
         {
-            logger.LogInformation("Skipping QuickBooks import schema guard for non-relational database provider.");
+            logger.LogInformation("Skipping QuickBooks import schema guard for non-Npgsql provider (rely on EF model + EnsureCreated for SQLite/local machine; raw Postgres DDL is Npgsql/Aurora legacy safety net).");
             return;
         }
 

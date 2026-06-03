@@ -7,12 +7,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
-    <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.4.16" />
-    <PackageVersion Include="AWSSDK.SimpleSystemsManagement" Version="4.0.4.16" />
+    <!-- AWS SDKs removed for local machine hosting (cost decoupling). Local config/env/vault used instead. -->
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
     <PackageVersion Include="ExcelDataReader" Version="3.8.0" />
     <PackageVersion Include="ExcelDataReader.DataSet" Version="3.8.0" />
-    <PackageVersion Include="AWSXRayRecorder.Handlers.AspNetCore" Version="2.13.0" />
+    <!-- AWSXRay removed for local machine hosting (cost decoupling). -->
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.14" />
@@ -21,6 +20,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.4" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />

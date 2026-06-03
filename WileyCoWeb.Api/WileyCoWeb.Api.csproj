@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.SecretsManager" />
-    <PackageReference Include="AWSSDK.SimpleSystemsManagement" />
-    <PackageReference Include="AWSXRayRecorder.Handlers.AspNetCore" />
+    <!-- AWSSDK.* and AWSXRay removed for local machine hosting (cost decoupling from AWS).
+         Secrets now from env, config, or EncryptedLocalSecretVaultService (DPAPI on Windows).
+         See docs/wiley-widget-local-windows-machine-alternatives.md and feasibility plan. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <ProjectReference Include="..\src\WileyWidget.Data\WileyWidget.Data.csproj" />
