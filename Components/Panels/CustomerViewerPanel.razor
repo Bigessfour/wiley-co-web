@@ -80,6 +80,7 @@
         <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--tall mt-3 min-h-0" aria-busy="@IsBusy()">
             @* EnablePersistence: restores sort order, page number, and column widths across browser sessions *@
             @* AllowFiltering with FilterType.Menu: provides per-column filter menus for council-grade data interrogation *@
+            @* Per Syncfusion Blazor Agent Skills (syncfusion-blazor-datagrid): using documented structure with child settings elements, Persistence, Menu filtering, templates. Future grid changes should reference .agents/skills/syncfusion-blazor-datagrid/SKILL.md + references/*.md for exact events/props (e.g. <GridEvents>, no invented APIs). *@
             <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="100%" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v1">
                 <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
                 <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
@@ -112,9 +113,9 @@
                             @{
                                 var customer = (UtilityCustomerRecord)customerContext;
                             }
-                            <div class="flex flex-wrap gap-2">
-                                <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
-                                <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
+                            <div class="flex flex-wrap gap-1.5">
+                                <SfButton Size="Syncfusion.Blazor.Buttons.ButtonSize.Small" IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
+                                <SfButton Size="Syncfusion.Blazor.Buttons.ButtonSize.Small" IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
                             </div>
                         </Template>
                     </GridColumn>

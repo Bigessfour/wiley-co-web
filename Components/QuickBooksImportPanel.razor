@@ -40,6 +40,7 @@
             </div>
 
             @* ID only — NO EnablePersistence: wizard must always start at step 0 for each new file upload session *@
+            @* Per Syncfusion skills (syncfusion-blazor-stepper, syncfusion-blazor-uploader, etc.): Stepper for linear wizard, Uploader with DropArea/AllowedExtensions. See .agents/skills/ for exact props. *@
             <SfStepper ID="quickbooks-import-stepper" ActiveStep="@ActiveStep" Linear="true" Orientation="StepperOrientation.Horizontal" StepType="StepperType.Indicator" LabelPosition="StepperLabelPosition.Bottom" ShowTooltip="true">
                 <StepperSteps>
                     <StepperStep Label="Context" Text="Select the enterprise and fiscal year"></StepperStep>

@@ -122,6 +122,7 @@
                     Width="100%"
                     EnablePersistence="true"
                     CssClass="workspace-splitter">
+            @* Per Syncfusion Blazor layouts + common skills (now configured via .agents/skills/syncfusion-blazor-*): SplitterPanes with Size/Min/Max/Resizable/Collapsible, events for persistence + WorkspaceState sync. Use EnablePersistence where appropriate. *@
             <SplitterEvents Collapsed="HandleSplitterCollapsed" Expanded="HandleSplitterExpanded" />
             <SplitterPanes>
                 @* Context Rail – pane 0: enterprise context, navigation, actions *@
@@ -133,6 +134,7 @@
                             <CardContent>
                                 <div class="space-y-4">
                                     @* EnablePersistence: restores the selected enterprise across page refreshes so users return to their active workspace context *@
+                                    @* Per newly configured Syncfusion Blazor Agent Skills (syncfusion-blazor-dropdowns): using DropDownListEvents child, FilterType, EnablePersistence, PopupHeight. See .agents/skills/syncfusion-blazor-dropdowns/ for patterns. *@
                                     <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" FilterBarPlaceholder="Search enterprises..." EnablePersistence="true" PersistenceKey="wiley.workspace.enterprise.v1">
                                         <DropDownListEvents TValue="string" TItem="string" ValueChange="HandleEnterpriseChanged" />
                                     </SfDropDownList>

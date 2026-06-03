@@ -1,0 +1,10 @@
+name: WW AWS
+version: 1.0.0
+description: APM project for WW AWS
+author: bigessfour
+dependencies:
+  apm:
+  - syncfusion/blazor-ui-builder
+  mcp: []
+includes: auto
+scripts: {}

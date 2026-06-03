@@ -129,6 +129,7 @@
                                 @* Removed: extra custom chat shell blocks that duplicated the assist surface.
                                    Replacement: the assist rail now owns the premium conversation experience, while surrounding cards focus on runtime and audit context. *@
                                 <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel" aria-busy="@IsChatBusy">
+                                    @* Per syncfusion-blazor-ai-assistview skill (configured in .agents/skills/): using @bind-Prompt, PromptRequested, toolbar items, AssistViews + templates, PromptSuggestions. Cross-ref references/*.md for API. *@
                                     <SfAIAssistView ID="jarvis-chat-surface"
                                                     @ref="JarvisAssistView"
                                                     Height="100%"
