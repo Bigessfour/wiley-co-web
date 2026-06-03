@@ -532,7 +532,7 @@ public class BudgetSnapshot
     [Column("notes")]
     public string? Notes { get; set; }
 
-    [Column("payload", TypeName = "jsonb")]
+    [Column("payload")]
     public string? Payload { get; set; }
 
     public ICollection<BudgetSnapshotArtifact> ExportArtifacts { get; set; } = new List<BudgetSnapshotArtifact>();

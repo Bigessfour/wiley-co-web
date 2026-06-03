@@ -12,7 +12,6 @@ using CsvHelper.Configuration;
 using ExcelDataReader;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using WileyWidget.Data;
 using WileyWidget.Models.Amplify;
 using WileyWidget.Models;
@@ -149,7 +148,7 @@ namespace WileyWidget.Services
             {
                 await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
-            catch (DbUpdateException ex) when (ex.InnerException is PostgresException postgresException && postgresException.SqlState == PostgresErrorCodes.UniqueViolation)
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
                 var message = $"Duplicate import blocked for {canonicalEntity}: the selected file has already been imported.";
                 _logger.LogWarning(ex, "{Message} File: {FilePath}", message, filePath);
@@ -497,6 +496,30 @@ namespace WileyWidget.Services
                 Map(m => m.DepartmentId).Name("DepartmentId", "Department");
                 Map(m => m.FundType).Name("FundType", "Fund");
             }
+        }
+
+        // Provider-agnostic unique violation detector (for Slice D / duplicate import guard).
+        // Supports Postgres (23505, PostgresException) and SQLite ("UNIQUE constraint failed") + string fallbacks.
+        // Prevents regressions when using SQLite for local machine.
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            var full = (ex.Message ?? string.Empty) + " " + (ex.InnerException?.Message ?? string.Empty) + " " + ex.ToString();
+            if (full.Contains("23505", StringComparison.Ordinal))
+                return true;
+            if (full.Contains("duplicate key value violates unique constraint", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (full.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // PostgresException via reflection (no hard assembly ref in all units)
+            var innerType = ex.InnerException?.GetType();
+            if (innerType != null && innerType.Name.Equals("PostgresException", StringComparison.Ordinal))
+            {
+                var sqlState = innerType.GetProperty("SqlState")?.GetValue(ex.InnerException) as string;
+                if (string.Equals(sqlState, "23505", StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
     }
 }

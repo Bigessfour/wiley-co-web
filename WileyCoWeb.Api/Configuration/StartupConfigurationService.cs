@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using WileyWidget.Services.Logging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Sqlite;
 using Npgsql;
 using WileyWidget.Data;
 
@@ -97,7 +98,14 @@ public static class StartupConfigurationService
 
     private static string BuildConnectivityProbeConnectionString(string configuredConnectionString)
     {
-        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(Environment.ExpandEnvironmentVariables(configuredConnectionString))
+        var expanded = Environment.ExpandEnvironmentVariables(configuredConnectionString);
+        if (IsSqliteConnectionString(expanded))
+        {
+            // SQLite probe: no Npgsql pooling/timeout builder needed; raw conn string suffices for CanConnect
+            return expanded;
+        }
+
+        var connectionStringBuilder = new NpgsqlConnectionStringBuilder(expanded)
         {
             Pooling = false
         };
@@ -129,6 +137,14 @@ public static class StartupConfigurationService
     private static bool HasConfiguredConnectionString(string? configuredConnectionString)
         => !string.IsNullOrWhiteSpace(configuredConnectionString);
 
+    private static bool IsSqliteConnectionString(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString)) return false;
+        var c = connectionString.Trim();
+        return c.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase)
+            || c.StartsWith("Filename=", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static async Task<bool> CanConnectToDevelopmentDatabaseAsync(string configuredConnectionString, CancellationToken cancellationToken)
     {
         var options = CreateDevelopmentDatabaseProbeOptions(configuredConnectionString);
@@ -139,9 +155,16 @@ public static class StartupConfigurationService
     private static DbContextOptions<AppDbContext> CreateDevelopmentDatabaseProbeOptions(string configuredConnectionString)
     {
         var probeConnectionString = BuildConnectivityProbeConnectionString(configuredConnectionString);
-        return new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(probeConnectionString)
-            .Options;
+        var builder = new DbContextOptionsBuilder<AppDbContext>();
+        if (IsSqliteConnectionString(probeConnectionString))
+        {
+            builder.UseSqlite(probeConnectionString);
+        }
+        else
+        {
+            builder.UseNpgsql(probeConnectionString);
+        }
+        return builder.Options;
     }
 
     private static void ActivateDegradedMode(ILogger logger, string fallbackReason, Exception? exception = null)

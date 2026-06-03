@@ -4,6 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Serilog;
 
@@ -11,7 +12,9 @@ namespace WileyWidget.Data
 {
     /// <summary>
     /// Application DbContext factory. Provides IDbContextFactory<AppDbContext> using
-    /// configured DbContextOptions for Aurora PostgreSQL with a degraded-mode fallback.
+    /// configured DbContextOptions for PostgreSQL (default), SQLite, or InMemory (degraded) with fallback.
+    /// Provider selected via Database:Provider config (or inferred from connection string).
+    /// Npgsql path remains default/unchanged for full backward compatibility.
     /// </summary>
     public sealed class AppDbContextFactory : IDbContextFactory<AppDbContext>
     {
@@ -53,6 +56,21 @@ namespace WileyWidget.Data
             _lazyOptions = new Lazy<DbContextOptions<AppDbContext>>(() => _options ?? BuildOptionsFromConfiguration());
         }
 
+        private string GetConfiguredProvider()
+        {
+            if (_configuration == null)
+            {
+                return "PostgreSQL";
+            }
+            var provider = _configuration.GetValue<string>("Database:Provider")
+                ?? _configuration.GetValue<string>("Database__Provider");
+            if (string.IsNullOrWhiteSpace(provider))
+            {
+                return "PostgreSQL"; // default preserves all existing Npgsql/Aurora/local dev behavior
+            }
+            return provider.Trim();
+        }
+
         private DbContextOptions<AppDbContext> BuildOptionsFromConfiguration()
         {
             if (_configuration == null)
@@ -82,22 +100,39 @@ namespace WileyWidget.Data
 
                 if (string.IsNullOrWhiteSpace(connectionString))
                 {
-                    throw new InvalidOperationException("DefaultConnection is not configured for Aurora PostgreSQL.");
+                    throw new InvalidOperationException("DefaultConnection is not configured for the selected database provider (see Database:Provider).");
                 }
 
-                // Expand environment variables
+                // Expand environment variables (supports %LOCALAPPDATA% etc for SQLite paths)
                 connectionString = Environment.ExpandEnvironmentVariables(connectionString);
 
+                var provider = GetConfiguredProvider();
+                var isSqliteByConn = connectionString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase)
+                                     || connectionString.StartsWith("Filename=", StringComparison.OrdinalIgnoreCase);
                 var builder = new DbContextOptionsBuilder<AppDbContext>();
-                builder.UseNpgsql(connectionString, npgsql =>
+
+                if (provider.Equals("SQLite", StringComparison.OrdinalIgnoreCase) || isSqliteByConn)
                 {
-                    npgsql.CommandTimeout(_configuration.GetValue<int>("Database:CommandTimeoutSeconds", 30));
-                });
+                    builder.UseSqlite(connectionString, sqlite =>
+                    {
+                        // SQLite has no direct CommandTimeout equivalent on the extension in same way; rely on EF defaults or connection
+                    });
+                    builder.EnableDetailedErrors();
+                    builder.EnableSensitiveDataLogging(_configuration.GetValue<bool>("Database:EnableSensitiveDataLogging", false));
+                    Log.Information("Built DbContextOptions for SQLite (provider={Provider}, conn inferred or explicit)", provider);
+                }
+                else
+                {
+                    // Default / explicit PostgreSQL path (unchanged behavior for Aurora, local postgres, existing configs)
+                    builder.UseNpgsql(connectionString, npgsql =>
+                    {
+                        npgsql.CommandTimeout(_configuration.GetValue<int>("Database:CommandTimeoutSeconds", 30));
+                    });
+                    builder.EnableDetailedErrors();
+                    builder.EnableSensitiveDataLogging(_configuration.GetValue<bool>("Database:EnableSensitiveDataLogging", false));
+                    Log.Information("Built DbContextOptions for PostgreSQL (provider={Provider})", provider);
+                }
 
-                builder.EnableDetailedErrors();
-                builder.EnableSensitiveDataLogging(_configuration.GetValue<bool>("Database:EnableSensitiveDataLogging", false));
-
-                Log.Information("Built DbContextOptions for Aurora PostgreSQL");
                 return builder.Options;
             }
             catch (Exception ex)

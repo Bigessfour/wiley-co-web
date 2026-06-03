@@ -18,6 +18,12 @@ namespace WileyWidget.Data
         private const string TransactionNonZeroConstraintSql = "\"Amount\" <> 0";
         private const string ConservationTrustFundName = "Conservation Trust Fund";
 
+        // Provider detection for conditional model configuration (Npgsql-specific types like bytea/jsonb/timestamptz).
+        // Returns true for PostgreSQL/Aurora path (default for backward compat).
+        // False for SQLite (use defaults or SQLite-friendly types: BLOB/TEXT).
+        // Used in OnModelCreating to keep Npgsql exact while supporting SQLite via EnsureCreated.
+        private bool IsNpgsql => Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) ?? false;
+
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
             // DbSets are now auto-initialized properties - no manual initialization needed
@@ -171,11 +177,14 @@ namespace WileyWidget.Data
                 entity.HasIndex(e => new { e.FundType, e.Type });
                 entity.Property(e => e.Balance).HasColumnType(Decimal18_2);
                 entity.Property(e => e.BudgetAmount).HasColumnType(Decimal18_2);
-                entity.Property(e => e.RowVersion)
-                        .HasColumnType(ByteArrayColumnType)
+                var municipalRowVersion = entity.Property(e => e.RowVersion)
                         .IsConcurrencyToken()
                         .ValueGeneratedNever()
                         .HasDefaultValue(Array.Empty<byte>());
+                if (IsNpgsql)
+                {
+                    municipalRowVersion.HasColumnType(ByteArrayColumnType);
+                }
                 // Optional Fund relationship (navigation property)
                 entity.HasOne(e => e.Fund)
                       .WithMany()
@@ -222,11 +231,14 @@ namespace WileyWidget.Data
 
             modelBuilder.Entity<Enterprise>(entity =>
             {
-                entity.Property(e => e.RowVersion)
-                    .HasColumnType(ByteArrayColumnType)
+                var enterpriseRowVersion = entity.Property(e => e.RowVersion)
                     .IsConcurrencyToken()
                     .ValueGeneratedNever()
                     .HasDefaultValue(Array.Empty<byte>());
+                if (IsNpgsql)
+                {
+                    enterpriseRowVersion.HasColumnType(ByteArrayColumnType);
+                }
 
                 entity.HasMany(e => e.ApartmentUnitTypes)
                     .WithOne(unitType => unitType.Enterprise)
@@ -244,11 +256,14 @@ namespace WileyWidget.Data
 
             modelBuilder.Entity<FiscalYearSettings>(entity =>
             {
-                entity.Property(e => e.RowVersion)
-                    .HasColumnType(ByteArrayColumnType)
+                var fiscalRowVersion = entity.Property(e => e.RowVersion)
                     .IsConcurrencyToken()
                     .ValueGeneratedNever()
                     .HasDefaultValue(Array.Empty<byte>());
+                if (IsNpgsql)
+                {
+                    fiscalRowVersion.HasColumnType(ByteArrayColumnType);
+                }
             });
 
             // New: Invoice
@@ -310,7 +325,11 @@ namespace WileyWidget.Data
                 entity.Property(e => e.User).HasMaxLength(100);
                 entity.Property(e => e.Category).HasMaxLength(100);
                 entity.Property(e => e.Icon).HasMaxLength(100);
-                entity.Property(e => e.Timestamp).HasColumnType(TimestampWithTimeZone);
+                var activityTs = entity.Property(e => e.Timestamp);
+                if (IsNpgsql)
+                {
+                    activityTs.HasColumnType(TimestampWithTimeZone);
+                }
             });
 
             modelBuilder.Entity<SavedScenarioSnapshot>(entity =>
@@ -332,12 +351,14 @@ namespace WileyWidget.Data
                 entity.Property(e => e.ProjectedValue).HasColumnType(Decimal19_4);
                 entity.Property(e => e.Variance).HasColumnType(Decimal19_4);
 
-                entity.Property(e => e.CreatedAtUtc)
-                    .HasColumnType(TimestampWithTimeZone)
+                var scenarioCreated = entity.Property(e => e.CreatedAtUtc)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                entity.Property(e => e.UpdatedAtUtc)
-                    .HasColumnType(TimestampWithTimeZone);
+                var scenarioUpdated = entity.Property(e => e.UpdatedAtUtc);
+                if (IsNpgsql)
+                {
+                    scenarioCreated.HasColumnType(TimestampWithTimeZone);
+                    scenarioUpdated.HasColumnType(TimestampWithTimeZone);
+                }
             });
 
             // AI chat conversation persistence
@@ -396,9 +417,12 @@ namespace WileyWidget.Data
                     .HasMaxLength(6000)
                     .IsRequired();
 
-                entity.Property(e => e.CreatedAtUtc)
-                    .HasColumnType(TimestampWithTimeZone)
+                var recCreated = entity.Property(e => e.CreatedAtUtc)
                     .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                if (IsNpgsql)
+                {
+                    recCreated.HasColumnType(TimestampWithTimeZone);
+                }
 
                 entity.HasIndex(e => new { e.UserId, e.Enterprise, e.FiscalYear, e.CreatedAtUtc });
                 entity.HasIndex(e => e.ConversationId);
@@ -432,8 +456,13 @@ namespace WileyWidget.Data
                 entity.Property(e => e.SourceSystem).HasMaxLength(100).IsRequired();
                 entity.Property(e => e.Status).HasMaxLength(50).IsRequired();
                 entity.Property(e => e.Notes).HasMaxLength(1000);
-                entity.Property(e => e.StartedAt).HasColumnType(TimestampWithTimeZone);
-                entity.Property(e => e.CompletedAt).HasColumnType(TimestampWithTimeZone);
+                var importStarted = entity.Property(e => e.StartedAt);
+                var importCompleted = entity.Property(e => e.CompletedAt);
+                if (IsNpgsql)
+                {
+                    importStarted.HasColumnType(TimestampWithTimeZone);
+                    importCompleted.HasColumnType(TimestampWithTimeZone);
+                }
             });
 
             modelBuilder.Entity<SourceFileVariant>(entity =>
@@ -461,7 +490,11 @@ namespace WileyWidget.Data
                 entity.Property(e => e.NormalizedFileName).HasMaxLength(260);
                 entity.Property(e => e.SheetName).HasMaxLength(100);
                 entity.Property(e => e.FileHash).HasMaxLength(128).IsRequired();
-                entity.Property(e => e.ImportedAt).HasColumnType(TimestampWithTimeZone);
+                var sourceImported = entity.Property(e => e.ImportedAt);
+                if (IsNpgsql)
+                {
+                    sourceImported.HasColumnType(TimestampWithTimeZone);
+                }
                 entity.HasIndex(e => e.BatchId);
                 entity.HasIndex(e => e.CanonicalEntity);
                 entity.HasIndex(e => e.FileHash);
@@ -630,9 +663,14 @@ namespace WileyWidget.Data
                       .OnDelete(DeleteBehavior.SetNull);
                 entity.Property(e => e.SnapshotName).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.Notes).HasMaxLength(1000);
-                entity.Property(e => e.CreatedAt).HasColumnType(TimestampWithTimeZone);
+                var snapCreated = entity.Property(e => e.CreatedAt);
+                var snapPayload = entity.Property(e => e.Payload);
+                if (IsNpgsql)
+                {
+                    snapCreated.HasColumnType(TimestampWithTimeZone);
+                    snapPayload.HasColumnType("jsonb");
+                }
                 entity.Property(e => e.SnapshotDate).HasColumnType("date");
-                entity.Property(e => e.Payload).HasColumnType("jsonb");
             });
 
             modelBuilder.Entity<BudgetSnapshotArtifact>(entity =>
@@ -647,8 +685,13 @@ namespace WileyWidget.Data
                 entity.Property(e => e.DocumentKind).HasMaxLength(100).IsRequired();
                 entity.Property(e => e.FileName).HasMaxLength(260).IsRequired();
                 entity.Property(e => e.ContentType).HasMaxLength(200).IsRequired();
-                entity.Property(e => e.CreatedAt).HasColumnType(TimestampWithTimeZone);
-                entity.Property(e => e.Payload).HasColumnType("bytea");
+                var artifactCreated = entity.Property(e => e.CreatedAt);
+                var artifactPayload = entity.Property(e => e.Payload);
+                if (IsNpgsql)
+                {
+                    artifactCreated.HasColumnType(TimestampWithTimeZone);
+                    artifactPayload.HasColumnType("bytea");
+                }
             });
 
             // Precision for TaxRevenueSummary decimal columns to prevent truncation/rounding issues
@@ -719,11 +762,14 @@ namespace WileyWidget.Data
                 entity.Property(ub => ub.LateFees).HasColumnType(Decimal18_2).HasDefaultValue(0);
                 entity.Property(ub => ub.OtherCharges).HasColumnType(Decimal18_2).HasDefaultValue(0);
                 entity.Property(ub => ub.AmountPaid).HasColumnType(Decimal18_2).HasDefaultValue(0);
-                entity.Property(ub => ub.RowVersion)
-                        .HasColumnType(ByteArrayColumnType)
+                var utilityBillRowVersion = entity.Property(ub => ub.RowVersion)
                         .IsConcurrencyToken()
                         .ValueGeneratedNever()
                         .HasDefaultValue(Array.Empty<byte>());
+                if (IsNpgsql)
+                {
+                    utilityBillRowVersion.HasColumnType(ByteArrayColumnType);
+                }
             });
 
             // UtilityCustomer configuration
@@ -734,11 +780,14 @@ namespace WileyWidget.Data
                       .HasForeignKey(uc => uc.EnterpriseId)
                       .OnDelete(DeleteBehavior.SetNull);
                 entity.HasIndex(uc => uc.EnterpriseId);
-                entity.Property(uc => uc.RowVersion)
-                      .HasColumnType(ByteArrayColumnType)
+                var utilityCustomerRowVersion = entity.Property(uc => uc.RowVersion)
                       .IsConcurrencyToken()
                       .ValueGeneratedNever()
                       .HasDefaultValue(Array.Empty<byte>());
+                if (IsNpgsql)
+                {
+                    utilityCustomerRowVersion.HasColumnType(ByteArrayColumnType);
+                }
             });
 
             // Charge configuration
@@ -765,7 +814,11 @@ namespace WileyWidget.Data
                 entity.Property(dcc => dcc.Department).HasMaxLength(50).IsRequired();
                 entity.Property(dcc => dcc.CurrentCharge).HasColumnType(Decimal18_2).IsRequired();
                 entity.Property(dcc => dcc.CustomerCount).IsRequired();
-                entity.Property(dcc => dcc.LastUpdated).HasColumnType(TimestampWithTimeZone);
+                var dccLast = entity.Property(dcc => dcc.LastUpdated);
+                if (IsNpgsql)
+                {
+                    dccLast.HasColumnType(TimestampWithTimeZone);
+                }
                 entity.Property(dcc => dcc.UpdatedBy).HasMaxLength(100);
                 entity.Property(dcc => dcc.Notes).HasMaxLength(500);
             });
@@ -779,7 +832,11 @@ namespace WileyWidget.Data
                 entity.Property(dg => dg.AdjustmentFactor).HasColumnType("decimal(18,4)").HasDefaultValue(1.0m);
                 entity.Property(dg => dg.TargetProfitMarginPercent).HasColumnType("decimal(18,4)");
                 entity.Property(dg => dg.RecommendationText).HasMaxLength(1000);
-                entity.Property(dg => dg.GeneratedAt).HasColumnType(TimestampWithTimeZone);
+                var dgGen = entity.Property(dg => dg.GeneratedAt);
+                if (IsNpgsql)
+                {
+                    dgGen.HasColumnType(TimestampWithTimeZone);
+                }
                 entity.Property(dg => dg.Source).HasMaxLength(100);
             });
 
