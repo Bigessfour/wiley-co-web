@@ -1,4 +1,12 @@
 name: Wiley.co CI
+# CI for Wiley Widget (Blazor WASM + API).
+# Aligned with local Windows machine support / AWS decoupling migration (see docs/wiley-widget-local-windows-machine-alternatives.md and .grok/prompts/db-multi-provider-sqlite-feasibility.md).
+# - Core validation on windows-latest for .NET/Windows specifics + HighRisk filters (per AGENTS.md).
+# - Playwright smoke/highrisk for UI (using published client artifact + API host).
+# - AWS/Amplify deployment guard removed (was prod health check); AWS runtime elements (secrets, XRay, etc.) removed from app code.
+# - New local publish script (Scripts/publish-local-machine.ps1) validated in spirit via builds.
+# - .NET pinned to 9.0.313 (global.json).
+# Future: add SQLite-specific matrix or local-machine publish job when migration complete.
 on:
   push:
     branches: [main]
@@ -12,7 +20,7 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write # required for GitHub OIDC — deployment-guard assumes role via federation
+  # id-token removed: was only for AWS OIDC in legacy deployment-guard.
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -249,6 +257,9 @@ jobs:
         run: dotnet test ${{ matrix.project }} --configuration Release --no-build --no-restore --filter "Category=HighRisk" --verbosity normal
 
   build-and-publish:
+    # Builds full solution + produces client wwwroot artifact used exclusively by the Playwright UI job.
+    # (No longer Amplify-specific; supports both legacy hosting and new local-machine publish flows.)
+    # Includes sanity check for the new Scripts/publish-local-machine.ps1 (self-contained win-x64 for Windows laptop deploys).
     runs-on: windows-latest
     needs: [test, highrisk-tests]
     env:
@@ -286,14 +297,28 @@ jobs:
       - name: Build
         run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Publish for Amplify
+      - name: Publish client for Playwright CI smoke (wwwroot artifact)
+        # Previously "for Amplify". Now generic for CI validation of client build (used by playwright-ui job).
+        # Aligns with local publish script (Scripts/publish-local-machine.ps1) for machine-hosted deploys.
         run: dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Upload build artifact for Amplify
+      - name: Upload client artifact for Playwright
         uses: actions/upload-artifact@v4
         with:
           name: blazor-publish
           path: publish_output/wwwroot
+
+      - name: Sanity-check local publish script (Scripts/publish-local-machine.ps1)
+        # New for local Windows machine / AWS-decoupled hosting (self-contained win-x64, SQLite example included).
+        # Validates the script referenced in feasibility.md and local-alternatives.md.
+        # Lightweight: just confirm presence + pwsh exec (full publish would duplicate work and bloat CI time).
+        # Manual run of the script produces ready-to-copy publish/local-machine/ folder for target Win11 machines.
+        run: |
+          pwsh -Command @"
+            if (-not (Test-Path 'Scripts/publish-local-machine.ps1')) { throw 'publish-local-machine.ps1 missing' }
+            Write-Host 'publish-local-machine.ps1 present and pwsh available for local machine deploys.'
+            Write-Host 'See: .grok/prompts/db-multi-provider-sqlite-feasibility.md (packaging section) and Scripts/publish-local-machine.ps1 for usage.'
+          "@
 
   playwright-ui:
     runs-on: ubuntu-latest
@@ -378,38 +403,16 @@ jobs:
             test-results
           if-no-files-found: warn
 
-  deployment-guard:
-    runs-on: ubuntu-latest
-    needs: [build-and-publish, playwright-ui]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::570912405222:role/wiley-co-github-ci
-          aws-region: us-east-2
-
-      - name: Fail if latest Amplify main job is unhealthy
-        run: |
-          set -euo pipefail
-          latest_status="$(aws amplify list-jobs --app-id d2ellat1y3ljd9 --branch-name main --max-items 1 --query 'jobSummaries[0].status' --output text)"
-          if [ -z "$latest_status" ] || [ "$latest_status" = "None" ]; then
-            echo "Unable to resolve the latest Amplify main job status."
-            exit 1
-          fi
-          echo "Latest Amplify main job status: $latest_status"
-          if [ "$latest_status" = "FAILED" ] || [ "$latest_status" = "CANCELLED" ]; then
-            echo "Amplify main latest job is $latest_status. Failing deployment guard."
-            exit 1
-          fi
-
-      - name: Fail if live Syncfusion settings endpoint returns 404
-        run: |
-          set -euo pipefail
-          status_code="$(curl -s -o /dev/null -w '%{http_code}' https://wileywidget.townofwiley.gov/appsettings.Syncfusion.local.json)"
-          echo "Live appsettings.Syncfusion.local.json status: $status_code"
-          if [ "$status_code" = "404" ]; then
-            echo "Live endpoint returned 404 for appsettings.Syncfusion.local.json. Failing deployment guard."
-            exit 1
-          fi
+  # === LEGACY AWS DEPLOYMENT GUARD (REMOVED 2026-06) ===
+  # This job previously enforced prod health via AWS Amplify (OIDC, `aws amplify list-jobs`,
+  # live domain checks) on main pushes. All active AWS references have been removed from ci.yml
+  # to align with the local Windows machine / cost-decoupling migration.
+  #
+  # See:
+  # - docs/wiley-widget-local-windows-machine-alternatives.md
+  # - .grok/prompts/db-multi-provider-sqlite-feasibility.md
+  # - AGENTS.md (PR discipline, no main push without evidence)
+  #
+  # Replacement strategy (future): GitHub branch protection rules, required status checks
+  # (HighRisk + Playwright already here), and/or non-AWS health probes once prod hosting moves.
+  # Current practice: all changes via PR + local + CI gates (HighRisk filters, Playwright highrisk/smoke).

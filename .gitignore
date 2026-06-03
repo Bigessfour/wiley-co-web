@@ -111,6 +111,17 @@ terraform.tfstate
 terraform.tfstate.backup
 .vscode/settings.json
 
+# Local machine publish output and agent/tooling artifacts (not part of PR source)
+publish/
+.agents/
+apm.lock.yaml
+skills-lock.json
+.github/agents/
+.grok/prompts/ci-fix-stabilization-pass.md
+.grok/prompts/final-production-polish-stabilization.md
+.grok/prompts/left-nav-navigation-cloudwatch-logging.md
+.grok/prompts/ssm-xai-jarvis-ci-push.md
+.grok/prompts/ui-polish-phase2-left-nav-surfaces-spacing.md
 
 # APM dependencies
 apm_modules/
