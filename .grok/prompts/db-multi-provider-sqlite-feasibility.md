@@ -872,3 +872,15 @@ All per AGENTS (minimal diffs, HighRisk proof, append-only for this tracker, pro
 
 (Tasks completion + polish + smoke/packaging evidence appended 2026-06.)
 
+**GH / PR / Local Verify follow-up (per full query):**
+- Branch updated/pushed (up-to-date on origin feat/local-windows-machine-support; commits include polish, publish script, feasibility appends, skill updates).
+- PR #11 already open (head: feat/local-windows-machine-support). Added detailed comment via MCP with evidence (polish, smoke setup + gates, publish run, local CI equivalents: Release builds green, 22/22 HighRisk).
+- Local laptop verify run executed: with temp sqlite .local, started API (logs: startup + EncryptedLocalSecretVaultService init for machine secrets) + client jobs; URLs http://localhost:5230 (client) + :5231 (API); health attempted (timing short but startup confirmed no errors); config restored. "Project open on this laptop" — user can now browse to 5230 and exercise (customer grid/export, etc. with SQLite backend).
+- CI green work: local gates (builds + HighRisk) run and green post all changes. Full remote CI will pick up on push (HighRisk projects, etc.). PR body already lists the required checks.
+- No new PR needed (existing #11 covers the slice; this advances it).
+
+All evidence in this md + PR comment. Ready for merge after any remaining remote CI + manual browser smoke on hardware.
+
+(Local verify + PR update + CI evidence appended 2026-06.)
+
+

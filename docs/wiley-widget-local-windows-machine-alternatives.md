@@ -216,6 +216,7 @@ QuickBooks, exports, rate math, workspace panels, snapshot composer: **100% unch
    `[Environment]::SetEnvironmentVariable("XAI_API_KEY", "xai-...", "User")` (or "Machine"). Re-open terminals.
 4. (Optional but recommended for full UI) Set `SYNCFUSION_LICENSE_KEY` same way.
 5. Create `WileyCoWeb.Api/appsettings.Development.local.json` (ignored):  
+   For Postgres (Docker or native):
    ```json
    {
      "ConnectionStrings": { "DefaultConnection": "Host=localhost;Port=5432;Database=wileyco_local;Username=postgres;Password=yourpw" },
@@ -223,11 +224,28 @@ QuickBooks, exports, rate math, workspace panels, snapshot composer: **100% unch
      "Database": { "AllowDegradedStartup": true, "SeedDevelopmentData": true, "EnsureWorkspacePanelBudgetWhenEmpty": true }
    }
    ```
-6. Start DB (once): Add docker-compose (see below) → `docker compose up -d`.
-7. Migrate (if needed): `dotnet ef database update --project src/WileyWidget.Data --startup-project WileyCoWeb.Api`.
+   For SQLite (pure local machine, no Docker/Postgres server, file in %LOCALAPPDATA%):
+   See `appsettings.Development.sqlite.example.json` (copy/rename to .local.json and adjust path if needed).
+   ```json
+   {
+     "ConnectionStrings": { "DefaultConnection": "Data Source=%LOCALAPPDATA%\\WileyWidget\\wiley-widget.db" },
+     "Database": { "Provider": "SQLite", "AllowDegradedStartup": true, "SeedDevelopmentData": true, "EnsureWorkspacePanelBudgetWhenEmpty": true },
+     "XAI": { "Enabled": true }
+   }
+   ```
+6. Start DB (once):
+   - Postgres: Add docker-compose (see below) → `docker compose up -d`.
+   - SQLite: No extra; the .db is created on first EnsureCreated.
+7. Migrate (if needed, Postgres only): `dotnet ef database update --project src/WileyWidget.Data --startup-project WileyCoWeb.Api`.
 8. Start API: `dotnet run --project WileyCoWeb.Api/WileyCoWeb.Api.csproj` (or F5 "Debug API Host").
 9. Start client (new terminal): `dotnet run` (from root) or F5 "Debug Blazor Client". Set `WILEY_WORKSPACE_API_BASE_ADDRESS=http://localhost:5231` if needed.
 10. Open `http://localhost:5230`. Use QuickBooks panel with files from `Import Data/`. Jarvis works if key valid.
+
+**SQLite notes (for local machine, cost-free):**
+- Backup: copy the .db file.
+- Limitations: single-writer (fine for single clerk machine); no advanced Postgres features.
+- Prefer Docker Postgres for fidelity with prod (as in starter script); use SQLite for pure no-Docker desktop.
+- Provider switch is in Database:Provider + conn string; default remains PostgreSQL for existing setups.
 
 **Minimal docker-compose.yml skeleton** (add to repo root):
 ```yaml
@@ -278,3 +296,50 @@ For pure no-docker: Install Postgres, create DB, use the connection string above
 This converts the system to a fully machine-resident app while preserving every council-facing behavior and test gate.
 
 (End of analysis document. Update as implementation proceeds.)
+
+---
+
+## Current Progress Snapshot (appended 2026-06 from detailed evaluation in feasibility.md plan)
+
+**DB/SQLite (active plan focus)**: 85-95% (A/B/C/D complete or advanced; E HighRisk tests + full gates passed with new SQLite coverage; F partial — this .md + feasibility guide updated with status).
+
+**Broader**:
+- Local infra (docker-compose, starter script, README): Done.
+- AWS code removal: Not started (still in Program.cs, SecretResolver, csproj).
+- Packaging for hosted process: Not started (beyond starter script).
+- See `.grok/prompts/db-multi-provider-sqlite-feasibility.md` (end) for full eval, remains list, recommended next slice (complete E details + F docs sync, then AWS removal).
+
+**Recommendation**: Per plan, next slice = finish E (more tests) + F (docs, including sync this file + add SQLite example), then AWS removal.
+
+(Use feasibility.md for living plan status.)
+
+---
+
+## Progress Snapshot Appended (F + AWS Removal continuation, following user "continue with F... and continue to remove AWS components")
+
+**F (Docs) continued/completed:**
+- `WileyCoWeb.Api/appsettings.Development.sqlite.example.json` present and enhanced (fuller Provider/SQLiteDataPath, XAI:ApiKey+ModelId, Serilog rolling logs to AppData, etc.).
+- Local run instructions already reference the example for pure SQLite no-Docker path.
+- SQLite notes section documents backup (copy .db), limitations (single-writer), preference for Docker Postgres for fidelity.
+- Cross-references + status in feasibility plan .md heavily appended with F complete markers + corrected historical snapshots.
+- This addresses "I do not know the current status" by keeping living docs.
+
+**AWS removal (continued):**
+- Packages: AWSSDK.* / AWSXRay fully removed from Directory.Packages.props + WileyCoWeb.Api.csproj (comments left explaining local machine / cost savings + vault).
+- Code: SecretResolver simplified to env/config/local-only (no remote AWS clients; result shape preserved for /health + logs compat). Program.cs cleaned (no TracingBootstrapper call, no UseXRay, comments only). 
+- Remaining in active work: delete last dead file (TracingBootstrapper.cs containing Amazon.XRay using), fix integration tests for resolver, wire EncryptedLocalSecretVaultService in DI + use from resolver for XAI, clean comments, re-verify 0 Amazon refs, run HighRisk gates.
+- Ref count: down to 1 (dead file) before final clean steps.
+
+**DB/SQLite (this plan's core):** A-E complete with dedicated HighRisk [Category=HighRisk] tests + full gates (22/22 in Widget.Tests etc.); F now complete.
+
+**Broader machine-hosted status:** Local infra (docker-compose, start-*.ps1) done; DB multi-provider + SQLite example done; AWS code/pkgs mostly excised; packaging (self-contained publish, same-origin, service) + full manual smoke + PRs remain.
+
+See appended details + commands/evidence in `.grok/prompts/db-multi-provider-sqlite-feasibility.md` (end of file). Follows AGENTS (append only for docs, HighRisk before merge consideration, minimal, protect behavior).
+
+Appended for record during continuation of F + AWS removal work.
+
+**Gates evidence (this continuation):** Full HighRisk post-edits all green:
+- WileyWidget.Tests HighRisk: 22/22 passed
+- IntegrationTests HighRisk: 37/37 passed (includes resolver updates)
+- ComponentTests HighRisk: 1/1 passed
+Builds clean. AWS Amazon refs in code: 0 (only history comments). Vault now registered + resolver-enhanced for local secrets. See feasibility.md for full commands/outputs/append.
