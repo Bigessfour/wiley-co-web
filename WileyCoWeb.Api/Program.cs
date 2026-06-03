@@ -129,11 +129,15 @@ public partial class Program
 
     private static async Task<(SyncfusionLicenseResult SyncfusionResult, XaiSecretResolutionResult XaiResult)> ResolveSecretsAsync(WebApplicationBuilder builder)
     {
-        // Create short-lived vault (with bootstrap logger) for early secret resolve. The DI singleton (registered in ConfigureServices)
-        // will be the long-lived instance used by app code after build. Vault init is idempotent (dir + entropy).
-        using var vaultLoggerFactory = LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: false));
-        var vaultLogger = vaultLoggerFactory.CreateLogger<EncryptedLocalSecretVaultService>();
-        var localVault = new EncryptedLocalSecretVaultService(vaultLogger);
+        // IntegrationTest hosts inject stub XAI keys via ApiApplicationFactory; skip vault init to avoid
+        // parallel CI races on the shared AppData .entropy file (EncryptedLocalSecretVaultService ctor throws).
+        ISecretVaultService? localVault = null;
+        if (!builder.Environment.IsEnvironment("IntegrationTest"))
+        {
+            using var vaultLoggerFactory = LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: false));
+            var vaultLogger = vaultLoggerFactory.CreateLogger<EncryptedLocalSecretVaultService>();
+            localVault = new EncryptedLocalSecretVaultService(vaultLogger);
+        }
 
         var secretResolver = new SecretResolver(builder.Configuration, localVault);
         var xaiSecretResolution = await secretResolver.ResolveXaiSecretAsync().ConfigureAwait(false);
@@ -646,10 +650,11 @@ public partial class Program
         builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
 
         // EncryptedLocalSecretVaultService (DPAPI LocalMachine on Windows) registered for pure local machine hosting / AWS cost decoupling.
-        // Provides secure (encrypted-at-rest) storage for secrets like XAI_API_KEY without env, .local.json, or remote AWS.
-        // Used by SecretResolver (enhanced) and available for other services (e.g. future promotion/migrate flows).
-        // Note: uses AppData or fallback; implements IDisposable but singleton lifetime is acceptable for app lifetime.
-        builder.Services.AddSingleton<ISecretVaultService, EncryptedLocalSecretVaultService>();
+        // Skipped in IntegrationTest: parallel test hosts race on shared AppData entropy file; factory injects env/config keys instead.
+        if (!builder.Environment.IsEnvironment("IntegrationTest"))
+        {
+            builder.Services.AddSingleton<ISecretVaultService, EncryptedLocalSecretVaultService>();
+        }
 
         // Fix 1 (P0 AICache DI regression): Always wire safe NullAIService fallback so any host (incl. ApiApplicationFactory IntegrationTest) can resolve IAIService.
         // Mirrors TelemetryStartupService config-gate pattern but defaults *off* for AICache in test factories; real AI stack (when XAI keys present) can override or condition later.

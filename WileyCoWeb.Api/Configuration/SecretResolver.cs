@@ -105,7 +105,24 @@ public sealed partial class SecretResolver
             EnvironmentApiKey: Environment.GetEnvironmentVariable("XAI_API_KEY"),
             ConfigDirectApiKey: _configuration["XAI_API_KEY"],
             ConfigNamedApiKey: _configuration["XAI:ApiKey"],
-            SsmParameterName: null);
+            SsmParameterName: ResolveSsmParameterName());
+    }
+
+    /// <summary>
+    /// Parse SSM param name from config/env for logging/health compat only (no AWS fetch in local-only resolver).
+    /// </summary>
+    private string? ResolveSsmParameterName()
+    {
+        var fromConfig = _configuration["XAI:ParameterName"];
+        if (!string.IsNullOrWhiteSpace(fromConfig))
+            return fromConfig.Trim();
+
+        fromConfig = _configuration["XAI:SSMParameterName"];
+        if (!string.IsNullOrWhiteSpace(fromConfig))
+            return fromConfig.Trim();
+
+        var fromEnv = Environment.GetEnvironmentVariable("XAI_SSM_PARAMETER_NAME");
+        return string.IsNullOrWhiteSpace(fromEnv) ? null : fromEnv.Trim();
     }
 
     private static XaiSecretResolutionResult? TryResolveConfiguredKey(SecretResolutionContext context)
@@ -167,7 +184,7 @@ public sealed partial class SecretResolver
                 SecretFetchErrorCode: null,
                 SecretFetchErrorMessage: null,
                 ConfigurationInjected: false,
-                SsmParameterName: null,
+                SsmParameterName: context.SsmParameterName,
                 SsmFetchAttempted: false,
                 SsmFetchStatus: "skipped",
                 SsmFetchErrorCode: null,
@@ -187,7 +204,7 @@ public sealed partial class SecretResolver
                 SecretFetchErrorCode: null,
                 SecretFetchErrorMessage: null,
                 ConfigurationInjected: false,
-                SsmParameterName: null,
+                SsmParameterName: context.SsmParameterName,
                 SsmFetchAttempted: false,
                 SsmFetchStatus: "skipped",
                 SsmFetchErrorCode: null,
@@ -207,7 +224,7 @@ public sealed partial class SecretResolver
                 SecretFetchErrorCode: null,
                 SecretFetchErrorMessage: null,
                 ConfigurationInjected: false,
-                SsmParameterName: null,
+                SsmParameterName: context.SsmParameterName,
                 SsmFetchAttempted: false,
                 SsmFetchStatus: "skipped",
                 SsmFetchErrorCode: null,
