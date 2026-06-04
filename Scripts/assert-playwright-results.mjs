@@ -14,7 +14,11 @@ const skipped = Number(stats.skipped ?? 0);
 const total = expected + unexpected + flaky + skipped;
 
 if (total === 0) {
-  throw new Error(`No Playwright tests were recorded in ${resultsPath}.`);
+  const hint =
+    process.env.CI === "true" || process.env.GITHUB_ACTIONS
+      ? " Likely cause: config.webServer failed to start (check job logs for PlatformNotSupportedException / API crash before tests ran)."
+      : "";
+  throw new Error(`No Playwright tests were recorded in ${resultsPath}.${hint}`);
 }
 
 const passRate = (expected / total) * 100;

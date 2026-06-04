@@ -15,8 +15,8 @@ using Serilog;
 namespace WileyWidget.Services;
 
 /// <summary>
-/// Encrypted local secret vault service using Windows DPAPI.
-/// Provides secure storage of secrets encrypted with machine-specific keys.
+/// Encrypted local secret vault service. Windows uses DPAPI; Linux/macOS use AES-256-GCM
+/// (required for Playwright CI and Docker). Provides machine-local secret storage.
 /// </summary>
 public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDisposable
 {
@@ -118,15 +118,20 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
             {
                 try
                 {
-                    // Load existing entropy (stored encrypted with DPAPI LocalMachine scope)
-                    var encryptedEntropyBase64 = File.ReadAllText(_entropyFile);
-                    var encryptedEntropy = Convert.FromBase64String(encryptedEntropyBase64);
+                    var entropyFileContent = File.ReadAllText(_entropyFile).Trim();
+                    if (!EncryptedLocalSecretVaultCrypto.UseDpapi
+                        && EncryptedLocalSecretVaultCrypto.TryReadAesEntropyFile(entropyFileContent, out var aesEntropy))
+                    {
+                        _logger.LogDebug("Loaded AES entropy from vault file (non-Windows)");
+                        return aesEntropy;
+                    }
 
-                    // Decrypt entropy using machine-bound DPAPI for additional protection
-                    var entropy = ProtectedData.Unprotect(
-                        encryptedEntropy,
-                        null, // No additional entropy for entropy itself (avoid recursion)
-                        DataProtectionScope.LocalMachine); // Machine-bound
+                    var encryptedEntropy = Convert.FromBase64String(entropyFileContent);
+                    var entropy = EncryptedLocalSecretVaultCrypto.UnprotectEntropyFromStorage(encryptedEntropy);
+                    if (entropy.Length != 32)
+                    {
+                        throw new CryptographicException("Entropy file has unexpected length.");
+                    }
 
                     _logger.LogDebug("Loaded entropy from encrypted file");
                     return entropy;
@@ -134,7 +139,6 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
                 catch (CryptographicException ex)
                 {
                     _logger.LogWarning(ex, "Failed to decrypt existing entropy file - it may be corrupted or from a different machine/user. Regenerating entropy.");
-                    // Delete corrupted entropy file so we generate new entropy
                     try
                     {
                         File.Delete(_entropyFile);
@@ -143,35 +147,37 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
                     {
                         _logger.LogWarning(deleteEx, "Failed to delete corrupted entropy file");
                     }
-                    // Fall through to generate new entropy
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to load existing entropy file. Regenerating entropy.");
-                    // Fall through to generate new entropy
                 }
             }
 
-            // Generate new entropy (executed when file doesn't exist OR loading failed)
             using var rng = RandomNumberGenerator.Create();
-            var newEntropy = new byte[32]; // 256 bits
+            var newEntropy = new byte[32];
             rng.GetBytes(newEntropy);
 
-            // Encrypt entropy with machine-bound DPAPI before saving
-            var newEncryptedEntropy = ProtectedData.Protect(
-                newEntropy,
-                null,
-                DataProtectionScope.LocalMachine);
+            if (EncryptedLocalSecretVaultCrypto.UseDpapi)
+            {
+                var newEncryptedEntropy = EncryptedLocalSecretVaultCrypto.ProtectEntropyForStorage(newEntropy);
+                File.WriteAllText(_entropyFile, Convert.ToBase64String(newEncryptedEntropy));
+            }
+            else
+            {
+                File.WriteAllText(
+                    _entropyFile,
+                    EncryptedLocalSecretVaultCrypto.FormatAesEntropyFile(newEntropy));
+            }
 
-            var newEncryptedEntropyBase64 = Convert.ToBase64String(newEncryptedEntropy);
+            if (EncryptedLocalSecretVaultCrypto.UseDpapi)
+            {
+                File.SetAttributes(_entropyFile, FileAttributes.Hidden);
+            }
 
-            // Save encrypted entropy (hidden file)
-            File.WriteAllText(_entropyFile, newEncryptedEntropyBase64);
-            File.SetAttributes(_entropyFile, FileAttributes.Hidden);
-
-            // Rely on default filesystem ACLs for entropy; machine-scope DPAPI already protects contents
-
-            _logger.LogInformation("Generated new encryption entropy for secret vault");
+            _logger.LogInformation(
+                "Generated new encryption entropy for secret vault (platform={Platform})",
+                EncryptedLocalSecretVaultCrypto.UseDpapi ? "Windows-DPAPI" : "AES-GCM");
             return newEntropy;
         }
         catch (Exception ex)
@@ -201,13 +207,18 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
             byte[] decryptedBytes;
             try
             {
-                decryptedBytes = ProtectedData.Unprotect(
+                decryptedBytes = EncryptedLocalSecretVaultCrypto.Unprotect(
                     encryptedBytes,
-                    _entropy,
+                    _entropy!,
                     SecretProtectionScope);
             }
             catch (CryptographicException ex)
             {
+                if (!EncryptedLocalSecretVaultCrypto.UseDpapi)
+                {
+                    throw;
+                }
+
                 _logger.LogWarning(ex, "Failed to decrypt secret '{SecretName}' with machine scope; trying legacy user scope for migration", secretName);
 
                 decryptedBytes = ProtectedData.Unprotect(
@@ -217,9 +228,9 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
 
                 try
                 {
-                    var migratedEncrypted = ProtectedData.Protect(
+                    var migratedEncrypted = EncryptedLocalSecretVaultCrypto.Protect(
                         decryptedBytes,
-                        _entropy,
+                        _entropy!,
                         SecretProtectionScope);
 
                     await File.WriteAllTextAsync(filePath, Convert.ToBase64String(migratedEncrypted)).ConfigureAwait(false);
@@ -277,13 +288,18 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
             byte[] decryptedBytes;
             try
             {
-                decryptedBytes = ProtectedData.Unprotect(
+                decryptedBytes = EncryptedLocalSecretVaultCrypto.Unprotect(
                     encryptedBytes,
-                    _entropy,
+                    _entropy!,
                     SecretProtectionScope);
             }
             catch (CryptographicException ex)
             {
+                if (!EncryptedLocalSecretVaultCrypto.UseDpapi)
+                {
+                    throw;
+                }
+
                 _logger.LogWarning(ex, "Failed to decrypt secret '{SecretName}' with machine scope (sync); trying legacy user scope for migration", secretName);
 
                 decryptedBytes = ProtectedData.Unprotect(
@@ -293,9 +309,9 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
 
                 try
                 {
-                    var migratedEncrypted = ProtectedData.Protect(
+                    var migratedEncrypted = EncryptedLocalSecretVaultCrypto.Protect(
                         decryptedBytes,
-                        _entropy,
+                        _entropy!,
                         SecretProtectionScope);
 
                     File.WriteAllText(filePath, Convert.ToBase64String(migratedEncrypted));
@@ -340,9 +356,9 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
         {
             var filePath = GetSecretFilePath(key);
             var secretBytes = Encoding.UTF8.GetBytes(value);
-            var encryptedBytes = ProtectedData.Protect(
+            var encryptedBytes = EncryptedLocalSecretVaultCrypto.Protect(
                 secretBytes,
-                _entropy,
+                _entropy!,
                 SecretProtectionScope);
             var encryptedBase64 = Convert.ToBase64String(encryptedBytes);
             File.WriteAllText(filePath, encryptedBase64);
@@ -371,9 +387,9 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
             var plainBytes = Encoding.UTF8.GetBytes(value);
             try
             {
-                var encryptedBytes = ProtectedData.Protect(
+                var encryptedBytes = EncryptedLocalSecretVaultCrypto.Protect(
                     plainBytes,
-                    _entropy,
+                    _entropy!,
                     SecretProtectionScope);
 
                 var encryptedBase64 = Convert.ToBase64String(encryptedBytes);
@@ -730,9 +746,9 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
             var plainBytes = Encoding.UTF8.GetBytes(newValue);
             try
             {
-                var encryptedBytes = ProtectedData.Protect(
+                var encryptedBytes = EncryptedLocalSecretVaultCrypto.Protect(
                     plainBytes,
-                    _entropy,
+                    _entropy!,
                     SecretProtectionScope);
 
                 var encryptedBase64 = Convert.ToBase64String(encryptedBytes);
@@ -814,13 +830,17 @@ public sealed class EncryptedLocalSecretVaultService : ISecretVaultService, IDis
                 return false;
             }
 
-            // Try to decrypt entropy - if it fails, it's been tampered with or corrupted
-            var encryptedEntropyBase64 = File.ReadAllText(_entropyFile);
-            var encryptedEntropy = Convert.FromBase64String(encryptedEntropyBase64);
-            var testEntropy = ProtectedData.Unprotect(encryptedEntropy, null, DataProtectionScope.LocalMachine);
+            var entropyFileContent = File.ReadAllText(_entropyFile).Trim();
+            if (!EncryptedLocalSecretVaultCrypto.UseDpapi
+                && EncryptedLocalSecretVaultCrypto.TryReadAesEntropyFile(entropyFileContent, out var aesEntropy))
+            {
+                return aesEntropy.Length == 32;
+            }
 
-            // If we get here, entropy is valid
-            return testEntropy.Length == 32; // Verify expected size
+            var encryptedEntropy = Convert.FromBase64String(entropyFileContent);
+            var testEntropy = EncryptedLocalSecretVaultCrypto.UnprotectEntropyFromStorage(encryptedEntropy);
+
+            return testEntropy.Length == 32;
         }
         catch (CryptographicException ex)
         {

@@ -41,12 +41,21 @@ See also [Streamlit’s playwright_install action](https://github.com/streamlit/
 | **skipped** (`playwright-ui`) | Upstream `build-and-publish` failed. |
 | **success** with red test steps | Smoke/highrisk use `continue-on-error`; check `playwright-report/results.json`. |
 
+## API webServer crash on Linux (`PlatformNotSupportedException`)
+
+**Symptom:** Smoke/high-risk exit immediately with `Process from config.webServer was not able to start`; gate reports `No Playwright tests were recorded`.
+
+**Cause:** `EncryptedLocalSecretVaultService` used Windows DPAPI (`ProtectedData`) during API startup. Playwright CI runs in `mcr.microsoft.com/playwright` (Linux).
+
+**Fix (2026-06):** Vault uses AES-256-GCM on non-Windows; `playwright.config.ts` sets SQLite + stub `XAI__ApiKey` for the CI API host.
+
 ## Diagnosis checklist
 
 1. `gh run view <run-id>` — confirm whether `playwright-ui` ran or was skipped.
 2. **Install Playwright browsers (container image; no apt)** should finish in under ~2 minutes on cache hit.
 3. Download artifact `playwright-ui-report` and read `stats.unexpected` in `playwright-report/results.json`.
 4. Ensure repo secret `SYNCFUSION_LICENSE_KEY` is set.
+5. If `unexpected=0` but the gate fails with zero tests, search logs for `PlatformNotSupportedException` or `/health` never ready.
 
 ## Reference runs (June 2026)
 

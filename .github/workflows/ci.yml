@@ -46,7 +46,7 @@ jobs:
           extra_args: --only-verified
 
   test:
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs: [secrets-guard]
     timeout-minutes: 40
     strategy:
@@ -226,7 +226,7 @@ jobs:
           if-no-files-found: warn
 
   highrisk-tests:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -263,7 +263,7 @@ jobs:
     # Builds full solution + produces client wwwroot artifact used exclusively by the Playwright UI job.
     # (No longer Amplify-specific; supports both legacy hosting and new local-machine publish flows.)
     # Includes sanity check for the new Scripts/publish-local-machine.ps1 (self-contained win-x64 for Windows laptop deploys).
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs: [test, highrisk-tests]
     env:
       DOTNET_NOLOGO: true

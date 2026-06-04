@@ -53,6 +53,18 @@ function browserProjects() {
 const ciWwwroot = "./publish_output/wwwroot";
 const ciApiDll = "./api_output/WileyCoWeb.Api.dll";
 
+/** Linux CI (Playwright container): SQLite + env secrets; avoids PostgreSQL and Windows DPAPI. */
+const ciApiWebServerEnv: Record<string, string> = {
+  ASPNETCORE_ENVIRONMENT: "Development",
+  ConnectionStrings__DefaultConnection: "Data Source=/tmp/wiley-playwright-ci.db",
+  Database__Provider: "SQLite",
+  Database__SeedDevelopmentData: "true",
+  Database__AllowDegradedStartup: "true",
+  Database__EnsureWorkspacePanelBudgetWhenEmpty: "true",
+  XAI__ApiKey: "ci-playwright-stub-key",
+  XAI__Enabled: "true",
+};
+
 const finalBaseURL = isCI
   ? normalizeBaseURL(process.env.WILEYCO_E2E_BASE_URL ?? defaultLocalBaseURL)
   : normalizeBaseURL(process.env.WILEYCO_E2E_BASE_URL ?? defaultLocalBaseURL);
@@ -66,9 +78,7 @@ const finalWebServer = isCI
         url: `${defaultLocalApiURL}/health`,
         reuseExistingServer: true,
         timeout: 180_000,
-        env: {
-          ASPNETCORE_ENVIRONMENT: "Development",
-        },
+        env: ciApiWebServerEnv,
       },
       {
         command: `node ./Scripts/serve-wwwroot.mjs --root ${ciWwwroot} --port 5230`,
