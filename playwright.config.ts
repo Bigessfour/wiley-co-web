@@ -65,7 +65,7 @@ const finalWebServer = isCI
           'bash -lc "cd ./api_output && dotnet ./WileyCoWeb.Api.dll --urls http://127.0.0.1:5231"',
         url: `${defaultLocalApiURL}/health`,
         reuseExistingServer: true,
-        timeout: 120_000,
+        timeout: 180_000,
         env: {
           ASPNETCORE_ENVIRONMENT: "Development",
         },
@@ -74,7 +74,7 @@ const finalWebServer = isCI
         command: `node ./Scripts/serve-wwwroot.mjs --root ${ciWwwroot} --port 5230`,
         url: defaultLocalBaseURL,
         reuseExistingServer: true,
-        timeout: 60_000,
+        timeout: 120_000,
       },
     ]
   : useManagedWebServer
