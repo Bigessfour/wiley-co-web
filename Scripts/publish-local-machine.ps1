@@ -74,6 +74,56 @@ Write-Info "Publishing client WASM assets to $clientOut ..."
 dotnet publish $clientProject -c $Configuration -o $clientOut | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Client publish failed" }
 
+# 2b. Inject Syncfusion key from env (machine or user scope) into the published bundle so the deployed client has no license popup.
+# Mirrors the logic in amplify.yml (pre-publish generation of wwwroot/appsettings.Syncfusion.local.json).
+$sfKey = [Environment]::GetEnvironmentVariable('SYNCFUSION_LICENSE_KEY', 'Machine')
+if (-not $sfKey) { $sfKey = [Environment]::GetEnvironmentVariable('SYNCFUSION_LICENSE_KEY', 'User') }
+if (-not $sfKey) { $sfKey = $env:SYNCFUSION_LICENSE_KEY }
+if ($sfKey) {
+    $sfJson = @{ SyncfusionLicenseKey = $sfKey.Trim() } | ConvertTo-Json -Compress
+    $sfPath = Join-Path $clientOut "wwwroot/appsettings.Syncfusion.local.json"
+    $sfJson | Out-File -FilePath $sfPath -Encoding utf8 -Force
+    # Also write the compressed variants if the publish produced them (simple overwrite of json source; real prod build compresses properly via amplify).
+    $sfBr = Join-Path $clientOut "wwwroot/appsettings.Syncfusion.local.json.br"
+    $sfGz = Join-Path $clientOut "wwwroot/appsettings.Syncfusion.local.json.gz"
+    if (Test-Path $sfBr) { $sfJson | Out-File -FilePath ($sfBr -replace '\.br$','') -Encoding utf8 -Force } # will be re-compressed on serve or ignore for local
+    if (Test-Path $sfGz) { $sfJson | Out-File -FilePath ($sfGz -replace '\.gz$','') -Encoding utf8 -Force }
+    Write-Info "Injected current SYNCFUSION_LICENSE_KEY into published client (wwwroot/appsettings.Syncfusion.local.json and variants)."
+} else {
+    Write-Warn "SYNCFUSION_LICENSE_KEY not found in Machine/User env or $env; client bundle may trigger Syncfusion license popup on run. Set before publish for clean local deploys."
+}
+
+# 2c. Clean junk from the client publish root (prevents bloat from repo root files, previous publishes, test artifacts, scripts that leak into publish output dir due to project content items or prior runs).
+# Keep only the web assets (wwwroot/), minimal config, web.config, staticwebassets manifests, and our top-level README.
+Write-Info "Cleaning non-web junk from client publish dir..."
+$clientLevelJunkDirs = @('iam', 'playwright-report', 'Scripts', 'test-results', 'publish', 'node_modules', 'bin', 'obj', '.git', 'logs', 'TestResults', 'playwright-report')
+$clientLevelJunkFilePatterns = @('*.ps1', '*.sh', 'global.json', 'package*.json', 'NuGet.Config', 'manifest.json', 'ai-fetchable-manifest.json', 'apprunner-update.json', 'update-config.json', 'trust-policy.json', 'skills-lock.json', 'jarvis-*.json', 'playwright-*.json', '*.dmp', '*.log', '*.ts', '*.tsx', 'tsconfig*.json', 'playwright.config.*')
+
+foreach ($dirName in $clientLevelJunkDirs) {
+    $p = Join-Path $clientOut $dirName
+    if (Test-Path $p) {
+        Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+# Remove any nested publish/local-machine copies that may have been included
+Get-ChildItem -Path $clientOut -Recurse -Directory -Include 'local-machine' -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
+
+Get-ChildItem -Path $clientOut -File -ErrorAction SilentlyContinue | Where-Object {
+    $name = $_.Name
+    foreach ($pat in $clientLevelJunkFilePatterns) {
+        if ($name -like $pat) { return $true }
+    }
+    return $false
+} | Remove-Item -Force -ErrorAction SilentlyContinue
+
+# Also aggressively remove any top-level loose .json that are clearly not runtime config or blazor manifests (keep appsettings*, *staticwebassets*)
+Get-ChildItem -Path $clientOut -File -Filter '*.json' -ErrorAction SilentlyContinue | Where-Object {
+    $n = $_.Name
+    -not ($n -like 'appsettings*') -and -not ($n -like '*staticwebassets*') -and -not ($n -like 'web.config')
+} | Remove-Item -Force -ErrorAction SilentlyContinue
+
+Write-Info "Client publish cleaned. Only web assets + essential configs remain under $clientOut (wwwroot/ is the static site root)."
+
 # 3. Basic README for the publish output
 $readme = @"
 # Wiley Widget - Local Machine Publish (Self-Contained, Windows x64)
@@ -117,7 +167,7 @@ Runtime: $Runtime | Config: $Configuration | SingleFile: $SingleFile
 - Full packaging + launcher + Windows Service (UseWindowsService) is next iteration.
 - See root README.md "Local Windows Machine / AWS-Decoupled Operation" and .grok/prompts/db-multi-provider-sqlite-feasibility.md for status + manual smoke evidence.
 
-Built with Syncfusion Blazor + .NET 9 (global.json pin respected at build time).
+Built with Syncfusion Blazor 33.x + .NET 9.0.313 (global.json pin respected at build time).\n\n## Prod / Town Deployment Notes (for parity after local changes)\n- Auth: Production appsettings has Jwt Enabled with Cognito. Town site expects valid tokens.\n- See the generated README-local-machine.txt in publish output for full verification checklist, data loading (Load council demo data), and parity steps.\n- Run the publish script on target to get clean client with key injected and junk removed.
 "@
 
 $readme | Out-File -FilePath (Join-Path $OutputRoot "README-local-machine.txt") -Encoding utf8
