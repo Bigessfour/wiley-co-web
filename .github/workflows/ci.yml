@@ -399,7 +399,17 @@ jobs:
             playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers + Linux deps
+        id: playwright_install
+        # Fail fast instead of burning the whole 50m job (see run 26954265012: install hung until timeout).
+        timeout-minutes: 12
         run: npx playwright install --with-deps chromium
+
+      - name: Retry Playwright install (clear browser cache)
+        if: steps.playwright_install.outcome == 'failure'
+        timeout-minutes: 12
+        run: |
+          rm -rf "$HOME/.cache/ms-playwright"
+          npx playwright install --with-deps chromium
 
       - name: Run Playwright UI smoke (curated specs)
         continue-on-error: true
@@ -410,9 +420,29 @@ jobs:
         run: npm run playwright:test:ci:highrisk
 
       - name: Enforce Playwright pass-rate gate
-        # Lenient in CI (see job comment). Still surfaces real unexpected failures via logs.
-        continue-on-error: true
+        # Fails the job on unexpected>0; smoke/highrisk remain continue-on-error until install is stable.
         run: node ./Scripts/assert-playwright-results.mjs
+
+      - name: Playwright job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Playwright UI"
+            if [ -f playwright-report/results.json ]; then
+              node --input-type=module -e "
+                import { readFileSync } from 'node:fs';
+                const stats = JSON.parse(readFileSync('playwright-report/results.json','utf8')).stats ?? {};
+                console.log('| Metric | Value |');
+                console.log('| --- | ---: |');
+                for (const key of ['expected','unexpected','flaky','skipped']) {
+                  console.log('| ' + key + ' | ' + (stats[key] ?? 0) + ' |');
+                }
+              "
+            else
+              echo "No \`playwright-report/results.json\` — tests likely did not run (install timeout, skipped upstream, or cancelled job)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright artifacts
         if: always()
