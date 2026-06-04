@@ -13,7 +13,7 @@ This file applies to **Grok CLI**, **Cursor**, and any other coding agent workin
 
 - **.NET SDK 9.0.313** — see `global.json` (`rollForward: disable`). Do not bump SDK without updating CI and Dockerfiles.
 - **Syncfusion Blazor 33.x** — license required for builds; see `README.md`.
-- Local dev: client `http://localhost:5230`, API `http://localhost:5231`.
+- Local dev: client `http://localhost:5230`, API `http://localhost:5231`. Docker stack: `pwsh -NoProfile -File Scripts/start-wiley-widget-local.ps1` then `Scripts/start-wiley-widget-client.ps1` (see `docs/debugging-wiley-widget-cursor.md`).
 
 ## Non-negotiable principles
 

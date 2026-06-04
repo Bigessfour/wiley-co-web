@@ -143,7 +143,24 @@
       }
     },
     {
+      "label": "🔑 Prepare Syncfusion License (Machine env)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-File",
+        "${workspaceFolder}/Scripts/Apply-SyncfusionLicenseEnv.ps1",
+        "-Quiet"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "🔨 Debug Build API",
+      "dependsOn": ["🔑 Prepare Syncfusion License (Machine env)"],
+      "dependsOrder": "sequence",
       "type": "shell",
       "command": "dotnet",
       "args": [
@@ -162,6 +179,8 @@
     },
     {
       "label": "🔨 Debug Build",
+      "dependsOn": ["🔑 Prepare Syncfusion License (Machine env)"],
+      "dependsOrder": "sequence",
       "type": "shell",
       "command": "dotnet",
       "args": [
@@ -251,6 +270,48 @@
         "group": "grok",
         "showReuseMessage": false,
         "clear": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🐘 Start Local API (Docker Postgres)",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-File",
+        "${workspaceFolder}/Scripts/start-wiley-widget-local.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "group": "local-stack"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🌐 Start Local Blazor Client",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-File",
+        "${workspaceFolder}/Scripts/start-wiley-widget-client.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "group": "local-stack"
       },
       "problemMatcher": []
     },

@@ -45,6 +45,30 @@ Cursor is VS Code–compatible; the debug UI is the same but the **left icon bar
 - API: `http://localhost:5231`
 - Full-stack debugging expects `WILEY_WORKSPACE_API_BASE_ADDRESS=http://localhost:5231` for the client (already set on **watch: debug client** task).
 
+### Docker Postgres + terminal stack (no F5)
+
+Matches [docker-compose.yml](../docker-compose.yml) (`wileyco_local` / `localdevpw` on **host port 5433** — avoids Windows PostgreSQL on 5432):
+
+1. **Tasks** → **Start Local API (Docker Postgres)** — or `pwsh -NoProfile -File .\Scripts\start-wiley-widget-local.ps1`
+2. **Tasks** → **Start Local Blazor Client** — or `pwsh -NoProfile -File .\Scripts\start-wiley-widget-client.ps1`  
+   Or one command: `start-wiley-widget-local.ps1 -StartClient`
+3. Open http://localhost:5230/wiley-workspace
+
+First run creates gitignored `appsettings.Development.local.json` and `appsettings.Workspace.local.json` from the `*.example.json` templates. API logs should show `DatabaseConfigured=True` (not degraded mode) when Postgres is reachable.
+
+**Syncfusion license (Blazor WASM):** Store `SYNCFUSION_LICENSE_KEY` in Windows **Machine** or **User** environment variables. Before build/run, `Scripts/Apply-SyncfusionLicenseEnv.ps1` copies it into `wwwroot/appsettings.Syncfusion.local.json` and sets process env for the API. The client calls `SyncfusionLicenseProvider.RegisterLicense` from that JSON before `AddSyncfusionBlazor` ([Syncfusion docs](https://blazor.syncfusion.com/documentation/getting-started/license-key/how-to-register-in-an-application)). F5 **Debug Build** tasks run the prepare step automatically.
+
+### Startup logs (local scripts + client)
+
+| Source | Where to look |
+| --- | --- |
+| API + script steps | Terminal running `start-wiley-widget-local.ps1`; file `TestResults/local-startup/local-start-*.log` |
+| Blazor dev server | **Separate window** when using `-StartClient`; file `TestResults/local-startup/local-client-*.log` |
+| WASM client boot | Browser DevTools → Console: lines prefixed `[WileyWidget.Client.Startup]` |
+| API runtime | Same terminal as API: `WileyWidget.Startup.*`, `DatabaseConfigured=True` expected |
+
+If **localhost:5230** fails: confirm **5230 is listening** (`Get-NetTCPConnection -LocalPort 5230 -State Listen`). API-only on 5231 is not enough — the UI requires the client script window to finish `dotnet run`.
+
 ## 3. Agentic debug loop (repeat until root cause)
 
 Use this loop in **Chat** or with a colleague. Each step produces evidence.

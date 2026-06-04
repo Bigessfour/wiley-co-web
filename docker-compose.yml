@@ -6,7 +6,7 @@
 #   # Or let dev startup seeds handle it when Database:SeedDevelopmentData=true
 #
 # Connection for appsettings.Development.local.json or DATABASE_URL:
-#   Host=localhost;Port=5432;Database=wileyco_local;Username=postgres;Password=localdevpw
+#   Host=localhost;Port=5433;Database=wileyco_local;Username=postgres;Password=localdevpw
 #
 # Data persists in named volume "wiley_pgdata". To reset: docker compose down -v
 # This is the recommended zero-cost local replacement for Aurora on Windows 11.
@@ -22,8 +22,9 @@ services:
       POSTGRES_PASSWORD: localdevpw
       # TZ for consistency with timestamptz expectations
       TZ: UTC
+    # Host 5433 avoids conflict with a local Windows PostgreSQL service on 5432.
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - wiley_pgdata:/var/lib/postgresql/data
     healthcheck:

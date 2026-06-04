@@ -75,6 +75,9 @@ test-results/
 .playwright/
 .playwright-mcp/
 logs/
+# Local dev process capture (manual API/client debug)
+stdout_*.txt
+stderr_*.txt
 jarvis-*.json
 playwright-live-*.json
 CRAP-Analysis-Report.md

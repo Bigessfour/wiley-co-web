@@ -40,29 +40,46 @@ namespace WileyCoWeb.Services
 
         public static async Task RunAsync(string[] args)
         {
-            var builder = WebAssemblyHostBuilder.CreateDefault(args);
-            var startupDiagnostics = new List<(LogLevel Level, string Message, Exception? Exception)>();
-            var clientBaseAddress = builder.HostEnvironment.BaseAddress;
+            Console.WriteLine($"[WileyWidget.Client.Startup] RunAsync begin UTC={DateTime.UtcNow:O}");
+            WebAssemblyHostBuilder? builder = null;
+            try
+            {
+                builder = WebAssemblyHostBuilder.CreateDefault(args);
+                // Syncfusion Blazor WASM: license in wwwroot JSON (build/CI inject) + RegisterLicense before AddSyncfusionBlazor.
+                // https://blazor.syncfusion.com/documentation/getting-started/license-key/how-to-register-in-an-application
+                builder.Configuration.AddJsonFile("appsettings.Syncfusion.local.json", optional: true);
+                var startupDiagnostics = new List<(LogLevel Level, string Message, Exception? Exception)>();
+                var clientBaseAddress = builder.HostEnvironment.BaseAddress;
+                Console.WriteLine($"[WileyWidget.Client.Startup] BaseAddress={clientBaseAddress} Environment={builder.HostEnvironment.Environment}");
 
-            var startupState = await ResolveClientStartupStateAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
+                var startupState = await ResolveClientStartupStateAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
+                Console.WriteLine(
+                    $"[WileyWidget.Client.Startup] Resolved SyncfusionKeySource={startupState.SyncfusionKeySource} SyncfusionPresent={!string.IsNullOrWhiteSpace(startupState.SyncfusionLicenseKey)} WorkspaceApiSource={startupState.WorkspaceApiSource} ApiBase={startupState.ResolvedApiBaseAddress}");
 
-            ConfigureClientBuilder(builder, startupState.ResolvedApiBaseAddress!);
+                ConfigureClientBuilder(builder, startupState.ResolvedApiBaseAddress!);
 
-            var host = builder.Build();
-            var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WileyCoWeb.Startup");
+                var host = builder.Build();
+                var startupLogger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WileyCoWeb.Startup");
 
-            LogClientStartupState(
-                startupLogger,
-                startupDiagnostics,
-                startupState.SyncfusionLicenseKey,
-                startupState.SyncfusionKeySource,
-                startupState.WorkspaceApiSource,
-                clientBaseAddress,
-                startupState.ResolvedApiBaseAddress!,
-                builder.HostEnvironment.Environment);
+                LogClientStartupState(
+                    startupLogger,
+                    startupDiagnostics,
+                    startupState.SyncfusionLicenseKey,
+                    startupState.SyncfusionKeySource,
+                    startupState.WorkspaceApiSource,
+                    clientBaseAddress,
+                    startupState.ResolvedApiBaseAddress!,
+                    builder.HostEnvironment.Environment);
 
-            StartWorkspaceBootstrapTask(host.Services, startupLogger);
-            await host.RunAsync().ConfigureAwait(false);
+                StartWorkspaceBootstrapTask(host.Services, startupLogger);
+                await host.RunAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                var diag = builder is null ? "before builder created" : "after builder created";
+                Console.WriteLine($"[WileyWidget.Client.Startup] FATAL startup error ({diag}): {ex}");
+                throw;
+            }
         }
 
         static async Task<(string? SyncfusionLicenseKey, string SyncfusionKeySource, string WorkspaceApiSource, Uri ResolvedApiBaseAddress)> ResolveClientStartupStateAsync(
@@ -108,7 +125,11 @@ namespace WileyCoWeb.Services
             if (!string.IsNullOrWhiteSpace(syncfusionLicenseKey))
             {
                 SyncfusionLicenseProvider.RegisterLicense(syncfusionLicenseKey);
+                Console.WriteLine($"[WileyWidget.Client.Startup] SyncfusionLicenseProvider.RegisterLicense applied (length {syncfusionLicenseKey.Length}).");
+                return;
             }
+
+            Console.WriteLine("[WileyWidget.Client.Startup] WARNING: Syncfusion license key missing; components may show trial UI.");
         }
 
         static string ResolveSyncfusionKeySource(string? syncfusionLicenseKeyFromConfig, string? syncfusionLicenseKeyFromEnvironment)

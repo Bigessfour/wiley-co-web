@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Syncfusion.Licensing;
 using System.Text.Json;
 
@@ -7,21 +8,21 @@ namespace WileyCoWeb.Api.Configuration;
 
 public static class LicenseBootstrapper
 {
-    public static async Task<SyncfusionLicenseResult> RegisterSyncfusionLicenseAsync(WebApplicationBuilder builder)
+    public static async Task<SyncfusionLicenseResult> RegisterSyncfusionLicenseAsync(WebApplicationBuilder builder, ILogger logger)
     {
-        var resolution = await ResolveSyncfusionLicenseAsync(builder).ConfigureAwait(false);
-        EmitResolutionLog(resolution);
+        var resolution = await ResolveSyncfusionLicenseAsync(builder, logger).ConfigureAwait(false);
+        EmitResolutionLog(resolution, logger);
         return resolution;
     }
 
-    private static Task<SyncfusionLicenseResult> ResolveSyncfusionLicenseAsync(WebApplicationBuilder builder)
-        => ResolveSyncfusionLicenseCoreAsync(builder);
+    private static Task<SyncfusionLicenseResult> ResolveSyncfusionLicenseAsync(WebApplicationBuilder builder, ILogger logger)
+        => ResolveSyncfusionLicenseCoreAsync(builder, logger);
 
-    private static async Task<SyncfusionLicenseResult> ResolveSyncfusionLicenseCoreAsync(WebApplicationBuilder builder)
+    private static async Task<SyncfusionLicenseResult> ResolveSyncfusionLicenseCoreAsync(WebApplicationBuilder builder, ILogger logger)
     {
         var syncfusionLicenseKey = TryResolveConfiguredSyncfusionLicenseKey(builder.Configuration, out var syncfusionKeySource);
 
-        var localSettingsLicenseKey = await TryResolveLocalSettingsSyncfusionLicenseKeyAsync(builder.Environment, syncfusionLicenseKey).ConfigureAwait(false);
+        var localSettingsLicenseKey = await TryResolveLocalSettingsSyncfusionLicenseKeyAsync(builder.Environment, syncfusionLicenseKey, logger).ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(localSettingsLicenseKey))
         {
             syncfusionLicenseKey = localSettingsLicenseKey;
@@ -31,14 +32,14 @@ public static class LicenseBootstrapper
         return new SyncfusionLicenseResult(syncfusionLicenseKey, syncfusionKeySource);
     }
 
-    private static Task<string?> TryResolveLocalSettingsSyncfusionLicenseKeyAsync(IWebHostEnvironment environment, string? currentLicenseKey)
+    private static Task<string?> TryResolveLocalSettingsSyncfusionLicenseKeyAsync(IWebHostEnvironment environment, string? currentLicenseKey, ILogger logger)
     {
         if (HasConfiguredSyncfusionLicenseKey(currentLicenseKey) || !CanLoadSyncfusionLicenseKeyFromLocalSettings(environment))
         {
             return Task.FromResult<string?>(null);
         }
 
-        return LoadSyncfusionLicenseKeyFromLocalSettingsAsync(environment);
+        return LoadSyncfusionLicenseKeyFromLocalSettingsAsync(environment, logger);
     }
 
     private static bool HasConfiguredSyncfusionLicenseKey(string? currentLicenseKey)
@@ -82,10 +83,10 @@ public static class LicenseBootstrapper
         }
     }
 
-    private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(IWebHostEnvironment environment)
-        => await LoadSyncfusionLicenseKeyFromLocalSettingsCoreAsync(environment).ConfigureAwait(false);
+    private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsAsync(IWebHostEnvironment environment, ILogger logger)
+        => await LoadSyncfusionLicenseKeyFromLocalSettingsCoreAsync(environment, logger).ConfigureAwait(false);
 
-    private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsCoreAsync(IWebHostEnvironment environment)
+    private static async Task<string?> LoadSyncfusionLicenseKeyFromLocalSettingsCoreAsync(IWebHostEnvironment environment, ILogger logger)
     {
         var localSettingsPath = GetLocalSettingsPath(environment);
         if (!File.Exists(localSettingsPath))
@@ -100,7 +101,7 @@ public static class LicenseBootstrapper
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[API Startup] Failed to load Syncfusion license from local settings: {ex.Message}");
+            logger.LogWarning("Failed to load Syncfusion license from local settings: {Message}", ex.Message);
             return null;
         }
     }
@@ -150,18 +151,17 @@ public static class LicenseBootstrapper
     }
 
     private sealed record ConfiguredSyncfusionLicenseCandidate(string? LicenseKey, string KeySource);
-    private static void EmitResolutionLog(SyncfusionLicenseResult resolution)
+    private static void EmitResolutionLog(SyncfusionLicenseResult resolution, ILogger logger)
     {
         if (!string.IsNullOrWhiteSpace(resolution.LicenseKey))
         {
             var trimmed = resolution.LicenseKey.Trim();
             SyncfusionLicenseProvider.RegisterLicense(trimmed);
-            Console.WriteLine($"[API Startup] Syncfusion license key registered (source: {resolution.KeySource}, length: {trimmed.Length}).");
+            logger.LogInformation("Syncfusion license key registered (source: {KeySource}, length: {Length}).", resolution.KeySource, trimmed.Length);
             return;
         }
 
-        Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). " +
-            "Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
+        logger.LogWarning("SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
     }
 
 }

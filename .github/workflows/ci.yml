@@ -326,6 +326,11 @@ jobs:
   playwright-ui:
     runs-on: ubuntu-latest
     needs: build-and-publish
+    # Official Playwright Noble image: browsers + OS deps preinstalled; avoids apt/man-db hangs from
+    # `npx playwright install --with-deps` on ubuntu-latest (actions/runner-images#11347, playwright#14434).
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      options: --ipc=host
     # Focused browser smoke + high-risk specs only (no full suite in CI).
     # The job is intentionally more lenient (continue-on-error on the run + gate steps)
     # due to persistent GitHub Actions ubuntu-latest flakiness with webServer launch
@@ -394,22 +399,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-${{ runner.os }}-v1.59.1-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            playwright-${{ runner.os }}-
+            playwright-${{ runner.os }}-v1.59.1-
 
-      - name: Install Playwright browsers + Linux deps
+      # No --with-deps: Noble image already includes Chromium system libraries; only sync browser binaries.
+      - name: Install Playwright browsers (container image; no apt)
         id: playwright_install
-        # Fail fast instead of burning the whole 50m job (see run 26954265012: install hung until timeout).
-        timeout-minutes: 12
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
+        run: npx playwright install chromium
 
       - name: Retry Playwright install (clear browser cache)
         if: steps.playwright_install.outcome == 'failure'
-        timeout-minutes: 12
+        timeout-minutes: 8
         run: |
           rm -rf "$HOME/.cache/ms-playwright"
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
 
       - name: Run Playwright UI smoke (curated specs)
         continue-on-error: true

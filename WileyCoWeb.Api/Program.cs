@@ -83,6 +83,10 @@ public partial class Program
                 builder.Configuration.AddUserSecrets<Program>(optional: true);
             }
 
+            // Ensure consistent startup + application logging (simple console with timestamps, filters, + workspace file logger for diagnostics).
+            // This was previously only applied to bootstrap LoggerFactories; without it the post-Build app.Logger used default providers/format (no file logs).
+            StartupConfigurationService.ConfigureLogging(builder);
+
             bootstrapLoggerFactory = CreateStartupLoggerFactory();
             bootstrapLogger = bootstrapLoggerFactory.CreateLogger("WileyCoWeb.Api.Startup");
             bootstrapLogger.LogInformation(
@@ -127,7 +131,7 @@ public partial class Program
         return LoggerFactory.Create(logging => StartupConfigurationService.ConfigureApiLogging(logging, includeWorkspaceFileLogger: false));
     }
 
-    private static async Task<(SyncfusionLicenseResult SyncfusionResult, XaiSecretResolutionResult XaiResult)> ResolveSecretsAsync(WebApplicationBuilder builder)
+    private static async Task<(SyncfusionLicenseResult SyncfusionResult, XaiSecretResolutionResult XaiResult)> ResolveSecretsAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
         // IntegrationTest hosts inject stub XAI keys via ApiApplicationFactory; skip vault init to avoid
         // parallel CI races on the shared AppData .entropy file (EncryptedLocalSecretVaultService ctor throws).
@@ -141,7 +145,7 @@ public partial class Program
 
         var secretResolver = new SecretResolver(builder.Configuration, localVault);
         var xaiSecretResolution = await secretResolver.ResolveXaiSecretAsync().ConfigureAwait(false);
-        var syncfusionLicenseResult = await LicenseBootstrapper.RegisterSyncfusionLicenseAsync(builder).ConfigureAwait(false);
+        var syncfusionLicenseResult = await LicenseBootstrapper.RegisterSyncfusionLicenseAsync(builder, bootstrapLogger).ConfigureAwait(false);
         return (syncfusionLicenseResult, xaiSecretResolution);
     }
 
@@ -331,7 +335,7 @@ public partial class Program
     private static async Task<StartupRuntimeOptions> PrepareStartupRuntimeOptionsAsync(WebApplicationBuilder builder, ILogger bootstrapLogger)
     {
         NormalizeAppRunnerInjectedXaiApiKey(builder, bootstrapLogger);
-        var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder).ConfigureAwait(false);
+        var (syncfusionLicenseResult, xaiSecretResolution) = await ResolveSecretsAsync(builder, bootstrapLogger).ConfigureAwait(false);
 
         var configuredConnectionString = GetConfiguredConnectionString(builder.Configuration);
         var allowDegradedStartup = ShouldAllowDegradedStartup(builder.Environment, builder.Configuration);
