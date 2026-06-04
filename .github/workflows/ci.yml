@@ -14,9 +14,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Only cancel in-progress runs on direct pushes to main (deploy path).
+# PR synchronize no longer cancels prior runs — avoids "stuck then cancelled" when pushing while CI is on Playwright install.
+# Trade-off: rapid PR pushes may run overlapping workflows; wait for the latest run before merging.
 concurrency:
   group: wiley-co-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -325,7 +328,8 @@ jobs:
     needs: build-and-publish
     # Smoke-only: full Playwright suite is long and environment-sensitive (static wwwroot + API).
     # Run locally: npm run playwright:test:ci or npm run playwright:test:strict before release.
-    timeout-minutes: 25
+    # Browser install + smoke + highrisk often exceeds 25m on cold runners (run #141 cancelled at job timeout).
+    timeout-minutes: 50
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -380,6 +384,14 @@ jobs:
 
       - name: Restore Node dependencies
         run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers + Linux deps
         run: npx playwright install --with-deps chromium
