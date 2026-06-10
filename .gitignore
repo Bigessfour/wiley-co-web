@@ -7,6 +7,7 @@ wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 .DS_Store
 .cursor/
+.agents/
 bin/
 obj/
 wwwroot/appsettings.json

@@ -246,6 +246,109 @@ async function waitWorkspaceReady(page) {
   await page.waitForTimeout(1500);
 }
 
+/** Expand the context rail when collapsed so overview dropdowns are clickable. */
+async function ensureContextRailExpanded(page) {
+  const contextPane = page.locator(".workspace-splitter-pane-context.e-pane");
+  if ((await contextPane.count()) === 0) return;
+
+  const isCollapsed = await contextPane
+    .first()
+    .evaluate((el) => el.classList.contains("e-pane-collapsed"))
+    .catch(() => false);
+  if (!isCollapsed) return;
+
+  const expanded = await page.evaluate(() => {
+    const splitter = document.querySelector("#workspace-main-splitter");
+    const pane = splitter?.querySelector(".workspace-splitter-pane-context");
+    if (!pane?.classList.contains("e-pane-collapsed")) return true;
+
+    const bars = splitter?.querySelectorAll(".e-split-bar") ?? [];
+    for (const bar of bars) {
+      const arrow = bar.querySelector(
+        ".e-navigate-arrow, .e-arrow-left, .e-arrow-right",
+      );
+      if (arrow) {
+        arrow.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, cancelable: true }),
+        );
+        return !pane.classList.contains("e-pane-collapsed");
+      }
+    }
+    return false;
+  });
+
+  if (!expanded) {
+    await page
+      .evaluate(() => {
+        try {
+          const key = "wiley.workspace.layout.v2";
+          const raw = localStorage.getItem(key);
+          const state = raw ? JSON.parse(raw) : {};
+          state.ContextRailCollapsed = false;
+          localStorage.setItem(key, JSON.stringify(state));
+        } catch {
+          // Non-fatal: audit may still exercise visible controls.
+        }
+      })
+      .catch(() => undefined);
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 120000 });
+    await waitWorkspaceReady(page);
+  } else {
+    await page.waitForTimeout(400);
+  }
+}
+
+/** Open a Syncfusion DropDownList and wait for its id-specific popup. */
+async function openDropDownListForAudit(page, controlId) {
+  await page
+    .locator("#workspace-enterprise-context-card")
+    .scrollIntoViewIfNeeded()
+    .catch(() => undefined);
+  await page.waitForTimeout(200);
+
+  const host = page.locator(`#${controlId}`);
+  const combobox = host.locator("[role='combobox']").first();
+  const ddlIcon = host.locator(".e-ddl-icon").first();
+  const wrapper = host.locator(
+    "xpath=ancestor::*[contains(@class,'e-input-group') or contains(@class,'e-ddl')][1]",
+  );
+
+  let clickTarget = combobox;
+  if ((await combobox.count()) === 0) {
+    clickTarget = (await ddlIcon.count()) > 0 ? ddlIcon : wrapper;
+  }
+
+  await clickTarget.scrollIntoViewIfNeeded().catch(() => undefined);
+  await clickTarget.click({ timeout: 5000, force: true });
+
+  const popupById = page.locator(`#${controlId}_popup`);
+  try {
+    await popupById.waitFor({ state: "visible", timeout: 3000 });
+    return true;
+  } catch {
+    const hostBox = await host.boundingBox().catch(() => null);
+    const popups = page.locator(
+      ".e-popup.e-ddl:visible, .e-popup.e-dropdownbase:visible",
+    );
+    const count = await popups.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      const popupBox = await popups
+        .nth(i)
+        .boundingBox()
+        .catch(() => null);
+      if (
+        hostBox &&
+        popupBox &&
+        Math.abs(popupBox.x - hostBox.x) < 240 &&
+        popupBox.y >= hostBox.y - 40
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 function shouldSkipDiscoveredControl(meta) {
   const id = meta?.id || "";
   const cls = meta?.classes || "";
@@ -444,23 +547,15 @@ async function testExpectedControl(page, control) {
     }
 
     if (control.action === "open-ddl") {
-      const wrapper = control.id
-        ? page
-            .locator(`#${control.id}`)
-            .locator(
-              "xpath=ancestor::*[contains(@class,'e-input-group') or contains(@class,'e-ddl')][1]",
-            )
-        : locator;
-      await wrapper.scrollIntoViewIfNeeded().catch(() => undefined);
-      await wrapper.click({ timeout: 5000, force: true });
-      const popup = page
-        .locator(".e-popup.e-ddl, .e-popup.e-dropdownbase")
-        .first();
-      const opened = await popup.isVisible().catch(() => false);
+      await ensureContextRailExpanded(page);
+      const opened = control.id
+        ? await openDropDownListForAudit(page, control.id)
+        : false;
       result.status = opened ? "pass" : "warn";
       if (!opened)
-        result.notes.push("dropdown popup not detected after wrapper click");
+        result.notes.push("dropdown popup not detected after combobox click");
       await page.keyboard.press("Escape").catch(() => undefined);
+      await page.waitForTimeout(150);
       return result;
     }
 
