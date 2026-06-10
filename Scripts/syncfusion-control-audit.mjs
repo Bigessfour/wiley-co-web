@@ -307,15 +307,24 @@ async function openDropDownListForAudit(page, controlId) {
   await page.waitForTimeout(200);
 
   const host = page.locator(`#${controlId}`);
-  const combobox = host.locator("[role='combobox']").first();
-  const ddlIcon = host.locator(".e-ddl-icon").first();
+  const combobox = page
+    .locator(`#${controlId}[role='combobox'], #${controlId} [role='combobox']`)
+    .first();
   const wrapper = host.locator(
     "xpath=ancestor::*[contains(@class,'e-input-group') or contains(@class,'e-ddl')][1]",
   );
+  const ddlIcon = wrapper.locator(".e-ddl-icon").first();
 
-  let clickTarget = combobox;
-  if ((await combobox.count()) === 0) {
-    clickTarget = (await ddlIcon.count()) > 0 ? ddlIcon : wrapper;
+  // Syncfusion sets ID on the input; role=combobox lives on a parent DIV.
+  let clickTarget = host;
+  if ((await host.count()) === 0) {
+    clickTarget = combobox;
+  } else if ((await combobox.count()) > 0) {
+    clickTarget = combobox;
+  } else if ((await ddlIcon.count()) > 0) {
+    clickTarget = ddlIcon;
+  } else if ((await wrapper.count()) > 0) {
+    clickTarget = wrapper;
   }
 
   await clickTarget.scrollIntoViewIfNeeded().catch(() => undefined);
