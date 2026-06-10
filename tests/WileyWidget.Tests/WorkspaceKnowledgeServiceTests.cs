@@ -160,7 +160,7 @@ public sealed class WorkspaceKnowledgeServiceTests
                 RiskAssessment = "Stable"
             });
 
-        public Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, CancellationToken cancellationToken = default)
+        public Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, string? enterpriseName = null, CancellationToken cancellationToken = default)
             => tracker.TrackAsync("budget-overview", () => new BudgetOverviewData
             {
                 TotalBudget = 13250m,
@@ -232,7 +232,7 @@ public sealed class WorkspaceKnowledgeServiceTests
             this.tracker = tracker;
         }
 
-        public Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, CancellationToken ct = default)
+        public Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
             => tracker.TrackAsync("top-variances", () => new List<VarianceAnalysis>
             {
                 new()
@@ -254,7 +254,7 @@ public sealed class WorkspaceKnowledgeServiceTests
         public Task<TrendAnalysis> GetTrendAnalysisAsync(DateTime start, DateTime end, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, CancellationToken ct = default)
+        public Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
             => throw new NotSupportedException();
 
         public Task<List<BudgetMetric>> GetBudgetMetricsAsync(int fiscalYear, CancellationToken ct = default)
@@ -281,7 +281,7 @@ public sealed class WorkspaceKnowledgeServiceTests
                 RiskAssessment = "Stable"
             });
 
-        public Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, CancellationToken cancellationToken = default)
+        public Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, string? enterpriseName = null, CancellationToken cancellationToken = default)
             => Task.FromResult(new BudgetOverviewData
             {
                 TotalBudget = 13250m,
@@ -339,7 +339,7 @@ public sealed class WorkspaceKnowledgeServiceTests
 
     private sealed class ThrowingBudgetAnalyticsRepository : IBudgetAnalyticsRepository
     {
-        public Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, CancellationToken ct = default)
+        public Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
             => throw new InvalidOperationException("Variance query failed.");
 
         public Task<List<ReserveDataPoint>> GetReserveHistoryAsync(DateTime from, DateTime to, string? entryScope = null, CancellationToken ct = default)
@@ -351,7 +351,7 @@ public sealed class WorkspaceKnowledgeServiceTests
         public Task<TrendAnalysis> GetTrendAnalysisAsync(DateTime start, DateTime end, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, CancellationToken ct = default)
+        public Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
             => throw new NotSupportedException();
 
         public Task<List<BudgetMetric>> GetBudgetMetricsAsync(int fiscalYear, CancellationToken ct = default)
@@ -376,7 +376,7 @@ public sealed class WorkspaceKnowledgeServiceTests
             return Task.FromResult(new ReserveForecastResult());
         }
 
-        public Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, CancellationToken cancellationToken = default)
+        public Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, string? enterpriseName = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(new BudgetOverviewData());
@@ -433,7 +433,7 @@ public sealed class WorkspaceKnowledgeServiceTests
 
     private sealed class CancellationAwareBudgetAnalyticsRepository : IBudgetAnalyticsRepository
     {
-        public Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, CancellationToken ct = default)
+        public Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             return Task.FromResult(new List<VarianceAnalysis>());
@@ -448,7 +448,7 @@ public sealed class WorkspaceKnowledgeServiceTests
         public Task<TrendAnalysis> GetTrendAnalysisAsync(DateTime start, DateTime end, CancellationToken ct = default)
             => throw new NotSupportedException();
 
-        public Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, CancellationToken ct = default)
+        public Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
             => throw new NotSupportedException();
 
         public Task<List<BudgetMetric>> GetBudgetMetricsAsync(int fiscalYear, CancellationToken ct = default)

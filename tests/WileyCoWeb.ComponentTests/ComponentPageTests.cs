@@ -257,15 +257,20 @@ public sealed class ComponentPageTests
 	public void WileyWorkspace_JarvisLauncher_OpensFloatingDock()
 	{
 		using var context = CreateContext();
+		var layoutContext = new WorkspaceLayoutContext();
 
-		var cut = context.RenderComponent<WileyWorkspace>();
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.AddCascadingValue(layoutContext));
 
+		Assert.False(layoutContext.IsJarvisOpen);
 		cut.Find("#workspace-jarvis-launcher").Click();
 
 		cut.WaitForAssertion(() =>
 		{
-			Assert.Contains("workspace-jarvis-rail", cut.Markup);
+			Assert.True(layoutContext.IsJarvisOpen);
+			Assert.Contains("workspace-jarvis-dock", cut.Markup);
 			Assert.Single(cut.FindComponents<JarvisChatPanel>());
+			Assert.DoesNotContain("workspace-jarvis-launcher", cut.Markup);
 		});
 	}
 

@@ -39,7 +39,7 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, CancellationToken ct = default)
+    public async Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
     {
         try
         {
@@ -47,17 +47,33 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
 
             await using var context = await _contextFactory.CreateDbContextAsync(ct);
 
-            IQueryable<BudgetEntry> fiscalYearEntries = context.BudgetEntries
+            var fiscalYearEntries = await context.BudgetEntries
                 .AsNoTracking()
-                .Where(b => b.FiscalYear == fiscalYear);
+                .Include(b => b.Department)
+                .Include(b => b.Fund)
+                .Include(b => b.MunicipalAccount)
+                .Where(b => b.FiscalYear == fiscalYear)
+                .ToListAsync(ct);
 
-            var hasImportedActuals = await fiscalYearEntries.AnyAsync(b => b.ActualAmount != 0, ct);
-            if (hasImportedActuals)
+            if (!string.IsNullOrWhiteSpace(enterpriseName))
             {
-                fiscalYearEntries = fiscalYearEntries.Where(b => b.ActualAmount != 0);
+                fiscalYearEntries = fiscalYearEntries
+                    .Where(entry => EnterpriseBudgetScope.MatchesEnterpriseScope(
+                        enterpriseName,
+                        entry.Description,
+                        entry.Department?.Name,
+                        entry.Fund?.Name,
+                        entry.MunicipalAccount?.Name))
+                    .ToList();
             }
 
-            var topVariances = await fiscalYearEntries
+            var hasImportedActuals = fiscalYearEntries.Any(b => b.ActualAmount != 0);
+            if (hasImportedActuals)
+            {
+                fiscalYearEntries = fiscalYearEntries.Where(b => b.ActualAmount != 0).ToList();
+            }
+
+            var topVariances = fiscalYearEntries
                 .OrderByDescending(b => Math.Abs(b.Variance))
                 .ThenByDescending(b => Math.Abs(b.ActualAmount))
                 .Take(topN)
@@ -70,9 +86,14 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
                     VarianceAmount = e.Variance,
                     VariancePercentage = e.BudgetedAmount != 0 ? (e.Variance / e.BudgetedAmount) * 100 : 0
                 })
-                .ToListAsync(ct);
+                .ToList();
 
-            _logger.LogInformation("Retrieved top {Count} variances for fiscal year {FiscalYear} (HasImportedActuals={HasImportedActuals})", topVariances.Count, fiscalYear, hasImportedActuals);
+            _logger.LogInformation(
+                "Retrieved top {Count} variances for fiscal year {FiscalYear} (Enterprise={Enterprise}, HasImportedActuals={HasImportedActuals})",
+                topVariances.Count,
+                fiscalYear,
+                enterpriseName ?? "all",
+                hasImportedActuals);
             return topVariances;
         }
         catch (OperationCanceledException)
@@ -368,9 +389,9 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
         _logger.LogInformation("Invalidated analytics cache for fiscal year {FiscalYear}", fiscalYear);
     }
 
-    public async Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, CancellationToken ct = default)
+    public async Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, string? enterpriseName = null, CancellationToken ct = default)
     {
-        var cacheKey = $"{CacheKeyPrefix}Overview_{fiscalYear}";
+        var cacheKey = $"{CacheKeyPrefix}Overview_{fiscalYear}_{enterpriseName ?? "all"}";
 
         if (_cache.TryGetValue<BudgetOverviewData>(cacheKey, out var cached))
         {
@@ -384,19 +405,35 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
 
             await using var context = await _contextFactory.CreateDbContextAsync(ct);
 
-            // Server-side aggregation - no client-side enumeration
-            var overview = await context.BudgetEntries
+            var entries = await context.BudgetEntries
                 .AsNoTracking()
+                .Include(b => b.Department)
+                .Include(b => b.Fund)
+                .Include(b => b.MunicipalAccount)
                 .Where(b => b.FiscalYear == fiscalYear)
-                .GroupBy(_ => 1)  // Single group for global aggregation
-                .Select(g => new
+                .ToListAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(enterpriseName))
+            {
+                entries = entries
+                    .Where(entry => EnterpriseBudgetScope.MatchesEnterpriseScope(
+                        enterpriseName,
+                        entry.Description,
+                        entry.Department?.Name,
+                        entry.Fund?.Name,
+                        entry.MunicipalAccount?.Name))
+                    .ToList();
+            }
+
+            var overview = entries.Count == 0
+                ? null
+                : new
                 {
-                    TotalBudget = g.Sum(e => e.BudgetedAmount),
-                    TotalActual = g.Sum(e => e.ActualAmount),
-                    OverBudget = g.Count(e => e.ActualAmount > e.BudgetedAmount),
-                    UnderBudget = g.Count(e => e.ActualAmount < e.BudgetedAmount)
-                })
-                .SingleOrDefaultAsync(ct);
+                    TotalBudget = entries.Sum(e => e.BudgetedAmount),
+                    TotalActual = entries.Sum(e => e.ActualAmount),
+                    OverBudget = entries.Count(e => e.ActualAmount > e.BudgetedAmount),
+                    UnderBudget = entries.Count(e => e.ActualAmount < e.BudgetedAmount)
+                };
 
             if (overview == null)
             {

@@ -16,7 +16,12 @@ public sealed class QuickBooksRoutingService
         ("sanitation", "Wiley Sanitation District"),
         ("sewer", "Wiley Sanitation District"),
         ("Util", "Water Utility"),
-        ("utility", "Water Utility")
+        ("utility", "Water Utility"),
+        ("trash", "Trash"),
+        ("refuse", "Trash"),
+        ("garbage", "Trash"),
+        ("apartment", "Apartments"),
+        ("apts", "Apartments")
     ];
 
     private static readonly HashSet<string> GenericScopes = new(StringComparer.OrdinalIgnoreCase)

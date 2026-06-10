@@ -43,17 +43,71 @@ public sealed partial class SecretResolver
             return configuredResult;
         }
 
-        // SSM before Secrets Manager (primary for xAI when ParameterName configured). Skip all remote fetches in IntegrationTest env (stub key from factory).
-        if (!IsIntegrationTestEnvironment())
+        // In Development (local dotnet run without AWS creds), skip remote AWS fetches by default.
+        // Production / App Runner will have the ParameterName/SecretName values and will attempt.
+        // Use XAI:ForceRemoteSecretResolutionInDevelopment=true (or set a direct XAI_API_KEY) to force.
+        if (ShouldAttemptRemoteAwsResolution())
         {
-            var ssmResult = await TryResolveFromSsmAsync(context).ConfigureAwait(false);
-            if (ssmResult is not null)
+            // SSM before Secrets Manager (primary for xAI when ParameterName configured).
+            // Skip all remote fetches in IntegrationTest env (stub key from factory).
+            if (!IsIntegrationTestEnvironment())
             {
-                return ssmResult;
+                var ssmResult = await TryResolveFromSsmAsync(context).ConfigureAwait(false);
+                if (ssmResult is not null)
+                {
+                    return ssmResult;
+                }
             }
+
+            return await ResolveFromSecretsManagerAsync(context).ConfigureAwait(false);
         }
 
-        return await ResolveFromSecretsManagerAsync(context).ConfigureAwait(false);
+        // No remote resolution attempted (typical local Development path).
+        return BuildNoRemoteAttemptResult(context);
+    }
+
+    private bool ShouldAttemptRemoteAwsResolution()
+    {
+        if (IsIntegrationTestEnvironment())
+        {
+            return false;
+        }
+
+        // Check common ways Development is signaled.
+        var aspnetEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? _configuration["ASPNETCORE_ENVIRONMENT"]
+            ?? _configuration["Environment"]
+            ?? _configuration["ASPNETCORE__ENVIRONMENT"];
+
+        if (string.Equals(aspnetEnv, "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            var force = _configuration.GetValue<bool?>("XAI:ForceRemoteSecretResolutionInDevelopment") ?? false;
+            return force;
+        }
+
+        // Non-Development environments (Production, Staging, etc.) attempt remote when names are configured.
+        return true;
+    }
+
+    private static XaiSecretResolutionResult BuildNoRemoteAttemptResult(SecretResolutionContext context)
+    {
+        return new XaiSecretResolutionResult(
+            ResolvedKeySource: "not-found",
+            EnvironmentKeyPresent: false,
+            ConfigDirectKeyPresent: false,
+            ConfigNamedKeyPresent: false,
+            SecretFetchAttempted: false,
+            SecretName: context.SecretName,
+            RegionName: context.RegionName,
+            SecretFetchStatus: "skipped_development",
+            SecretFetchErrorCode: null,
+            SecretFetchErrorMessage: null,
+            ConfigurationInjected: false,
+            SsmParameterName: context.SsmParameterName,
+            SsmFetchAttempted: false,
+            SsmFetchStatus: "skipped_development",
+            SsmFetchErrorCode: null,
+            SsmFetchErrorMessage: null);
     }
 
     private bool IsIntegrationTestEnvironment()
@@ -63,5 +117,12 @@ public sealed partial class SecretResolver
             ?? _configuration["Environment"]
             ?? _configuration["ASPNETCORE__ENVIRONMENT"];
         return string.Equals(env, "IntegrationTest", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDevelopmentEnvironment()
+    {
+        var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+        return string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase);
     }
 }

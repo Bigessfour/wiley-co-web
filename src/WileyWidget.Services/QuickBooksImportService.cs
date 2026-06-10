@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Models.Amplify;
+using WileyWidget.Services.Abstractions;
 
 namespace WileyWidget.Services;
 
@@ -20,6 +21,7 @@ public sealed class QuickBooksImportService
 	private readonly IQuickBooksFileParser csvParser;
 	private readonly IQuickBooksFileParser excelParser;
 	private readonly QuickBooksRoutingService routingService;
+	private readonly IEnterpriseLedgerCostService enterpriseLedgerCostService;
 
 	static QuickBooksImportService()
 	{
@@ -30,12 +32,14 @@ public sealed class QuickBooksImportService
 		ILogger<QuickBooksImportService> logger,
 		IDbContextFactory<AppDbContext> contextFactory,
 		QuickBooksRoutingService routingService,
+		IEnterpriseLedgerCostService enterpriseLedgerCostService,
 		QuickBooksCsvParser csvParser,
 		QuickBooksExcelParser excelParser)
 	{
 		this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
 		this.routingService = routingService ?? throw new ArgumentNullException(nameof(routingService));
+		this.enterpriseLedgerCostService = enterpriseLedgerCostService ?? throw new ArgumentNullException(nameof(enterpriseLedgerCostService));
 		this.csvParser = csvParser ?? throw new ArgumentNullException(nameof(csvParser));
 		this.excelParser = excelParser ?? throw new ArgumentNullException(nameof(excelParser));
 	}
@@ -180,7 +184,13 @@ public sealed class QuickBooksImportService
 			await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		}
 
-		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, routedRows.Count);
+		var refreshedEnterprises = await enterpriseLedgerCostService.RefreshEnterpriseMonthlyExpensesAsync(selectedFiscalYear, cancellationToken).ConfigureAwait(false);
+		logger.LogInformation(
+			"QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}, refreshedEnterpriseCosts={RefreshedEnterpriseCosts}",
+			Path.GetFileName(fileName),
+			batch.Id,
+			routedRows.Count,
+			refreshedEnterprises);
 
 		return new QuickBooksImportCommitResponse(
 			Path.GetFileName(fileName),

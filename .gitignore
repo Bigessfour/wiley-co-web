@@ -110,3 +110,7 @@ build/Release
 terraform.tfstate
 terraform.tfstate.backup
 .vscode/settings.json
+
+
+# APM dependencies
+apm_modules/

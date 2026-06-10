@@ -1,0 +1,11 @@
+name: wiley-co-web
+version: 1.0.0
+description: APM project for wiley-co-web
+author: Bigessfour
+dependencies:
+  apm:
+    - syncfusion/react-ui-builder
+    - syncfusion/blazor-ui-builder
+  mcp: []
+includes: auto
+scripts: {}

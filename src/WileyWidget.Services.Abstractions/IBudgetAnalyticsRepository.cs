@@ -14,7 +14,7 @@ namespace WileyWidget.Services.Abstractions
         /// <summary>
         /// Gets top budget variances by amount for a fiscal year.
         /// </summary>
-        Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, CancellationToken ct = default);
+        Task<List<VarianceAnalysis>> GetTopVariancesAsync(int topN, int fiscalYear, string? enterpriseName = null, CancellationToken ct = default);
 
         /// <summary>
         /// Gets reserve history data points for forecasting.
@@ -34,7 +34,7 @@ namespace WileyWidget.Services.Abstractions
         /// <summary>
         /// Gets budget overview data for a fiscal year.
         /// </summary>
-        Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, CancellationToken ct = default);
+        Task<BudgetOverviewData> GetBudgetOverviewDataAsync(int fiscalYear, string? enterpriseName = null, CancellationToken ct = default);
 
         /// <summary>
         /// Gets budget metrics for grid display.

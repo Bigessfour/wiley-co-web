@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using System.Globalization;
 using Syncfusion.Blazor.InteractiveChat;
 using WileyCoWeb.Contracts;
@@ -36,6 +38,22 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     [Inject]
     protected IServiceProvider ServiceProvider { get; set; } = default!;
 
+    [Inject]
+    protected ILogger<JarvisChatPanel> Logger { get; set; } = default!;
+
+    [Inject]
+    protected IJSRuntime JSRuntime { get; set; } = default!;
+
+    /// <summary>When true (Decision Support panel), renders the Jarvis chat block above insights and recommendations.</summary>
+    [Parameter]
+    public bool ChatFirstLayout { get; set; }
+
+    /// <summary>Stable DOM id for SfAIAssistView; must be unique when multiple JarvisChatPanel instances render (dock vs Decision Support).</summary>
+    [Parameter]
+    public string AssistViewId { get; set; } = "jarvis-chat-ui";
+
+    private bool _scrolledChatIntoView;
+
     protected List<AssistViewPrompt> ChatPrompts => chatPrompts;
     public List<string> PromptSuggestions => promptSuggestions;
     protected string StatusText { get; set; } = "Live guidance pending";
@@ -60,6 +78,26 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     protected bool CanAskChat => !IsChatBusy && !string.IsNullOrWhiteSpace(ChatQuestion);
     public bool IsSecureJarvisEnabled => !string.Equals(Environment.GetEnvironmentVariable("UI__UseSecureJarvis"), "false", StringComparison.OrdinalIgnoreCase);
 
+    // --- Local dev xAI key setup (production-safe: endpoint + storage only exist in Development) ---
+    // Kept as the canonical method: key is added/rotated exclusively via the Jarvis panel prompt.
+    // Never exchanged in chat or committed. Persisted only to gitignored local file.
+    protected bool ShowXaiKeySetupPrompt { get; set; }
+    protected bool ShowXaiKeyInputForm { get; set; }
+    protected string XaiKeyInput { get; set; } = string.Empty;
+    protected bool IsSettingXaiKey { get; set; }
+    protected string XaiKeySetupMessage { get; set; } = string.Empty;
+    protected string XaiKeySetupStatus { get; set; } = string.Empty;
+
+    // Always offer a dev-only key manager (local only) for easy access/rotation
+    // even after the initial prompt. This completes the "add xai key via jarvis chat window" flow.
+    // The server endpoint is guarded to Development only.
+    protected bool ShowDevKeyManager => true; // Always available in the panel for local dev convenience
+
+    // Simple flag to toggle the manager UI (collapsed by default after first use)
+    protected bool DevKeyManagerExpanded { get; set; } = false;
+
+    protected bool CanSubmitXaiKey => !IsSettingXaiKey && !string.IsNullOrWhiteSpace(XaiKeyInput);
+
     protected override void OnInitialized()
     {
         ApplyFallbackKnowledge("Waiting for live workspace guidance.");
@@ -76,7 +114,124 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
 
         await LoadRecommendationHistoryAsync(force: true).ConfigureAwait(false); // Persists via EfConversationRepository + UserContextPlugin (history now auditable)
         await RefreshKnowledgeAsync(force: true).ConfigureAwait(false);
+        await CheckForMissingXaiKeyAtStartupAsync().ConfigureAwait(false);
+
+        if (ChatFirstLayout && !_scrolledChatIntoView)
+        {
+            _scrolledChatIntoView = true;
+            await JSRuntime.InvokeVoidAsync("wileyWorkspace.scrollIntoViewById", AssistViewId);
+        }
+
         await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// "Startup" hook: checks AI health. If fallbacks are active (typical when no xAI key for local dev),
+    /// we surface a friendly prompt so the developer can add/rotate the key with Yes/No buttons.
+    /// This only makes sense / is useful in Development.
+    /// </summary>
+    private async Task CheckForMissingXaiKeyAtStartupAsync()
+    {
+        try
+        {
+            var health = await AiApi.GetHealthAsync().ConfigureAwait(false);
+            if (health is null)
+            {
+                Logger.LogWarning("Jarvis startup health check failed: /api/ai/health returned null.");
+                ChatRuntimeStatusTitle = "AI health unavailable";
+                ChatRuntimeStatusDetail = "Could not reach /api/ai/health. Confirm the API is running on http://localhost:5231 and the client base address points to it.";
+                return;
+            }
+
+            Logger.LogInformation(
+                "Jarvis startup health: LatestUsedFallback={LatestUsedFallback} SemanticKernelAvailable={SemanticKernelAvailable} LatestAnswerSource={LatestAnswerSource}",
+                health.LatestUsedFallback,
+                health.SemanticKernelAvailable,
+                health.LatestAnswerSource);
+
+            if (health.LatestUsedFallback)
+            {
+                ShowXaiKeySetupPrompt = true;
+                XaiKeySetupStatus = "Jarvis is using safe fallback responses (no live Grok turn yet, or xAI key missing).";
+                UpdateChatRuntimeStatus(true, health.LatestAnswerSource);
+                ChatRuntimeStatusDetail = "Set XAI_API_KEY (or use Dev: xAI Key below), restart the API, then send a prompt to verify live Grok.";
+                return;
+            }
+
+            UpdateChatRuntimeStatus(false, health.LatestAnswerSource);
+            if (!health.SemanticKernelAvailable)
+            {
+                ChatRuntimeStatusTitle = "Semantic Kernel unavailable";
+                ChatRuntimeStatusDetail = "The API health check reports Semantic Kernel is not initialized. Set XAI_API_KEY before starting WileyCoWeb.Api, then restart the API.";
+                ShowXaiKeySetupPrompt = true;
+                XaiKeySetupStatus = "Live Grok requires a valid xAI key at API startup.";
+            }
+            else if (string.Equals(health.Status, "healthy", StringComparison.OrdinalIgnoreCase))
+            {
+                ChatRuntimeStatusDetail = "Semantic Kernel is available. Send a prompt to confirm live Grok; expand Dev: xAI Key if you still need to configure the key locally.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Jarvis startup health check failed.");
+            ChatRuntimeStatusTitle = "AI health check failed";
+            ChatRuntimeStatusDetail = "Could not load /api/ai/health. Start the API (dotnet run --project WileyCoWeb.Api) and reload the workspace.";
+        }
+    }
+
+    protected void OnXaiKeyPromptYes()
+    {
+        XaiKeySetupMessage = string.Empty;
+        ShowXaiKeyInputForm = true;   // reveal the password input + save button
+    }
+
+    protected void OnXaiKeyPromptNo()
+    {
+        ShowXaiKeySetupPrompt = false;
+        ShowXaiKeyInputForm = false;
+        XaiKeySetupMessage = "You can always add the key later from the Jarvis rail or by setting XAI_API_KEY / user secrets before starting the API.";
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected async Task SubmitXaiKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(XaiKeyInput))
+        {
+            XaiKeySetupMessage = "Please enter a key (starts with sk- or similar).";
+            return;
+        }
+
+        IsSettingXaiKey = true;
+        XaiKeySetupMessage = string.Empty;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            bool ok = await AiApi.SetDevXaiApiKeyAsync(XaiKeyInput).ConfigureAwait(false);
+            if (ok)
+            {
+                XaiKeySetupMessage = "Key accepted and saved to your local development settings (gitignored). " +
+                                     "For full effect in this Jarvis session you may need to restart the API process. " +
+                                     "Refresh or try a new prompt.";
+                ShowXaiKeySetupPrompt = false; // hide after success; user can re-trigger if needed
+                // Clear sensitive input
+                XaiKeyInput = string.Empty;
+            }
+            else
+            {
+                XaiKeySetupMessage = "Could not save the key (the dev endpoint may not be available in this environment). " +
+                                     "Use dotnet user-secrets set \"XAI_API_KEY\" \"sk-...\" --project WileyCoWeb.Api/WileyCoWeb.Api.csproj or export the env var instead.";
+            }
+        }
+        catch (Exception ex)
+        {
+            XaiKeySetupMessage = $"Error saving key: {ex.Message}. See README for manual alternatives (user secrets / launchctl / local json).";
+        }
+        finally
+        {
+            IsSettingXaiKey = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     protected Task RefreshKnowledgeFromButtonAsync()

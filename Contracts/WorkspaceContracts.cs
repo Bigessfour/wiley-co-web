@@ -120,4 +120,9 @@ public sealed record WorkspaceBootstrapData(
     /// document-center can show when each export was last downloaded.
     /// </summary>
     public Dictionary<string, string>? LastExportedTimestamps { get; init; }
+
+    /// <summary>
+    /// Origin of <see cref="TotalCosts"/>: ledger, snapshot, or baseline.
+    /// </summary>
+    public string? CostSource { get; init; }
 }

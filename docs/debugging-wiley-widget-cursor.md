@@ -73,6 +73,8 @@ Use this loop in **Chat** or with a colleague. Each step produces evidence.
 - **API not hit** — Client still pointing at production App Runner; use local base address or `wwwroot/appsettings.Workspace.local.json` per [README.md](../README.md).
 - **preLaunchTask failed** — Run `dotnet build WileyCoWeb.Api/WileyCoWeb.Api.csproj` (or solution) in terminal; fix compile errors first.
 - **Syncfusion / static assets** — Licensing and `wwwroot` issues often show as **browser Console** errors, not C# breakpoints.
+- **Stuck at 0–5% (“Loading dotnet.js…”)** — Two common causes: (1) **Broken `loadBootResource`** in `wwwroot/js/wiley-wasm-boot.js` — `dotnetjs` / `js-module-runtime` must return a **URI string**, not `fetch()`; console shows `For a dotnetjs resource, custom loaders must supply a URI string`. (2) **Zombie dev server** on port 5230 — lingering `dotnet-watch.dll` processes or exit 134 in `TestResults/local-run/client.log`. Fix: `./stop-local.sh && ./start-local.sh` (uses stable `dotnet run`). Validate: `node Scripts/validate-blazor-boot-resources.mjs --base http://127.0.0.1:5230`. Browser diagnose: `node Scripts/diagnose-wasm-stuck.mjs`. E2E gate: `npx playwright test tests/playwright/boot-resources.spec.ts`.
+- **Stuck on “Loading Wiley Widget (2–90%)”** — Often a **stale browser tab** caching an old `blazor.boot.json` fingerprint manifest. Close all `5230` tabs completely, then `./Scripts/start-chrome-debug.sh http://127.0.0.1:5230/wiley-workspace` (clean Chrome profile). Hard refresh alone is usually not enough.
 
 ## 6. Release evidence (skill alignment)
 

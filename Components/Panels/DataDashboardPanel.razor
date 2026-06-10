@@ -7,6 +7,11 @@
 
 <div class="space-y-6" id="data-dashboard-panel">
 
+    @if (!string.IsNullOrWhiteSpace(CostSource))
+    {
+        <p class="text-xs wiley-text-muted">Cost source: <span class="font-semibold wiley-text">QuickBooks @CostSource · FY@SelectedFiscalYear</span></p>
+    }
+
     @* ─── KPI ROW ────────────────────────────────────────────────────────────── *@
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SfCard ID="kpi-net-position">
@@ -39,8 +44,40 @@
         </SfCard>
     </div>
 
-    @* ─── CIRCULAR GAUGES ────────────────────────────────────────────────────── *@
-    <div class="grid gap-4 md:grid-cols-2">
+    @if (EnterpriseComparisonRows.Count > 0)
+    {
+        <div id="enterprise-comparison-matrix" class="wiley-surface-panel p-4">
+            <p class="mb-3 text-sm font-semibold wiley-text">Enterprise comparison (ledger-sourced costs)</p>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="text-xs uppercase tracking-wide wiley-text-muted">
+                        <tr>
+                            <th class="px-3 py-2">Enterprise</th>
+                            <th class="px-3 py-2">Monthly costs</th>
+                            <th class="px-3 py-2">Monthly revenue</th>
+                            <th class="px-3 py-2">Net</th>
+                            <th class="px-3 py-2">Break-even rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in EnterpriseComparisonRows)
+                        {
+                            <tr class="border-t border-[var(--wiley-border)]">
+                                <td class="px-3 py-2 font-semibold">@row.EnterpriseName</td>
+                                <td class="px-3 py-2">@row.MonthlyCosts.ToString("C0")</td>
+                                <td class="px-3 py-2">@row.MonthlyRevenue.ToString("C0")</td>
+                                <td class="px-3 py-2 @(row.NetPosition >= 0 ? "text-emerald-600" : "text-rose-600")">@row.NetPosition.ToString("C0")</td>
+                                <td class="px-3 py-2">@row.BreakEvenRate.ToString("C2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @* ─── CIRCULAR GAUGES + RATE CHART WORKBENCH ─────────────────────────────── *@
+    <div class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div class="wiley-surface-panel p-4" role="img" aria-label="Coverage ratio gauge showing revenue divided by costs">
             <p class="mb-1 text-sm font-semibold wiley-text">Coverage Ratio</p>
             <p class="mb-2 text-xs wiley-text-muted">Revenue ÷ Costs · Target ≥ 1.25×</p>
@@ -100,7 +137,7 @@
     @* ─── RATE COMPARISON BAR CHART ──────────────────────────────────────────── *@
     @if (RateComparison.Count > 0)
     {
-        <div id="rate-comparison-section" class="wiley-surface-panel p-4">
+        <div id="rate-comparison-section" class="wiley-surface-panel p-4 lg:col-span-2">
             <p class="mb-3 text-sm font-semibold wiley-text">Rate Comparison</p>
             @* Theme Fluent2: consistent with app-wide Syncfusion theme; ZoomSettings disabled — this is a KPI comparison chart not an analysis surface *@
             <SfChart ID="budget-variance-chart"
@@ -296,8 +333,19 @@
     [Parameter] public IReadOnlyList<RateComparisonPoint> RateComparison { get; set; } = [];
     [Parameter] public string SelectedEnterprise { get; set; } = string.Empty;
     [Parameter] public int SelectedFiscalYear { get; set; }
+    [Parameter] public string? CostSource { get; set; }
+    [Parameter] public IReadOnlyList<BreakEvenQuadrantData> BreakEvenQuadrants { get; set; } = [];
 
     // ── Computed KPIs ─────────────────────────────────────────────────────────
+    private IReadOnlyList<EnterpriseComparisonRow> EnterpriseComparisonRows => BreakEvenQuadrants
+        .Select(quadrant => new EnterpriseComparisonRow(
+            quadrant.EnterpriseName,
+            quadrant.MonthlyExpenses,
+            quadrant.MonthlyRevenue,
+            quadrant.MonthlyBalance,
+            quadrant.BreakEvenRate))
+        .ToList();
+
     private decimal EffectiveBreakEvenRate => ScenarioCostTotal > 0m ? AdjustedRecommendedRate : RecommendedRate;
     private decimal MonthlyRevenue => EnterpriseRateService.CalculateMonthlyRevenue(CurrentRate, ProjectedVolume);
     private decimal NetPosition => EnterpriseRateService.CalculateMonthlyBalance(MonthlyRevenue, ScenarioCostTotal > 0m ? TotalCosts + ScenarioCostTotal : TotalCosts);
@@ -339,4 +387,5 @@
     // ── Local records ─────────────────────────────────────────────────────────
     private record WaterfallPoint(string Label, double Value);
     private record PiePoint(string Label, int Count);
+    private record EnterpriseComparisonRow(string EnterpriseName, decimal MonthlyCosts, decimal MonthlyRevenue, decimal NetPosition, decimal BreakEvenRate);
 }

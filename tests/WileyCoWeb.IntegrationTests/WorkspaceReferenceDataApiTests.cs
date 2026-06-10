@@ -7,6 +7,7 @@ using ContractCustomerType = WileyCoWeb.Contracts.CustomerType;
 using ContractServiceLocation = WileyCoWeb.Contracts.ServiceLocation;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.IntegrationTests.Infrastructure;
+using WileyWidget.Services.Abstractions;
 
 namespace WileyCoWeb.IntegrationTests;
 
@@ -82,6 +83,28 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
     }
 
     [Fact]
+    public async Task PostReferenceDataImport_LedgerRows_ContainExpenseAccountsForRollup()
+    {
+        await factory.ResetDatabaseAsync();
+        await ClearWorkspaceReferenceDataAsync();
+
+        using var client = factory.CreateClient();
+        var request = new WorkspaceReferenceDataImportRequest(
+            ResolveImportDataPath(),
+            IncludeSampleLedgerData: true,
+            ApplyDefaultEnterpriseBaselines: true);
+
+        var importResponse = await client.PostAsJsonAsync("/api/workspace/reference-data/import", request, jsonOptions);
+        importResponse.EnsureSuccessStatusCode();
+
+        var ledgerCostService = factory.Services.GetRequiredService<IEnterpriseLedgerCostService>();
+        var rollup = await ledgerCostService.ComputeAsync("Water Utility", 2026);
+
+        Assert.True(rollup.HasLedgerData);
+        Assert.True(rollup.MonthlyOperatingExpenses > 0m);
+    }
+
+    [Fact]
     public async Task PostReferenceDataImport_BackfillsBaselines_AndImportsSampleLedgers_WhenRequested()
     {
         await factory.ResetDatabaseAsync();
@@ -110,7 +133,8 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         Assert.NotNull(snapshot);
         Assert.Equal("Water Utility", snapshot.SelectedEnterprise);
         Assert.Equal(31.25m, snapshot.CurrentRate);
-        Assert.Equal(98000m, snapshot.TotalCosts);
+        Assert.Equal("ledger", snapshot.CostSource);
+        Assert.True(snapshot.TotalCosts > 0m);
         Assert.Equal(4500m, snapshot.ProjectedVolume);
 
         var knowledgeResponse = await client.PostAsJsonAsync(
@@ -131,12 +155,14 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
 
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
         await using var context = await contextFactory.CreateDbContextAsync();
+        var waterEnterprise = await context.Enterprises
+            .Where(item => item.Name == "Water Utility")
+            .OrderByDescending(item => item.ModifiedDate ?? item.LastModified ?? DateTime.MinValue)
+            .FirstAsync();
+        Assert.Equal(snapshot.TotalCosts, waterEnterprise.MonthlyExpenses);
         Assert.True(await context.LedgerEntries.AnyAsync());
         Assert.True(await context.ImportBatches.AnyAsync());
         Assert.True(await context.SourceFiles.AnyAsync());
-
-        var wsdCollectionFeeBudget = await context.BudgetEntries.SingleAsync(item => item.FiscalYear == 2026 && item.AccountNumber == "310.00");
-        Assert.Equal(1500m, wsdCollectionFeeBudget.ActualAmount);
     }
 
     [Fact]
@@ -218,6 +244,42 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
         Assert.NotNull(waterKnowledge);
         Assert.NotNull(wsdKnowledge);
         Assert.NotEqual(waterKnowledge.CurrentReserveBalance, wsdKnowledge.CurrentReserveBalance);
+        Assert.NotEmpty(waterKnowledge.TopVariances);
+        Assert.NotEmpty(wsdKnowledge.TopVariances);
+        Assert.NotEqual(
+            waterKnowledge.TopVariances[0].AccountName,
+            wsdKnowledge.TopVariances[0].AccountName);
+    }
+
+    [Fact]
+    public async Task PostReferenceDataImport_ProducesDistinctLedgerBreakEvenQuadrantsPerEnterprise()
+    {
+        await factory.ResetDatabaseAsync();
+        await ClearWorkspaceReferenceDataAsync();
+
+        using var client = factory.CreateClient();
+        var request = new WorkspaceReferenceDataImportRequest(
+            ResolveImportDataPath(),
+            IncludeSampleLedgerData: true,
+            ApplyDefaultEnterpriseBaselines: true);
+
+        var importResponse = await client.PostAsJsonAsync("/api/workspace/reference-data/import", request, jsonOptions);
+        importResponse.EnsureSuccessStatusCode();
+
+        var snapshotResponse = await client.GetAsync("/api/workspace/snapshot?enterprise=Water%20Utility&fiscalYear=2026");
+        snapshotResponse.EnsureSuccessStatusCode();
+        var snapshot = await snapshotResponse.Content.ReadFromJsonAsync<WorkspaceBootstrapData>(jsonOptions);
+
+        Assert.NotNull(snapshot);
+        Assert.NotNull(snapshot.BreakEvenQuadrants);
+        Assert.Equal(4, snapshot.BreakEvenQuadrants.Count);
+        Assert.Equal("ledger", snapshot.CostSource);
+
+        var monthlyExpenses = snapshot.BreakEvenQuadrants
+            .Select(quadrant => quadrant.MonthlyExpenses)
+            .Distinct()
+            .ToList();
+        Assert.True(monthlyExpenses.Count > 1, "Ledger-primary costs should differ across enterprises.");
     }
 
     [Fact]
@@ -297,6 +359,9 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
     {
         var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
         await using var context = await contextFactory.CreateDbContextAsync();
+        context.LedgerEntries.RemoveRange(context.LedgerEntries);
+        context.SourceFiles.RemoveRange(context.SourceFiles);
+        context.ImportBatches.RemoveRange(context.ImportBatches);
         context.UtilityCustomers.RemoveRange(context.UtilityCustomers);
         context.Enterprises.RemoveRange(context.Enterprises);
         await context.SaveChangesAsync();

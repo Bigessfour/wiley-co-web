@@ -11,7 +11,7 @@
     @* Removed: the old ad-hoc rates-kpi-grid that only mimicked a KPI board with two plain placements.
        Replacement: a full SfCard hierarchy so each metric gets native header/content rhythm, better scanability,
        and a more boardroom-ready visual hierarchy. *@
-    <section id="rates-overview-section" class="grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
+    <section id="rates-overview-section" class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <SfCard ID="rates-overview-card" CssClass="wiley-panel-card">
             <CardHeader Title="Rate Position"
                         SubTitle="Live summary of the active customer charge against the current break-even target." />
@@ -57,7 +57,7 @@
     @* Removed: the plain rates-input-chart-grid and helper paragraph.
        Replacement: separate Syncfusion workbench cards so editing, save behavior, and comparison analytics all live
        inside native card surfaces instead of loose div/flex groupings and ad-hoc helper text. *@
-    <section id="rates-workbench-section" class="grid gap-4 xl:grid-cols-[0.88fr,1.12fr]">
+    <section id="rates-workbench-section" class="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
         <SfCard ID="rates-editor-card" CssClass="wiley-panel-card">
             <CardHeader Title="Rate Workbench"
                         SubTitle="Native Syncfusion editing, tooltip guidance, and save feedback replace the former loose helper copy." />

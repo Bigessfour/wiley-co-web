@@ -161,12 +161,16 @@ body {
   grid-template-columns: 2.25rem 1fr;
   align-items: center;
   gap: 0.625rem;
+  width: 100%;
   padding: 0.5rem 0.625rem;
   border-radius: var(--wiley-radius-md);
   color: var(--wiley-text);
   text-decoration: none;
   border: 1px solid transparent;
   background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   transition:
     background-color 80ms ease,
     border-color 80ms ease,
@@ -504,6 +508,31 @@ h1:focus {
   content: "An error has occurred.";
 }
 
+#blazor-error-ui {
+  color-scheme: normal;
+  background: var(--wiley-surface-2, #f1f5f9);
+  border-top: 1px solid var(--wiley-border, #e2e8f0);
+  bottom: 0;
+  box-shadow: 0 -1px 2px rgb(0 0 0 / 0.15);
+  box-sizing: border-box;
+  display: none;
+  left: 0;
+  padding: 0.5rem 1rem 0.6rem;
+  position: fixed;
+  width: 100%;
+  z-index: 1000;
+  color: var(--wiley-text, #0f172a);
+  font-size: 0.85rem;
+}
+
+#blazor-error-ui .dismiss {
+  cursor: pointer;
+  position: absolute;
+  right: 0.5rem;
+  top: 0.35rem;
+  opacity: 0.7;
+}
+
 .darker-border-checkbox.form-check-input {
   border-color: #929292;
 }
@@ -697,6 +726,45 @@ h1:focus {
   animation-delay: 0.4s;
 }
 
+/* Budget Dashboard (/budget-dashboard) — compact executive layout for 1080p viewports */
+.budget-executive-dashboard {
+  min-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.budget-executive-dashboard .budget-kpi-card.e-card {
+  min-height: 8.75rem;
+  max-height: 10rem;
+}
+
+.budget-executive-dashboard .budget-kpi-card .e-card-content {
+  padding-top: 0.25rem;
+}
+
+.budget-executive-dashboard .budget-chart-grid {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 1023px) {
+  .budget-executive-dashboard .budget-chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.budget-executive-dashboard .budget-chart-card.e-card {
+  min-height: 0;
+}
+
+.budget-executive-dashboard .budget-chart-card .e-card-content {
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
 /* Hero overview skeleton grid — mirrors the workspace-overview-grid layout */
 .wiley-overview-skeleton-grid {
   display: grid;
@@ -843,7 +911,47 @@ h1:focus {
   overflow: hidden;
 }
 
-/* Summary / toggle row */
+.wiley-mobile-context-summary {
+  display: block;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  list-style: none;
+}
+
+.wiley-mobile-context-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Mobile: stack splitter panes vertically; hide desktop context rail (mobile details replaces it) */
+.wiley-workspace--mobile-stack .workspace-splitter.e-splitter {
+  display: flex !important;
+  flex-direction: column !important;
+  height: auto !important;
+  min-height: calc(100vh - 20rem);
+}
+
+.wiley-workspace--mobile-stack .workspace-splitter .e-split-bar {
+  display: none !important;
+}
+
+.wiley-workspace--mobile-stack .workspace-splitter .e-pane {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 auto !important;
+}
+
+.wiley-workspace--mobile-stack .workspace-splitter .e-pane:first-child {
+  display: none !important;
+}
+
+.wiley-workspace--mobile-stack .workspace-pane-main {
+  height: auto;
+  min-height: 24rem;
+}
+
+/* Summary / toggle row — dark theme block follows */
 .wiley-mobile-context-summary {
   /* ── Dark theme overrides (Slice 1) — activated when MainLayout toggle (or early OS script) sets data-wiley-theme="dark" ──
    Covers body/content surfaces, cards, text, links, focus, skeleton, mobile rail, and toast tweaks.

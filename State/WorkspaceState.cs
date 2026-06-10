@@ -20,6 +20,7 @@ public sealed class WorkspaceState
     private decimal currentRate = WorkspaceDefaults.CurrentRate;
     private decimal totalCosts = WorkspaceDefaults.TotalCosts;
     private decimal projectedVolume = WorkspaceDefaults.ProjectedVolume;
+    private string costSource = string.Empty;
     private string lastUpdatedUtc = DateTime.UtcNow.ToString("O");
     private readonly List<ScenarioItem> scenarioItems = [];
     private readonly List<CustomerRow> customerRows = [];
@@ -273,6 +274,8 @@ public sealed class WorkspaceState
         set => SetProjectedVolume(value);
     }
 
+    public string CostSource => costSource;
+
     public decimal RecommendedRate
     {
         get
@@ -519,7 +522,8 @@ public sealed class WorkspaceState
             // file was last downloaded even after a full page refresh.
             LastExportedTimestamps = lastExportedTimestamps.Count > 0
                 ? new Dictionary<string, string>(lastExportedTimestamps)
-                : null
+                : null,
+            CostSource = string.IsNullOrWhiteSpace(costSource) ? null : costSource
         };
     }
 
@@ -939,7 +943,8 @@ public sealed class WorkspaceState
         => SetStringWithoutNotify(ref activeScenarioName, bootstrapData.ActiveScenarioName, WorkspaceDefaults.ActiveScenarioName)
             | SetDecimalWithoutNotify(ref currentRate, bootstrapData.CurrentRate, WorkspaceDefaults.CurrentRate)
             | SetDecimalWithoutNotify(ref totalCosts, bootstrapData.TotalCosts, WorkspaceDefaults.TotalCosts)
-            | SetDecimalWithoutNotify(ref projectedVolume, bootstrapData.ProjectedVolume, WorkspaceDefaults.ProjectedVolume);
+            | SetDecimalWithoutNotify(ref projectedVolume, bootstrapData.ProjectedVolume, WorkspaceDefaults.ProjectedVolume)
+            | SetStringWithoutNotify(ref costSource, bootstrapData.CostSource, string.Empty);
 
     private bool ApplyBootstrapScenarioMetadata(WorkspaceBootstrapData bootstrapData)
         => SetNullableLongField(ref selectedScenarioSnapshotId, bootstrapData.SelectedScenarioSnapshotId)

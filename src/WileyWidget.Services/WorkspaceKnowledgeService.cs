@@ -132,12 +132,12 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
                 input.SelectedFiscalYear);
             var topVariancesTask = LoadAnalyticsDependencyAsync(
                 "top budget variances",
-                () => budgetAnalyticsRepository.GetTopVariancesAsync(Math.Max(1, input.TopVarianceCount), input.SelectedFiscalYear, cancellationToken),
+                () => budgetAnalyticsRepository.GetTopVariancesAsync(Math.Max(1, input.TopVarianceCount), input.SelectedFiscalYear, normalizedEnterprise, cancellationToken),
                 normalizedEnterprise,
                 input.SelectedFiscalYear);
             var budgetOverviewTask = LoadAnalyticsDependencyAsync(
                 "budget overview",
-                () => analyticsService.GetBudgetOverviewAsync(input.SelectedFiscalYear, cancellationToken),
+                () => analyticsService.GetBudgetOverviewAsync(input.SelectedFiscalYear, normalizedEnterprise, cancellationToken),
                 normalizedEnterprise,
                 input.SelectedFiscalYear);
 

@@ -160,3 +160,34 @@ globalThis.wileyQuickBooks = {
     };
   },
 };
+
+/** Panel scroll helpers shared by workspace panels (QuickBooks, Decision Support, etc.). */
+globalThis.wileyWorkspace = {
+  scrollIntoViewById: function (elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) {
+      return false;
+    }
+
+    const scrollParent =
+      el.closest("#workspace-main-content") ||
+      el.closest(".workspace-pane-main") ||
+      el.parentElement;
+
+    el.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "auto",
+    });
+
+    if (scrollParent && scrollParent !== document.documentElement) {
+      const parentRect = scrollParent.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
+        scrollParent.scrollTop += elRect.top - parentRect.top - 12;
+      }
+    }
+
+    return true;
+  },
+};

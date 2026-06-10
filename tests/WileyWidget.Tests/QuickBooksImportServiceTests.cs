@@ -125,6 +125,7 @@ public sealed class QuickBooksImportServiceTests
             _loggerFactory.CreateLogger<QuickBooksImportService>(),
             contextFactory,
             routingService,
+            new NullEnterpriseLedgerCostService(),
             csvParser,
             excelParser);
 
@@ -173,6 +174,7 @@ public sealed class QuickBooksImportServiceTests
             _loggerFactory.CreateLogger<QuickBooksImportService>(),
             contextFactory,
             routingService,
+            new NullEnterpriseLedgerCostService(),
             csvParser,
             excelParser);
 
@@ -347,8 +349,24 @@ public sealed class QuickBooksImportServiceTests
             _loggerFactory.CreateLogger<QuickBooksImportService>(),
             contextFactory,
             routingService,
+            new NullEnterpriseLedgerCostService(),
             csvParser,
             excelParser);
+    }
+
+    private sealed class NullEnterpriseLedgerCostService : WileyWidget.Services.Abstractions.IEnterpriseLedgerCostService
+    {
+        public Task<WileyWidget.Services.Abstractions.EnterpriseLedgerCostResult> ComputeAsync(string enterpriseName, int fiscalYear, CancellationToken cancellationToken = default)
+            => Task.FromResult(new WileyWidget.Services.Abstractions.EnterpriseLedgerCostResult(enterpriseName, fiscalYear, false, 0, 0m, 0m));
+
+        public Task<Dictionary<string, WileyWidget.Services.Abstractions.EnterpriseLedgerCostResult>> ComputeForCanonicalEnterprisesAsync(int fiscalYear, CancellationToken cancellationToken = default)
+            => Task.FromResult(new Dictionary<string, WileyWidget.Services.Abstractions.EnterpriseLedgerCostResult>(StringComparer.OrdinalIgnoreCase));
+
+        public Task<int> RefreshEnterpriseMonthlyExpensesAsync(int fiscalYear, CancellationToken cancellationToken = default)
+            => Task.FromResult(0);
+
+        public Task<int> RefreshEnterpriseMonthlyExpensesForSourceFileAsync(long sourceFileId, CancellationToken cancellationToken = default)
+            => Task.FromResult(0);
     }
 
     private static IDbContextFactory<AppDbContext> CreateContextFactory(string databaseName)

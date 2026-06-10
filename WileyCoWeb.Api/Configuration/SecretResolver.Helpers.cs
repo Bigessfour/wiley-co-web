@@ -67,7 +67,12 @@ public sealed partial class SecretResolver
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[API Startup] Failed to resolve xAI secret from AWS Secrets Manager: {ex.Message}");
+            // In Development this path is normally skipped (see ShouldAttemptRemoteAwsResolution).
+            // Keep the message but avoid polluting normal logs for credential-less local runs.
+            if (!IsDevelopmentEnvironment())
+            {
+                Console.WriteLine($"[API Startup] Failed to resolve xAI secret from AWS Secrets Manager: {ex.Message}");
+            }
             return BuildFailureResult(context, "failed", ex.GetType().Name, ex.Message);
         }
     }
@@ -203,7 +208,10 @@ public sealed partial class SecretResolver
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[API Startup] Failed to resolve xAI API key from SSM Parameter Store: {ex.Message}");
+            if (!IsDevelopmentEnvironment())
+            {
+                Console.WriteLine($"[API Startup] Failed to resolve xAI API key from SSM Parameter Store: {ex.Message}");
+            }
             return BuildSsmFailureResult(context, "failed", ex.GetType().Name, ex.Message);
         }
     }

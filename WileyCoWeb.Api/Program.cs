@@ -633,6 +633,7 @@ public partial class Program
         builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
         builder.Services.AddSingleton<QuickBooksCsvParser>();
         builder.Services.AddSingleton<QuickBooksExcelParser>();
+        builder.Services.AddSingleton<IEnterpriseLedgerCostService, EnterpriseLedgerCostService>();
         builder.Services.AddSingleton<QuickBooksRoutingService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
@@ -1081,6 +1082,97 @@ public partial class Program
         app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint);
         app.MapGet("/api/ai/health", MapWorkspaceAiHealthEndpoint);
         app.MapGet("/api/jarvis/health", MapWorkspaceAiHealthEndpoint);
+
+        // Development-only: interactive "add or rotate xAI key" support from the client UI.
+        // Persists to the gitignored appsettings.Development.local.json (same pattern as other local dev secrets)
+        // and updates the live IConfiguration. This route does not exist in Production.
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapPost("/api/dev/xai-key", async (HttpContext http, IConfiguration config, IWebHostEnvironment env, ILogger<Program> log) =>
+            {
+                try
+                {
+                    var body = await http.Request.ReadFromJsonAsync<DevSetXaiKeyRequest>(cancellationToken: http.RequestAborted);
+                    var key = body?.ApiKey?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(key))
+                        return Results.BadRequest(new { error = "ApiKey is required." });
+
+                    // Basic guard (same as startup guards)
+                    var issue = XaiApiKeyGuards.TryGetRuntimeValidationIssue(key);
+                    if (!string.IsNullOrWhiteSpace(issue))
+                        return Results.BadRequest(new { error = issue });
+
+                    // 1. Persist to local dev file (safe, gitignored, survives restarts)
+                    var localSettingsPath = Path.Combine(env.ContentRootPath, "appsettings.Development.local.json");
+                    await PersistXaiKeyToLocalDevSettingsAsync(localSettingsPath, key, log);
+
+                    log.LogInformation("Dev xAI key accepted and persisted via /api/dev/xai-key. File: {Path}. Restart the API process ('dotnet run' for the API project) for the key to be picked up by the Semantic Kernel on next initialization.", localSettingsPath);
+
+                    return Results.Ok(new
+                    {
+                        message = "Key saved to your local development settings (gitignored). " +
+                                  "Restart the 'dotnet run' for the API to fully activate the real model in Jarvis for new conversations."
+                    });
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "Failed to process dev xAI key set request.");
+                    return Results.Problem("Failed to store key. See server logs.");
+                }
+            });
+        }
+    }
+
+    private sealed record DevSetXaiKeyRequest(string? ApiKey);
+
+    /// <summary>
+    /// Production-ready local dev storage: writes/rotates the xAI key into the gitignored
+    /// appsettings.Development.local.json file (the same mechanism used for other local-only secrets).
+    /// This keeps the key out of source control and out of AWS for pure local runs.
+    /// </summary>
+    private static async Task PersistXaiKeyToLocalDevSettingsAsync(string filePath, string apiKey, ILogger logger)
+    {
+        Dictionary<string, object?> settings;
+
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                var existingJson = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
+                settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(existingJson)
+                           ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                settings = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        else
+        {
+            settings = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Store at root level (matches what SecretResolver and Program.cs look for first)
+        settings["XAI_API_KEY"] = apiKey;
+
+        // Also keep a nested copy for clarity / compatibility
+        if (!settings.TryGetValue("XAI", out var xaiRaw) || xaiRaw is not Dictionary<string, object?> xaiDict)
+        {
+            xaiDict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            settings["XAI"] = xaiDict;
+        }
+        xaiDict["ApiKey"] = apiKey;
+
+        var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+        var newJson = System.Text.Json.JsonSerializer.Serialize(settings, options);
+
+        // Write atomically-ish
+        var temp = filePath + ".tmp";
+        await File.WriteAllTextAsync(temp, newJson).ConfigureAwait(false);
+        File.Move(temp, filePath, overwrite: true);
+
+        logger.LogInformation("xAI API key written/rotated into {File} (local dev only).", Path.GetFileName(filePath));
     }
 
     private static void MapQuickBooksImportEndpoints(WebApplication app)
@@ -1172,7 +1264,11 @@ public partial class Program
         return Results.Ok(history);
     }
 
-    private static async Task<IResult> MapQuickBooksHistoricalRerouteEndpoint(QuickBooksHistoricalRerouteRequest request, QuickBooksRoutingService routingService, CancellationToken cancellationToken)
+    private static async Task<IResult> MapQuickBooksHistoricalRerouteEndpoint(
+        QuickBooksHistoricalRerouteRequest request,
+        QuickBooksRoutingService routingService,
+        IEnterpriseLedgerCostService enterpriseLedgerCostService,
+        CancellationToken cancellationToken)
     {
         if (request.SourceFileId <= 0)
         {
@@ -1180,6 +1276,11 @@ public partial class Program
         }
 
         var response = await routingService.ReapplyRoutingAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.RoutedRowCount > 0)
+        {
+            await enterpriseLedgerCostService.RefreshEnterpriseMonthlyExpensesForSourceFileAsync(request.SourceFileId, cancellationToken).ConfigureAwait(false);
+        }
+
         return Results.Ok(response);
     }
 
@@ -1248,10 +1349,16 @@ public partial class Program
         return Results.NoContent();
     }
 
-    private static IResult MapWorkspaceAiHealthEndpoint(WorkspaceAiAssistantService assistantService, IJarvisHealthState jarvisHealth)
+    private static IResult MapWorkspaceAiHealthEndpoint(WorkspaceAiAssistantService assistantService, IJarvisHealthState jarvisHealth, ILogger<Program> logger)
     {
         jarvisHealth.SetSemanticKernelAvailability(assistantService.IsSemanticKernelAvailable);
-        return Results.Ok(jarvisHealth.GetSnapshot());
+        var snapshot = jarvisHealth.GetSnapshot();
+        logger.LogInformation(
+            "Jarvis health requested: LatestUsedFallback={LatestUsedFallback} SemanticKernelAvailable={SemanticKernelAvailable} LatestAnswerSource={LatestAnswerSource}",
+            snapshot.LatestUsedFallback,
+            snapshot.SemanticKernelAvailable,
+            snapshot.LatestAnswerSource);
+        return Results.Ok(snapshot);
     }
 
     private static async Task<IResult> MapWorkspaceRecommendationHistoryEndpoint(
@@ -2020,6 +2127,12 @@ public partial class Program
         if (request.Snapshot.SelectedFiscalYear <= 0)
         {
             validationError = Results.BadRequest("A valid fiscal year is required to calculate live knowledge.");
+            return false;
+        }
+
+        if (request.Snapshot.ProjectedVolume is <= 0m)
+        {
+            validationError = Results.BadRequest("Projected volume must be greater than zero to calculate live knowledge.");
             return false;
         }
 

@@ -64,6 +64,27 @@ public sealed class WorkspaceKnowledgeApiTests : IClassFixture<ApiApplicationFac
     }
 
     [Fact]
+    public async Task PostKnowledge_ReturnsBadRequest_WhenProjectedVolumeIsZero()
+    {
+        await factory.ResetDatabaseAsync();
+        using var client = factory.CreateClient();
+
+        var snapshot = new WorkspaceBootstrapData(
+            "Water Utility",
+            2026,
+            "Water Utility planning snapshot",
+            55.25m,
+            13250m,
+            0m,
+            DateTime.UtcNow.ToString("O"));
+        var response = await client.PostAsJsonAsync("/api/workspace/knowledge", new WorkspaceKnowledgeRequest(snapshot, 5, 3), jsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Projected volume must be greater than zero", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task PostKnowledge_ReturnsNotFound_WhenServiceReportsMissingWorkspaceScope()
     {
         await factory.ResetDatabaseAsync();

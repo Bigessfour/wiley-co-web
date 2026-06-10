@@ -67,20 +67,23 @@
                                     SubTitle="SfUploader provides the native drag/drop and staged-file workflow that the rebuild plan called for." />
                         <CardContent>
                             <div id="quickbooks-import-drop-zone" class="space-y-3">
-                                <SfUploader @ref="QuickBooksUploader"
-                                            ID="quickbooks-import-uploader-host"
-                                            CssClass="w-full"
-                                            AllowedExtensions=".csv,.xlsx,.xls"
-                                            AutoUpload="false"
-                                            AllowMultiple="true"
-                                            SequentialUpload="true"
-                                            ShowProgressBar="false"
-                                            MaxFileSize="@MaxImportFileSize"
-                                            DropArea="#quickbooks-import-drop-zone"
-                                            InputAttributes="@UploaderInputAttributes">
-                                    <UploaderEvents FileSelected="HandleUploaderFileSelectedAsync"
-                                                    ValueChange="HandleUploaderValueChangeAsync" />
-                                </SfUploader>
+                                @* Stable host id for audits/automation; file input id stays on InputAttributes for Playwright setInputFiles. *@
+                                <div id="quickbooks-import-uploader-host" class="block w-full">
+                                    <SfUploader @ref="QuickBooksUploader"
+                                                CssClass="w-full quickbooks-import-uploader-host"
+                                                AllowedExtensions=".csv,.xlsx,.xls"
+                                                AutoUpload="false"
+                                                AllowMultiple="true"
+                                                SequentialUpload="true"
+                                                ShowProgressBar="false"
+                                                MaxFileSize="@MaxImportFileSize"
+                                                DropArea="#quickbooks-import-drop-zone"
+                                                InputAttributes="@UploaderInputAttributes">
+                                        <UploaderButtons Browse="Choose QuickBooks file" Clear="Clear" Upload="Upload" />
+                                        <UploaderEvents FileSelected="HandleUploaderFileSelectedAsync"
+                                                        ValueChange="HandleUploaderValueChangeAsync" />
+                                    </SfUploader>
+                                </div>
 
                                 <span id="quickbooks-import-uploader-help" class="text-xs wiley-text-muted">
                                     CSV or Excel, up to 50 MB per file. Multiple files can be staged in the uploader list, and the most recently selected file becomes the active preview candidate.
@@ -471,6 +474,17 @@
 
 
 @code {
+    private bool _scrolledUploaderIntoView;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_scrolledUploaderIntoView)
+        {
+            _scrolledUploaderIntoView = true;
+            await JSRuntime.InvokeVoidAsync("wileyWorkspace.scrollIntoViewById", "quickbooks-import-uploader-card");
+        }
+    }
+
     private const string DefaultAssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
     private const string DefaultAssistantContext = "No QuickBooks preview has been loaded yet.";
 

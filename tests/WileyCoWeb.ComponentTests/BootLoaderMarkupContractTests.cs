@@ -17,5 +17,9 @@ public sealed class BootLoaderMarkupContractTests
         Assert.Contains("Starting Wiley Widget", html, StringComparison.Ordinal);
         Assert.Contains("data-wiley-theme", html, StringComparison.Ordinal);
         Assert.Contains("blazor.webassembly.js", html, StringComparison.Ordinal);
+        Assert.Contains("autostart=\"false\"", html, StringComparison.Ordinal);
+        Assert.Contains("js/wiley-wasm-boot.js", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"blazor-error-ui\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"wiley-static-boot-progress\"", html, StringComparison.Ordinal);
     }
 }

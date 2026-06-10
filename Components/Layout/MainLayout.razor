@@ -142,12 +142,6 @@
    when workspace routes change. *@
 <ToastHost />
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
-
 @code {
     // ── Storage keys ──────────────────────────────────────────────────────────
 
@@ -262,11 +256,16 @@
         // Wire the context delegate so any child can call ToggleLeftNavAsync
         // through the context without needing a direct reference to MainLayout.
         _layoutContext.ToggleLeftNavAsync = ToggleLeftNavAsync;
+        _layoutContext.OnChange += HandleLayoutContextChanged;
 
         // Set an initial conservative state; localStorage restore follows in
         // OnAfterRenderAsync once JS interop becomes available.
         _layoutContext.SetLeftNavCollapsed(true);
+        _layoutContext.SetContextRailCollapsed(true);
+        _layoutContext.SetJarvisOpen(false);
     }
+
+    private void HandleLayoutContextChanged() => _ = InvokeAsync(StateHasChanged);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -631,6 +630,8 @@
         _jsBridge    = null;
         _jsBridgeRef = null;
 
+        _layoutContext.OnChange -= HandleLayoutContextChanged;
+
         // Dispose the context to clear subscriber list and prevent leaks.
         _layoutContext.Dispose();
     }
@@ -673,8 +674,8 @@
     private sealed class PersistedLayoutState
     {
         public bool LeftNavCollapsed     { get; set; } = true;
-        public bool ContextRailCollapsed { get; set; }
-        public bool JarvisOpen           { get; set; }
+        public bool ContextRailCollapsed { get; set; } = true;
+        public bool JarvisOpen           { get; set; } = false;
 
         /// <summary>
         /// Internal flag: <c>true</c> when this state was read from the legacy

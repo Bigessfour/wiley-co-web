@@ -89,8 +89,8 @@ public sealed class DebtCoverageService : IDebtCoverageService
             throw new DebtCoverageNotFoundException($"Enterprise '{normalizedEnterprise}' was not found in the live data store.");
         }
 
-        var startDate = new DateTime(fiscalYear, 1, 1);
-        var endDate = new DateTime(fiscalYear, 12, 31);
+        var startDate = new DateTime(fiscalYear, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var endDate = new DateTime(fiscalYear, 12, 31, 23, 59, 59, DateTimeKind.Utc);
 
         var revenueTask = accountsRepository.GetMonthlyRevenueAsync(startDate, endDate, cancellationToken);
         var budgetTask = budgetRepository.GetByFiscalYearAsync(fiscalYear, cancellationToken);

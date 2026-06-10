@@ -161,7 +161,9 @@ public static class LicenseBootstrapper
         }
 
         Console.WriteLine("[API Startup] WARNING: SYNCFUSION_LICENSE_KEY not found from any source (config, env, local settings). " +
-            "Server-side PDF/Excel features may trigger license popups. Set SYNCFUSION_LICENSE_KEY env var or AWS Secrets Manager.");
+            "Server-side PDF/Excel document generation (if used) may show license messages. " +
+            "For local development this is usually harmless (client-side license is injected at Blazor build time). " +
+            "Set SYNCFUSION_LICENSE_KEY env var if you need server-side exports without watermarks.");
     }
 
 }

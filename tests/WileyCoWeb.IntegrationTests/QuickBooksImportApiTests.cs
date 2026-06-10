@@ -97,6 +97,31 @@ public sealed class QuickBooksImportApiTests : IClassFixture<ApiApplicationFacto
 
 	[Fact]
 	[Trait("Category", "HighRisk")]
+	public async Task Commit_RefreshesEnterpriseMonthlyExpenses_WhenExpenseRowsAreImported()
+	{
+		await factory.ResetDatabaseAsync();
+		using var client = factory.CreateClient();
+
+		var contextFactory = factory.Services.GetRequiredService<IDbContextFactory<AppDbContext>>();
+		await using (var context = await contextFactory.CreateDbContextAsync())
+		{
+			var seededEnterprise = await context.Enterprises.FirstAsync(item => item.Name == "Water Utility");
+			seededEnterprise.MonthlyExpenses = 500m;
+			await context.SaveChangesAsync();
+		}
+
+		var expenseCsv = "Date,Type,Num,Name,Memo,Account,Split,Amount,Balance,Clr\n" +
+			"01/15/2026,Check,2001,Vendor,Utility bill,510.00 Utilities,Cash,1200.00,1200.00,C\n";
+		var commitResponse = await PostImportAsync(client, "/api/imports/quickbooks/commit", expenseCsv);
+		commitResponse.EnsureSuccessStatusCode();
+
+		await using var verifyContext = await contextFactory.CreateDbContextAsync();
+		var enterprise = await verifyContext.Enterprises.FirstAsync(item => item.Name == "Water Utility");
+		Assert.Equal(100m, enterprise.MonthlyExpenses);
+	}
+
+	[Fact]
+	[Trait("Category", "HighRisk")]
 	public async Task QuickBooksImport_RejectsDuplicateFileHash()
 	{
 		await factory.ResetDatabaseAsync();

@@ -130,6 +130,68 @@ If you use a port-forwarded or otherwise local-only PostgreSQL endpoint instead,
 
 Note: this workstation still needs TCP reachability to whatever PostgreSQL endpoint you store. If the target is the private Aurora writer, you must use a VPC-attached host, SSM tunnel, or another reachable endpoint; otherwise the API will still activate degraded mode.
 
+### Local Full-Stack Development (Real Postgres + Real Jarvis for Evaluation)
+
+For local development and evaluation (including clerk-like workflows), use a real PostgreSQL database so the API runs without degraded mode or synthetic data. The xAI key for live Jarvis is provided securely at runtime via the in-app UI (never via chat or committed files).
+
+**Keep the xAI key addition method via the Jarvis panel** (as requested): When running locally in Development, the Decision Support / Jarvis rail automatically surfaces a prompt card ("Would you like to add or rotate your Xai api key?") if no real key is detected. You input the key directly in the browser (password field). It is sent only to your local API and persisted exclusively to the gitignored `WileyCoWeb.Api/appsettings.Development.local.json`. This is the secure, production-ready local path (the `/api/dev/xai-key` endpoint exists only in Development; prod uses AWS Secrets Manager / App Runner injection).
+
+**Recommended for developers with Docker (you have it running):**
+
+- Use the lightweight `docker-compose.dev.yml` (postgres:16-alpine image, small footprint, exact match to production Postgres dialect, data persists in named volume).
+- The new `start-local.sh` (see below) will start it for you automatically.
+
+**For clerks / environments without Docker (native Postgres path):**
+
+- Install Postgres natively (e.g. `brew install postgresql@16` on Mac and `brew services start postgresql@16`; or official installer on Windows).
+- Use the same connection string via a gitignored override (see below).
+- The project already supports this via `appsettings.Development.local.json` or .NET user secrets.
+
+**Recommended single-command start (the proper way - replaces manual two-terminal runs):**
+
+```bash
+# From repo root (Docker assumed for DB; keys pre-configured via launchctl/local files/keychain)
+./start-local.sh
+```
+
+- Handles DB startup (`docker-compose.dev.yml` for real Postgres → no degraded mode).
+- Starts API + Client (backgrounded, with logs in `TestResults/local-run/`).
+- Waits for health checks on both ports.
+- Opens browser to the workspace.
+- Prints instructions: **provide your xAI key via the in-app prompt in the Decision Support / Jarvis panel** (the method kept per request; secure, writes only to gitignored local file; may require one API restart after first submit for full effect).
+
+Companion:
+
+```bash
+./stop-local.sh
+```
+
+**In VS Code / Cursor:**
+
+- Use the task **"🚀 Start Local Full Stack (recommended - single script)"** (added to `.vscode/tasks.json`).
+- Use **"🛑 Stop Local Full Stack"** for cleanup.
+
+The old manual terminal steps and parallel tasks remain for advanced use, but `./start-local.sh` (or the IDE task) is now the supported, single-invocation way to get a running stack for UI evaluation.
+
+**After start (or via the script):**
+
+- UI: http://localhost:5230/wiley-workspace
+- Open **Decision Support** panel.
+- Use the xAI key prompt (or the persistent "Dev: xAI Key (local only)" section we added to the panel).
+- Real Postgres + (after key) real Jarvis.
+- Syncfusion keys assumed pre-configured (as you did with the keychain/launchctl flow).
+
+See the full "Local Full-Stack Development" section for Docker vs native details. This, plus the prior DB, key (UI prompt), and Syncfusion fixes, gives a complete local runtime without leaving startup as a manual/undeveloped process. Run `./start-local.sh` (with Docker up) to test. Use the kill task or `./stop-local.sh` to clean ports.
+
+**Tips for completion / no undeveloped paths:**
+
+- Real DB + real key = full non-degraded experience (real data paths, live AI).
+- The dev key flow, DB connection, and prompt are fully wired (no stubs).
+- For future clerk deployments: they will use the same native Postgres + the in-app prompt (or env/user-secrets) + the existing production key injection.
+- After your evaluation, we can close any remaining loops (e.g. better hot-reload of key without restart, one-command helper script, docs polish).
+
+See also the existing `Scripts/sync-local-api-database-url.ps1` (for pulling real Aurora URLs into local overrides) and `docs/aurora-postgresql-reset-runbook.md`.
+
 ## UI Rebuild Roadmap
 
 The restored Wiley Widget rebuild plan is documented in [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md).
@@ -299,13 +361,17 @@ dotnet user-secrets set "QuickBooks:ClientSecret" "<your-secret>" --project Wile
 Syncfusion keys remain environment-variable based by policy:
 
 ```bash
-launchctl setenv SYNCFUSION_LICENSE_KEY "<your-runtime-license-key>"
-launchctl setenv SYNCFUSION_API_KEY_PATH "$HOME/.config/syncfusion/documentsdk.key"
+# Blazor runtime license (Passwords / Keychain)
+./Scripts/syncfusion-license-keychain.sh launchctl
+
+# MCP documentation API key (Passwords service: com.wileyco.syncfusion.blazor-mcp)
+./Scripts/syncfusion-api-keychain.sh launchctl
+./Scripts/syncfusion-api-keychain.sh verify
 ```
 
-Restart VS Code after changing `launchctl` values so GUI-launched tools pick them up.
+Restart Cursor after `launchctl` so GUI-launched MCP servers inherit the env vars.
 
-The workspace MCP config points `Syncfusion_API_Key_Path` at `/Users/stephenmckitrick/.config/syncfusion/documentsdk.key`, so keep the API key in that file as a single line of text.
+`Scripts/mcp-sf-blazor-assistant.sh` reads the MCP key from Passwords, exports `Syncfusion_API_Key` + `Syncfusion_API_Key_Path` (`~/.config/syncfusion/documentsdk.key`), then starts `@syncfusion/blazor-assistant`. The MCP key is **not** the same as `SYNCFUSION_LICENSE_KEY`.
 
 ## Amplify CLI Reference
 
