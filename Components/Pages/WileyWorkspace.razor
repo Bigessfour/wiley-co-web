@@ -974,11 +974,18 @@
     /// </summary>
     private void ToggleJarvisAsync()
     {
-        // ToggleJarvis() calls LayoutContext.SetJarvisOpen(!current) which fires
-        // OnChange — any subscriber (e.g. a decision-support badge) re-renders.
-        // The SplitterPane for Jarvis (pane 2) reacts automatically via its
-        // Collapsed binding.
-        ToggleJarvis();
+        bool targetOpen = !IsJarvisOpen;
+
+        // Update the source of truth (context). This will cause re-renders of any
+        // binding to IsJarvisOpen (including the launcher @if and the pane Collapsed).
+        LayoutContext?.SetJarvisOpen(targetOpen);
+        WorkspaceLogger.LogInformation("Jarvis panel toggled via launcher: targetOpen={TargetOpen}", targetOpen);
+        StateHasChanged();
+
+        // Declarative Collapsed="@(!IsJarvisOpen)" binding on the SplitterPane (plus
+        // HandleJarvisPaneCollapsedChanged) is the supported Syncfusion pattern.
+        // Imperative Expand/Collapse calls were removed (they do not exist on SfSplitter
+        // in this version and caused CS1061 build failures).
     }
 
     private void ToggleWorkspacePanelAsync()

@@ -49,7 +49,7 @@ public sealed record WorkspaceAiKernelInitializationResult(
 
 public static class WorkspaceAiKernelFactory
 {
-    public const string DefaultSemanticKernelModel = "grok-4-1-fast-reasoning";
+    public const string DefaultSemanticKernelModel = "grok-4.3";
     public const string HttpClientName = "WorkspaceAiTransport";
 
     private static readonly Uri DirectResponsesEndpoint = NormalizeResponsesEndpoint("https://api.x.ai/v1");
