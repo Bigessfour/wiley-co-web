@@ -306,15 +306,21 @@ public sealed class QuickBooksRoutingApiTests : IClassFixture<ApiApplicationFact
         };
     }
 
-    private static async Task<HttpResponseMessage> PostImportAsync(HttpClient client, string requestUri, string csvContent, string fileName)
+    private static async Task<HttpResponseMessage> PostImportAsync(
+        HttpClient client,
+        string requestUri,
+        string csvContent,
+        string fileName,
+        string selectedEnterprise = "Water Utility",
+        string selectedFiscalYear = "2026")
     {
         using var form = new MultipartFormDataContent();
         using var fileContent = new ByteArrayContent(Encoding.UTF8.GetBytes(csvContent));
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
 
         form.Add(fileContent, "file", fileName);
-        form.Add(new StringContent("Water Utility"), "selectedEnterprise");
-        form.Add(new StringContent("2026"), "selectedFiscalYear");
+        form.Add(new StringContent(selectedEnterprise), "selectedEnterprise");
+        form.Add(new StringContent(selectedFiscalYear), "selectedFiscalYear");
 
         return await client.PostAsync(requestUri, form);
     }

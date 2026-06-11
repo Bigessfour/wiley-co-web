@@ -1507,7 +1507,12 @@ public sealed class ComponentPageTests
 					],
 					[
 						new WorkspaceKnowledgeVarianceResponse("Chemicals", 10000m, 12500m, 2500m, 25m)
-					]);
+					],
+					80000m,
+					15000m,
+					65000m,
+					false,
+					42625m);
 
 				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
 				{
