@@ -6,11 +6,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Amazon;
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
-using Amazon.XRay.Recorder.Core;
-using Amazon.XRay.Recorder.Handlers.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +21,7 @@ using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Business.Interfaces;
 using WileyWidget.Models;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
 using WileyWidget.Services.Telemetry;
@@ -98,7 +93,7 @@ public partial class Program
                 builder.Environment.ApplicationName,
                 Environment.CurrentDirectory);
 
-            TracingBootstrapper.InitializeTracing(builder);
+            // TracingBootstrapper.InitializeTracing(builder); // AWS XRay removed (lean local)
 
             var startupOptions = await PrepareStartupRuntimeOptionsAsync(builder, bootstrapLogger).ConfigureAwait(false);
 
@@ -220,7 +215,17 @@ public partial class Program
         }
         catch (Exception ex)
         {
-            bootstrapLogger.LogWarning(ex, "Workspace API could not promote persisted AppSettings AI configuration; continuing with environment and secret-based configuration.");
+            // Common in dev after model changes (e.g. overhead % columns like LaborPercent added to AppSettings but DB not migrated).
+            // This is logged prominently so operators see the promotion skipped and fall back to env/secret config (still functional).
+            var isSchemaIssue = ex.Message.Contains("column", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase);
+            if (isSchemaIssue)
+            {
+                bootstrapLogger.LogWarning(ex, "Workspace API AppSettings schema mismatch during AI config promotion (likely new overhead % columns not in this dev DB). Falling back to environment/secret config. Run migrations or reseed if full persisted settings are needed.");
+            }
+            else
+            {
+                bootstrapLogger.LogWarning(ex, "Workspace API could not promote persisted AppSettings AI configuration; continuing with environment and secret-based configuration.");
+            }
         }
     }
 
@@ -368,6 +373,15 @@ public partial class Program
         EnforceXaiApiKeyStartupGuards(builder, bootstrapLogger, effectiveXaiKey);
         var xaiKeyFingerprint = XaiApiKeyGuards.ComputeFingerprint(effectiveXaiKey);
         var xaiKeyLength = string.IsNullOrWhiteSpace(effectiveXaiKey) ? 0 : effectiveXaiKey.Trim().Length;
+
+        // Explicit top-level structured log for the key process at startup so operators can immediately see if live AI / Jarvis is armed or in safe fallback.
+        bootstrapLogger.LogInformation(
+            "Workspace API XAI key resolution complete at startup. XaiKeyResolved={XaiKeyResolved} XaiKeySource={XaiKeySource} XaiKeyPresent={XaiKeyPresent} ApiKeySource={ApiKeySource} SemanticKernelWillBeAvailable={SemanticKernelWillBeAvailable}",
+            !string.IsNullOrWhiteSpace(effectiveXaiKey),
+            xaiKeySource,
+            !string.IsNullOrWhiteSpace(effectiveXaiKey),
+            xaiSecretResolution.ResolvedKeySource ?? "not-found",
+            !string.IsNullOrWhiteSpace(effectiveXaiKey));
 
         return new StartupRuntimeOptions(
             syncfusionLicenseResult,
@@ -633,6 +647,7 @@ public partial class Program
         builder.Services.AddSingleton<WorkspaceReferenceDataImportService>();
         builder.Services.AddSingleton<QuickBooksCsvParser>();
         builder.Services.AddSingleton<QuickBooksExcelParser>();
+        builder.Services.AddSingleton<IEnterpriseLedgerCostService, EnterpriseLedgerCostService>();
         builder.Services.AddSingleton<QuickBooksRoutingService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
@@ -734,7 +749,7 @@ public partial class Program
             }
         });
 
-        app.UseXRay("WileyCoWeb.Api");
+        // app.UseXRay // removed("WileyCoWeb.Api");
         app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
         app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
@@ -911,9 +926,7 @@ public partial class Program
             "XaiConfigNamedKeyPresent={XaiConfigNamedKeyPresent} XaiSecretFetchAttempted={XaiSecretFetchAttempted} " +
             "XaiSecretName={XaiSecretName} XaiAwsRegion={XaiAwsRegion} XaiSecretFetchStatus={XaiSecretFetchStatus} " +
             "XaiSecretFetchErrorCode={XaiSecretFetchErrorCode} XaiSecretFetchErrorMessage={XaiSecretFetchErrorMessage} " +
-            "XaiConfigurationInjected={XaiConfigurationInjected} " +
-            "XaiSsmParameterName={XaiSsmParameterName} XaiSsmFetchAttempted={XaiSsmFetchAttempted} XaiSsmFetchStatus={XaiSsmFetchStatus} " +
-            "XaiSsmFetchErrorCode={XaiSsmFetchErrorCode} XaiSsmFetchErrorMessage={XaiSsmFetchErrorMessage}",
+            "XaiConfigurationInjected={XaiConfigurationInjected}",
             environmentName,
             logData.SyncfusionKeySource,
             logData.SyncfusionKeyPresent,
@@ -932,12 +945,7 @@ public partial class Program
             logData.XaiSecretFetchStatus,
             logData.XaiSecretFetchErrorCode,
             logData.XaiSecretFetchErrorMessage,
-            logData.XaiConfigurationInjected,
-            logData.XaiSsmParameterName,
-            logData.XaiSsmFetchAttempted,
-            logData.XaiSsmFetchStatus,
-            logData.XaiSsmFetchErrorCode,
-            logData.XaiSsmFetchErrorMessage);
+            logData.XaiConfigurationInjected);
     }
 
     private static void LogXaiEndpointResolution(ILogger logger, XaiEndpointResolution resolution, string environmentName)
@@ -984,12 +992,7 @@ public partial class Program
             xaiSecretResolution.SecretFetchStatus,
             xaiSecretResolution.SecretFetchErrorCode,
             TruncateForLog(xaiSecretResolution.SecretFetchErrorMessage),
-            xaiSecretResolution.ConfigurationInjected,
-            xaiSecretResolution.SsmParameterName,
-            xaiSecretResolution.SsmFetchAttempted,
-            xaiSecretResolution.SsmFetchStatus,
-            xaiSecretResolution.SsmFetchErrorCode,
-            TruncateForLog(xaiSecretResolution.SsmFetchErrorMessage));
+            xaiSecretResolution.ConfigurationInjected);
     }
 
     private static string KeyFingerprint(string? key)
@@ -1032,13 +1035,7 @@ public partial class Program
         string XaiSecretFetchStatus,
         string? XaiSecretFetchErrorCode,
         string? XaiSecretFetchErrorMessage,
-        bool XaiConfigurationInjected,
-        // SSM Parameter Store (mirrors Secret* fields; populated on XAI:ParameterName resolution path)
-        string? XaiSsmParameterName,
-        bool XaiSsmFetchAttempted,
-        string XaiSsmFetchStatus,
-        string? XaiSsmFetchErrorCode,
-        string? XaiSsmFetchErrorMessage);
+        bool XaiConfigurationInjected);
 
     private sealed record XaiEndpointResolution(
         bool XaiChatEndpointPresent,
@@ -1081,6 +1078,97 @@ public partial class Program
         app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint);
         app.MapGet("/api/ai/health", MapWorkspaceAiHealthEndpoint);
         app.MapGet("/api/jarvis/health", MapWorkspaceAiHealthEndpoint);
+
+        // Development-only: interactive "add or rotate xAI key" support from the client UI.
+        // Persists to the gitignored appsettings.Development.local.json (same pattern as other local dev secrets)
+        // and updates the live IConfiguration. This route does not exist in Production.
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapPost("/api/dev/xai-key", async (HttpContext http, IConfiguration config, IWebHostEnvironment env, ILogger<Program> log) =>
+            {
+                try
+                {
+                    var body = await http.Request.ReadFromJsonAsync<DevSetXaiKeyRequest>(cancellationToken: http.RequestAborted);
+                    var key = body?.ApiKey?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(key))
+                        return Results.BadRequest(new { error = "ApiKey is required." });
+
+                    // Basic guard (same as startup guards)
+                    var issue = XaiApiKeyGuards.TryGetRuntimeValidationIssue(key);
+                    if (!string.IsNullOrWhiteSpace(issue))
+                        return Results.BadRequest(new { error = issue });
+
+                    // 1. Persist to local dev file (safe, gitignored, survives restarts)
+                    var localSettingsPath = Path.Combine(env.ContentRootPath, "appsettings.Development.local.json");
+                    await PersistXaiKeyToLocalDevSettingsAsync(localSettingsPath, key, log);
+
+                    log.LogInformation("Dev xAI key accepted and persisted via /api/dev/xai-key. File: {Path}. Restart the API process ('dotnet run' for the API project) for the key to be picked up by the Semantic Kernel on next initialization.", localSettingsPath);
+
+                    return Results.Ok(new
+                    {
+                        message = "Key saved to your local development settings (gitignored). " +
+                                  "Restart the 'dotnet run' for the API to fully activate the real model in Jarvis for new conversations."
+                    });
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "Failed to process dev xAI key set request.");
+                    return Results.Problem("Failed to store key. See server logs.");
+                }
+            });
+        }
+    }
+
+    private sealed record DevSetXaiKeyRequest(string? ApiKey);
+
+    /// <summary>
+    /// Production-ready local dev storage: writes/rotates the xAI key into the gitignored
+    /// appsettings.Development.local.json file (the same mechanism used for other local-only secrets).
+    /// This keeps the key out of source control and out of AWS for pure local runs.
+    /// </summary>
+    private static async Task PersistXaiKeyToLocalDevSettingsAsync(string filePath, string apiKey, ILogger logger)
+    {
+        Dictionary<string, object?> settings;
+
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                var existingJson = await File.ReadAllTextAsync(filePath).ConfigureAwait(false);
+                settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(existingJson)
+                           ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                settings = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        else
+        {
+            settings = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Store at root level (matches what SecretResolver and Program.cs look for first)
+        settings["XAI_API_KEY"] = apiKey;
+
+        // Also keep a nested copy for clarity / compatibility
+        if (!settings.TryGetValue("XAI", out var xaiRaw) || xaiRaw is not Dictionary<string, object?> xaiDict)
+        {
+            xaiDict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            settings["XAI"] = xaiDict;
+        }
+        xaiDict["ApiKey"] = apiKey;
+
+        var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+        var newJson = System.Text.Json.JsonSerializer.Serialize(settings, options);
+
+        // Write atomically-ish
+        var temp = filePath + ".tmp";
+        await File.WriteAllTextAsync(temp, newJson).ConfigureAwait(false);
+        File.Move(temp, filePath, overwrite: true);
+
+        logger.LogInformation("xAI API key written/rotated into {File} (local dev only).", Path.GetFileName(filePath));
     }
 
     private static void MapQuickBooksImportEndpoints(WebApplication app)
@@ -1172,7 +1260,11 @@ public partial class Program
         return Results.Ok(history);
     }
 
-    private static async Task<IResult> MapQuickBooksHistoricalRerouteEndpoint(QuickBooksHistoricalRerouteRequest request, QuickBooksRoutingService routingService, CancellationToken cancellationToken)
+    private static async Task<IResult> MapQuickBooksHistoricalRerouteEndpoint(
+        QuickBooksHistoricalRerouteRequest request,
+        QuickBooksRoutingService routingService,
+        IEnterpriseLedgerCostService enterpriseLedgerCostService,
+        CancellationToken cancellationToken)
     {
         if (request.SourceFileId <= 0)
         {
@@ -1180,6 +1272,11 @@ public partial class Program
         }
 
         var response = await routingService.ReapplyRoutingAsync(request, cancellationToken).ConfigureAwait(false);
+        if (response.RoutedRowCount > 0)
+        {
+            await enterpriseLedgerCostService.RefreshEnterpriseMonthlyExpensesForSourceFileAsync(request.SourceFileId, cancellationToken).ConfigureAwait(false);
+        }
+
         return Results.Ok(response);
     }
 
@@ -1248,10 +1345,16 @@ public partial class Program
         return Results.NoContent();
     }
 
-    private static IResult MapWorkspaceAiHealthEndpoint(WorkspaceAiAssistantService assistantService, IJarvisHealthState jarvisHealth)
+    private static IResult MapWorkspaceAiHealthEndpoint(WorkspaceAiAssistantService assistantService, IJarvisHealthState jarvisHealth, ILogger<Program> logger)
     {
         jarvisHealth.SetSemanticKernelAvailability(assistantService.IsSemanticKernelAvailable);
-        return Results.Ok(jarvisHealth.GetSnapshot());
+        var snapshot = jarvisHealth.GetSnapshot();
+        logger.LogInformation(
+            "Jarvis health requested: LatestUsedFallback={LatestUsedFallback} SemanticKernelAvailable={SemanticKernelAvailable} LatestAnswerSource={LatestAnswerSource}",
+            snapshot.LatestUsedFallback,
+            snapshot.SemanticKernelAvailable,
+            snapshot.LatestAnswerSource);
+        return Results.Ok(snapshot);
     }
 
     private static async Task<IResult> MapWorkspaceRecommendationHistoryEndpoint(
@@ -2023,6 +2126,12 @@ public partial class Program
             return false;
         }
 
+        if (request.Snapshot.ProjectedVolume is <= 0m)
+        {
+            validationError = Results.BadRequest("Projected volume must be greater than zero to calculate live knowledge.");
+            return false;
+        }
+
         return true;
     }
 
@@ -2037,7 +2146,8 @@ public partial class Program
             snapshot.ProjectedVolume ?? 0m,
             snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
             Math.Clamp(request.TopVarianceCount, 1, 20),
-            Math.Clamp(request.ForecastYears, 1, 10));
+            Math.Clamp(request.ForecastYears, 1, 10),
+            0m); // OverheadPercent: 0 = use service default (9% matching AppSettings global Town+Mgmt+Labor). Per-enterprise override possible via extended callers.
     }
 
     private static UtilityCustomerRecord ToUtilityCustomerRecord(UtilityCustomer customer)
@@ -2839,7 +2949,12 @@ public partial class Program
                 knowledge.GeneratedAtUtc.ToString("O"),
             knowledge.Insights.Select(item => new WorkspaceKnowledgeInsightResponse(item.Label, item.Value, item.Description)).ToArray(),
             knowledge.RecommendedActions.Select(item => new WorkspaceKnowledgeActionResponse(item.Title, item.Description, item.Priority)).ToArray(),
-            knowledge.TopVariances.Select(item => new WorkspaceKnowledgeVarianceResponse(item.AccountName, item.BudgetedAmount, item.ActualAmount, item.VarianceAmount, item.VariancePercentage)).ToArray());
+            knowledge.TopVariances.Select(item => new WorkspaceKnowledgeVarianceResponse(item.AccountName, item.BudgetedAmount, item.ActualAmount, item.VarianceAmount, item.VariancePercentage)).ToArray(),
+            knowledge.DirectCosts,
+            knowledge.OverheadBurden,
+            knowledge.NetContribution,
+            knowledge.HoldsItsOwn,
+            knowledge.VampireImpact);
     }
 
     private static string? ExtractDescription(string notes)

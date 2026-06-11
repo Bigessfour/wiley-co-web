@@ -11,7 +11,10 @@ internal sealed partial class WorkspaceReferenceDataImportService
         ("wsd", "Wiley Sanitation District"),
         ("utility", WorkspaceEnterpriseCatalog.WaterUtility),
         ("tow utility account", WorkspaceEnterpriseCatalog.WaterUtility),
-        ("town utility account", WorkspaceEnterpriseCatalog.WaterUtility)
+        ("town utility account", WorkspaceEnterpriseCatalog.WaterUtility),
+        ("trash", WorkspaceEnterpriseCatalog.Trash),
+        ("refuse", WorkspaceEnterpriseCatalog.Trash),
+        ("apartment", WorkspaceEnterpriseCatalog.Apartments)
     ];
 
     private static readonly (string Pattern, string Name)[] EnterpriseNameOverrides =
@@ -19,7 +22,9 @@ internal sealed partial class WorkspaceReferenceDataImportService
         ("WSD", "Wiley Sanitation District"),
         ("sanitation", "Wiley Sanitation District"),
         ("Util", WorkspaceEnterpriseCatalog.WaterUtility),
-        ("utility", WorkspaceEnterpriseCatalog.WaterUtility)
+        ("utility", WorkspaceEnterpriseCatalog.WaterUtility),
+        ("trash", WorkspaceEnterpriseCatalog.Trash),
+        ("apartment", WorkspaceEnterpriseCatalog.Apartments)
     ];
 
     private static readonly (string Pattern, string Code)[] EnterpriseCodeOverrides =

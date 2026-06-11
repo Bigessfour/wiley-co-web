@@ -1,7 +1,7 @@
 using System.Text.Json;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.IntegrationTests.Infrastructure;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 
 namespace WileyCoWeb.IntegrationTests;
 

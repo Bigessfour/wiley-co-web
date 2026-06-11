@@ -66,4 +66,43 @@ public sealed class WorkspaceAiApiService(HttpClient httpClient, ILogger<Workspa
 
 		return payload ?? new WorkspaceRecommendationHistoryResponse([]);
 	}
+
+	/// <summary>
+	/// Fetches Jarvis/AI health (used to detect whether a real xAI key is active or fallbacks are in use).
+	/// </summary>
+	public async Task<JarvisHealthResponse?> GetHealthAsync(CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			var payload = await httpClient.GetFromJsonAsync<JarvisHealthResponse>("api/ai/health", JsonOptions, cancellationToken).ConfigureAwait(false);
+			return payload;
+		}
+		catch (Exception ex)
+		{
+			logger?.LogWarning(ex, "Failed to fetch AI health status.");
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// Development-only helper: sends an xAI API key to the local API so it can be persisted
+	/// into your gitignored local settings for the next run (and injected for the current process where possible).
+	/// This endpoint only exists when the API is running in Development.
+	/// </summary>
+	public async Task<bool> SetDevXaiApiKeyAsync(string apiKey, CancellationToken cancellationToken = default)
+	{
+		if (string.IsNullOrWhiteSpace(apiKey))
+			return false;
+
+		try
+		{
+			var response = await httpClient.PostAsJsonAsync("api/dev/xai-key", new { ApiKey = apiKey.Trim() }, JsonOptions, cancellationToken).ConfigureAwait(false);
+			return response.IsSuccessStatusCode;
+		}
+		catch (Exception ex)
+		{
+			logger?.LogWarning(ex, "Failed to send dev xAI key to local API.");
+			return false;
+		}
+	}
 }

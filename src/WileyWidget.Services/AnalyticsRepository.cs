@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WileyWidget.Data;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 using WileyWidget.Models;
 using WileyWidget.Services.Abstractions;
 

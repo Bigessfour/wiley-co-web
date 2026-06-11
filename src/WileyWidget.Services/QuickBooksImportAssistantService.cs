@@ -80,7 +80,7 @@ public sealed class QuickBooksImportAssistantService
 				return null;
 			}
 
-			var model = configuration["Grok:Model"] ?? configuration["XAI:Model"] ?? "grok-4.1";
+			var model = configuration["Grok:Model"] ?? configuration["XAI:Model"] ?? "grok-4.3";
 
 			var kernelBuilder = Kernel.CreateBuilder();
 			kernelBuilder.AddOpenAIChatCompletion(
@@ -167,5 +167,64 @@ public sealed class QuickBooksImportAssistantService
 		}
 
 		return "Review the preview rows, confirm the selected enterprise and fiscal year, and only commit after the file-level duplicate check passes. If you want, ask a more specific question about duplicate blocking, missing columns, dates, or row mapping.";
+	}
+
+	/// <summary>
+	/// Jarvis AI fallback for categorizing a single ambiguous QuickBooks row into one of the 4 canonical enterprises.
+	/// Used by import flow when simple routing rules do not produce a confident match.
+	/// Returns the exact canonical name or null (caller falls back to default/selected).
+	/// </summary>
+	public async Task<string?> SuggestEnterpriseForRowAsync(QuickBooksImportPreviewRow row, CancellationToken cancellationToken = default)
+	{
+		var assistant = chatService.Value;
+		if (assistant is null)
+		{
+			return null;
+		}
+
+		try
+		{
+			var prompt = BuildRowCategorizationPrompt(row);
+			var chatHistory = new ChatHistory();
+			chatHistory.AddSystemMessage("You are a precise classifier for Town of Wiley municipal utility transactions. The only valid answers are exactly one of: Water Utility, Wiley Sanitation District, Trash, Apartments. Reply with ONLY that exact name and nothing else.");
+			chatHistory.AddUserMessage(prompt);
+
+			var response = await assistant.GetChatMessageContentAsync(chatHistory, cancellationToken: cancellationToken).ConfigureAwait(false);
+			var answer = response.Content?.Trim();
+			if (!string.IsNullOrWhiteSpace(answer))
+			{
+				// Strict match to canonical 4 only
+				var canonical = new[] { "Water Utility", "Wiley Sanitation District", "Trash", "Apartments" };
+				foreach (var c in canonical)
+				{
+					if (answer.Equals(c, StringComparison.OrdinalIgnoreCase) ||
+					    answer.Contains(c, StringComparison.OrdinalIgnoreCase))
+					{
+						return c;
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.LogDebug(ex, "Jarvis row categorization fallback failed for row {Row}", row.RowNumber);
+		}
+
+		return null;
+	}
+
+	private static string BuildRowCategorizationPrompt(QuickBooksImportPreviewRow row)
+	{
+		var sb = new StringBuilder();
+		sb.AppendLine("Classify this QuickBooks transaction row to exactly one enterprise:");
+		sb.AppendLine($"Type: {row.EntryType}");
+		sb.AppendLine($"Name/Customer/Vendor: {row.Name}");
+		sb.AppendLine($"Memo/Description: {row.Memo}");
+		sb.AppendLine($"Account: {row.AccountName}");
+		sb.AppendLine($"Split: {row.SplitAccount}");
+		sb.AppendLine($"Amount: {row.Amount}");
+		sb.AppendLine("Valid enterprises only: Water Utility, Wiley Sanitation District, Trash, Apartments.");
+		sb.AppendLine("Reply with ONLY the exact enterprise name.");
+		return sb.ToString();
 	}
 }

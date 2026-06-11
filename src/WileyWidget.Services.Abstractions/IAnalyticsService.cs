@@ -30,7 +30,7 @@ namespace WileyWidget.Services.Abstractions
         /// <summary>
         /// Gets budget overview data for the specified fiscal year
         /// </summary>
-        Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, CancellationToken cancellationToken = default);
+        Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, string? enterpriseName = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Gets budget metrics for grid display

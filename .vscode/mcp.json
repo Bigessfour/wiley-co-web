@@ -31,12 +31,26 @@
     "sf-blazor-mcp": {
       "type": "stdio",
       "command": "/bin/bash",
-      "args": ["${workspaceFolder}/Scripts/mcp-sf-blazor-assistant.sh"]
+      "args": ["${workspaceFolder}/Scripts/mcp-sf-blazor-assistant.sh"],
+      "env": {
+        "SYNCFUSION_API_KEY_PATH": "${env:HOME}/.config/syncfusion/documentsdk.key",
+        "Syncfusion_API_Key_Path": "${env:HOME}/.config/syncfusion/documentsdk.key"
+      }
     },
     "playwright-test": {
       "type": "stdio",
       "command": "npx",
       "args": ["playwright", "run-test-mcp-server"]
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--browser-url=http://127.0.0.1:9222",
+        "--no-usage-statistics"
+      ]
     }
   }
 }

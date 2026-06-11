@@ -60,6 +60,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected IJSRuntime JSRuntime { get; set; } = default!;
 
     private DotNetObjectReference<WileyWorkspaceBase>? _networkStatusRef;
+    private Action? layoutContextChangedHandler;
+    private WorkspaceLayoutContext? subscribedLayoutContext;
 
     private bool persistenceInitialized;
     private bool isRefreshingScenarioCatalog;
@@ -156,13 +158,16 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected decimal ScenarioCostTotal => WorkspaceState.ScenarioCostTotal;
 
     protected string CurrentRateDisplay => CurrentRate.ToString("C2", WorkspaceUiCulture);
+    protected string TotalCostsDisplay => TotalCosts.ToString("C0", WorkspaceUiCulture);
+    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0", WorkspaceUiCulture);
     protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2", WorkspaceUiCulture);
+    protected string CostSourceDisplay => string.IsNullOrWhiteSpace(WorkspaceState.CostSource)
+        ? "baseline"
+        : WorkspaceState.CostSource;
     protected string RateDeltaDisplay => WorkspaceState.RateDelta.ToString("C2", WorkspaceUiCulture);
     protected string ScenarioAdjustedRateDisplay => WorkspaceState.AdjustedRecommendedRate.ToString("C2", WorkspaceUiCulture);
     protected string ScenarioAdjustedDeltaDisplay => WorkspaceState.AdjustedRateDelta.ToString("C2", WorkspaceUiCulture);
     protected string ScenarioCostTotalDisplay => WorkspaceState.ScenarioCostTotal.ToString("C0", WorkspaceUiCulture);
-    protected string TotalCostsDisplay => TotalCosts.ToString("C0", WorkspaceUiCulture);
-    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0", WorkspaceUiCulture);
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
     protected WorkspaceReserveTrajectoryData? ReserveTrajectory => WorkspaceState.ReserveTrajectory;
     protected double GaugeCurrentRateValue => (double)CurrentRate;
@@ -229,7 +234,12 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     protected string ActivePanelKey => NormalizePanelKey(Panel);
     protected bool IsOverviewMode => string.Equals(ActivePanelKey, "overview", StringComparison.Ordinal);
-    protected string ActivePanelLabel => PanelNavItems.FirstOrDefault(item => item.Key == ActivePanelKey)?.Label ?? "Overview";
+    protected bool IsBudgetDashboardMode => string.Equals(ActivePanelKey, "budget-dashboard", StringComparison.Ordinal);
+    protected string ActivePanelLabel => ActivePanelKey switch
+    {
+        "budget-dashboard" => "Budget Dashboard",
+        _ => PanelNavItems.FirstOrDefault(item => item.Key == ActivePanelKey)?.Label ?? "Overview"
+    };
     protected string BreadcrumbSection => IsOverviewMode ? "Workspace Overview" : "Workspace Panel";
     protected static string HostingEnvironmentName => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
     protected static string HostingVersion => typeof(WileyWorkspaceBase).Assembly.GetName().Version?.ToString() ?? "dev";
@@ -249,6 +259,12 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     /// <summary>Current viewport layout mode from the resize observer.</summary>
     protected WorkspaceLayoutMode LayoutMode => LayoutContext?.LayoutMode ?? WorkspaceLayoutMode.Desktop;
+
+    /// <summary>Mobile uses stacked panes instead of the horizontal SfSplitter.</summary>
+    protected bool UseMobileWorkspaceStack => LayoutMode == WorkspaceLayoutMode.Mobile;
+
+    /// <summary>Tablet or mobile viewport — shows compact workspace chrome such as the panel toggle.</summary>
+    protected bool IsCompactLayout => LayoutContext?.IsCompactLayout ?? false;
 
     protected string NavigationRailToggleText => IsLeftNavRailCollapsed ? "Expand navigation" : "Collapse navigation";
 
@@ -273,9 +289,12 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected static string GetPanelRoute(string panelKey)
     {
         var normalized = NormalizePanelKey(panelKey);
-        return string.Equals(normalized, "overview", StringComparison.Ordinal)
-            ? "/wiley-workspace"
-            : $"/wiley-workspace/{normalized}";
+        return normalized switch
+        {
+            "overview" => "/wiley-workspace",
+            "budget-dashboard" => "/budget-dashboard",
+            _ => $"/wiley-workspace/{normalized}"
+        };
     }
 
     protected void CloseSidebar()
@@ -384,6 +403,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected void ToggleJarvis()
     {
         LayoutContext?.SetJarvisOpen(!IsJarvisOpen);
+        WorkspaceLogger.LogInformation("Jarvis panel toggled: IsJarvisOpen={IsJarvisOpen}", IsJarvisOpen);
+        StateHasChanged();
     }
 
     /// <summary>
@@ -704,6 +725,29 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         Console.WriteLine("[startup] WileyWorkspaceBase.OnInitialized entered.");
         WorkspaceLogger.LogInformation("Wiley workspace component initialized for panel {Panel}.", Panel ?? "overview");
         WorkspaceState.Changed += HandleWorkspaceStateChanged;
+        SubscribeToLayoutContextChanges();
+    }
+
+    protected override void OnParametersSet()
+    {
+        SubscribeToLayoutContextChanges();
+    }
+
+    private void SubscribeToLayoutContextChanges()
+    {
+        if (LayoutContext is null || ReferenceEquals(LayoutContext, subscribedLayoutContext))
+        {
+            return;
+        }
+
+        if (subscribedLayoutContext is not null && layoutContextChangedHandler is not null)
+        {
+            subscribedLayoutContext.OnChange -= layoutContextChangedHandler;
+        }
+
+        subscribedLayoutContext = LayoutContext;
+        layoutContextChangedHandler ??= () => _ = InvokeAsync(StateHasChanged);
+        subscribedLayoutContext.OnChange += layoutContextChangedHandler;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -741,6 +785,12 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         // Mark initialization complete so the skeleton scaffold is removed.
         IsInitializingWorkspace = false;
 
+        if (IsBudgetDashboardMode)
+        {
+            LayoutContext?.SetJarvisOpen(false);
+            LayoutContext?.SetContextRailCollapsed(true);
+        }
+
         // Register navigator.onLine bridge so offline banner appears immediately
         // if the browser has already lost connectivity during startup.
         await RegisterNetworkStatusAsync();
@@ -750,6 +800,14 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        if (subscribedLayoutContext is not null && layoutContextChangedHandler is not null)
+        {
+            subscribedLayoutContext.OnChange -= layoutContextChangedHandler;
+        }
+
+        subscribedLayoutContext = null;
+        layoutContextChangedHandler = null;
+
         WorkspaceState.Changed -= HandleWorkspaceStateChanged;
         WorkspacePersistenceService.Dispose();
 
@@ -1036,6 +1094,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "capital-gap" => "capital-gap",
             "decision-support" => "decision-support",
             "data-dashboard" => "data-dashboard",
+            "budget-dashboard" => "budget-dashboard",
             _ => "overview"
         };
     }

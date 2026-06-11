@@ -6,13 +6,13 @@
 @using Syncfusion.Blazor.Spinner
 
 <div class="jarvis-chat-panel">
-    <SfCard ID="decision-support-panel" CssClass="h-full">
+    <SfCard ID="jarvis-chat-shell-card" CssClass="h-full">
         <CardHeader Title="Decision Support" SubTitle="Live workspace guidance with a premium Jarvis AI rail." />
         <CardContent>
-            <div class="space-y-4">
+            <div class="flex flex-col gap-4">
                 @* Removed: the flat operational-status pill and plain brief container.
                    Replacement: Syncfusion cards turn the executive state and workspace brief into first-class rail surfaces that resize cleanly inside the parent splitter. *@
-                <div class="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                <div class="grid gap-4 xl:grid-cols-[0.85fr_1.15fr] @(ChatFirstLayout ? "order-2" : "order-1")">
                     <SfCard ID="jarvis-operational-status-card">
                         <CardHeader Title="Operational status" SubTitle="@StatusText" />
                         <CardContent>
@@ -30,7 +30,7 @@
 
                 @* Removed: ad-hoc insight div tiles.
                    Replacement: every insight now renders as a nested Syncfusion card so the rail keeps a consistent visual language with the rest of the workspace shell. *@
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 @(ChatFirstLayout ? "order-4" : "order-2")">
                     @foreach (var insight in Insights)
                     {
                         <SfCard>
@@ -45,7 +45,7 @@
 
                 @* Removed: custom recommendation shells.
                    Replacement: a Syncfusion recommendation workbench card keeps live-refresh actions, status, and action items in one component-native section. *@
-                <SfCard ID="jarvis-recommended-actions-card">
+                <SfCard ID="jarvis-recommended-actions-card" CssClass="@(ChatFirstLayout ? "order-5" : "order-3")">
                     <CardHeader Title="Recommended actions" SubTitle="@KnowledgeStatus" />
                     <CardContent>
                         <div class="space-y-3">
@@ -83,7 +83,7 @@
 
                 @if (IsSecureJarvisEnabled)
                 {
-                    <SfCard ID="jarvis-ai-rail-card">
+                    <SfCard ID="jarvis-ai-rail-card" CssClass="@(ChatFirstLayout ? "order-1" : "order-4")">
                         <CardHeader Title="Jarvis chat" SubTitle="Secure API-backed assistant using the same workspace snapshot as the rest of the shell." />
                         <CardContent>
                             <div class="space-y-4">
@@ -126,12 +126,114 @@
                                     </CardContent>
                                 </SfCard>
 
+                                @if (ShowXaiKeySetupPrompt)
+                                {
+                                    <SfCard ID="jarvis-xai-key-setup" CssClass="border-amber-400">
+                                        <CardHeader Title="Would you like to add or rotate your Xai api key?"
+                                                    SubTitle="Local development convenience" />
+                                        <CardContent>
+                                            <div class="space-y-3">
+                                                <div class="text-sm wiley-text-muted">
+                                                    Jarvis is running in fallback mode because no xAI (Grok) API key was found for the backend.
+                                                </div>
+
+                                                <SfTooltip Content="The xAI API key powers real Jarvis/Grok responses instead of safe deterministic fallbacks. This prompt appears during local development startup when the API reports LatestUsedFallback=true. Choosing Yes lets you paste a key; it will be written ONLY to appsettings.Development.local.json (a gitignored file on YOUR machine). In production the key comes automatically from AWS Secrets Manager / App Runner — this UI and endpoint do not exist outside Development. Never commit keys."
+                                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                                           OpensOn="Hover Focus"
+                                                           ShowTipPointer="true"
+                                                           CloseDelay="300">
+                                                    <span class="text-xs underline decoration-dotted cursor-help">What's this for? (hover for plain-English explanation)</span>
+                                                </SfTooltip>
+
+                                                <div class="flex gap-3">
+                                                    <SfButton CssClass="e-success" Disabled="@IsSettingXaiKey" OnClick="OnXaiKeyPromptYes">Yes, add/rotate key</SfButton>
+                                                    <SfButton CssClass="e-flat" Disabled="@IsSettingXaiKey" OnClick="OnXaiKeyPromptNo">No, not now</SfButton>
+                                                </div>
+
+                                                @if (ShowXaiKeyInputForm)
+                                                {
+                                                    <div class="pt-2 border-t">
+                                                        <label class="text-xs wiley-text-muted block mb-1">Paste your xAI key (will not be logged or shown after submit)</label>
+                                                        <SfTextBox @bind-Value="XaiKeyInput"
+                                                                   Type="InputType.Password"
+                                                                   Placeholder="sk-..."
+                                                                   CssClass="w-full"
+                                                                   Enabled="!IsSettingXaiKey" />
+                                                        <div class="mt-2 flex gap-2">
+                                                            <SfButton CssClass="e-primary" Disabled="@(!CanSubmitXaiKey)" OnClick="SubmitXaiKeyAsync">
+                                                                @(IsSettingXaiKey ? "Saving..." : "Save key for local dev")
+                                                            </SfButton>
+                                                        </div>
+                                                    </div>
+                                                }
+
+                                                @if (!string.IsNullOrWhiteSpace(XaiKeySetupMessage))
+                                                {
+                                                    <div class="text-xs p-2 rounded bg-amber-50 border border-amber-200 wiley-text-muted">@XaiKeySetupMessage</div>
+                                                }
+
+                                                <div class="text-[10px] wiley-text-muted">
+                                                    Safe storage used: .NET user secrets (recommended), launchctl, or the local json written by this flow. Matches the project's documented patterns.
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </SfCard>
+                                }
+
+                                @* Persistent dev-only key manager (always available in the Jarvis panel for local development).
+                                   This keeps the "add xai key via jarvis chat window" as the primary/only method.
+                                   Expands to the same secure form. Server-side endpoint is Development-only.
+                                *@
+                                @if (ShowDevKeyManager)
+                                {
+                                    <SfCard ID="jarvis-dev-key-manager" CssClass="border-dashed">
+                                        <CardHeader Title="Dev: xAI Key (local only)" SubTitle="For evaluation — input here, never in chat or git" />
+                                        <CardContent>
+                                            <div class="flex items-center justify-between">
+                                                <div class="text-xs wiley-text-muted">
+                                                    Use this to add/rotate your xAI key via the Jarvis panel (secure browser → local API → gitignored .local.json).
+                                                </div>
+                                                <SfButton CssClass="e-flat e-small" OnClick="@(() => DevKeyManagerExpanded = !DevKeyManagerExpanded)">
+                                                    @(DevKeyManagerExpanded ? "Collapse" : "Manage Key")
+                                                </SfButton>
+                                            </div>
+
+                                            @if (DevKeyManagerExpanded)
+                                            {
+                                                <div class="pt-3 border-t mt-3">
+                                                    @if (!string.IsNullOrWhiteSpace(XaiKeySetupMessage))
+                                                    {
+                                                        <div class="text-xs p-2 rounded bg-amber-50 border border-amber-200 wiley-text-muted mb-2">@XaiKeySetupMessage</div>
+                                                    }
+
+                                                    <label class="text-xs wiley-text-muted block mb-1">Paste your xAI key</label>
+                                                    <SfTextBox @bind-Value="XaiKeyInput"
+                                                               Type="InputType.Password"
+                                                               Placeholder="sk-..."
+                                                               CssClass="w-full"
+                                                               Enabled="!IsSettingXaiKey" />
+
+                                                    <div class="mt-2">
+                                                        <SfButton CssClass="e-primary e-small" Disabled="@(!CanSubmitXaiKey)" OnClick="SubmitXaiKeyAsync">
+                                                            @(IsSettingXaiKey ? "Saving..." : "Save / Rotate Key (local dev)")
+                                                        </SfButton>
+                                                    </div>
+
+                                                    <div class="text-[10px] wiley-text-muted mt-1">
+                                                        After save, restart the API process for full real-Jarvis effect. Matches documented safe local patterns.
+                                                    </div>
+                                                </div>
+                                            }
+                                        </CardContent>
+                                    </SfCard>
+                                }
+
                                 @* Removed: extra custom chat shell blocks that duplicated the assist surface.
-                                   Replacement: the assist rail now owns the premium conversation experience, while surrounding cards focus on runtime and audit context. *@
-                                <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel" aria-busy="@IsChatBusy">
-                                    <SfAIAssistView ID="jarvis-chat-surface"
+                                   Replacement: SfAIAssistView owns the stable #jarvis-chat-ui anchor (audits/Playwright) with explicit Height for a non-zero bounding box. *@
+                                    <SfAIAssistView ID="@AssistViewId"
                                                     @ref="JarvisAssistView"
-                                                    Height="100%"
+                                                    CssClass="scroll-mt-4 jarvis-chat-surface min-h-[24rem] rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel"
+                                                    Height="360px"
                                                     Width="100%"
                                                     @bind-Prompt="ChatQuestion"
                                                     PromptPlaceholder="Ask about the workspace, codebase, or AI tools"
@@ -225,7 +327,6 @@
                                             </AssistViews>
                                         </ChildContent>
                                     </SfAIAssistView>
-                                </div>
 
                                 <div class="grid gap-4 xl:grid-cols-2">
                                     @* Removed: custom transcript div stack.

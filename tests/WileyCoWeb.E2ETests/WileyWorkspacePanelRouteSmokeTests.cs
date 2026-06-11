@@ -10,6 +10,7 @@ public sealed class WileyWorkspacePanelRouteSmokeTests
 
     [Theory]
     [InlineData("/wiley-workspace", "#workspace-overview-dashboard")]
+    [InlineData("/budget-dashboard", "#workspace-overview-dashboard")]
     [InlineData("/wiley-workspace/break-even", "#break-even-panel")]
     [InlineData("/wiley-workspace/rates", "#rates-panel")]
     [InlineData("/wiley-workspace/quickbooks-import", "#quickbooks-import-panel")]

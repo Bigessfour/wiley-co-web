@@ -1,0 +1,43 @@
+# Lightweight PostgreSQL for local development only.
+# (version key removed as it is obsolete in modern Compose and causes warnings)
+# Matches production (Aurora PostgreSQL) dialect and features.
+# Uses alpine image for smaller footprint.
+# Data persists in a named volume between restarts.
+#
+# Usage (with Docker running):
+#   docker compose -f docker-compose.dev.yml up -d
+#   # To stop and remove container (data stays in volume):
+#   docker compose -f docker-compose.dev.yml down
+#   # To completely reset data:
+#   docker compose -f docker-compose.dev.yml down -v
+#
+# Connection string for appsettings.Development.local.json (or user secrets):
+# "Host=localhost;Database=wileyco_dev;Username=postgres;Password=password"
+#
+# This is optional for developers who have Docker.
+# Clerks / non-Docker users should use native PostgreSQL install (see README).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wileyco-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: wileyco_dev
+      # Optional: tune for dev
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - wileyco-dev-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wileyco_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  wileyco-dev-postgres-data:
+    driver: local

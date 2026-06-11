@@ -90,43 +90,41 @@ public sealed class JarvisHealthApiTests : IClassFixture<ApiApplicationFactory>
         Assert.False(string.IsNullOrWhiteSpace(healthPayload.LastTurnAtUtc));
     }
 
-    // --- SSM resolution tests (minimal, non-HighRisk; verify skip + param parsing without AWS calls or secrets) ---
+    // --- Local-only secret resolution (post-AWS cull; no remote fetches) ---
     [Fact]
-    public async Task SecretResolver_SkipsSsmFetch_WhenEnvOrConfigKeyPresent_EvenIfSsmParameterNameConfigured()
+    public async Task SecretResolver_ResolvesConfigDirectKey_WithoutRemoteFetch()
     {
         var config = new ConfigurationManager();
         config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["XAI_API_KEY"] = "test-xai-key-from-config-for-ssm-skip-test",
-            ["XAI:ParameterName"] = "/wiley-widget/xai-api-key",
-            ["XAI:SSMParameterName"] = "/should-be-ignored-when-key-present"
+            ["XAI_API_KEY"] = "test-xai-key-from-config"
         });
 
         var resolver = new SecretResolver(config);
         var result = await resolver.ResolveXaiSecretAsync();
 
         Assert.NotNull(result);
-        Assert.True(result.ResolvedKeySource.StartsWith("env:") || result.ResolvedKeySource.StartsWith("config:"), $"Expected env or config source when key present, got {result.ResolvedKeySource}");
-        Assert.False(result.SsmFetchAttempted, "SSM must be skipped when a key is already present in env/config (per requirements).");
-        Assert.Equal("not-attempted", result.SsmFetchStatus);
-        // Param name still parsed from config for logging/ops visibility.
-        Assert.Equal("/wiley-widget/xai-api-key", result.SsmParameterName);
+        Assert.Equal("config:XAI_API_KEY", result.ResolvedKeySource);
+        Assert.True(result.ConfigDirectKeyPresent);
+        Assert.False(result.SecretFetchAttempted);
+        Assert.True(result.ConfigurationInjected);
     }
 
     [Fact]
-    public async Task SecretResolver_ParsesSsmParameterName_FromAllSupportedConfigKeys()
+    public async Task SecretResolver_ResolvesNamedApiKey_WithoutRemoteFetch()
     {
         var config = new ConfigurationManager();
         config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["XAI:ApiKey"] = "another-test-key-present",
-            ["XAI:ParameterName"] = "/custom/path/to/xai"
+            ["XAI:ApiKey"] = "another-test-key-present"
         });
 
         var resolver = new SecretResolver(config);
         var result = await resolver.ResolveXaiSecretAsync();
 
-        Assert.Equal("/custom/path/to/xai", result.SsmParameterName);
-        Assert.False(result.SsmFetchAttempted);
+        Assert.Equal("config:XAI:ApiKey", result.ResolvedKeySource);
+        Assert.True(result.ConfigNamedKeyPresent);
+        Assert.False(result.SecretFetchAttempted);
+        Assert.True(result.ConfigurationInjected);
     }
 }

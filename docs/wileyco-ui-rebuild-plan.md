@@ -698,7 +698,7 @@ This is the target UI shape the current backend and middle-layer files should fe
 - **Enterprise context rail**: `EnterpriseRepository`, `AppDbContext`, shared enterprise models, and the import lineage tables should drive enterprise selection, fiscal year selection, and active scenario context.
 - **Break-even tile**: `DashboardService`, `AnalyticsService`, `BudgetAnalyticsRepository`, `AnalyticsPipeline`, and the rate-calculation services should feed total cost, projected volume, current rate, break-even rate, and delta.
 - **Scenario planner tile**: `ScenarioSnapshotRepository`, `SavedScenarioSnapshot`, `BudgetRepository`, and the scenario engine should drive add-cost items, compare-before/after views, and save/load actions.
-- **Customer viewer tile**: `AmplifySchemaEntities`, `AppDbContext`, and the customer-focused repository layer should provide light customer records only, with filters for enterprise, search, and city-limits flags.
+- **Customer viewer tile**: `ImportSchemaEntities` (formerly AmplifySchemaEntities), `AppDbContext`, and the customer-focused repository layer should provide light customer records only, with filters for enterprise, search, and city-limits flags.
 - **Trends and projections tile**: `BudgetAnalyticsRepository`, `TownOfWileyBudget2026`, `MonthlyRevenue`-style models, and projection services should provide historical and forward-looking series for charts.
 - **Rates tile**: `DashboardService`, manual rate input state, and scenario comparison models should keep current rate, recommended rate, and visual comparison in sync.
 - **AI chat rail**: `ChatBridgeService`, `SemanticSearchService`, `XAIService`, and the AI context/logging services should provide explainable rate summaries and scenario answers.
@@ -789,6 +789,32 @@ This closes the static evaluation loop. Next: clean build/test, git push for CI/
 - Keep `SavedScenarioSnapshot` available for narrower analytics-specific use, but do not rely on it for the web workspace until its shape can represent the full scenario payload.
 - Continue to prefer local Syncfusion Blazor documentation in `docs/blazor-documentation-index.md` and the `Blazor Documentation/` PDFs when refining control behavior.
 - For baseline persistence, update the canonical `Enterprise` fields used by the snapshot composer: `CurrentRate`, `MonthlyExpenses`, `CitizenCount`, and `LastModified`, then recompose the workspace snapshot from the same API path the UI already uses.
+
+## Workspace Layout Principles (June 2026)
+
+Council-facing panels follow a consistent **KPI band → workbench → full-width grid** rhythm so clerks and council members scan metrics first, then drill into controls and charts.
+
+| Layer              | Purpose                                                                | Typical controls                                                                                                |
+| ------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Slim hero          | Active enterprise, fiscal year, cost source, headline rate/cost KPIs   | `WileyWorkspace.razor` hero band                                                                                |
+| KPI band           | Four-up (or responsive 2×2) metric cards per panel                     | `SfCard` grids in Break-even, Rates, Debt Coverage, Capital Gap, Trends, Data Dashboard                         |
+| 2-column workbench | Primary analytic surface (chart/gauge/editor) beside supporting detail | `lg:grid-cols-[1.2fr_0.8fr]` (Rates editor/chart uses inverted `0.88fr_1.12fr` when the chart needs more width) |
+| Full-width grid    | Tabular exports, scenario grids, customer grids                        | `SfGrid` hosts with `workspace-syncfusion-grid-host` height tokens                                              |
+
+**Shell compaction**
+
+- Document Center collapsed into `<details>`; global actions live in the context rail.
+- Context rail and Jarvis default collapsed on first load (`PersistedLayoutState` + `MainLayout` init).
+- Data Dashboard exposes an enterprise comparison matrix fed from ledger-primary `BreakEvenQuadrants` and `CostSource`.
+
+**Mobile (`LayoutMode == Mobile`)**
+
+- `wiley-workspace--mobile-stack` stacks splitter panes vertically via CSS; a native `<details>` mobile context rail replaces the hidden desktop context pane.
+- Panel workbench grids collapse to a single column below the `lg` breakpoint.
+
+**Cost provenance in UI**
+
+- Hero and Data Dashboard show `CostSource` (`ledger`, `baseline`, or `snapshot`) so council knows whether break-even quadrants reflect QuickBooks actuals.
 
 ## Notes
 

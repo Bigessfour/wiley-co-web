@@ -84,7 +84,10 @@ internal sealed partial class WorkspaceReferenceDataImportService
 
     private void EnsureCanonicalEnterprises(AppDbContext context, DateTime importedAtUtc, bool applyDefaultEnterpriseBaselines, EnterpriseImportStats stats)
     {
-        var existingEnterprises = context.Enterprises.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
+        var existingEnterprises = context.Enterprises
+            .AsEnumerable()
+            .GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.OrderBy(item => item.Id).First(), StringComparer.OrdinalIgnoreCase);
         foreach (var seed in WorkspaceEnterpriseSeedCatalog.All)
         {
             if (!existingEnterprises.TryGetValue(seed.Name, out var enterprise))
@@ -167,7 +170,7 @@ internal sealed partial class WorkspaceReferenceDataImportService
 
             if (string.Equals(seed.Name, "Apartments", StringComparison.OrdinalIgnoreCase))
             {
-                var apartmentEnterprise = context.Enterprises.FirstOrDefault(item => !item.IsDeleted && string.Equals(item.Name, seed.Name, StringComparison.OrdinalIgnoreCase));
+                var apartmentEnterprise = context.Enterprises.FirstOrDefault(item => !item.IsDeleted && item.Name == seed.Name);
                 if (apartmentEnterprise is not null && !context.Set<ApartmentUnitType>().Any(item => item.EnterpriseId == apartmentEnterprise.Id && !item.IsDeleted))
                 {
                     context.Set<ApartmentUnitType>().AddRange(

@@ -59,7 +59,7 @@ namespace WileyWidget.Services
                 var result = new BudgetAnalysisResult
                 {
                     CategoryBreakdown = await _budgetAnalyticsRepository.GetCategoryBreakdownAsync(startDate, endDate, entityName, ct),
-                    TopVariances = await _budgetAnalyticsRepository.GetTopVariancesAsync(10, startDate.Year, ct), // Top 10 for current fiscal year
+                    TopVariances = await _budgetAnalyticsRepository.GetTopVariancesAsync(10, startDate.Year, null, ct), // Top 10 for current fiscal year
                     TrendData = await _budgetAnalyticsRepository.GetTrendAnalysisAsync(startDate, endDate, ct),
                     Insights = new List<string>(),
                     AvailableEntities = availableEntities.ToList()
@@ -340,12 +340,12 @@ namespace WileyWidget.Services
         /// <summary>
         /// Gets budget overview data for the specified fiscal year
         /// </summary>
-        public async Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, CancellationToken cancellationToken = default)
+        public async Task<BudgetOverviewData> GetBudgetOverviewAsync(int? fiscalYear = null, string? enterpriseName = null, CancellationToken cancellationToken = default)
         {
             return await ExecuteAsync(async ct =>
             {
                 var year = fiscalYear ?? DateTime.Now.Year;
-                var data = await _budgetAnalyticsRepository.GetBudgetOverviewDataAsync(year, ct);
+                var data = await _budgetAnalyticsRepository.GetBudgetOverviewDataAsync(year, enterpriseName, ct);
 
                 return new BudgetOverviewData
                 {

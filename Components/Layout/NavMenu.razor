@@ -14,14 +14,14 @@
                        OpenDelay="300"
                        CloseDelay="100">
                        @* OpenDelay/CloseDelay: prevents tooltip flickering on fast cursor sweeps across the nav rail *@
-                <NavLink class="app-nav-link"
-                         href="@navItem.Href"
-                         Match="@navItem.Match"
-                         aria-label="@navItem.Label"
-                         aria-current="@(IsNavItemActive(navItem) ? "page" : null)">
+                <button type="button"
+                        class="app-nav-link @(IsNavItemActive(navItem) ? "active" : null)"
+                        aria-label="@navItem.Label"
+                        aria-current="@(IsNavItemActive(navItem) ? "page" : null)"
+                        @onclick="() => NavigateToPanel(navItem.Href)">
                     <span class="app-nav-link-index" aria-hidden="true">@navItem.Index</span>
                     <span class="app-nav-link-label">@navItem.Label</span>
-                </NavLink>
+                </button>
             </SfTooltip>
         </Template>
     </SfListView>
@@ -59,6 +59,11 @@
     /// <c>aria-current="page"</c> for screen readers.  Mirrors the same logic
     /// Blazor's NavLink uses internally for the "active" CSS class.
     /// </summary>
+    private void NavigateToPanel(string href)
+    {
+        Nav.NavigateTo(href);
+    }
+
     private bool IsNavItemActive(WorkspaceNavItem item)
     {
         var relativeCurrent = Nav.ToBaseRelativePath(Nav.Uri).TrimStart('/');

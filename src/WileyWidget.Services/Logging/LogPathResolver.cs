@@ -15,7 +15,7 @@ namespace WileyWidget.Services.Logging
 
         /// <summary>
         /// Gets the writable log directory to use for runtime file logging.
-        /// App Runner, ECS, Docker, and Lambda should use a temp-backed path.
+        /// Docker and containerized local runs use a temp-backed path.
         /// </summary>
         public static string GetLogDirectory()
         {
@@ -95,10 +95,8 @@ namespace WileyWidget.Services.Logging
 
         private static bool IsContainerEnvironment()
         {
-            return !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AWS_EXECUTION_ENV"))
-                || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CONTAINER"))
-                || File.Exists("/.dockerenv")
-                || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
+            return !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CONTAINER"))
+                || File.Exists("/.dockerenv");
         }
 
         private static string EnsureDirectory(string directoryPath)

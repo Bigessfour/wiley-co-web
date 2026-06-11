@@ -2,7 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 
 namespace WileyWidget.Services;
 
@@ -16,7 +16,12 @@ public sealed class QuickBooksRoutingService
         ("sanitation", "Wiley Sanitation District"),
         ("sewer", "Wiley Sanitation District"),
         ("Util", "Water Utility"),
-        ("utility", "Water Utility")
+        ("utility", "Water Utility"),
+        ("trash", "Trash"),
+        ("refuse", "Trash"),
+        ("garbage", "Trash"),
+        ("apartment", "Apartments"),
+        ("apts", "Apartments")
     ];
 
     private static readonly HashSet<string> GenericScopes = new(StringComparer.OrdinalIgnoreCase)

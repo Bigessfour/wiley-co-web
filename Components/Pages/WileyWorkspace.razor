@@ -17,67 +17,50 @@
 
 <LoggingErrorBoundary BoundaryName="WileyWorkspace">
     <ChildContent>
-<div class="wiley-workspace min-h-screen wiley-surface-panel-secondary px-4 py-4 md:px-6 lg:px-8">
+<div class="wiley-workspace @(UseMobileWorkspaceStack ? "wiley-workspace--mobile-stack" : string.Empty) @(IsBudgetDashboardMode ? "py-2" : "py-4") min-h-screen wiley-surface-panel-secondary px-4 md:px-6 lg:px-8">
     <div class="flex w-full flex-col gap-4">
-        <div id="workspace-overview-hero" class="rounded-3xl border px-6 py-5 shadow-lg wiley-hero">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        @if (!IsBudgetDashboardMode)
+        {
+        <div id="workspace-overview-hero" class="rounded-2xl border px-4 py-3 shadow-sm wiley-hero">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley Widget</p>
-                    <h1 class="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Utility Rate Study Workspace</h1>
-                    <p class="mt-2 max-w-3xl text-sm wiley-text-muted md:text-base">
-                        Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.
+                    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sky-300">Wiley Widget · FY@SelectedFiscalYear</p>
+                    <h1 class="mt-1 text-lg font-semibold tracking-tight md:text-xl">@SelectedEnterprise workspace</h1>
+                    <p class="mt-1 text-xs wiley-text-muted md:text-sm">
+                        API @HostingApiHealth · @StartupSourceStatus · Costs: <span class="font-semibold text-sky-200">@CostSourceDisplay</span>
                     </p>
-                    <div id="workspace-hero-data-source" class="mt-4 max-w-3xl rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-left text-xs leading-relaxed wiley-text-muted md:text-sm">
-                        <div class="font-semibold text-sky-200">Data source</div>
-                        <div class="mt-1"><span class="wiley-text-muted">Workspace API:</span> @HostingApiHealth · <span class="wiley-text-muted">Bootstrap:</span> <span class="@(IsUsingStartupFallback ? "text-amber-200" : "text-emerald-200")">@StartupSourceStatus</span></div>
-                        <div class="mt-1 line-clamp-2"><span class="wiley-text-muted">Current state:</span> @CurrentStateSourceStatus</div>
-                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 text-right text-xs wiley-text-muted sm:grid-cols-4 lg:text-sm">
-                    <div>
-                        <div class="wiley-text-muted">Selected enterprise</div>
-                        <div class="font-semibold text-white">@SelectedEnterprise</div>
-                    </div>
-                    <div>
-                        <div class="wiley-text-muted">Fiscal Year</div>
-                        <div class="font-semibold text-white">@SelectedFiscalYear</div>
-                    </div>
                     <div>
                         <div class="wiley-text-muted">Current Rate</div>
                         <div class="font-semibold text-white">@CurrentRateDisplay</div>
                     </div>
                     <div>
+                        <div class="wiley-text-muted">Total Costs</div>
+                        <div class="font-semibold text-white">@TotalCostsDisplay</div>
+                    </div>
+                    <div>
+                        <div class="wiley-text-muted">Volume</div>
+                        <div class="font-semibold text-white">@ProjectedVolumeDisplay</div>
+                    </div>
+                    <div>
                         <div class="wiley-text-muted">Break-Even</div>
                         <div class="font-semibold text-emerald-300">@BreakEvenRateDisplay</div>
-                    </div>
-                    <div class="col-span-2 sm:col-span-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left">
-                        <div class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-sky-200">Four-enterprise break-even points</div>
-                        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            @foreach (var quadrant in HeroBreakEvenQuadrants)
-                            {
-                                <div class="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
-                                    <div class="text-sm font-semibold text-white">@GetHeroBreakEvenLabel(quadrant)</div>
-                                    <div class="mt-1 text-xs wiley-text-muted">Break-even</div>
-                                    <div class="text-lg font-semibold text-emerald-300">@quadrant.BreakEvenRate.ToString("C2")</div>
-                                </div>
-                            }
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
+        }
 
-        <div id="workspace-document-center" class="rounded-2xl border px-5 py-4 shadow-sm wiley-surface-panel">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Document Center</p>
-                    <h2 class="mt-1 text-lg font-semibold wiley-text-muted">Syncfusion Excel & PDF Deliverables</h2>
-                    <p class="mt-1 text-sm wiley-text-muted">Export the filtered customer set, the active scenario workbook, or a PDF rate packet from the current workspace state.</p>
-                </div>
-                <div class="flex flex-col gap-3 xl:min-w-[38rem]">
+        @if (!IsBudgetDashboardMode)
+        {
+        <details id="workspace-document-center" open class="rounded-2xl border px-5 py-4 shadow-sm wiley-surface-panel">
+            <summary class="cursor-pointer text-sm font-semibold wiley-text-muted">Document Center · Syncfusion exports</summary>
+            <div class="mt-4 flex flex-col gap-4">
+                <div class="flex flex-col gap-3">
                     <div class="grid gap-3 md:grid-cols-3">
                         @* Export buttons disable during any export operation so concurrent file-writes are prevented *@
-                        <SfButton id="export-customers-excel-button"
+                        <SfButton ID="export-customers-excel-button"
                                   CssClass="e-primary"
                                   IsPrimary="true"
                                   Disabled="@IsExportingDocuments"
@@ -85,13 +68,13 @@
                                   OnClick="ExportCustomerWorkbookAsync">
                             @(IsExportingDocuments ? "Exporting…" : "Export customers to Excel")
                         </SfButton>
-                        <SfButton id="export-scenario-excel-button"
+                        <SfButton ID="export-scenario-excel-button"
                                   Disabled="@IsExportingDocuments"
                                   IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
                                   OnClick="ExportScenarioWorkbookAsync">
                             @(IsExportingDocuments ? "Exporting…" : "Export scenario to Excel")
                         </SfButton>
-                        <SfButton id="export-workspace-pdf-button"
+                        <SfButton ID="export-workspace-pdf-button"
                                   Disabled="@IsExportingDocuments"
                                   IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
                                   OnClick="ExportWorkspacePdfAsync">
@@ -114,7 +97,33 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </details>
+        }
+
+        @if (UseMobileWorkspaceStack)
+        {
+            <details id="workspace-mobile-context-rail" class="wiley-mobile-context-rail">
+                <summary class="wiley-mobile-context-summary">@SelectedEnterprise · FY @SelectedFiscalYear</summary>
+                <div class="space-y-4 p-4 border-t border-[var(--wiley-border)]">
+                    <SfDropDownList ID="enterprise-select-mobile" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" FilterBarPlaceholder="Search enterprises..." EnablePersistence="true" PersistenceKey="wiley.workspace.enterprise.v1">
+                        <DropDownListEvents TValue="string" TItem="string" ValueChange="HandleEnterpriseChanged" />
+                    </SfDropDownList>
+                    <SfDropDownList ID="fiscal-year-select-mobile" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" EnablePersistence="true" PersistenceKey="wiley.workspace.fiscal-year.v1">
+                        <DropDownListEvents TValue="int" TItem="int" ValueChange="HandleFiscalYearChanged" />
+                    </SfDropDownList>
+                    <div id="workspace-navigation-list-mobile" class="grid gap-2">
+                        @foreach (var panelNavItem in PanelNavItems)
+                        {
+                            <button type="button"
+                                    class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors @(ActivePanelKey == panelNavItem.Key ? "bg-sky-100 text-sky-900 font-semibold border-sky-200" : "wiley-text-muted hover:bg-[var(--wiley-surface-2)]")"
+                                    @onclick="() => OpenPanel(panelNavItem.Key)">
+                                @panelNavItem.Label
+                            </button>
+                        }
+                    </div>
+                </div>
+            </details>
+        }
 
         <SfSplitter @ref="_workspaceSplitter"
                     ID="workspace-main-splitter"
@@ -125,7 +134,10 @@
             <SplitterEvents Collapsed="HandleSplitterCollapsed" Expanded="HandleSplitterExpanded" />
             <SplitterPanes>
                 @* Context Rail – pane 0: enterprise context, navigation, actions *@
-                <SplitterPane Size="280px" Min="48px" Max="420px" Resizable="true" Collapsible="true">
+                <SplitterPane Size="280px" Min="48px" Max="420px" Resizable="true" Collapsible="true"
+                              CssClass="workspace-splitter-pane-context"
+                              Collapsed="@IsContextRailCollapsed"
+                              CollapsedChanged="HandleContextRailPaneCollapsedChanged">
                     <ContentTemplate>
                         <div id="workspace-sidebar-shell" class="workspace-pane-context-rail h-full overflow-y-auto overflow-x-hidden space-y-4 p-4">
                     <SfCard ID="workspace-enterprise-context-card">
@@ -133,23 +145,22 @@
                             <CardContent>
                                 <div class="space-y-4">
                                     @* EnablePersistence: restores the selected enterprise across page refreshes so users return to their active workspace context *@
-                                    <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" FilterBarPlaceholder="Search enterprises..." EnablePersistence="true" PersistenceKey="wiley.workspace.enterprise.v1">
+                                    <SfDropDownList ID="enterprise-select" TValue="string" TItem="string" DataSource="@EnterpriseOptions" Value="@SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" PopupWidth="100%" Width="100%" ZIndex="10050" FilterBarPlaceholder="Search enterprises..." EnablePersistence="true" PersistenceKey="wiley.workspace.enterprise.v1">
                                         <DropDownListEvents TValue="string" TItem="string" ValueChange="HandleEnterpriseChanged" />
                                     </SfDropDownList>
                                     @* EnablePersistence: preserves the selected fiscal year as part of the user's active workspace context *@
-                                    <SfDropDownList ID="fiscal-year-select" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" Width="100%" EnablePersistence="true" PersistenceKey="wiley.workspace.fiscal-year.v1">
+                                    <SfDropDownList ID="fiscal-year-select" TValue="int" TItem="int" DataSource="@FiscalYearOptions" Value="@SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" PopupHeight="240px" PopupWidth="100%" Width="100%" ZIndex="10050" EnablePersistence="true" PersistenceKey="wiley.workspace.fiscal-year.v1">
                                         <DropDownListEvents TValue="int" TItem="int" ValueChange="HandleFiscalYearChanged" />
+                                    </SfDropDownList>
+                                    @* Saved scenarios above free-text fields so the dropdown stays in the context-rail viewport without scrolling past hosting/nav cards. *@
+                                    <SfDropDownList ID="saved-scenarios-dropdown" TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" PopupWidth="100%" Width="100%" EnableVirtualization="true" FilterBarPlaceholder="Search scenarios..." EnablePersistence="true" PersistenceKey="wiley.workspace.scenario.v1" ZIndex="10050">
+                                        <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
+                                        <DropDownListEvents TValue="long?" TItem="WorkspaceScenarioSummaryResponse" ValueChange="HandleSavedScenarioChanged" />
                                     </SfDropDownList>
                                     @* MaxLength: prevents runaway scenario names from exceeding the Aurora column width *@
                                     <SfTextBox ID="scenario-name-input" Placeholder="Scenario name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="ActiveScenarioName" MaxLength="128" />
                                     @* MaxLength: caps description length in line with Aurora varchar column size *@
                                     <SfTextBox ID="scenario-description-input" Placeholder="Scenario description" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="ScenarioDescription" MaxLength="512" />
-                                    @* EnableVirtualization: scenarios grow unbounded; virtualization keeps the popup responsive at scale *@
-                                    @* EnablePersistence: restores the last-applied scenario selection across page refreshes *@
-                                    <SfDropDownList ID="saved-scenarios-dropdown" TValue="long?" TItem="WorkspaceScenarioSummaryResponse" DataSource="@SavedScenarios" Value="@SelectedScenarioSnapshotId" Placeholder="Saved scenarios" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="280px" Width="100%" EnableVirtualization="true" FilterBarPlaceholder="Search scenarios..." EnablePersistence="true" PersistenceKey="wiley.workspace.scenario.v1">
-                                        <DropDownListFieldSettings Text="ScenarioName" Value="SnapshotId" />
-                                        <DropDownListEvents TValue="long?" TItem="WorkspaceScenarioSummaryResponse" ValueChange="HandleSavedScenarioChanged" />
-                                    </SfDropDownList>
                                 </div>
                             </CardContent>
                         </SfCard>
@@ -170,12 +181,11 @@
                             <div id="workspace-navigation-list" class="mt-2 grid gap-2">
                                 @foreach (var panelNavItem in PanelNavItems)
                                 {
-                                    <a href="@GetPanelRoute(panelNavItem.Key)"
-                                       class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors @(ActivePanelKey == panelNavItem.Key ? "bg-sky-100 text-sky-900 font-semibold border-sky-200" : "wiley-text-muted hover:bg-[var(--wiley-surface-2)]")"
-                                       @onclick="() => OpenPanel(panelNavItem.Key)"
-                                       @onclick:preventDefault>
+                                    <button type="button"
+                                            class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors @(ActivePanelKey == panelNavItem.Key ? "bg-sky-100 text-sky-900 font-semibold border-sky-200" : "wiley-text-muted hover:bg-[var(--wiley-surface-2)]")"
+                                            @onclick="() => OpenPanel(panelNavItem.Key)">
                                         @panelNavItem.Label
-                                    </a>
+                                    </button>
                                 }
                             </div>
                         </div>
@@ -213,19 +223,33 @@
                 </SplitterPane>
 
                 @* Main Content – pane 1: active panel router *@
-                <SplitterPane Min="420px" Resizable="true" Collapsible="false">
+                <SplitterPane Min="420px" Resizable="true" Collapsible="false" CssClass="workspace-splitter-pane-main">
                     <ContentTemplate>
                         <div id="workspace-main-content" class="workspace-pane-main h-full overflow-y-auto overflow-x-hidden">
                         <div id="workspace-dashboard" class="w-full">
-                    <div class="workspace-main-shell flex flex-col gap-4 p-4 md:p-5">
+                    <div class="workspace-main-shell flex flex-col @(IsBudgetDashboardMode ? "gap-2 p-2 md:p-3" : "gap-4 p-4 md:p-5")">
+                        @if (!IsBudgetDashboardMode)
+                        {
                         <div id="workspace-breadcrumb" class="border-b border-[var(--wiley-border)] pb-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">@BreadcrumbSection</p>
-                            <div class="mt-1 flex items-center gap-2 text-sm wiley-text-muted">
-                                <span>Workspace</span>
-                                <span>/</span>
-                                <span class="font-semibold wiley-text-muted">@ActivePanelLabel</span>
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">@BreadcrumbSection</p>
+                                    <div class="mt-1 flex items-center gap-2 text-sm wiley-text-muted">
+                                        <span>Workspace</span>
+                                        <span>/</span>
+                                        <span class="font-semibold wiley-text-muted">@ActivePanelLabel</span>
+                                    </div>
+                                </div>
+                                <SfButton ID="workspace-panel-toggle"
+                                          CssClass="e-outline workspace-panel-toggle-btn max-lg:inline-flex lg:hidden"
+                                          OnClick="ToggleWorkspacePanelAsync"
+                                          aria-expanded="@(!IsContextRailCollapsed ? "true" : "false")"
+                                          aria-controls="workspace-sidebar-shell">
+                                    @(IsContextRailCollapsed ? "Open workspace panel" : "Close workspace panel")
+                                </SfButton>
                             </div>
                         </div>
+                        }
 
                         @* ── Workspace initialization skeleton ──────────────────────────────
                            Renders while the first-render persistence cycle is in-flight so the
@@ -535,6 +559,21 @@
                                     case "decision-support":
                                         <DecisionSupportPanel @key="ActivePanelKey" />
                                         break;
+                                    case "budget-dashboard":
+                                        <BudgetDashboardPanel @key="ActivePanelKey"
+                                                              CurrentRate="@CurrentRate"
+                                                              TotalCosts="@TotalCosts"
+                                                              ProjectedVolume="@ProjectedVolume"
+                                                              RecommendedRate="@RecommendedRate"
+                                                              AdjustedRecommendedRate="@ScenarioAdjustedRate"
+                                                              ScenarioCostTotal="@ScenarioCostTotal"
+                                                              ScenarioItems="@ScenarioItems"
+                                                              ProjectionSeries="@ProjectionSeries"
+                                                              RateComparison="@RateComparison"
+                                                              CostSource="@CostSourceDisplay"
+                                                              SelectedEnterprise="@SelectedEnterprise"
+                                                              SelectedFiscalYear="@SelectedFiscalYear" />
+                                        break;
                                     case "data-dashboard":
                                         <DataDashboardPanel @key="ActivePanelKey"
                                                             CurrentRate="@CurrentRate"
@@ -547,6 +586,8 @@
                                                             ProjectionSeries="@ProjectionSeries"
                                                             Customers="@Customers"
                                                             RateComparison="@RateComparison"
+                                                            BreakEvenQuadrants="@BreakEvenQuadrants"
+                                                            CostSource="@CostSourceDisplay"
                                                             SelectedEnterprise="@SelectedEnterprise"
                                                             SelectedFiscalYear="@SelectedFiscalYear" />
                                         break;
@@ -564,19 +605,21 @@
 
                 @* Jarvis Rail – pane 2: AI chat, starts collapsed *@
                 <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true"
+                              CssClass="workspace-splitter-pane-jarvis"
                               Collapsed="@(!IsJarvisOpen)"
                               CollapsedChanged="HandleJarvisPaneCollapsedChanged">
                     <ContentTemplate>
-                        <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
+                        <div id="workspace-jarvis-dock" class="workspace-jarvis-rail workspace-pane-jarvis flex flex-col h-full">
                             <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b border-[var(--wiley-border)] px-4 py-3 flex-shrink-0 wiley-surface-panel-secondary">
                                 <span class="e-icons e-ai-chat text-[var(--wiley-accent)] text-base flex-shrink-0" aria-hidden="true"></span>
-                                <div class="min-w-0">
+                                <div class="min-w-0 flex-1">
                                     <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Jarvis</p>
                                     <p class="mt-0.5 text-[0.7rem] wiley-text-muted leading-tight">AI workspace guidance</p>
                                 </div>
+                                <SfButton CssClass="e-flat e-small" OnClick="ToggleJarvisAsync">Close</SfButton>
                             </div>
                             <div class="min-h-0 flex-1 overflow-auto p-3">
-                                <JarvisChatPanel />
+                                <JarvisChatPanel AssistViewId="jarvis-rail-chat-ui" />
                             </div>
                         </div>
                     </ContentTemplate>
@@ -586,12 +629,12 @@
 
         @if (!string.Equals(ActivePanelKey, "decision-support", StringComparison.Ordinal) && !IsJarvisOpen)
         {
-            <SfButton id="workspace-jarvis-launcher"
+            <SfButton ID="workspace-jarvis-launcher"
                       CssClass="e-primary fixed bottom-6 right-6 z-40 shadow-xl"
                       IsPrimary="true"
                       OnClick="ToggleJarvisAsync"
                       title="Open Jarvis AI guidance rail"
-                      aria-expanded="false">
+                      aria-expanded="@(IsJarvisOpen ? "true" : "false")">
                 <span class="e-icons e-ai-chat" aria-hidden="true"></span>
                 Jarvis
             </SfButton>
@@ -627,6 +670,24 @@
     /* Pane backgrounds */
     .workspace-splitter .e-pane {
         background: var(--wiley-surface-1);
+        overflow: hidden;
+    }
+
+    /* Keep the main workspace pane above adjacent splitter panes so overview
+       card buttons and panel controls receive clicks (Syncfusion pane stacking). */
+    .workspace-splitter .workspace-splitter-pane-main.e-pane {
+        position: relative;
+        z-index: 2;
+    }
+
+    .workspace-splitter .workspace-splitter-pane-context.e-pane,
+    .workspace-splitter .workspace-splitter-pane-jarvis.e-pane {
+        position: relative;
+        z-index: 1;
+    }
+
+    .workspace-splitter .workspace-splitter-pane-jarvis.e-pane.e-pane-collapsed .workspace-pane-jarvis {
+        pointer-events: none;
     }
 
     /* Split-bar styling */
@@ -913,11 +974,30 @@
     /// </summary>
     private void ToggleJarvisAsync()
     {
-        // ToggleJarvis() calls LayoutContext.SetJarvisOpen(!current) which fires
-        // OnChange — any subscriber (e.g. a decision-support badge) re-renders.
-        // The SplitterPane for Jarvis (pane 2) reacts automatically via its
-        // Collapsed binding.
-        ToggleJarvis();
+        bool targetOpen = !IsJarvisOpen;
+
+        // Update the source of truth (context). This will cause re-renders of any
+        // binding to IsJarvisOpen (including the launcher @if and the pane Collapsed).
+        LayoutContext?.SetJarvisOpen(targetOpen);
+        WorkspaceLogger.LogInformation("Jarvis panel toggled via launcher: targetOpen={TargetOpen}", targetOpen);
+        StateHasChanged();
+
+        // Declarative Collapsed="@(!IsJarvisOpen)" binding on the SplitterPane (plus
+        // HandleJarvisPaneCollapsedChanged) is the supported Syncfusion pattern.
+        // Imperative Expand/Collapse calls were removed (they do not exist on SfSplitter
+        // in this version and caused CS1061 build failures).
+    }
+
+    private void ToggleWorkspacePanelAsync()
+    {
+        LayoutContext?.SetContextRailCollapsed(!IsContextRailCollapsed);
+        StateHasChanged();
+    }
+
+    private void HandleContextRailPaneCollapsedChanged(bool collapsed)
+    {
+        LayoutContext?.SetContextRailCollapsed(collapsed);
+        StateHasChanged();
     }
 
     /// <summary>

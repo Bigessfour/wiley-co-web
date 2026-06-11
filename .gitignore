@@ -7,6 +7,7 @@ wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 .DS_Store
 .cursor/
+.agents/
 bin/
 obj/
 wwwroot/appsettings.json
@@ -34,6 +35,7 @@ Thumbs.db
 *.swp
 *.bak
 publish_output/
+api_output/
 node_modules/
 *.user
 *.suo
@@ -75,6 +77,9 @@ test-results/
 .playwright/
 .playwright-mcp/
 logs/
+
+# RAG index for agents (local Chroma persistent store — rebuild as needed)
+.rag-index/
 jarvis-*.json
 playwright-live-*.json
 CRAP-Analysis-Report.md
@@ -110,3 +115,7 @@ build/Release
 terraform.tfstate
 terraform.tfstate.backup
 .vscode/settings.json
+
+
+# APM dependencies
+apm_modules/

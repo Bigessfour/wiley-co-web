@@ -13,6 +13,7 @@ using WileyWidget.Business.Interfaces;
 using WileyWidget.Data;
 using WileyWidget.Models;
 using WileyWidget.Services;
+using WileyWidget.Services.Abstractions;
 
 namespace WileyCoWeb.Api;
 
@@ -22,6 +23,7 @@ internal sealed partial class WorkspaceReferenceDataImportService
     private readonly IDbContextFactory<AppDbContext> contextFactory;
     private readonly IBudgetRepository budgetRepository;
     private readonly QuickBooksImportService quickBooksImportService;
+    private readonly IEnterpriseLedgerCostService enterpriseLedgerCostService;
     private readonly IConfiguration configuration;
     private readonly ILogger<WorkspaceReferenceDataImportService> logger;
 
@@ -29,12 +31,14 @@ internal sealed partial class WorkspaceReferenceDataImportService
         IDbContextFactory<AppDbContext> contextFactory,
         IBudgetRepository budgetRepository,
         QuickBooksImportService quickBooksImportService,
+        IEnterpriseLedgerCostService enterpriseLedgerCostService,
         IConfiguration configuration,
         ILogger<WorkspaceReferenceDataImportService> logger)
     {
         this.contextFactory = Require(contextFactory, nameof(contextFactory));
         this.budgetRepository = Require(budgetRepository, nameof(budgetRepository));
         this.quickBooksImportService = Require(quickBooksImportService, nameof(quickBooksImportService));
+        this.enterpriseLedgerCostService = Require(enterpriseLedgerCostService, nameof(enterpriseLedgerCostService));
         this.configuration = Require(configuration, nameof(configuration));
         this.logger = Require(logger, nameof(logger));
     }
@@ -174,7 +178,29 @@ internal sealed partial class WorkspaceReferenceDataImportService
         public int FallbackAddressCount { get; set; }
     }
 
-    private async Task<LedgerImportSummary> ImportSampleLedgerDataAsync(string importDataPath, CancellationToken cancellationToken) { var ledgerFiles = EnumerateSampleLedgerFiles(importDataPath).ToList(); if (ledgerFiles.Count == 0) { return new LedgerImportSummary(0, 0, "No sample QuickBooks ledger files were found in the import folder."); } var stats = new SampleLedgerImportStats(); foreach (var filePath in ledgerFiles) { cancellationToken.ThrowIfCancellationRequested(); await ProcessSampleLedgerFileAsync(filePath, cancellationToken, stats).ConfigureAwait(false); } stats.UpdatedBudgetRowCount = await RefreshBudgetActualsForFiscalYearsAsync(stats.FiscalYears, cancellationToken).ConfigureAwait(false); return BuildSampleLedgerImportSummary(stats); }
+    private async Task<LedgerImportSummary> ImportSampleLedgerDataAsync(string importDataPath, CancellationToken cancellationToken)
+    {
+        var ledgerFiles = EnumerateSampleLedgerFiles(importDataPath).ToList();
+        if (ledgerFiles.Count == 0)
+        {
+            return new LedgerImportSummary(0, 0, "No sample QuickBooks ledger files were found in the import folder.");
+        }
+
+        var stats = new SampleLedgerImportStats();
+        foreach (var filePath in ledgerFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await ProcessSampleLedgerFileAsync(filePath, cancellationToken, stats).ConfigureAwait(false);
+        }
+
+        stats.UpdatedBudgetRowCount = await RefreshBudgetActualsForFiscalYearsAsync(stats.FiscalYears, cancellationToken).ConfigureAwait(false);
+        foreach (var fiscalYear in stats.FiscalYears.OrderBy(year => year))
+        {
+            await enterpriseLedgerCostService.RefreshEnterpriseMonthlyExpensesAsync(fiscalYear, cancellationToken).ConfigureAwait(false);
+        }
+
+        return BuildSampleLedgerImportSummary(stats);
+    }
 
     private static IEnumerable<string> EnumerateSampleLedgerFiles(string importDataPath) => Directory.EnumerateFiles(importDataPath, "*", SearchOption.TopDirectoryOnly).Where(IsSampleLedgerFile).GroupBy(path => Path.GetFileNameWithoutExtension(Path.GetFileName(path)), StringComparer.OrdinalIgnoreCase).Select(group => group.OrderByDescending(path => GetSampleLedgerFilePreference(path)).ThenBy(path => path, StringComparer.OrdinalIgnoreCase).First()).OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
 
@@ -241,15 +267,24 @@ internal sealed partial class WorkspaceReferenceDataImportService
         CancellationToken cancellationToken)
     {
         var ledgerRows = await LoadImportedLedgerRowsAsync(cancellationToken).ConfigureAwait(false);
-        var actualsByNormalizedCode = BuildActualsByNormalizedCode(ledgerRows, fiscalYear);
+        var scopedActualsByEnterprise = new Dictionary<string, Dictionary<string, decimal>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var enterpriseName in WorkspaceEnterpriseCatalog.CanonicalEnterpriseOrder)
+        {
+            var scopedActuals = BuildActualsByNormalizedCode(ledgerRows, fiscalYear, enterpriseName);
+            if (scopedActuals.Count > 0)
+            {
+                scopedActualsByEnterprise[enterpriseName] = scopedActuals;
+            }
+        }
 
-        if (actualsByNormalizedCode.Count == 0)
+        var globalActualsByCode = BuildActualsByNormalizedCode(ledgerRows, fiscalYear, null);
+        if (scopedActualsByEnterprise.Count == 0 && globalActualsByCode.Count == 0)
         {
             logger.LogInformation("No imported general-ledger actuals matched FY {FiscalYear} budget rows.", fiscalYear);
             return new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var actualsByBudgetAccount = BuildActualsByBudgetAccount(budgetEntries, actualsByNormalizedCode);
+        var actualsByBudgetAccount = BuildActualsByBudgetAccount(budgetEntries, scopedActualsByEnterprise, globalActualsByCode);
 
         if (actualsByBudgetAccount.Count == 0)
         {
@@ -271,20 +306,103 @@ internal sealed partial class WorkspaceReferenceDataImportService
     {
         return (await budgetRepository.GetByFiscalYearAsync(fiscalYear, cancellationToken).ConfigureAwait(false))
             .Where(entry => !string.IsNullOrWhiteSpace(entry.AccountNumber))
-            .Select(entry => new BudgetEntrySnapshot(entry.AccountNumber!, NormalizeAccountNumber(entry.AccountNumber)))
+            .Select(entry => new BudgetEntrySnapshot(
+                entry.AccountNumber!,
+                NormalizeAccountNumber(entry.AccountNumber),
+                entry.Description,
+                entry.Department?.Name,
+                entry.Fund?.Name,
+                entry.MunicipalAccount?.Name))
             .ToList();
     }
 
-    private async Task<List<ImportedLedgerRow>> LoadImportedLedgerRowsAsync(CancellationToken cancellationToken) { await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false); return await context.LedgerEntries.AsNoTracking().Select(entry => new ImportedLedgerRow(entry.AccountName ?? string.Empty, entry.Amount ?? 0m, entry.SourceFile.OriginalFileName)).ToListAsync(cancellationToken).ConfigureAwait(false); }
+    private async Task<List<ImportedLedgerRow>> LoadImportedLedgerRowsAsync(CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        return await context.LedgerEntries
+            .AsNoTracking()
+            .Select(entry => new ImportedLedgerRow(
+                entry.AccountName ?? string.Empty,
+                entry.Amount ?? 0m,
+                entry.SourceFile.OriginalFileName,
+                entry.EntryScope))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 
-    private static Dictionary<string, decimal> BuildActualsByNormalizedCode(IEnumerable<ImportedLedgerRow> ledgerRows, int fiscalYear) => ledgerRows.Where(row => LooksLikeGeneralLedgerFile(row.OriginalFileName)).Where(row => row.OriginalFileName is not null && ResolveFiscalYear(row.OriginalFileName) == fiscalYear).Select(row => new { NormalizedCode = NormalizeAccountNumber(ExtractAccountCode(row.AccountName)), row.Amount }).Where(row => row.NormalizedCode != null).GroupBy(row => row.NormalizedCode!, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => Math.Abs(group.Sum(row => row.Amount)), StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, decimal> BuildActualsByNormalizedCode(IEnumerable<ImportedLedgerRow> ledgerRows, int fiscalYear, string? enterpriseName)
+    {
+        var aliases = enterpriseName is null
+            ? null
+            : WorkspaceEnterpriseCatalog.GetAliases(enterpriseName)
+                .Select(alias => alias.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-    private static Dictionary<string, decimal> BuildActualsByBudgetAccount(IEnumerable<BudgetEntrySnapshot> budgetEntries, IReadOnlyDictionary<string, decimal> actualsByNormalizedCode)
-    => budgetEntries.Where(entry => entry.NormalizedCode != null && actualsByNormalizedCode.ContainsKey(entry.NormalizedCode)).ToDictionary(entry => entry.AccountNumber!, entry => actualsByNormalizedCode[entry.NormalizedCode!], StringComparer.OrdinalIgnoreCase);
+        return ledgerRows
+            .Where(row => LooksLikeGeneralLedgerFile(row.OriginalFileName))
+            .Where(row => row.OriginalFileName is not null && ResolveFiscalYear(row.OriginalFileName) == fiscalYear)
+            .Where(row => aliases is null || aliases.Any(alias => string.Equals(row.EntryScope, alias, StringComparison.OrdinalIgnoreCase)))
+            .Select(row => new { NormalizedCode = NormalizeAccountNumber(ExtractAccountCode(row.AccountName)), row.Amount })
+            .Where(row => row.NormalizedCode != null)
+            .GroupBy(row => row.NormalizedCode!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => Math.Abs(group.Sum(row => row.Amount)), StringComparer.OrdinalIgnoreCase);
+    }
 
-    private sealed record BudgetEntrySnapshot(string AccountNumber, string? NormalizedCode);
+    private static Dictionary<string, decimal> BuildActualsByBudgetAccount(
+        IEnumerable<BudgetEntrySnapshot> budgetEntries,
+        IReadOnlyDictionary<string, Dictionary<string, decimal>> scopedActualsByEnterprise,
+        IReadOnlyDictionary<string, decimal> globalActualsByCode)
+    {
+        var actualsByBudgetAccount = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in budgetEntries)
+        {
+            if (entry.NormalizedCode is null)
+            {
+                continue;
+            }
 
-    private sealed record ImportedLedgerRow(string AccountName, decimal Amount, string? OriginalFileName);
+            var enterpriseName = ResolveBudgetEntryEnterprise(entry);
+            var scopedActuals = enterpriseName is not null && scopedActualsByEnterprise.TryGetValue(enterpriseName, out var scoped)
+                ? scoped
+                : globalActualsByCode;
+
+            if (scopedActuals.TryGetValue(entry.NormalizedCode, out var actualAmount))
+            {
+                actualsByBudgetAccount[entry.AccountNumber] = actualAmount;
+            }
+        }
+
+        return actualsByBudgetAccount;
+    }
+
+    private static string? ResolveBudgetEntryEnterprise(BudgetEntrySnapshot entry)
+    {
+        foreach (var enterpriseName in WorkspaceEnterpriseCatalog.CanonicalEnterpriseOrder)
+        {
+            if (EnterpriseBudgetScope.MatchesEnterpriseScope(
+                enterpriseName,
+                entry.Description,
+                entry.DepartmentName,
+                entry.FundName,
+                entry.MunicipalAccountName))
+            {
+                return enterpriseName;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed record BudgetEntrySnapshot(
+        string AccountNumber,
+        string? NormalizedCode,
+        string Description,
+        string? DepartmentName,
+        string? FundName,
+        string? MunicipalAccountName);
+
+    private sealed record ImportedLedgerRow(string AccountName, decimal Amount, string? OriginalFileName, string EntryScope);
 
     private static string? ExtractAccountCode(string? value)
     {

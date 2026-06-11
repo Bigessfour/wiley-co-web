@@ -97,11 +97,31 @@ export async function gotoWorkspacePanel(page: Page, route: string) {
   const linkName = getWorkspacePanelLinkName(route);
   await page
     .locator("#workspace-navigation-card")
-    .getByRole("link", { name: linkName })
+    .getByRole("button", { name: linkName })
     .click();
 
   await expect(page).toHaveURL(route);
   await waitForWorkspaceShell(page);
+}
+
+export async function seedBudgetDashboardLayout(page: Page) {
+  const storedValue = JSON.stringify({
+    LeftNavCollapsed: true,
+    ContextRailCollapsed: true,
+    JarvisOpen: false,
+  });
+
+  await page.addInitScript(
+    ({ currentStorageKey, initialValue }) => {
+      try {
+        window.localStorage.setItem(currentStorageKey, initialValue);
+      } catch {}
+    },
+    {
+      currentStorageKey: layoutStorageKey,
+      initialValue: storedValue,
+    },
+  );
 }
 
 export async function seedLeftNavCollapsed(page: Page, collapsed: boolean) {

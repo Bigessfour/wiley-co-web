@@ -5,7 +5,8 @@ using WileyCoWeb.Contracts;
 using WileyWidget.Abstractions;
 using WileyWidget.Data;
 using WileyWidget.Models;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
+using WileyWidget.Services.Abstractions;
 
 namespace WileyCoWeb.Api;
 
@@ -14,11 +15,16 @@ internal sealed class WorkspaceSnapshotComposer
     private const string RateSnapshotRecordPrefix = "RecordType:RateSnapshot";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IDbContextFactory<AppDbContext> contextFactory;
+    private readonly IEnterpriseLedgerCostService enterpriseLedgerCostService;
     private readonly ILogger<WorkspaceSnapshotComposer> logger;
 
-    public WorkspaceSnapshotComposer(IDbContextFactory<AppDbContext> contextFactory, ILogger<WorkspaceSnapshotComposer> logger)
+    public WorkspaceSnapshotComposer(
+        IDbContextFactory<AppDbContext> contextFactory,
+        IEnterpriseLedgerCostService enterpriseLedgerCostService,
+        ILogger<WorkspaceSnapshotComposer> logger)
     {
         this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        this.enterpriseLedgerCostService = enterpriseLedgerCostService ?? throw new ArgumentNullException(nameof(enterpriseLedgerCostService));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -64,7 +70,8 @@ internal sealed class WorkspaceSnapshotComposer
         CancellationToken cancellationToken)
     {
         var selectionData = await LoadWorkspaceSnapshotSelectionAsync(context, enterpriseName, fiscalYear, cancellationToken).ConfigureAwait(false);
-        var derivedData = await LoadWorkspaceSnapshotDerivedDataAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
+        var enterpriseLedgerCosts = await enterpriseLedgerCostService.ComputeForCanonicalEnterprisesAsync(selectionData.SelectedFiscalYear, cancellationToken).ConfigureAwait(false);
+        var derivedData = await LoadWorkspaceSnapshotDerivedDataAsync(context, selectionData, enterpriseLedgerCosts, cancellationToken).ConfigureAwait(false);
         var reserveTrajectory = BuildWorkspaceReserveTrajectory(selectionData.SelectedEnterprise, selectionData.SelectedFiscalYear, derivedData.CurrentRate, derivedData.TotalCosts, derivedData.ProjectedVolume, derivedData.RecommendedRate, derivedData.ProjectionRows, selectionData.PersistedSnapshot?.ReserveTrajectory);
 
         return new WorkspaceSnapshotBuildContext(
@@ -81,7 +88,9 @@ internal sealed class WorkspaceSnapshotComposer
             derivedData.RateHistory,
             derivedData.ProjectionRows,
             derivedData.ScenarioItems,
-            reserveTrajectory);
+            reserveTrajectory,
+            derivedData.CostSource,
+            enterpriseLedgerCosts);
     }
 
     private async Task<WorkspaceSnapshotSelectionData> LoadWorkspaceSnapshotSelectionAsync(
@@ -102,10 +111,11 @@ internal sealed class WorkspaceSnapshotComposer
     private async Task<WorkspaceSnapshotDerivedData> LoadWorkspaceSnapshotDerivedDataAsync(
         AppDbContext context,
         WorkspaceSnapshotSelectionData selectionData,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts,
         CancellationToken cancellationToken)
     {
         var customerData = await LoadWorkspaceSnapshotCustomerDataAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
-        var rateData = await LoadWorkspaceSnapshotRateDataAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
+        var rateData = await LoadWorkspaceSnapshotRateDataAsync(context, selectionData, enterpriseLedgerCosts, cancellationToken).ConfigureAwait(false);
 
         return new WorkspaceSnapshotDerivedData(
             customerData.CustomerRows,
@@ -116,7 +126,8 @@ internal sealed class WorkspaceSnapshotComposer
             rateData.RecommendedRate,
             rateData.RateHistory,
             rateData.ProjectionRows,
-            rateData.ScenarioItems);
+            rateData.ScenarioItems,
+            rateData.CostSource);
     }
 
     private async Task<WorkspaceSnapshotCustomerData> LoadWorkspaceSnapshotCustomerDataAsync(
@@ -134,9 +145,10 @@ internal sealed class WorkspaceSnapshotComposer
     private async Task<WorkspaceSnapshotRateData> LoadWorkspaceSnapshotRateDataAsync(
         AppDbContext context,
         WorkspaceSnapshotSelectionData selectionData,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts,
         CancellationToken cancellationToken)
     {
-        var rateMetrics = await LoadWorkspaceSnapshotRateMetricsAsync(context, selectionData, cancellationToken).ConfigureAwait(false);
+        var rateMetrics = await LoadWorkspaceSnapshotRateMetricsAsync(context, selectionData, enterpriseLedgerCosts, cancellationToken).ConfigureAwait(false);
         var rateOutputs = await LoadWorkspaceSnapshotRateOutputsAsync(context, selectionData, rateMetrics, cancellationToken).ConfigureAwait(false);
 
         return new WorkspaceSnapshotRateData(
@@ -146,18 +158,23 @@ internal sealed class WorkspaceSnapshotComposer
             rateMetrics.RecommendedRate,
             rateMetrics.RateHistory,
             rateOutputs.ProjectionRows,
-            rateOutputs.ScenarioItems);
+            rateOutputs.ScenarioItems,
+            rateMetrics.CostSource);
     }
 
     private async Task<WorkspaceSnapshotRateMetrics> LoadWorkspaceSnapshotRateMetricsAsync(
         AppDbContext context,
         WorkspaceSnapshotSelectionData selectionData,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts,
         CancellationToken cancellationToken)
     {
-        var (currentRate, totalCosts, projectedVolume, recommendedRate) = CalculateRates(selectionData.SelectedEnterprise, selectionData.PersistedSnapshot);
+        var (currentRate, totalCosts, projectedVolume, recommendedRate, costSource) = CalculateRates(
+            selectionData.SelectedEnterprise,
+            selectionData.PersistedSnapshot,
+            enterpriseLedgerCosts);
         var rateHistory = await LoadRateHistoryAsync(context, selectionData.SelectedEnterprise.Name, selectionData.SelectedFiscalYear, cancellationToken);
 
-        return new WorkspaceSnapshotRateMetrics(currentRate, totalCosts, projectedVolume, recommendedRate, rateHistory);
+        return new WorkspaceSnapshotRateMetrics(currentRate, totalCosts, projectedVolume, recommendedRate, rateHistory, costSource);
     }
 
     private async Task<WorkspaceSnapshotRateOutputs> LoadWorkspaceSnapshotRateOutputsAsync(
@@ -195,7 +212,7 @@ internal sealed class WorkspaceSnapshotComposer
 
     private static WorkspaceBootstrapData CreateWorkspaceBootstrapData(WorkspaceSnapshotBuildContext buildContext)
     {
-        var breakEvenQuadrants = BuildBreakEvenQuadrants(buildContext.Enterprises, buildContext.ProjectionRows);
+        var breakEvenQuadrants = BuildBreakEvenQuadrants(buildContext.Enterprises, buildContext.ProjectionRows, buildContext.EnterpriseLedgerCosts);
         var apartmentUnitTypes = BuildApartmentUnitTypes(buildContext.Enterprises);
 
         return new WorkspaceBootstrapData(
@@ -216,7 +233,8 @@ internal sealed class WorkspaceSnapshotComposer
             ProjectionRows = buildContext.ProjectionRows,
             BreakEvenQuadrants = breakEvenQuadrants,
             ApartmentUnitTypes = apartmentUnitTypes,
-            ReserveTrajectory = buildContext.ReserveTrajectory
+            ReserveTrajectory = buildContext.ReserveTrajectory,
+            CostSource = buildContext.CostSource
         };
     }
 
@@ -376,15 +394,20 @@ internal sealed class WorkspaceSnapshotComposer
         return serviceOptions;
     }
 
-    private static (decimal CurrentRate, decimal TotalCosts, decimal ProjectedVolume, decimal RecommendedRate) CalculateRates(Enterprise selectedEnterprise, WorkspaceBootstrapData? persistedSnapshot)
+    private static (decimal CurrentRate, decimal TotalCosts, decimal ProjectedVolume, decimal RecommendedRate, string CostSource) CalculateRates(
+        Enterprise selectedEnterprise,
+        WorkspaceBootstrapData? persistedSnapshot,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts)
     {
+        var (totalCosts, costSource) = ResolveTotalCosts(selectedEnterprise, persistedSnapshot, enterpriseLedgerCosts);
+        var projectedVolume = ResolveProjectedVolume(selectedEnterprise, persistedSnapshot);
+
         return (
             ResolveCurrentRate(selectedEnterprise, persistedSnapshot),
-            ResolveTotalCosts(selectedEnterprise, persistedSnapshot),
-            ResolveProjectedVolume(selectedEnterprise, persistedSnapshot),
-            CalculateRecommendedRate(
-                ResolveTotalCosts(selectedEnterprise, persistedSnapshot),
-                ResolveProjectedVolume(selectedEnterprise, persistedSnapshot)));
+            totalCosts,
+            projectedVolume,
+            CalculateRecommendedRate(totalCosts, projectedVolume),
+            costSource);
     }
 
     private static decimal ResolveCurrentRate(Enterprise selectedEnterprise, WorkspaceBootstrapData? persistedSnapshot)
@@ -392,9 +415,29 @@ internal sealed class WorkspaceSnapshotComposer
         return ResolveRateValue(persistedSnapshot?.CurrentRate, selectedEnterprise.CurrentRate);
     }
 
-    private static decimal ResolveTotalCosts(Enterprise selectedEnterprise, WorkspaceBootstrapData? persistedSnapshot)
+    private static (decimal TotalCosts, string CostSource) ResolveTotalCosts(
+        Enterprise selectedEnterprise,
+        WorkspaceBootstrapData? persistedSnapshot,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts)
     {
-        return ResolveRateValue(persistedSnapshot?.TotalCosts, selectedEnterprise.MonthlyExpenses);
+        if (enterpriseLedgerCosts.TryGetValue(selectedEnterprise.Name, out var rollup)
+            && rollup.HasLedgerData
+            && rollup.MonthlyOperatingExpenses > 0m)
+        {
+            return (rollup.MonthlyOperatingExpenses, EnterpriseCostSources.Ledger);
+        }
+
+        if (persistedSnapshot?.TotalCosts is > 0m)
+        {
+            return (persistedSnapshot.TotalCosts.Value, EnterpriseCostSources.Snapshot);
+        }
+
+        if (selectedEnterprise.MonthlyExpenses > 0m)
+        {
+            return (selectedEnterprise.MonthlyExpenses, EnterpriseCostSources.Baseline);
+        }
+
+        return (0m, EnterpriseCostSources.Baseline);
     }
 
     private static decimal ResolveProjectedVolume(Enterprise selectedEnterprise, WorkspaceBootstrapData? persistedSnapshot)
@@ -432,22 +475,29 @@ internal sealed class WorkspaceSnapshotComposer
             .ToList();
     }
 
-    private static List<BreakEvenQuadrantData> BuildBreakEvenQuadrants(List<Enterprise> enterprises, IReadOnlyList<ProjectionRow> projectionRows)
+    private static List<BreakEvenQuadrantData> BuildBreakEvenQuadrants(
+        List<Enterprise> enterprises,
+        IReadOnlyList<ProjectionRow> projectionRows,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts)
     {
         return enterprises
             .Where(enterprise => !enterprise.IsDeleted)
             .OrderBy(enterprise => GetEnterpriseSortOrder(enterprise.Name))
             .ThenBy(enterprise => enterprise.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(enterprise => BuildBreakEvenQuadrant(enterprise, projectionRows))
+            .Select(enterprise => BuildBreakEvenQuadrant(enterprise, projectionRows, enterpriseLedgerCosts))
             .ToList();
     }
 
-    private static BreakEvenQuadrantData BuildBreakEvenQuadrant(Enterprise enterprise, IReadOnlyList<ProjectionRow> projectionRows)
+    private static BreakEvenQuadrantData BuildBreakEvenQuadrant(
+        Enterprise enterprise,
+        IReadOnlyList<ProjectionRow> projectionRows,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts)
     {
+        var monthlyExpenses = ResolveEnterpriseMonthlyExpenses(enterprise, enterpriseLedgerCosts);
         var effectiveCustomers = Math.Max(1m, enterprise.EffectiveCustomerCount);
-        var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(enterprise.MonthlyExpenses, effectiveCustomers, roundToCurrency: false);
-        var monthlyRevenue = Math.Round(enterprise.MonthlyRevenue, 2, MidpointRounding.AwayFromZero);
-        var monthlyBalance = Math.Round(enterprise.MonthlyBalance, 2, MidpointRounding.AwayFromZero);
+        var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(monthlyExpenses, effectiveCustomers, roundToCurrency: false);
+        var monthlyRevenue = Math.Round(enterprise.CurrentRate * effectiveCustomers, 2, MidpointRounding.AwayFromZero);
+        var monthlyBalance = Math.Round(monthlyRevenue - monthlyExpenses, 2, MidpointRounding.AwayFromZero);
         var expensesPerCustomer = breakEvenRate;
 
         var seriesPoints = BuildBreakEvenSeriesPoints(projectionRows, enterprise.CurrentRate, breakEvenRate, expensesPerCustomer);
@@ -456,12 +506,26 @@ internal sealed class WorkspaceSnapshotComposer
             enterprise.Name,
             enterprise.Type ?? string.Empty,
             enterprise.CurrentRate,
-            enterprise.MonthlyExpenses,
+            monthlyExpenses,
             monthlyRevenue,
             monthlyBalance,
             breakEvenRate,
             effectiveCustomers,
             seriesPoints);
+    }
+
+    private static decimal ResolveEnterpriseMonthlyExpenses(
+        Enterprise enterprise,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> enterpriseLedgerCosts)
+    {
+        if (enterpriseLedgerCosts.TryGetValue(enterprise.Name, out var rollup)
+            && rollup.HasLedgerData
+            && rollup.MonthlyOperatingExpenses > 0m)
+        {
+            return rollup.MonthlyOperatingExpenses;
+        }
+
+        return enterprise.MonthlyExpenses;
     }
 
     private static List<BreakEvenSeriesPoint> BuildBreakEvenSeriesPoints(IReadOnlyList<ProjectionRow> projectionRows, decimal currentRate, decimal breakEvenRate, decimal expensesPerCustomer)
@@ -858,7 +922,9 @@ internal sealed class WorkspaceSnapshotComposer
         IReadOnlyList<RateHistoryPoint> RateHistory,
         List<ProjectionRow> ProjectionRows,
         List<WorkspaceScenarioItemData> ScenarioItems,
-        WorkspaceReserveTrajectoryData ReserveTrajectory);
+        WorkspaceReserveTrajectoryData ReserveTrajectory,
+        string CostSource,
+        IReadOnlyDictionary<string, EnterpriseLedgerCostResult> EnterpriseLedgerCosts);
 
     private sealed record WorkspaceSnapshotSelectionData(
         List<Enterprise> Enterprises,
@@ -876,7 +942,8 @@ internal sealed class WorkspaceSnapshotComposer
         decimal RecommendedRate,
         IReadOnlyList<RateHistoryPoint> RateHistory,
         List<ProjectionRow> ProjectionRows,
-        List<WorkspaceScenarioItemData> ScenarioItems);
+        List<WorkspaceScenarioItemData> ScenarioItems,
+        string CostSource);
 
     private sealed record WorkspaceSnapshotCustomerData(
         List<CustomerRow> CustomerRows,
@@ -889,14 +956,16 @@ internal sealed class WorkspaceSnapshotComposer
         decimal RecommendedRate,
         IReadOnlyList<RateHistoryPoint> RateHistory,
         List<ProjectionRow> ProjectionRows,
-        List<WorkspaceScenarioItemData> ScenarioItems);
+        List<WorkspaceScenarioItemData> ScenarioItems,
+        string CostSource);
 
     private sealed record WorkspaceSnapshotRateMetrics(
         decimal CurrentRate,
         decimal TotalCosts,
         decimal ProjectedVolume,
         decimal RecommendedRate,
-        IReadOnlyList<RateHistoryPoint> RateHistory);
+        IReadOnlyList<RateHistoryPoint> RateHistory,
+        string CostSource);
 
     private sealed record WorkspaceSnapshotRateOutputs(
         List<ProjectionRow> ProjectionRows,

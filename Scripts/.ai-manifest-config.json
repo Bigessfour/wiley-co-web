@@ -29,6 +29,7 @@
     "^\\.trunk/",
     "^amplify-local-backend/",
     "^publish_output/",
+    "^api_output/",
     "^__remote_check__/",
     "^wwwroot/",
     "^schemas/",

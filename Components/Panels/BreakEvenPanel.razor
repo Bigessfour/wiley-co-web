@@ -110,7 +110,7 @@
 
     <section id="break-even-visuals-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Break-Even Visuals</p>
-        <div class="mt-3 grid gap-4 xl:grid-cols-[1fr_1.4fr]">
+        <div class="mt-3 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div id="break-even-gauge-card" class="rounded-2xl border border-[var(--wiley-border)] p-3">
                 <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
                     <CircularGaugeAxes>
@@ -252,7 +252,6 @@
                             <p class="text-xs font-medium @adequacyCss">@adequacyLabel</p>
                             <p class="text-[10px] wiley-text-muted">@adequacy.ToString("N0")% of break-even covered</p>
                         </div>
-
                         
                         <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2">
                             <SfChart ID="@GetQuadrantChartId(quadrant)"
@@ -309,6 +308,15 @@
                                 </ChartSeriesCollection>
                             </SfChart>
                         </div>
+        <SfAccordion ID="break-even-apartment-accordion" ExpandMode="ExpandMode.Single" LoadOnDemand="false">
+            <AccordionItems>
+                <AccordionItem Header="Apartment Configuration" Expanded="true" CssClass="break-even-apartment-item">
+                    <ContentTemplate>
+                        <ApartmentConfigPanel UnitTypes="@ApartmentUnitTypes" OnUnitTypesChanged="OnApartmentUnitTypesChanged" />
+                    </ContentTemplate>
+                </AccordionItem>
+            </AccordionItems>
+        </SfAccordion>
 
                     </div>
                 </section>

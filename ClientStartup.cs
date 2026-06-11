@@ -131,7 +131,7 @@ namespace WileyCoWeb.Services
             string clientBaseAddress,
             IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
         {
-            // Prefer the deployed public settings file so Amplify runtime cutovers are driven by the artifact the browser actually downloads.
+            // Prefer the deployed public settings file so runtime cutovers are driven by the artifact the browser actually downloads.
             var localSettingsApiBaseAddress = await LoadWorkspaceApiBaseAddressFromLocalSettingsAsync(clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
             var environmentApiBaseAddress = Environment.GetEnvironmentVariable("WILEY_WORKSPACE_API_BASE_ADDRESS");
             var configDirectApiBaseAddress = builder.Configuration["WILEY_WORKSPACE_API_BASE_ADDRESS"];

@@ -107,6 +107,17 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
             ? decimal.Round(monthlyRevenue / (input.TotalCosts + scenarioCostTotal), 2, MidpointRounding.AwayFromZero)
             : 0m;
 
+        // Overhead application (surgical enhancement after categorization).
+        // DirectCosts = input.TotalCosts (from EnterpriseLedgerCostService post-QB categorization by EntryScope).
+        // Global % from AppSettings (or per via input.OverheadPercent). Share base = direct costs.
+        // Formula: NetContribution = Revenue - Direct - (oh% * Direct)
+        decimal ohPercent = input.OverheadPercent > 0 ? input.OverheadPercent : 9.0m; // fallback to AppSettings defaults sum (Town+Mgmt+Labor)
+        var directCosts = input.TotalCosts;
+        var overheadBurden = EnterpriseRateService.CalculateOverheadBurden(directCosts, ohPercent);
+        var netContribution = EnterpriseRateService.CalculateNetContribution(monthlyRevenue, directCosts, overheadBurden);
+        var holdsItsOwn = EnterpriseRateService.HoldsItsOwn(netContribution);
+        var vampireImpact = EnterpriseRateService.CalculateVampireImpact(netContribution);
+
         logger.LogInformation(
             "Building workspace knowledge for {Enterprise} FY {FiscalYear} (scenarioCostTotal={ScenarioCostTotal})",
             normalizedEnterprise,
@@ -132,12 +143,12 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
                 input.SelectedFiscalYear);
             var topVariancesTask = LoadAnalyticsDependencyAsync(
                 "top budget variances",
-                () => budgetAnalyticsRepository.GetTopVariancesAsync(Math.Max(1, input.TopVarianceCount), input.SelectedFiscalYear, cancellationToken),
+                () => budgetAnalyticsRepository.GetTopVariancesAsync(Math.Max(1, input.TopVarianceCount), input.SelectedFiscalYear, normalizedEnterprise, cancellationToken),
                 normalizedEnterprise,
                 input.SelectedFiscalYear);
             var budgetOverviewTask = LoadAnalyticsDependencyAsync(
                 "budget overview",
-                () => analyticsService.GetBudgetOverviewAsync(input.SelectedFiscalYear, cancellationToken),
+                () => analyticsService.GetBudgetOverviewAsync(input.SelectedFiscalYear, normalizedEnterprise, cancellationToken),
                 normalizedEnterprise,
                 input.SelectedFiscalYear);
 
@@ -161,7 +172,7 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
         }
 
         var operationalStatus = BuildOperationalStatus(adjustedRateGap, coverageRatio, reserveForecast.RiskAssessment);
-        var executiveSummary = BuildExecutiveSummary(normalizedEnterprise, input.SelectedFiscalYear, adjustedRateGap, netPosition, coverageRatio, scenarioCostTotal, reserveForecast.RiskAssessment);
+        var executiveSummary = BuildExecutiveSummary(normalizedEnterprise, input.SelectedFiscalYear, adjustedRateGap, netPosition, coverageRatio, scenarioCostTotal, reserveForecast.RiskAssessment, ohPercent, directCosts, overheadBurden, netContribution, holdsItsOwn, vampireImpact);
         var rateRationale = BuildRateRationale(normalizedEnterprise, input.SelectedFiscalYear, input.CurrentRate, adjustedBreakEvenRate, scenarioCostTotal, topVariances);
 
         var insights = BuildInsights(
@@ -206,7 +217,12 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
             DateTime.UtcNow,
             insights,
             actions,
-            topVariances);
+            topVariances,
+            directCosts,
+            overheadBurden,
+            netContribution,
+            holdsItsOwn,
+            vampireImpact);
     }
 
     private async Task<T> LoadAnalyticsDependencyAsync<T>(
@@ -264,19 +280,18 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
         return "On target";
     }
 
-    private static string BuildExecutiveSummary(string enterprise, int fiscalYear, decimal adjustedRateGap, decimal netPosition, decimal coverageRatio, decimal scenarioCostTotal, string reserveRiskAssessment)
+    private static string BuildExecutiveSummary(string enterprise, int fiscalYear, decimal adjustedRateGap, decimal netPosition, decimal coverageRatio, decimal scenarioCostTotal, string reserveRiskAssessment,
+        decimal ohPercent, decimal directCosts, decimal overheadBurden, decimal netContribution, bool holdsItsOwn, decimal vampireImpact)
     {
-        if (adjustedRateGap > 0)
-        {
-            return string.Create(CultureInfo.InvariantCulture, $"{enterprise} FY {fiscalYear} is below the server-calculated adjusted break-even target by {adjustedRateGap:C2}. Net position is {netPosition:C0} and coverage is {coverageRatio:F2}x. Reserve outlook is {reserveRiskAssessment}. Scenario pressure currently adds {scenarioCostTotal:C0} to the required revenue base.");
-        }
+        var baseSummary = adjustedRateGap > 0
+            ? string.Create(CultureInfo.InvariantCulture, $"{enterprise} FY {fiscalYear} is below the server-calculated adjusted break-even target by {adjustedRateGap:C2}. Net position is {netPosition:C0} and coverage is {coverageRatio:F2}x. Reserve outlook is {reserveRiskAssessment}. Scenario pressure currently adds {scenarioCostTotal:C0} to the required revenue base.")
+            : adjustedRateGap < 0
+                ? string.Create(CultureInfo.InvariantCulture, $"{enterprise} FY {fiscalYear} is above the server-calculated adjusted break-even target by {Math.Abs(adjustedRateGap):C2}. Net position is {netPosition:C0}, coverage is {coverageRatio:F2}x, and reserve outlook is {reserveRiskAssessment}. Use the surplus deliberately for reserves or capital timing rather than letting it stay implicit.")
+                : string.Create(CultureInfo.InvariantCulture, $"{enterprise} FY {fiscalYear} is sitting on the adjusted break-even line. Coverage is {coverageRatio:F2}x, net position is {netPosition:C0}, and reserve outlook is {reserveRiskAssessment}. Any new scenario cost or actuals variance will move the recommendation immediately.");
 
-        if (adjustedRateGap < 0)
-        {
-            return string.Create(CultureInfo.InvariantCulture, $"{enterprise} FY {fiscalYear} is above the server-calculated adjusted break-even target by {Math.Abs(adjustedRateGap):C2}. Net position is {netPosition:C0}, coverage is {coverageRatio:F2}x, and reserve outlook is {reserveRiskAssessment}. Use the surplus deliberately for reserves or capital timing rather than letting it stay implicit.");
-        }
-
-        return string.Create(CultureInfo.InvariantCulture, $"{enterprise} FY {fiscalYear} is sitting on the adjusted break-even line. Coverage is {coverageRatio:F2}x, net position is {netPosition:C0}, and reserve outlook is {reserveRiskAssessment}. Any new scenario cost or actuals variance will move the recommendation immediately.");
+        // Append overhead-adjusted "holds its own" vs "vampire" report (surgical, after categorization + global %).
+        var ohNote = string.Create(CultureInfo.InvariantCulture, $" After applying {ohPercent:F1}% total overhead burden (${overheadBurden:N0} on ${directCosts:N0} direct costs): net contribution {netContribution:C0}. {(holdsItsOwn ? "Holds its own (self-sustaining)." : $"Vampire-feeding by {vampireImpact:C0} (shortfall must be covered by adjacent enterprises).")}");
+        return baseSummary + ohNote;
     }
 
     private static string BuildRateRationale(string enterprise, int fiscalYear, decimal currentRate, decimal adjustedBreakEvenRate, decimal scenarioCostTotal, IReadOnlyList<WorkspaceKnowledgeVariance> topVariances)

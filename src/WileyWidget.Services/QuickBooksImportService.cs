@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WileyCoWeb.Contracts;
 using WileyWidget.Data;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
+using WileyWidget.Services.Abstractions;
 
 namespace WileyWidget.Services;
 
@@ -20,6 +21,8 @@ public sealed class QuickBooksImportService
 	private readonly IQuickBooksFileParser csvParser;
 	private readonly IQuickBooksFileParser excelParser;
 	private readonly QuickBooksRoutingService routingService;
+	private readonly IEnterpriseLedgerCostService enterpriseLedgerCostService;
+	private readonly QuickBooksImportAssistantService? importAssistantService;
 
 	static QuickBooksImportService()
 	{
@@ -30,14 +33,18 @@ public sealed class QuickBooksImportService
 		ILogger<QuickBooksImportService> logger,
 		IDbContextFactory<AppDbContext> contextFactory,
 		QuickBooksRoutingService routingService,
+		IEnterpriseLedgerCostService enterpriseLedgerCostService,
 		QuickBooksCsvParser csvParser,
-		QuickBooksExcelParser excelParser)
+		QuickBooksExcelParser excelParser,
+		QuickBooksImportAssistantService? importAssistantService = null)
 	{
 		this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 		this.contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
 		this.routingService = routingService ?? throw new ArgumentNullException(nameof(routingService));
+		this.enterpriseLedgerCostService = enterpriseLedgerCostService ?? throw new ArgumentNullException(nameof(enterpriseLedgerCostService));
 		this.csvParser = csvParser ?? throw new ArgumentNullException(nameof(csvParser));
 		this.excelParser = excelParser ?? throw new ArgumentNullException(nameof(excelParser));
+		this.importAssistantService = importAssistantService;
 	}
 
 	public async Task<QuickBooksImportPreviewResponse> PreviewAsync(byte[] fileBytes, string fileName, string selectedEnterprise, int selectedFiscalYear, CancellationToken cancellationToken = default)
@@ -50,6 +57,7 @@ public sealed class QuickBooksImportService
 		ValidateStructuralLimits(preview, selectedEnterprise);
 
 		var routedPreview = await routingService.ApplyRoutingAsync(preview, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
+		routedPreview = await ApplyJarvisAiFallbackToAmbiguousRowsAsync(routedPreview, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
 		await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -85,6 +93,7 @@ public sealed class QuickBooksImportService
 		ValidateStructuralLimits(parsedRows, selectedEnterprise);
 
 		var routedRows = await routingService.ApplyRoutingAsync(parsedRows, fileName, selectedEnterprise, cancellationToken).ConfigureAwait(false);
+		routedRows = await ApplyJarvisAiFallbackToAmbiguousRowsAsync(routedRows, cancellationToken).ConfigureAwait(false);
 		var fileHash = ComputeFileHash(fileBytes);
 
 		await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
@@ -180,7 +189,13 @@ public sealed class QuickBooksImportService
 			await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		}
 
-		logger.LogInformation("QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}", Path.GetFileName(fileName), batch.Id, routedRows.Count);
+		var refreshedEnterprises = await enterpriseLedgerCostService.RefreshEnterpriseMonthlyExpensesAsync(selectedFiscalYear, cancellationToken).ConfigureAwait(false);
+		logger.LogInformation(
+			"QuickBooks import committed for {FileName}: batchId={BatchId}, rows={RowCount}, refreshedEnterpriseCosts={RefreshedEnterpriseCosts}",
+			Path.GetFileName(fileName),
+			batch.Id,
+			routedRows.Count,
+			refreshedEnterprises);
 
 		return new QuickBooksImportCommitResponse(
 			Path.GetFileName(fileName),
@@ -281,6 +296,43 @@ public sealed class QuickBooksImportService
 
 		if (!allowed.Contains(selectedEnterprise))
 			throw new ArgumentException($"Enterprise '{selectedEnterprise}' is not permitted for QuickBooks imports in this environment.");
+	}
+
+	private async Task<IReadOnlyList<QuickBooksImportPreviewRow>> ApplyJarvisAiFallbackToAmbiguousRowsAsync(
+		IReadOnlyList<QuickBooksImportPreviewRow> rows,
+		CancellationToken cancellationToken)
+	{
+		if (importAssistantService is null)
+			return rows;
+
+		var result = new List<QuickBooksImportPreviewRow>(rows.Count);
+		foreach (var row in rows)
+		{
+			var reason = row.RoutingReason ?? string.Empty;
+			if (!reason.Contains("No rule matched", StringComparison.OrdinalIgnoreCase))
+			{
+				result.Add(row);
+				continue;
+			}
+
+			// Ambiguous: no routing rule matched. Try Jarvis AI fallback for the 4 canonical enterprises.
+			var suggestion = await importAssistantService.SuggestEnterpriseForRowAsync(row, cancellationToken).ConfigureAwait(false);
+			if (!string.IsNullOrWhiteSpace(suggestion))
+			{
+				result.Add(row with
+				{
+					RoutedEnterprise = suggestion,
+					RoutingReason = "Jarvis AI fallback for ambiguous row (no routing rule matched)."
+				});
+				logger.LogInformation("Jarvis AI auto-categorized ambiguous QB row {RowNumber} to {Enterprise}", row.RowNumber, suggestion);
+			}
+			else
+			{
+				result.Add(row);
+			}
+		}
+
+		return result;
 	}
 
 	private sealed record DuplicateRowAnalysis(int DuplicateRows, IReadOnlyList<QuickBooksImportPreviewRow> Rows);
