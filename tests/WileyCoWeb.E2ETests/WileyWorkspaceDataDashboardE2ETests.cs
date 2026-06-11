@@ -120,6 +120,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
             if (sectionCount == 0)
                 return; // No projection rows from API — section correctly absent.
 
+            await page.GetByRole(AriaRole.Tab, new() { Name = "Rate Trend" }).ClickAsync();
             await Expect(page.Locator("#rate-trend-section")).ToBeVisibleAsync();
             await Expect(page.Locator("#rate-trend-chart")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
         });
@@ -135,6 +136,7 @@ public sealed class WileyWorkspaceDataDashboardE2ETests
             if (sectionCount == 0)
                 return; // No scenario items — section correctly absent.
 
+            await page.GetByRole(AriaRole.Tab, new() { Name = "Scenario Waterfall" }).ClickAsync();
             await Expect(page.Locator("#waterfall-section")).ToBeVisibleAsync();
             await Expect(page.Locator("#scenario-waterfall-chart")).ToBeVisibleAsync(new() { Timeout = ChartTimeoutMilliseconds });
         });

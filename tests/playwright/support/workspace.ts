@@ -87,20 +87,7 @@ export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
 }
 
 export async function gotoWorkspacePanel(page: Page, route: string) {
-  await page.goto("/wiley-workspace");
-  await waitForWorkspaceShell(page);
-
-  if (route === "/wiley-workspace") {
-    return;
-  }
-
-  const linkName = getWorkspacePanelLinkName(route);
-  await page
-    .locator("#workspace-navigation-card")
-    .getByRole("button", { name: linkName })
-    .click();
-
-  await expect(page).toHaveURL(route);
+  await page.goto(route);
   await waitForWorkspaceShell(page);
 }
 
@@ -160,6 +147,21 @@ export async function enterNumericValue(input: Locator, value: string) {
 /** Break-even inputs are Syncfusion numeric textboxes (`role="spinbutton"`). */
 export function breakEvenPanelSpinbuttons(page: Page) {
   return page.locator("#break-even-input-row").getByRole("spinbutton");
+}
+
+/** Apartment config lives in a collapsed accordion on the break-even panel. */
+export async function expandBreakEvenApartmentAccordion(page: Page) {
+  const apartmentPanel = page.locator("#apartment-config-panel");
+  if (await apartmentPanel.isVisible().catch(() => false)) {
+    return;
+  }
+
+  const accordionHeader = page
+    .locator("#break-even-apartment-accordion")
+    .locator(".e-acrdn-header")
+    .first();
+  await accordionHeader.click({ force: true });
+  await expect(apartmentPanel).toBeVisible({ timeout: 30_000 });
 }
 
 /**

@@ -8,8 +8,9 @@
 @* Affordability remains client-side via AffordabilityAnalysisService (snapshot + rate math). A future slice can hydrate from /api/workspace/knowledge when the contract exposes affordability rows; keep this service as fallback for council demos. *@
 @inject AffordabilityAnalysisService AffordabilityAnalysisService
 
-<div id="affordability-dashboard-panel" class="space-y-4" aria-live="polite">
-    <section id="affordability-hero" class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 p-5 text-white shadow-sm">
+<div id="affordability-dashboard-panel" class="wiley-analytics-panel" aria-live="polite">
+    <div class="wiley-analytics-panel-scroll space-y-4">
+    <section id="affordability-hero" class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950 p-5 text-white shadow-sm shrink-0">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">Affordability Analysis</p>
@@ -37,9 +38,9 @@
         </div>
     </section>
 
-    <section id="affordability-inputs" class="rounded-2xl wiley-surface-panel p-4">
+    <section id="affordability-inputs" class="wiley-input-section rounded-2xl wiley-surface-panel p-4">
         <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Scenario Inputs</p>
-        <div class="mt-3 grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <div class="mt-3 space-y-4">
             <SfNumericTextBox TValue="decimal"
                               ID="affordability-monthly-mhi-input"
                               Value="@MonthlyMhi"
@@ -50,27 +51,27 @@
                               Format="C0">
                 <NumericTextBoxEvents TValue="decimal" ValueChange="OnMonthlyMhiChanged" />
             </SfNumericTextBox>
-            <SfCard>
+            <SfCard CssClass="wiley-panel-card">
                 <CardHeader Title="Affordability Status" SubTitle="@AffordabilitySnapshot.Summary.RiskBand" />
                 <CardContent Content="@AffordabilitySnapshot.Summary.RiskNarrative" />
             </SfCard>
         </div>
     </section>
 
-    <section id="affordability-kpis" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SfCard ID="affordability-kpi-average-bill">
+    <section id="affordability-kpis" class="wiley-kpi-strip wiley-kpi-strip--4">
+        <SfCard ID="affordability-kpi-average-bill" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Average Monthly Bill" SubTitle="Modeled baseline" />
             <CardContent Content="@AffordabilitySnapshot.Summary.AverageMonthlyBill.ToString("C0")" />
         </SfCard>
-        <SfCard ID="affordability-kpi-mhi-share">
+        <SfCard ID="affordability-kpi-mhi-share" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Bill % of MHI" SubTitle="Average monthly burden" />
             <CardContent Content="@($"{AffordabilitySnapshot.Summary.AverageBillPctOfMhi:F1}%")" />
         </SfCard>
-        <SfCard ID="affordability-kpi-customer-count">
+        <SfCard ID="affordability-kpi-customer-count" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Customers Modeled" SubTitle="Live directory count" />
             <CardContent Content="@AffordabilitySnapshot.Summary.CustomerCount.ToString("N0")" />
         </SfCard>
-        <SfCard ID="affordability-kpi-class-count">
+        <SfCard ID="affordability-kpi-class-count" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Class Buckets" SubTitle="Heatmap rows" />
             <CardContent Content="@AffordabilitySnapshot.CustomerClasses.Count.ToString("N0")" />
         </SfCard>
@@ -81,13 +82,13 @@
             <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Affordability Gauge</p>
             <p class="text-sm wiley-text-muted">Average monthly bill as a percentage of MHI.</p>
         </div>
-        <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
+        <div class="mt-3 wiley-gauge-viewport rounded-2xl wiley-surface-panel-secondary p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
             @* AnimationDuration: smooth gauge needle animation consistent with DataDashboard gauge baseline *@
             <SfCircularGauge ID="affordability-gauge"
                              AllowMargin="true"
                              AnimationDuration="700"
                              Width="100%"
-                             Height="220px">
+                             Height="100%">
                 <CircularGaugeAxes>
                     <CircularGaugeAxis Minimum="0" Maximum="12" StartAngle="210" EndAngle="150" Radius="80%">
                         <CircularGaugeAxisLineStyle Width="8" Color="#cbd5e1" />
@@ -114,7 +115,7 @@
             <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Class Impact</p>
             <p class="text-sm wiley-text-muted">Stacked monthly bill comparison across the modeled rate scenarios.</p>
         </div>
-        <div class="mt-3">
+        <div class="mt-3 wiley-chart-viewport--primary">
             @* Theme Fluent2: consistent palette; ZoomSettings: class-impact chart is analytical; selection zoom allows per-class drill-down *@
             <SfChart ID="affordability-class-impact-chart"
                      Title="Monthly bill by class and scenario"
@@ -122,7 +123,7 @@
                      EnableAnimation="true"
                      UseGroupingSeparator="true"
                      Width="100%"
-                     Height="360px"
+                     Height="100%"
                      Theme="Syncfusion.Blazor.Theme.Fluent2">
                 <ChartArea>
                     <ChartAreaBorder Width="0" />
@@ -196,6 +197,7 @@
     </section>
 
     <p class="text-xs wiley-text-muted">This first slice uses modeled class baselines and workspace customer counts. The panel can later be switched to persisted bill history without changing the dashboard shape.</p>
+    </div>
 </div>
 
 @code {

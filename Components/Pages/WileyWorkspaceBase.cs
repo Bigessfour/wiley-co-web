@@ -774,6 +774,17 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
         await RefreshScenarioCatalogAsync();
 
+        // Legacy Syncfusion splitter persistence conflicted with WorkspaceLayoutContext
+        // (JarvisOpen). Remove stale keys so pane collapse follows layout context only.
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("wileyWorkspaceStorage.removeItem", "workspace-main-splitter").ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogDebug(ex, "Unable to clear legacy workspace splitter persistence key.");
+        }
+
         if (!WorkspaceLoadStatus.Contains("failed", StringComparison.OrdinalIgnoreCase))
         {
             WorkspaceLoadStatus = BuildWorkspaceReadyStatus();

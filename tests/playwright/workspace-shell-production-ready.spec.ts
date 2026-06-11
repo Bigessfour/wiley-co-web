@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  expandBreakEvenApartmentAccordion,
   seedLeftNavCollapsed,
   waitForWorkspacePanel,
   waitForWorkspaceShellRender,
@@ -33,6 +34,7 @@ test.describe("Workspace Shell", () => {
     await primaryNavigation.getByRole("link", { name: "Break-Even" }).click();
     await expect(page.locator("#break-even-panel")).toBeVisible();
     await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
+    await expandBreakEvenApartmentAccordion(page);
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
     await expect(page.locator("#break-even-panel")).toContainText(
       "Break-Even Quadrants",

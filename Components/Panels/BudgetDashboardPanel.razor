@@ -5,31 +5,32 @@
 @using WileyWidget.Abstractions
 
 <section id="workspace-overview-dashboard"
-         class="budget-executive-dashboard"
+         class="wiley-analytics-panel budget-executive-dashboard"
          aria-label="Budget executive dashboard">
-    <div class="budget-kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SfCard ID="kpi-net-position" CssClass="budget-kpi-card">
+    <div class="wiley-analytics-panel-scroll space-y-4">
+    <div class="wiley-kpi-strip wiley-kpi-strip--4">
+        <SfCard ID="kpi-net-position" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Net Position" SubTitle="@(SelectedEnterprise + " · FY" + SelectedFiscalYear)" />
             <CardContent>
                 <p class="text-2xl font-bold @(NetPosition >= 0 ? "text-emerald-600" : "text-rose-600")">@NetPosition.ToString("C0")</p>
                 <p class="mt-1 text-xs wiley-text-muted">Revenue @MonthlyRevenue.ToString("C0") − Costs @TotalCosts.ToString("C0")</p>
             </CardContent>
         </SfCard>
-        <SfCard ID="kpi-coverage-ratio" CssClass="budget-kpi-card">
+        <SfCard ID="kpi-coverage-ratio" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Coverage Ratio" SubTitle="Revenue ÷ Costs" />
             <CardContent>
                 <p class="text-2xl font-bold @(CoverageRatio >= 1.25 ? "text-emerald-600" : (CoverageRatio >= 1.0 ? "text-amber-600" : "text-rose-600"))">@CoverageRatio.ToString("F2")×</p>
                 <p class="mt-1 text-xs wiley-text-muted">Target ≥ 1.25×</p>
             </CardContent>
         </SfCard>
-        <SfCard ID="kpi-rate-adequacy" CssClass="budget-kpi-card">
+        <SfCard ID="kpi-rate-adequacy" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Rate Adequacy" SubTitle="Current ÷ Break-Even" />
             <CardContent>
                 <p class="text-2xl font-bold @(RateAdequacy >= 100 ? "text-emerald-600" : (RateAdequacy >= 85 ? "text-amber-600" : "text-rose-600"))">@RateAdequacy.ToString("F1")%</p>
                 <p class="mt-1 text-xs wiley-text-muted">Current @CurrentRate.ToString("C2") · Break-Even @RecommendedRate.ToString("C2")</p>
             </CardContent>
         </SfCard>
-        <SfCard ID="kpi-scenario-pressure" CssClass="budget-kpi-card">
+        <SfCard ID="kpi-scenario-pressure" CssClass="wiley-panel-card wiley-kpi-card">
             <CardHeader Title="Scenario Pressure" SubTitle="What-if cost additions" />
             <CardContent>
                 <p class="text-2xl font-bold @(ScenarioCostTotal > 0 ? "text-amber-600" : "wiley-text-muted")">@ScenarioCostTotal.ToString("C0")</p>
@@ -38,131 +39,131 @@
         </SfCard>
     </div>
 
-    <div class="budget-chart-grid grid gap-4 xl:grid-cols-3">
-        <SfCard CssClass="budget-chart-card">
-            <CardHeader Title="Budget Variance" SubTitle="Rate comparison" />
-            <CardContent>
-                @if (RateComparison.Count > 0)
-                {
-                    <SfChart ID="budget-variance-chart"
-                             AccessibilityDescription="Bar chart showing budget variance across rate comparison points."
-                             Width="100%"
-                             Height="150px"
-                             Background="transparent"
-                             Theme="Syncfusion.Blazor.Theme.Fluent2">
-                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
-                            <ChartAxisMajorGridLines Width="0" />
-                        </ChartPrimaryXAxis>
-                        <ChartPrimaryYAxis LabelFormat="C2">
-                            <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
-                        </ChartPrimaryYAxis>
-                        <ChartZoomSettings EnableSelectionZooming="false" />
-                        <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" Format="${point.x}: <b>${point.y}</b>" />
-                        <ChartLegendSettings Visible="false" />
-                        <ChartSeriesCollection>
-                            <ChartSeries DataSource="@RateComparison"
-                                         XName="@nameof(RateComparisonPoint.Label)"
-                                         YName="@nameof(RateComparisonPoint.Value)"
-                                         Name="Rate"
-                                         Type="ChartSeriesType.Column"
-                                         Fill="#93c5fd"
-                                         ColumnSpacing="0.2">
-                                <ChartMarker>
-                                    <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Top" Format="C2">
-                                        <ChartDataLabelFont Size="10px" />
-                                    </ChartDataLabel>
-                                </ChartMarker>
-                            </ChartSeries>
-                        </ChartSeriesCollection>
-                    </SfChart>
-                }
-                else
-                {
-                    <p class="text-sm wiley-text-muted">Rate comparison data will appear after workspace snapshot load.</p>
-                }
-            </CardContent>
-        </SfCard>
+    <div class="wiley-surface-panel p-4">
+        <p class="mb-1 text-sm font-semibold wiley-text">Budget Variance</p>
+        <p class="mb-3 text-xs wiley-text-muted">Rate comparison</p>
+        @if (RateComparison.Count > 0)
+        {
+            <div class="wiley-chart-viewport--primary">
+                <SfChart ID="budget-variance-chart"
+                         AccessibilityDescription="Bar chart showing budget variance across rate comparison points."
+                         Width="100%"
+                         Height="100%"
+                         Background="transparent"
+                         Theme="Syncfusion.Blazor.Theme.Fluent2">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                        <ChartAxisMajorGridLines Width="0" />
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis LabelFormat="C2">
+                        <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
+                    </ChartPrimaryYAxis>
+                    <ChartZoomSettings EnableSelectionZooming="false" />
+                    <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" Format="${point.x}: <b>${point.y}</b>" />
+                    <ChartLegendSettings Visible="false" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@RateComparison"
+                                     XName="@nameof(RateComparisonPoint.Label)"
+                                     YName="@nameof(RateComparisonPoint.Value)"
+                                     Name="Rate"
+                                     Type="ChartSeriesType.Column"
+                                     Fill="#93c5fd"
+                                     ColumnSpacing="0.2">
+                            <ChartMarker>
+                                <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Top" Format="C2">
+                                    <ChartDataLabelFont Size="10px" />
+                                </ChartDataLabel>
+                            </ChartMarker>
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            </div>
+        }
+        else
+        {
+            <p class="text-sm wiley-text-muted">Rate comparison data will appear after workspace snapshot load.</p>
+        }
+    </div>
 
-        <SfCard CssClass="budget-chart-card">
-            <CardHeader Title="Scenario Waterfall" SubTitle="Cost build-up" />
-            <CardContent>
-                @if (WaterfallPoints.Count >= 2)
-                {
-                    <SfChart ID="scenario-waterfall-chart"
-                             AccessibilityDescription="Waterfall chart showing scenario cost build-up."
-                             Width="100%"
-                             Height="150px"
-                             Background="transparent"
-                             Theme="Syncfusion.Blazor.Theme.Fluent2">
-                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
-                            <ChartAxisMajorGridLines Width="0" />
-                        </ChartPrimaryXAxis>
-                        <ChartPrimaryYAxis LabelFormat="C0">
-                            <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
-                        </ChartPrimaryYAxis>
-                        <ChartZoomSettings EnableSelectionZooming="false" />
-                        <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" />
-                        <ChartLegendSettings Visible="false" />
-                        <ChartSeriesCollection>
-                            <ChartSeries DataSource="@WaterfallPoints"
-                                         XName="@nameof(WaterfallPoint.Label)"
-                                         YName="@nameof(WaterfallPoint.Value)"
-                                         Name="Cost"
-                                         Type="ChartSeriesType.Waterfall"
-                                         SumIndexes="@WaterfallSumIndexes"
-                                         NegativeFillColor="#fca5a5"
-                                         SummaryFillColor="#475569"
-                                         Fill="#93c5fd">
-                                <ChartMarker>
-                                    <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Top" Format="C0">
-                                        <ChartDataLabelFont Size="10px" />
-                                    </ChartDataLabel>
-                                </ChartMarker>
-                            </ChartSeries>
-                        </ChartSeriesCollection>
-                    </SfChart>
-                }
-                else
-                {
-                    <p class="text-sm wiley-text-muted">Add scenario items to populate the waterfall chart.</p>
-                }
-            </CardContent>
-        </SfCard>
+    <div class="wiley-surface-panel p-4">
+        <p class="mb-1 text-sm font-semibold wiley-text">Scenario Waterfall</p>
+        <p class="mb-3 text-xs wiley-text-muted">Cost build-up</p>
+        @if (WaterfallPoints.Count >= 2)
+        {
+            <div class="wiley-chart-viewport--primary">
+                <SfChart ID="scenario-waterfall-chart"
+                         AccessibilityDescription="Waterfall chart showing scenario cost build-up."
+                         Width="100%"
+                         Height="100%"
+                         Background="transparent"
+                         Theme="Syncfusion.Blazor.Theme.Fluent2">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                        <ChartAxisMajorGridLines Width="0" />
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis LabelFormat="C0">
+                        <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
+                    </ChartPrimaryYAxis>
+                    <ChartZoomSettings EnableSelectionZooming="false" />
+                    <ChartTooltipSettings Enable="true" Header="<b>${point.x}</b>" />
+                    <ChartLegendSettings Visible="false" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@WaterfallPoints"
+                                     XName="@nameof(WaterfallPoint.Label)"
+                                     YName="@nameof(WaterfallPoint.Value)"
+                                     Name="Cost"
+                                     Type="ChartSeriesType.Waterfall"
+                                     SumIndexes="@WaterfallSumIndexes"
+                                     NegativeFillColor="#fca5a5"
+                                     SummaryFillColor="#475569"
+                                     Fill="#93c5fd">
+                            <ChartMarker>
+                                <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Top" Format="C0">
+                                    <ChartDataLabelFont Size="10px" />
+                                </ChartDataLabel>
+                            </ChartMarker>
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            </div>
+        }
+        else
+        {
+            <p class="text-sm wiley-text-muted">Add scenario items to populate the waterfall chart.</p>
+        }
+    </div>
 
-        <SfCard CssClass="budget-chart-card">
-            <CardHeader Title="Rate Trend" SubTitle="Projection series" />
-            <CardContent>
-                <div id="rate-trend-section">
-                    <SfChart ID="rate-trend-chart"
-                             AccessibilityDescription="Line chart showing projected rate trend."
-                             Width="100%"
-                             Height="150px"
-                             Background="transparent"
-                             Theme="Syncfusion.Blazor.Theme.Fluent2">
-                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
-                            <ChartAxisMajorGridLines Width="0" />
-                        </ChartPrimaryXAxis>
-                        <ChartPrimaryYAxis LabelFormat="C2">
-                            <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
-                        </ChartPrimaryYAxis>
-                        <ChartZoomSettings EnableSelectionZooming="false" />
-                        <ChartTooltipSettings Enable="true" Header="<b>Year ${point.x}</b>" />
-                        <ChartLegendSettings Visible="false" />
-                        <ChartSeriesCollection>
-                            <ChartSeries DataSource="@EffectiveProjectionSeries"
-                                         XName="@nameof(ProjectionRow.Year)"
-                                         YName="@nameof(ProjectionRow.Rate)"
-                                         Name="Projected Rate"
-                                         Type="ChartSeriesType.Line"
-                                         Fill="#6366f1"
-                                         Width="2">
-                                <ChartMarker Visible="true" Height="6" Width="6" Fill="#6366f1" />
-                            </ChartSeries>
-                        </ChartSeriesCollection>
-                    </SfChart>
-                </div>
-            </CardContent>
-        </SfCard>
+    <div class="wiley-surface-panel p-4">
+        <p class="mb-1 text-sm font-semibold wiley-text">Rate Trend</p>
+        <p class="mb-3 text-xs wiley-text-muted">Projection series</p>
+        <div id="rate-trend-section" class="wiley-chart-viewport--primary">
+            <SfChart ID="rate-trend-chart"
+                     AccessibilityDescription="Line chart showing projected rate trend."
+                     Width="100%"
+                     Height="100%"
+                     Background="transparent"
+                     Theme="Syncfusion.Blazor.Theme.Fluent2">
+                <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                    <ChartAxisMajorGridLines Width="0" />
+                </ChartPrimaryXAxis>
+                <ChartPrimaryYAxis LabelFormat="C2">
+                    <ChartAxisMajorGridLines DashArray="4,4" Color="#e2e8f0" />
+                </ChartPrimaryYAxis>
+                <ChartZoomSettings EnableSelectionZooming="false" />
+                <ChartTooltipSettings Enable="true" Header="<b>Year ${point.x}</b>" />
+                <ChartLegendSettings Visible="false" />
+                <ChartSeriesCollection>
+                    <ChartSeries DataSource="@EffectiveProjectionSeries"
+                                 XName="@nameof(ProjectionRow.Year)"
+                                 YName="@nameof(ProjectionRow.Rate)"
+                                 Name="Projected Rate"
+                                 Type="ChartSeriesType.Line"
+                                 Fill="#6366f1"
+                                 Width="2">
+                        <ChartMarker Visible="true" Height="6" Width="6" Fill="#6366f1" />
+                    </ChartSeries>
+                </ChartSeriesCollection>
+            </SfChart>
+        </div>
+    </div>
     </div>
 </section>
 
@@ -195,12 +196,11 @@
     {
         get
         {
-            var pts = new List<WaterfallPoint> { new("Base Cost", (double)TotalCosts) };
+            if (ScenarioItems.Count == 0) return [];
+            var pts = new List<WaterfallPoint>();
+            pts.Add(new WaterfallPoint("Base Cost", (double)TotalCosts));
             foreach (var item in ScenarioItems)
-            {
                 pts.Add(new WaterfallPoint(item.Name, (double)item.Cost));
-            }
-
             pts.Add(new WaterfallPoint("With Scenario", 0d));
             return pts;
         }

@@ -4,23 +4,24 @@
 @using WileyCoWeb.Contracts
 
 @* Reserve trajectory is fed from WorkspaceReserveTrajectoryData on the workspace snapshot (API WorkspaceSnapshotComposer), not a standalone REST endpoint. *@
-<section id="reserve-trajectory-panel" class="space-y-4">
+<section id="reserve-trajectory-panel" class="wiley-analytics-panel">
+    <div class="wiley-analytics-panel-scroll space-y-4">
     <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-2">
             <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Reserve Trajectory</p>
             <p class="text-sm wiley-text-muted">A live reserve forecast with a shaded stress band and policy floor carried through the workspace snapshot.</p>
         </div>
 
-        <div class="mt-4 grid gap-4 md:grid-cols-3">
-            <SfCard>
+        <div class="wiley-kpi-strip wiley-kpi-strip--3 mt-4">
+            <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="Current Reserves" SubTitle="@CurrentReservesDisplay" />
                 <CardContent Content="The current reserve balance from the workspace forecast." />
             </SfCard>
-            <SfCard>
+            <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="Current Reserve Months" SubTitle="@CurrentReserveMonthsDisplay" />
                 <CardContent Content="An estimated reserve coverage horizon versus the policy floor." />
             </SfCard>
-            <SfCard>
+            <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="5-Year Solvency Score" SubTitle="@FiveYearSolvencyScoreDisplay" />
                 <CardContent Content="How the five-year forecast compares with the policy minimum." />
             </SfCard>
@@ -53,13 +54,14 @@
             <div class="mt-4 rounded-2xl wiley-surface-panel-secondary p-3">
                 @* Theme Fluent2: chart palette aligned with app-wide Syncfusion theme *@
                 @* ChartZoomSettings: reserve trajectory is the most analytical chart in the workspace; scroll zoom allows multi-year drill-down *@
+                <div class="wiley-chart-viewport--primary">
                 <SfChart ID="@ChartId"
                          Title="Reserve forecast"
                          AccessibilityDescription="Area chart showing reserve projection, stress band, and policy minimum over time."
                          EnableAnimation="true"
                          UseGroupingSeparator="true"
                          Width="100%"
-                         Height="320px"
+                         Height="100%"
                          Theme="Syncfusion.Blazor.Theme.Fluent2">
                     <ChartArea>
                         <ChartAreaBorder Width="0"></ChartAreaBorder>
@@ -120,6 +122,7 @@
                         </ChartSeries>
                     </ChartSeriesCollection>
                 </SfChart>
+                </div>
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
                     <div class="rounded-xl wiley-surface-panel-secondary px-3 py-2 text-xs wiley-text-muted">
                         <span class="font-semibold wiley-text">Stress band:</span> Forecast plus or minus the current confidence interval.
@@ -139,6 +142,7 @@
             </div>
         }
     </section>
+    </div>
 </section>
 
 @code {

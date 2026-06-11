@@ -6,173 +6,139 @@
 @using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.State
 
-<div id="scenario-panel" class="space-y-4" aria-live="polite" aria-busy="@IsScenarioGridBusy">
-    @* Removed: the former Tailwind-only section wrappers and plain paragraph headings.
-       Replacement: the panel is now organized around Syncfusion Card surfaces so the summary, narrative,
-       and editing workbench inherit theme tokens cleanly in Fluent2 light/dark contexts. *@
-    <section id="scenario-overview-section" class="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
-        <SfCard ID="scenario-summary-card" CssClass="wiley-panel-card">
-            <CardHeader Title="Scenario Summary"
-                        SubTitle="Live before-and-after rate posture for the active workspace draft." />
-            <CardContent>
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4" role="group" aria-label="Scenario summary metrics">
-                    @* Kept the established metric IDs so automation can still target the authoritative value surfaces.
-                       The ad-hoc free-floating numeric displays are now housed inside full Syncfusion cards instead of a manual wrapper grid. *@
-                    <SfCard ID="scenario-current-rate-card">
-                        <CardHeader Title="Current Rate" SubTitle="Current customer charge" />
-                        <CardContent>
-                            <SfNumericTextBox ID="scenario-current-rate-display" TValue="decimal" Value="@CurrentRate" Enabled="false" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
-                        </CardContent>
-                    </SfCard>
-
-                    <SfCard ID="scenario-base-break-even-card">
-                        <CardHeader Title="Base Break-Even" SubTitle="Current operating target" />
-                        <CardContent>
-                            <SfNumericTextBox ID="scenario-base-break-even-display" TValue="decimal" Value="@BaseBreakEvenRate" Enabled="false" Placeholder="Base Break-Even" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
-                        </CardContent>
-                    </SfCard>
-
-                    <SfCard ID="scenario-adjusted-rate-card">
-                        <CardHeader Title="Scenario Break-Even" SubTitle="With active what-if costs" />
-                        <CardContent>
-                            <SfNumericTextBox ID="scenario-adjusted-rate-display" TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" Placeholder="Scenario Adjusted Rate" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
-                        </CardContent>
-                    </SfCard>
-
-                    <SfCard ID="scenario-adjusted-delta-card">
-                        <CardHeader Title="Scenario Delta" SubTitle="Gap versus current charge" />
-                        <CardContent>
-                            <SfNumericTextBox ID="scenario-adjusted-delta-display" TValue="decimal" Value="@ScenarioAdjustedDelta" Enabled="false" Placeholder="Scenario Delta" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
-                        </CardContent>
-                    </SfCard>
-                </div>
-            </CardContent>
-        </SfCard>
-
-        <SfCard ID="scenario-pressure-card" CssClass="wiley-panel-card">
-            <CardHeader Title="Draft Pressure"
-                        SubTitle="@ScenarioPressureTitle" />
-            <CardContent>
-                <div class="space-y-3">
-                    <SfCard ID="scenario-cost-total-card">
-                        <CardHeader Title="Scenario Cost Total" SubTitle="@ScenarioCostTotalDisplay" />
-                        <CardContent Content="All active scenario items roll up here so council can see the immediate added operating pressure." />
-                    </SfCard>
-
-                    <SfCard ID="scenario-volume-card">
-                        <CardHeader Title="Scenario Inventory" SubTitle="@ScenarioInventorySubtitle" />
-                        <CardContent Content="@ScenarioInventoryNarrative" />
-                    </SfCard>
-
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="e-badge @(ScenarioAdjustedDelta >= 0 ? "e-badge-info" : "e-badge-dark")" role="status">@ScenarioDeltaBadgeText</span>
-                        <span class="text-sm">@ScenarioAlignmentText</span>
-                    </div>
-                </div>
-            </CardContent>
-        </SfCard>
-    </section>
-
-    @* Removed: the separate ad-hoc metrics section and the custom empty-state container standing beside the grid.
-       Replacement: one Syncfusion workbench card owns the grid, status messaging, and the built-in EmptyRecordTemplate. *@
-    <SfCard ID="scenario-grid-workbench-card" CssClass="wiley-panel-card">
-        <CardHeader Title="Scenario Planner"
-                    SubTitle="Production grid settings now handle paging, virtualization, dialog editing, and empty-state presentation inside the grid itself." />
-        <CardContent>
-            <div class="space-y-4">
-                <SfCard ID="scenario-grid-guidance-card">
-                    <CardHeader Title="Editing Workflow"
-                                SubTitle="Toolbar commands update the workspace draft immediately; the sidebar save flow still persists the whole scenario to Aurora." />
+<div id="scenario-panel" class="flex flex-col gap-3 min-h-0" aria-live="polite" aria-busy="@IsScenarioGridBusy">
+    <section id="scenario-overview-section" class="flex shrink-0 flex-col gap-3 min-w-0">
+        <section id="scenario-metrics-panel" class="flex flex-col gap-3 min-w-0">
+            <section id="scenario-kpi-grid" class="wiley-kpi-strip wiley-kpi-strip--4" role="group" aria-label="Scenario summary metrics">
+                <SfCard ID="scenario-current-rate-card" CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Current Rate" SubTitle="Current customer charge" />
                     <CardContent>
-                        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div class="flex items-center gap-2">
-                                @* SfSpinner provides visible action-state feedback during save/delete cycles instead of relying on passive prose alone. *@
-                                <SfSpinner Visible="@IsScenarioGridBusy" Size="18" Label="" Type="SpinnerType.Material" />
-                                <span id="scenario-edit-status" role="status" aria-live="polite" class="text-sm">@ScenarioEditStatusText</span>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-2">
-                                <SfButton ID="load-new-hire-impact-template-button" CssClass="e-primary" IsPrimary="true" OnClick="OnLoadNewHireImpactTemplate">
-                                    Load New Hire Impact Template (Clerk + Field Employee)
-                                </SfButton>
-                                <SfTooltip Content="The grid uses paging plus virtualization to stay responsive as scenario lists grow, while dialog editing keeps names and costs readable on smaller screens."
-                                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
-                                           OpensOn="Hover Focus"
-                                           ShowTipPointer="true"
-                                           CloseDelay="200">
-                                    <span class="e-badge e-badge-info" tabindex="0">Dialog edit workflow</span>
-                                </SfTooltip>
-                            </div>
-                        </div>
+                        <SfNumericTextBox ID="scenario-current-rate-display" TValue="decimal" Value="@CurrentRate" Enabled="false" ShowSpinButton="false" Placeholder="Current Rate" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
                     </CardContent>
                 </SfCard>
 
-                <SfTooltip Content="Use the toolbar to add, edit, or delete scenario items. Saving a dialog updates the draft instantly and refreshes all derived rate metrics."
-                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
-                           OpensOn="Hover Focus"
-                           ShowTipPointer="true"
-                           CloseDelay="200">
-                    <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--medium min-h-0">
-                        @* Full production grid settings per Syncfusion review:
-                           - EnablePersistence remembers user layout preferences.
-                           - AllowPaging + GridPageSettings keep the grid readable in long scenarios.
-                           - EnableVirtualization avoids heavy DOM growth as scenario lists expand.
-                           - Dialog edit mode keeps form fields legible and touch-friendly.
-                           - Action events still flow through the WorkspaceState callback, while the panel adds immediate UI feedback. *@
-                        <SfGrid ID="scenario-grid"
-                                TValue="ScenarioItem"
-                                DataSource="@ScenarioItems"
-                                Toolbar="@ScenarioToolbarItems"
-                                AllowPaging="true"
-                                AllowSorting="true"
-                                AllowFiltering="true"
-                                AllowEditing="true"
-                                AllowAdding="true"
-                                AllowDeleting="true"
-                                AllowTextWrap="true"
-                                AllowResizing="true"
-                                AllowReordering="true"
-                                EnableHover="true"
-                                EnableStickyHeader="true"
-                                EnableVirtualization="true"
-                                GridLines="GridLine.Horizontal"
-                                ClipMode="ClipMode.EllipsisWithTooltip"
-                                Height="100%"
-                                EnablePersistence="true"
-                                PersistenceKey="wiley.scenario-grid.v2">
-                            <GridEvents TValue="ScenarioItem"
-                                        OnActionBegin="HandleScenarioGridActionBegin"
-                                        OnActionComplete="HandleScenarioGridActionCompleteInternal" />
-                            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
-                            <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
-                            <GridPageSettings PageSize="8" PageCount="4" />
-                            <GridEditSettings AllowAdding="true"
-                                              AllowEditing="true"
-                                              AllowDeleting="true"
-                                              AllowEditOnDblClick="false"
-                                              ShowDeleteConfirmDialog="true"
-                                              Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
-                            <GridTemplates>
-                                <EmptyRecordTemplate>
-                                    @* Removed: a custom empty-state div outside the grid.
-                                       Replacement: EmptyRecordTemplate keeps the no-data experience inside the grid lifecycle,
-                                       which is smoother, more maintainable, and consistent with Syncfusion paging/filtering states. *@
-                                    <SfCard ID="scenario-empty-state-card">
-                                        <CardHeader Title="No scenario items yet"
-                                                    SubTitle="Create a what-if item to see the break-even target and scenario delta move in real time." />
-                                        <CardContent Content="Use the built-in Add toolbar action to create the first scenario row. Dialog editing keeps names and costs readable, and the workspace draft refreshes immediately after each save." />
-                                    </SfCard>
-                                </EmptyRecordTemplate>
-                            </GridTemplates>
-                            <GridColumns>
-                                <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
-                                <GridColumn Field=@nameof(ScenarioItem.Name) HeaderText="Scenario Item" Width="240" />
-                                <GridColumn Field=@nameof(ScenarioItem.Cost) HeaderText="Cost" Format="C0" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="160" />
-                            </GridColumns>
-                        </SfGrid>
-                    </div>
-                </SfTooltip>
+                <SfCard ID="scenario-base-break-even-card" CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Base Break-Even" SubTitle="Current operating target" />
+                    <CardContent>
+                        <SfNumericTextBox ID="scenario-base-break-even-display" TValue="decimal" Value="@BaseBreakEvenRate" Enabled="false" ShowSpinButton="false" Placeholder="Base Break-Even" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
+                    </CardContent>
+                </SfCard>
+
+                <SfCard ID="scenario-adjusted-rate-card" CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Scenario Break-Even" SubTitle="With active what-if costs" />
+                    <CardContent>
+                        <SfNumericTextBox ID="scenario-adjusted-rate-display" TValue="decimal" Value="@ScenarioAdjustedRate" Enabled="false" ShowSpinButton="false" Placeholder="Scenario Break-Even" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
+                    </CardContent>
+                </SfCard>
+
+                <SfCard ID="scenario-adjusted-delta-card" CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Scenario Delta" SubTitle="Gap versus current charge" />
+                    <CardContent>
+                        <SfNumericTextBox ID="scenario-adjusted-delta-display" TValue="decimal" Value="@ScenarioAdjustedDelta" Enabled="false" ShowSpinButton="false" Placeholder="Scenario Delta" FloatLabelType="FloatLabelType.Never" Width="100%" Format="C2" />
+                    </CardContent>
+                </SfCard>
+            </section>
+
+            <section id="scenario-pressure-row" class="grid min-w-0 gap-3 md:grid-cols-2">
+                <SfCard ID="scenario-cost-total-card" CssClass="wiley-panel-card min-w-0">
+                    <CardHeader Title="Scenario Cost Total" SubTitle="@ScenarioCostTotalDisplay" />
+                    <CardContent Content="All active scenario items roll up here so council can see the immediate added operating pressure." />
+                </SfCard>
+
+                <SfCard ID="scenario-volume-card" CssClass="wiley-panel-card min-w-0">
+                    <CardHeader Title="Scenario Inventory" SubTitle="@ScenarioInventorySubtitle" />
+                    <CardContent Content="@ScenarioInventoryNarrative" />
+                </SfCard>
+            </section>
+
+            <div id="scenario-pressure-status" class="flex flex-wrap items-center gap-2">
+                <span class="e-badge @(ScenarioAdjustedDelta >= 0 ? "e-badge-info" : "e-badge-dark")" role="status">@ScenarioDeltaBadgeText</span>
+                <span class="text-sm">@ScenarioAlignmentText</span>
             </div>
+        </section>
+    </section>
+
+    <SfCard ID="scenario-grid-workbench-card" CssClass="wiley-panel-card scenario-grid-workbench min-h-0 min-w-0">
+        <CardHeader Title="Scenario Planner"
+                    SubTitle="Toolbar commands update the workspace draft immediately; the sidebar save flow still persists the whole scenario to Aurora." />
+        <CardContent>
+            <div id="scenario-grid-actions" class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex min-w-0 items-center gap-2">
+                    <SfSpinner Visible="@IsScenarioGridBusy" Size="18" Label="" Type="SpinnerType.Material" />
+                    <span id="scenario-edit-status" role="status" aria-live="polite" class="text-sm">@ScenarioEditStatusText</span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <SfButton ID="load-new-hire-impact-template-button" CssClass="e-primary scenario-template-button" IsPrimary="true" OnClick="OnLoadNewHireImpactTemplate">
+                        Load New Hire Impact Template (Clerk + Field Employee)
+                    </SfButton>
+                    <SfTooltip Content="The grid uses paging plus virtualization to stay responsive as scenario lists grow, while dialog editing keeps names and costs readable on smaller screens."
+                               Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                               OpensOn="Hover Focus"
+                               ShowTipPointer="true"
+                               CloseDelay="200">
+                        <span class="e-badge e-badge-info" tabindex="0">Dialog edit workflow</span>
+                    </SfTooltip>
+                </div>
+            </div>
+
+            <SfTooltip Content="Use the toolbar to add, edit, or delete scenario items. Saving a dialog updates the draft instantly and refreshes all derived rate metrics."
+                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                       OpensOn="Hover Focus"
+                       ShowTipPointer="true"
+                       CloseDelay="200">
+                <div class="workspace-syncfusion-grid-host scenario-grid-host min-h-0">
+                    <SfGrid ID="scenario-grid"
+                            TValue="ScenarioItem"
+                            DataSource="@ScenarioItems"
+                            Toolbar="@ScenarioToolbarItems"
+                            AllowPaging="true"
+                            AllowSorting="true"
+                            AllowFiltering="true"
+                            AllowEditing="true"
+                            AllowAdding="true"
+                            AllowDeleting="true"
+                            AllowTextWrap="true"
+                            AllowResizing="true"
+                            AllowReordering="true"
+                            EnableHover="true"
+                            EnableStickyHeader="true"
+                            EnableVirtualization="true"
+                            GridLines="GridLine.Horizontal"
+                            ClipMode="ClipMode.EllipsisWithTooltip"
+                            Height="100%"
+                            Width="100%"
+                            EnablePersistence="true"
+                            PersistenceKey="wiley.scenario-grid.v2">
+                        <GridEvents TValue="ScenarioItem"
+                                    OnActionBegin="HandleScenarioGridActionBegin"
+                                    OnActionComplete="HandleScenarioGridActionCompleteInternal" />
+                        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+                        <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
+                        <GridPageSettings PageSize="8" PageCount="4" />
+                        <GridEditSettings AllowAdding="true"
+                                          AllowEditing="true"
+                                          AllowDeleting="true"
+                                          AllowEditOnDblClick="false"
+                                          ShowDeleteConfirmDialog="true"
+                                          Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
+                        <GridTemplates>
+                            <EmptyRecordTemplate>
+                                <SfCard ID="scenario-empty-state-card">
+                                    <CardHeader Title="No scenario items yet"
+                                                SubTitle="Create a what-if item to see the break-even target and scenario delta move in real time." />
+                                    <CardContent Content="Use the built-in Add toolbar action to create the first scenario row. Dialog editing keeps names and costs readable, and the workspace draft refreshes immediately after each save." />
+                                </SfCard>
+                            </EmptyRecordTemplate>
+                        </GridTemplates>
+                        <GridColumns>
+                            <GridColumn Field=@nameof(ScenarioItem.Id) IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
+                            <GridColumn Field=@nameof(ScenarioItem.Name) HeaderText="Scenario Item" Width="240" />
+                            <GridColumn Field=@nameof(ScenarioItem.Cost) HeaderText="Cost" Format="C0" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="160" />
+                        </GridColumns>
+                    </SfGrid>
+                </div>
+            </SfTooltip>
         </CardContent>
     </SfCard>
 </div>
@@ -198,11 +164,6 @@
     private int ScenarioItemCount => ScenarioItems.Count;
 
     private decimal LargestScenarioCost => ScenarioItems.Count == 0 ? 0m : ScenarioItems.Max(item => item.Cost);
-
-    private string ScenarioPressureTitle
-        => ScenarioAdjustedDelta >= 0m
-            ? "The modeled current rate still leads the scenario target."
-            : "The scenario target has moved beyond the modeled current rate.";
 
     private string ScenarioInventorySubtitle
         => $"{ScenarioItemCount} active item{(ScenarioItemCount == 1 ? string.Empty : "s")} · Largest item {LargestScenarioCost:C0}";

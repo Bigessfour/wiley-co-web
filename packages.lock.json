@@ -35,12 +35,6 @@
           "Microsoft.Extensions.Options": "10.0.5"
         }
       },
-      "Microsoft.NET.ILLink.Tasks": {
-        "type": "Direct",
-        "requested": "[9.0.14, )",
-        "resolved": "9.0.14",
-        "contentHash": "+MeWjj5sGq6Oj/l0E9RPMgXDyCIPxczzCbGuvuVTZFEGiy2S/atsfoAoKUnkEin/GeGpN+HenCzRmiQKSc99eQ=="
-      },
       "Microsoft.NET.Sdk.WebAssembly.Pack": {
         "type": "Direct",
         "requested": "[9.0.14, )",
@@ -278,6 +272,18 @@
           "Syncfusion.Blazor.Navigations": "33.2.3",
           "Syncfusion.WordProcessor.AspNet.Core": "33.2.3"
         }
+      },
+      "Syncfusion.Compression.Net.Core": {
+        "type": "Direct",
+        "requested": "[33.2.3, )",
+        "resolved": "33.2.3",
+        "contentHash": "FnKplgMKoaKFvy8eJf5UK/aVh/r13CXv3efnr+MeauN4lp9sF8FfMsuHwIHxwoC7O2K0lPP1ajfWBGBJwuI5jg=="
+      },
+      "Syncfusion.Licensing": {
+        "type": "Direct",
+        "requested": "[33.2.3, )",
+        "resolved": "33.2.3",
+        "contentHash": "kkCbHXRZvUbsGUnraJN8RsiwFI116RcmoJtRoJhcjEOt3PKbUW/pvJgtN2JD6O7PTSVDvQE2qtCkrBUP5F1hzA=="
       },
       "Syncfusion.Pdf.Net.Core": {
         "type": "Direct",
@@ -802,11 +808,6 @@
           "Syncfusion.Blazor.Spinner": "33.2.3"
         }
       },
-      "Syncfusion.Compression.Net.Core": {
-        "type": "Transitive",
-        "resolved": "33.2.3",
-        "contentHash": "FnKplgMKoaKFvy8eJf5UK/aVh/r13CXv3efnr+MeauN4lp9sF8FfMsuHwIHxwoC7O2K0lPP1ajfWBGBJwuI5jg=="
-      },
       "Syncfusion.DocIO.Net.Core": {
         "type": "Transitive",
         "resolved": "33.2.3",
@@ -823,11 +824,6 @@
         "type": "Transitive",
         "resolved": "33.2.3",
         "contentHash": "jG0wv0GKHX4GP7r8u1ZdSlOuKXYBqsxH3wUveGPveHIsuqPO5Jp4P44i52CoXcBxlTWpots+htJ8IR76r46UWw=="
-      },
-      "Syncfusion.Licensing": {
-        "type": "Transitive",
-        "resolved": "33.2.3",
-        "contentHash": "kkCbHXRZvUbsGUnraJN8RsiwFI116RcmoJtRoJhcjEOt3PKbUW/pvJgtN2JD6O7PTSVDvQE2qtCkrBUP5F1hzA=="
       },
       "Syncfusion.Markdown": {
         "type": "Transitive",

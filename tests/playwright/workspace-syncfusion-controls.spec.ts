@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
   enterNumericValue,
+  expandBreakEvenApartmentAccordion,
   gotoWorkspacePanel,
   seedLeftNavCollapsed,
   waitForWorkspacePanel,
@@ -40,6 +41,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       await expect(page.locator("#break-even-chart-trash")).toBeVisible();
       await expect(page.locator("#break-even-chart-apartments")).toBeVisible();
 
+      await expandBreakEvenApartmentAccordion(page);
       await expect(apartmentPanel).toBeVisible();
       await expect(apartmentPanel).toContainText("Apartment Configuration");
       await expect(apartmentPanel).toContainText("Total Units");

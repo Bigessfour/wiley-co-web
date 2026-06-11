@@ -154,7 +154,7 @@ const EXPECTED_CONTROLS = {
       action: "click-mobile-only",
       viewport: { width: 1279, height: 900 },
     },
-    { id: "workspace-jarvis-launcher", type: "SfButton", action: "click" },
+    { id: "workspace-jarvis-launcher", type: "button", action: "click" },
   ],
   "/wiley-workspace/rates": [
     { id: "current-rate-input", type: "SfNumericTextBox", action: "focus" },

@@ -268,6 +268,568 @@ body {
   color: var(--wiley-text);
 }
 
+#break-even-panel-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100dvh - 10rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+#break-even-summary-panel {
+  isolation: isolate;
+}
+
+#break-even-kpi-grid {
+  position: relative;
+  z-index: 0;
+}
+
+#break-even-kpi-grid .e-card {
+  min-width: 0;
+}
+
+#break-even-quadrant-grid > section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#break-even-panel .break-even-chart-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#break-even-panel .e-chart,
+#break-even-panel .e-circulargauge {
+  max-width: 100%;
+}
+
+#apartment-config-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#apartment-config-summary-panel {
+  isolation: isolate;
+  position: relative;
+  z-index: 1;
+}
+
+#apartment-config-summary-panel .e-card {
+  min-width: 0;
+}
+
+#apartment-config-grid-card {
+  min-height: 0;
+}
+
+#apartment-config-panel .workspace-syncfusion-grid-host .e-grid {
+  max-width: 100%;
+}
+
+#rates-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+
+#rates-kpi-grid {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+#rates-kpi-grid .rates-kpi-card,
+#rates-decision-card,
+#rates-editor-card,
+#rates-chart-card {
+  min-width: 0;
+}
+
+#rates-kpi-grid .rates-kpi-card {
+  min-height: 8.5rem;
+}
+
+#rates-panel-chart-section {
+  min-height: 0;
+}
+
+#rates-panel .rates-chart-viewport {
+  min-height: 14rem;
+  height: min(22rem, 50vh);
+  width: 100%;
+}
+
+#rates-panel .rates-current-rate-field {
+  max-width: 28rem;
+}
+
+#rates-panel .e-chart {
+  max-width: 100%;
+}
+
+/* Shared analytics panel layout: KPI strip → inputs → gauge/chart (desktop polish) */
+.wiley-analytics-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.wiley-analytics-panel-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.wiley-kpi-strip {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+@media (min-width: 640px) {
+  .wiley-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .wiley-kpi-strip--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .wiley-kpi-strip--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.wiley-kpi-card {
+  min-height: 8.5rem;
+  min-width: 0;
+}
+
+.wiley-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.wiley-input-section .e-numerictextbox,
+.wiley-input-section .e-input-group {
+  max-width: 28rem;
+}
+
+.wiley-gauge-viewport {
+  min-height: 12rem;
+  height: min(15rem, 35vh);
+  width: 100%;
+}
+
+.wiley-chart-viewport--primary {
+  min-height: 16rem;
+  height: min(26.25rem, max(16rem, 420px));
+  width: 100%;
+}
+
+.wiley-analytics-panel .e-chart,
+.wiley-analytics-panel .e-circulargauge {
+  max-width: 100%;
+}
+
+/* Data Dashboard (/wiley-workspace/data-dashboard) — compact above-fold layout */
+#data-dashboard-panel .data-dashboard-panel-scroll {
+  gap: 0.875rem;
+}
+
+#data-dashboard-panel .data-dashboard-kpi-grid {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  #data-dashboard-panel .data-dashboard-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  #data-dashboard-panel .data-dashboard-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+#data-dashboard-panel .data-dashboard-kpi-grid .wiley-kpi-card {
+  min-height: 7.5rem;
+}
+
+#data-dashboard-panel .data-dashboard-gauge-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  #data-dashboard-panel .data-dashboard-gauge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+#data-dashboard-panel .data-dashboard-gauge-viewport {
+  min-height: 8.5rem;
+  height: 8.5rem;
+}
+
+#data-dashboard-panel .wiley-chart-viewport--tabbed {
+  min-height: 14rem;
+  height: min(20rem, 320px);
+  width: 100%;
+}
+
+#data-dashboard-panel .data-dashboard-charts-tab .e-content {
+  padding-top: 0.5rem;
+}
+
+#break-even-panel-scroll {
+  max-height: calc(100dvh - 10rem);
+}
+
+.quickbooks-import-panel-host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100dvh - 10rem);
+}
+
+.quickbooks-import-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.quickbooks-import-shell .e-card-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.quickbooks-import-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.quickbooks-import-panel-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.25rem;
+}
+
+#quickbooks-import-stepper {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+}
+
+#quickbooks-import-stepper .e-stepper,
+#quickbooks-import-stepper .e-stepper-steps {
+  max-width: 100%;
+}
+
+.quickbooks-wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.quickbooks-wizard-step .e-card {
+  min-width: 0;
+}
+
+#quickbooks-wizard-stage-card,
+#quickbooks-import-uploader-card,
+#quickbooks-import-status-card,
+#quickbooks-preview-card {
+  min-height: 0;
+}
+
+#quickbooks-import-uploader-host,
+.quickbooks-import-uploader-host {
+  width: 100%;
+  max-width: 100%;
+}
+
+#scenario-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+#scenario-overview-section,
+#scenario-metrics-panel {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+#scenario-metrics-panel {
+  isolation: isolate;
+  position: relative;
+  z-index: 1;
+}
+
+#scenario-kpi-grid {
+  position: relative;
+  z-index: 0;
+}
+
+#scenario-kpi-grid .scenario-kpi-card,
+#scenario-pressure-row .e-card {
+  min-width: 0;
+}
+
+#scenario-kpi-grid .scenario-kpi-card .e-card-content {
+  padding-top: 0.25rem;
+}
+
+#scenario-grid-workbench-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+#scenario-panel .scenario-grid-host {
+  min-height: 14rem;
+  height: min(32rem, max(14rem, calc(100dvh - 26rem)));
+}
+
+#scenario-panel .scenario-grid-host .e-grid {
+  max-width: 100%;
+}
+
+#scenario-panel .scenario-template-button {
+  min-height: 2.25rem;
+  font-weight: 600;
+  white-space: normal;
+  text-align: center;
+}
+
+#customer-viewer-panel,
+#customer-viewer-dashboard {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#customer-viewer-panel {
+  gap: 0.75rem;
+}
+
+#customer-viewer-dashboard {
+  flex: 1 1 auto;
+  gap: 0.75rem;
+}
+
+#customer-summary-panel,
+#customer-filters-panel {
+  isolation: isolate;
+  position: relative;
+  z-index: 1;
+}
+
+#customer-kpi-grid .customer-kpi-card {
+  min-width: 0;
+}
+
+#customer-kpi-grid .customer-kpi-card .e-card-content {
+  padding-top: 0.25rem;
+}
+
+#customer-filters-panel.customer-command-band {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+#customer-filters-row .e-input-group,
+#customer-filters-row .e-ddl {
+  min-width: 0;
+}
+
+#customer-directory-toolbar.e-toolbar {
+  border: 1px solid var(--wiley-border);
+  border-radius: var(--wiley-radius-md);
+  background: var(--wiley-surface-2);
+}
+
+#customer-directory-toolbar .e-toolbar-item .e-btn {
+  margin: 0;
+}
+
+#customer-grid-panel.customer-grid-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#customer-viewer-panel .customer-grid-host {
+  flex: 1 1 auto;
+  min-height: 14rem;
+  height: min(36rem, max(14rem, calc(100dvh - 24rem)));
+}
+
+#customer-viewer-panel .customer-grid-host .e-grid {
+  max-width: 100%;
+}
+
+.customer-grid-loading-host {
+  min-height: 16rem;
+}
+
+.customer-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: min(70vh, 40rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.customer-editor-section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.customer-editor-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wiley-text-muted);
+}
+
+.customer-editor-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.customer-editor-field {
+  min-width: 0;
+}
+
+.customer-editor-field--wide {
+  grid-column: 1 / -1;
+}
+
+#customer-editor-dialog .e-dlg-content {
+  overflow: hidden;
+}
+
+#decision-support-panel.decision-support-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: calc(100dvh - 11rem);
+}
+
+.jarvis-decision-support-layout,
+.jarvis-rail-layout {
+  min-height: 0;
+}
+
+.jarvis-decision-support-layout {
+  height: 100%;
+}
+
+.jarvis-executive-band .jarvis-summary-card,
+.jarvis-insights-band .jarvis-insight-card,
+.jarvis-actions-card,
+.jarvis-runtime-card,
+.jarvis-audit-card {
+  min-width: 0;
+}
+
+.jarvis-insights-band .jarvis-insight-card .e-card-content {
+  padding-top: 0.25rem;
+}
+
+.jarvis-actions-scroll {
+  max-height: 7rem;
+  overflow-y: auto;
+}
+
+.jarvis-chat-stage {
+  flex: 1 1 50%;
+  min-height: 0;
+}
+
+.jarvis-assist-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 12rem;
+}
+
+.jarvis-chat-surface.e-aiassistview {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--wiley-border);
+  border-radius: var(--wiley-radius-lg);
+  background: var(--wiley-surface-1);
+}
+
+.jarvis-chat-footer {
+  padding-top: 0.25rem;
+}
+
+.jarvis-audit-strip {
+  min-height: 0;
+}
+
+.jarvis-audit-scroll {
+  max-height: 5.5rem;
+  overflow-y: auto;
+}
+
+.jarvis-xai-key-compact .e-card-content {
+  padding-top: 0.5rem;
+}
+
+.jarvis-inline-spinner {
+  height: 20px;
+  width: 20px;
+}
+
+.jarvis-transcript-line + .jarvis-transcript-line {
+  margin-top: 0.5rem;
+}
+
 .wiley-text-muted {
   color: var(--wiley-text-muted);
 }
@@ -726,43 +1288,9 @@ h1:focus {
   animation-delay: 0.4s;
 }
 
-/* Budget Dashboard (/budget-dashboard) — compact executive layout for 1080p viewports */
+/* Budget Dashboard (/budget-dashboard) — scrollable analytics layout */
 .budget-executive-dashboard {
-  min-height: 80vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.budget-executive-dashboard .budget-kpi-card.e-card {
-  min-height: 8.75rem;
-  max-height: 10rem;
-}
-
-.budget-executive-dashboard .budget-kpi-card .e-card-content {
-  padding-top: 0.25rem;
-}
-
-.budget-executive-dashboard .budget-chart-grid {
-  align-items: stretch;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-@media (max-width: 1023px) {
-  .budget-executive-dashboard .budget-chart-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.budget-executive-dashboard .budget-chart-card.e-card {
   min-height: 0;
-}
-
-.budget-executive-dashboard .budget-chart-card .e-card-content {
-  padding: 0.5rem 0.75rem 0.75rem;
 }
 
 /* Hero overview skeleton grid — mirrors the workspace-overview-grid layout */

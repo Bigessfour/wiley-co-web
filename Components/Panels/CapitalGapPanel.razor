@@ -9,8 +9,9 @@
 @inject CapitalGapApiService CapitalGapApiService
 @inject ToastService ToastService
 
-<section id="capital-gap-panel" class="space-y-4" aria-live="polite">
-    <section class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 p-5 text-white shadow-sm">
+<section id="capital-gap-panel" class="wiley-analytics-panel" aria-live="polite">
+    <div class="wiley-analytics-panel-scroll space-y-4">
+    <section class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 p-5 text-white shadow-sm shrink-0">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-300">Capital Gap</p>
@@ -78,41 +79,39 @@
     }
     else if (Snapshot is not null)
     {
-        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SfCard ID="capital-gap-kpi-rate-revenue">
+        <section class="wiley-kpi-strip wiley-kpi-strip--4">
+            <SfCard ID="capital-gap-kpi-rate-revenue" CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="Annual Rate Revenue" SubTitle="Live revenue aggregate" />
                 <CardContent Content="@Snapshot.AnnualRateRevenue.ToString("C0")" />
             </SfCard>
-            <SfCard ID="capital-gap-kpi-capital-need">
+            <SfCard ID="capital-gap-kpi-capital-need" CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="Annual Capital Need" SubTitle="Tagged capital items" />
                 <CardContent Content="@Snapshot.AnnualCapitalNeed.ToString("C0")" />
             </SfCard>
-            <SfCard ID="capital-gap-kpi-gap">
+            <SfCard ID="capital-gap-kpi-gap" CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="Rate Revenue Gap" SubTitle="Revenue minus capital need" />
                 <CardContent Content="@Snapshot.RateRevenueGap.ToString("C0")" />
             </SfCard>
-            <SfCard ID="capital-gap-kpi-coverage-ratio">
+            <SfCard ID="capital-gap-kpi-coverage-ratio" CssClass="wiley-panel-card wiley-kpi-card">
                 <CardHeader Title="Coverage Ratio" SubTitle="Rate revenue / capital need" />
                 <CardContent Content="@Snapshot.CapitalNeedCoverageRatio.ToString("0.00x")" />
             </SfCard>
         </section>
 
-        <section class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <section class="flex flex-col gap-4">
             <div class="rounded-2xl wiley-surface-panel p-4">
                 <div class="flex flex-col gap-1">
                     <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Capital Need Chart</p>
                     <p class="text-sm wiley-text-muted">Stacked budgeted and actual capital amounts with a cumulative revenue-gap line.</p>
                 </div>
-                <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4">
-                    @* Theme Fluent2: chart palette aligned with app-wide Syncfusion theme *@
-                    @* ChartZoomSettings: capital gap chart is analytical; selection zoom lets councils drill into specific capital items *@
+                <div class="mt-3 wiley-chart-viewport--primary rounded-2xl wiley-surface-panel-secondary p-4">
                     <SfChart ID="capital-gap-chart"
                              Title="Capital needs versus rate revenue"
                              AccessibilityDescription="Stacked column chart showing capital needs and actual spend by capital-tagged budget item, with a cumulative revenue gap line."
                              EnableAnimation="true"
                              UseGroupingSeparator="true"
                              Width="100%"
-                             Height="360px"
+                             Height="100%"
                              Theme="Syncfusion.Blazor.Theme.Fluent2">
                         <ChartArea>
                             <ChartAreaBorder Width="0" />
@@ -190,6 +189,7 @@
             Capital gap data is not available yet.
         </section>
     }
+    </div>
 </section>
 
 @code {

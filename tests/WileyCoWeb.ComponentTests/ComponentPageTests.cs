@@ -17,6 +17,7 @@ using Syncfusion.Blazor.DropDowns;
 using Syncfusion.Blazor.Grids;
 using Syncfusion.Blazor.Inputs;
 using Syncfusion.Blazor.InteractiveChat;
+using Syncfusion.Blazor.Layouts;
 using Syncfusion.Blazor.Navigations;
 using Syncfusion.Blazor.Popups;
 using Syncfusion.Blazor.ProgressBar;
@@ -271,6 +272,32 @@ public sealed class ComponentPageTests
 			Assert.Contains("workspace-jarvis-dock", cut.Markup);
 			Assert.Single(cut.FindComponents<JarvisChatPanel>());
 			Assert.DoesNotContain("workspace-jarvis-launcher", cut.Markup);
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_JarvisCloseButton_HidesDockAndShowsLauncher()
+	{
+		using var context = CreateContext();
+		var layoutContext = new WorkspaceLayoutContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.AddCascadingValue(layoutContext));
+
+		cut.Find("#workspace-jarvis-launcher").Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.True(layoutContext.IsJarvisOpen);
+			Assert.Contains("workspace-jarvis-dock", cut.Markup);
+		});
+
+		cut.Find("#workspace-jarvis-dock").GetElementsByTagName("button").First(b => b.TextContent?.Contains("Close", StringComparison.Ordinal) == true).Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.False(layoutContext.IsJarvisOpen);
+			Assert.Contains("workspace-jarvis-launcher", cut.Markup);
 		});
 	}
 
@@ -898,7 +925,7 @@ public sealed class ComponentPageTests
 		{
 			Assert.Contains("QuickBooks Import", cut.Markup);
 			Assert.Contains("quickbooks-import-panel", cut.Markup);
-			Assert.Contains("quickbooks-assistant-question", cut.Markup);
+			Assert.Contains("quickbooks-import-uploader", cut.Markup);
 			Assert.Single(cut.FindComponents<SfProgressBar>());
 			Assert.Single(cut.FindComponents<SfStepper>());
 			Assert.Single(cut.FindComponents<QuickBooksImportPanel>());

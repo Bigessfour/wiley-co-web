@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   breakEvenPanelSpinbuttons,
+  expandBreakEvenApartmentAccordion,
   gotoWorkspacePanel,
   ratesPanelCurrentRateInput,
   setNumericInputValue,
@@ -141,6 +142,7 @@ test.describe("Workspace baseline save proof", () => {
     await expect(panel).toBeVisible();
     await expect(quadrantPanel).toBeVisible();
     await expect(quadrantGrid).toBeVisible();
+    await expandBreakEvenApartmentAccordion(page);
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
     await expect(status).toHaveText(
       "Baseline changes are local until you save them.",

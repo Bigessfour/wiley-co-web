@@ -61,11 +61,9 @@ public sealed class QuickBooksImportPanelTests : TestContext
 
 		Assert.Contains("QuickBooks Import", cut.Markup);
 		Assert.Contains("Choose QuickBooks file", cut.Markup);
-		Assert.Contains("Commit import", cut.Markup);
-		Assert.Contains("Ask assistant", cut.Markup);
+		Assert.Contains("Analyze file", cut.Markup);
 		Assert.Contains("No file selected", cut.Markup);
-		Assert.Single(cut.FindComponents<Syncfusion.Blazor.Navigations.SfTab>());
-		Assert.Equal(3, cut.FindComponents<Syncfusion.Blazor.Navigations.TabItem>().Count);
+		Assert.Empty(cut.FindComponents<Syncfusion.Blazor.Navigations.SfTab>());
 	}
 
 	[Fact]
@@ -100,6 +98,8 @@ public sealed class QuickBooksImportPanelTests : TestContext
 		Assert.Equal(2, previewRows.Count);
 		Assert.Equal(WorkspaceTestData.QuickBooksAssistantContextSummary, GetPrivateField<string>(cut.Instance, "AssistantContextSummary"));
 		Assert.False(previewResponse!.IsDuplicate);
+		Assert.Single(cut.FindComponents<Syncfusion.Blazor.Navigations.SfTab>());
+		Assert.Equal(3, cut.FindComponents<Syncfusion.Blazor.Navigations.TabItem>().Count);
 	}
 
 	[Fact]
@@ -456,7 +456,6 @@ public sealed class QuickBooksImportPanelTests : TestContext
 			Assert.Equal("Administrative split", loadedProfile.Name);
 			Assert.Equal("brookside-journal.csv", loadedHistoryItem.FileName);
 			Assert.Equal("Apartments, Trash", loadedHistoryItem.ScopeSummary);
-			Assert.Contains("Brookside to Apartments", cut.Markup);
 		});
 	}
 

@@ -35,6 +35,7 @@ Thumbs.db
 *.swp
 *.bak
 publish_output/
+api_output/
 node_modules/
 *.user
 *.suo

@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   breakEvenPanelSpinbuttons,
   enterScenarioGridDialogCost,
+  expandBreakEvenApartmentAccordion,
   gotoWorkspacePanel,
   ratesPanelCurrentRateInput,
   readCurrencyValueByLabel,
@@ -23,6 +24,7 @@ test.describe("Wiley workspace browser depth", () => {
     const breakEvenSpinners = breakEvenPanelSpinbuttons(page);
 
     await expect(page.locator("#break-even-quadrant-panel")).toBeVisible();
+    await expandBreakEvenApartmentAccordion(page);
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
 
     await setNumericInputValue(breakEvenSpinners.nth(0), "24000");

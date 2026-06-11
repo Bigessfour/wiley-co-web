@@ -20,10 +20,11 @@
 @inject IServiceProvider ServiceProvider
 @inject IJSRuntime JSRuntime
 
-<SfCard CssClass="h-full">
+<SfCard CssClass="wiley-panel-card quickbooks-import-shell">
     <CardHeader Title="QuickBooks Import" SubTitle="Clerk-facing CSV/XLSX intake with preview, duplicate checks, and commit confirmation." />
     <CardContent>
-        <div id="quickbooks-import-drop-area" aria-busy="@IsBusy" class="space-y-4">
+        <div id="quickbooks-import-drop-area" aria-busy="@IsBusy" class="quickbooks-import-workspace">
+        <div id="quickbooks-import-panel-scroll" class="quickbooks-import-panel-scroll">
             @* ID: allows targeted CSS/JS and automation selectors for the import progress bar *@
             <SfProgressBar ID="quickbooks-import-progress"
                            Type="ProgressType.Linear"
@@ -33,14 +34,8 @@
                            IsIndeterminate="@IsBusy"
                            Height="8px" />
 
-            <div class="grid gap-3 md:grid-cols-2">
-                @* IDs: match the automation selectors used in QB import E2E specs *@
-                <SfDropDownList ID="qb-enterprise-select" TValue="string" TItem="string" DataSource="@WorkspaceState.EnterpriseOptions" @bind-Value="WorkspaceState.SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-                <SfDropDownList ID="qb-fiscal-year-select" TValue="int" TItem="int" DataSource="@WorkspaceState.FiscalYearOptions" @bind-Value="WorkspaceState.SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" ShowClearButton="false" PopupHeight="240px" Width="100%" />
-            </div>
-
             @* ID only — NO EnablePersistence: wizard must always start at step 0 for each new file upload session *@
-            <SfStepper ID="quickbooks-import-stepper" ActiveStep="@ActiveStep" Linear="true" Orientation="StepperOrientation.Horizontal" StepType="StepperType.Indicator" LabelPosition="StepperLabelPosition.Bottom" ShowTooltip="true">
+            <SfStepper ID="quickbooks-import-stepper" ActiveStep="@StepperDisplayStep" Linear="true" Orientation="StepperOrientation.Horizontal" StepType="StepperType.Indicator" LabelPosition="StepperLabelPosition.Bottom" ShowTooltip="true">
                 <StepperSteps>
                     <StepperStep Label="Context" Text="Select the enterprise and fiscal year"></StepperStep>
                     <StepperStep Label="Upload" Text="Choose a QuickBooks export"></StepperStep>
@@ -57,17 +52,21 @@
                 <CardContent Content="@WizardStageDescription" />
             </SfCard>
 
-            <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-                <div class="space-y-4">
-                    @* Removed: the hidden InputFile + label-button pairing.
-                       Replacement: SfUploader now owns browse/drop behavior, file-list rendering, multiple-file staging, and the browser input selector.
-                       The input id is preserved through InputAttributes so the existing browser automation surface remains stable. *@
+            @if (!HasPreviewLoaded)
+            {
+                <section id="quickbooks-wizard-context-step" class="quickbooks-wizard-step">
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <SfDropDownList ID="qb-enterprise-select" TValue="string" TItem="string" DataSource="@WorkspaceState.EnterpriseOptions" @bind-Value="WorkspaceState.SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                        <SfDropDownList ID="qb-fiscal-year-select" TValue="int" TItem="int" DataSource="@WorkspaceState.FiscalYearOptions" @bind-Value="WorkspaceState.SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" ShowClearButton="false" PopupHeight="240px" Width="100%" />
+                    </div>
+                </section>
+
+                <section id="quickbooks-wizard-upload-step" class="quickbooks-wizard-step">
                     <SfCard ID="quickbooks-import-uploader-card">
                         <CardHeader Title="Upload QuickBooks exports"
-                                    SubTitle="SfUploader provides the native drag/drop and staged-file workflow that the rebuild plan called for." />
+                                    SubTitle="Browse or drop CSV/XLSX files, then analyze the active export." />
                         <CardContent>
                             <div id="quickbooks-import-drop-zone" class="space-y-3">
-                                @* Stable host id for audits/automation; file input id stays on InputAttributes for Playwright setInputFiles. *@
                                 <div id="quickbooks-import-uploader-host" class="block w-full">
                                     <SfUploader @ref="QuickBooksUploader"
                                                 CssClass="w-full quickbooks-import-uploader-host"
@@ -103,8 +102,6 @@
                         </SfCard>
                     </div>
 
-                    @* Removed: the ad-hoc bordered status strip.
-                       Replacement: a Syncfusion card plus inline spinner turns import state into a first-class workflow surface instead of a manually styled note. *@
                     <SfCard ID="quickbooks-import-status-card">
                         <CardHeader Title="Import status" SubTitle="@StatusHeadline" />
                         <CardContent>
@@ -120,53 +117,15 @@
                         </CardContent>
                     </SfCard>
 
-                    <div class="grid gap-3 sm:grid-cols-3" aria-busy="@IsBusy">
+                    <div class="flex flex-wrap gap-3" aria-busy="@IsBusy">
                         <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAnalyze)" OnClick="LoadPreviewAsync">Analyze file</SfButton>
-                        <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanCommit || IsBusy)" OnClick="OpenCommitDialogAsync">Commit import</SfButton>
                         <SfButton Disabled="@IsBusy" OnClick="ClearSelectionAsync">Reset panel</SfButton>
                     </div>
-
-                    <SfCard>
-                        <CardHeader Title="Import assistant" SubTitle="Ask semantic questions about this QuickBooks file, preview, or troubleshooting steps." />
-                        <CardContent>
-                            <div class="space-y-3">
-                                @* MaxLength: cap assistant prompts at 2000 characters to stay within the Jarvis token budget *@
-                                <SfTextBox Placeholder="Ask about duplicate detection, column mapping, dates, or commit errors"
-                                           ID="quickbooks-assistant-question"
-                                           FloatLabelType="FloatLabelType.Auto"
-                                           Multiline="true"
-                                           Rows="4"
-                                           MaxLength="2000"
-                                           @bind-Value="AssistantQuestion" />
-                                <div class="flex flex-wrap gap-3">
-                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskAssistant)" OnClick="AskAssistantAsync">Ask assistant</SfButton>
-                                    <SfButton Disabled="@IsAskingAssistant" OnClick="ClearAssistantAsync">Clear answer</SfButton>
-                                </div>
-
-                                @* Removed: the plain bordered assistant response block.
-                                   Replacement: a nested Syncfusion card keeps assistant context, answer text, and async state in the same design system as the rest of the wizard. *@
-                                <SfCard ID="quickbooks-assistant-status-card">
-                                    <CardHeader Title="Assistant context"
-                                                SubTitle="Preview-aware guidance for duplicates, mapping, dates, and commit issues." />
-                                    <CardContent>
-                                        <div class="flex items-start gap-3" role="status" aria-live="polite" aria-busy="@IsAskingAssistant">
-                                            <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
-                                                <SfSpinner Visible="@IsAskingAssistant" Size="18" Label="" Type="SpinnerType.Material" />
-                                            </div>
-                                            <div class="space-y-3">
-                                                <p class="text-xs font-semibold uppercase tracking-[0.24em] wiley-text-muted">Context</p>
-                                                <p id="quickbooks-assistant-context-summary" class="text-sm wiley-text-muted">@AssistantContextSummary</p>
-                                                <p id="quickbooks-assistant-answer" class="whitespace-pre-line text-sm wiley-text-muted">@AssistantAnswer</p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </SfCard>
-                            </div>
-                        </CardContent>
-                    </SfCard>
-                </div>
-
-                <div class="space-y-4">
+                </section>
+            }
+            else
+            {
+                <section id="quickbooks-wizard-preview-step" class="quickbooks-wizard-step">
                     <div class="grid gap-3 sm:grid-cols-3">
                         <SfCard>
                             <CardHeader Title="Rows" SubTitle="@RowCountDisplay" />
@@ -186,14 +145,7 @@
                         <CardHeader Title="Preview grid"
                                     SubTitle="Parsed rows, routed enterprises, and duplicate flags before commit." />
                         <CardContent>
-                            @if (PreviewRows.Count > 0)
-                            {
-                                @* Grid hardening based on Syncfusion import-workbench guidance:
-                                   - Menu filtering keeps column-specific diagnostics accessible.
-                                   - Row selection gives clerks a stable inspection target during large previews.
-                                   - Virtualization reduces DOM growth when large QuickBooks exports are staged.
-                                   - The existing test anchor (#quickbooks-preview-grid) is preserved. *@
-                                <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-0">
+                            <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-0">
                                 <SfGrid ID="quickbooks-preview-grid"
                                         TValue="QuickBooksImportPreviewRow"
                                         DataSource="@PreviewRows"
@@ -208,7 +160,8 @@
                                         EnableVirtualization="true"
                                         ClipMode="ClipMode.EllipsisWithTooltip"
                                         GridLines="GridLine.Horizontal"
-                                        Height="100%">
+                                        Height="100%"
+                                        Width="100%">
                                     <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
                                     <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
                                     <GridPageSettings PageSize="8" PageCount="4" />
@@ -226,19 +179,51 @@
                                         <GridColumn Field="@nameof(QuickBooksImportPreviewRow.IsDuplicate)" HeaderText="Duplicate" Width="100" Type="Syncfusion.Blazor.Grids.ColumnType.Boolean" />
                                     </GridColumns>
                                 </SfGrid>
-                                </div>
-                            }
-                            else
-                            {
-                                <SfCard>
-                                    <CardHeader Title="Nothing loaded yet" SubTitle="Analyze a staged QuickBooks export to populate the preview grid." />
-                                    <CardContent Content="The preview grid stays empty until the panel reads a selected CSV or Excel file and asks the API to parse the rows." />
-                                </SfCard>
-                            }
+                            </div>
                         </CardContent>
                     </SfCard>
-                </div>
-            </div>
+
+                    <SfCard>
+                        <CardHeader Title="Import assistant" SubTitle="Ask semantic questions about this QuickBooks file, preview, or troubleshooting steps." />
+                        <CardContent>
+                            <div class="space-y-3">
+                                <SfTextBox Placeholder="Ask about duplicate detection, column mapping, dates, or commit errors"
+                                           ID="quickbooks-assistant-question"
+                                           FloatLabelType="FloatLabelType.Auto"
+                                           Multiline="true"
+                                           Rows="4"
+                                           MaxLength="2000"
+                                           @bind-Value="AssistantQuestion" />
+                                <div class="flex flex-wrap gap-3">
+                                    <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanAskAssistant)" OnClick="AskAssistantAsync">Ask assistant</SfButton>
+                                    <SfButton Disabled="@IsAskingAssistant" OnClick="ClearAssistantAsync">Clear answer</SfButton>
+                                </div>
+
+                                <SfCard ID="quickbooks-assistant-status-card">
+                                    <CardHeader Title="Assistant context"
+                                                SubTitle="Preview-aware guidance for duplicates, mapping, dates, and commit issues." />
+                                    <CardContent>
+                                        <div class="flex items-start gap-3" role="status" aria-live="polite" aria-busy="@IsAskingAssistant">
+                                            <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">
+                                                <SfSpinner Visible="@IsAskingAssistant" Size="18" Label="" Type="SpinnerType.Material" />
+                                            </div>
+                                            <div class="space-y-3">
+                                                <p class="text-xs font-semibold uppercase tracking-[0.24em] wiley-text-muted">Context</p>
+                                                <p id="quickbooks-assistant-context-summary" class="text-sm wiley-text-muted">@AssistantContextSummary</p>
+                                                <p id="quickbooks-assistant-answer" class="whitespace-pre-line text-sm wiley-text-muted">@AssistantAnswer</p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </SfCard>
+                            </div>
+                        </CardContent>
+                    </SfCard>
+
+                    <div class="flex flex-wrap gap-3" aria-busy="@IsBusy">
+                        <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@(!CanCommit || IsBusy)" OnClick="OpenCommitDialogAsync">Commit import</SfButton>
+                        <SfButton Disabled="@IsBusy" OnClick="ClearSelectionAsync">Reset panel</SfButton>
+                    </div>
+                </section>
 
             @* EnablePersistence: preserves the active tab (Routing Rules / Allocation Profiles / Import History) across page reloads *@
             <SfTab ID="quickbooks-import-tab" OverflowMode="OverflowMode.Scrollable" EnablePersistence="true" PersistenceKey="wiley.qb-import-tab.v1">
@@ -443,6 +428,8 @@
                     </TabItem>
                 </TabItems>
             </SfTab>
+            }
+        </div>
         </div>
     </CardContent>
 </SfCard>
@@ -474,17 +461,6 @@
 
 
 @code {
-    private bool _scrolledUploaderIntoView;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && !_scrolledUploaderIntoView)
-        {
-            _scrolledUploaderIntoView = true;
-            await JSRuntime.InvokeVoidAsync("wileyWorkspace.scrollIntoViewById", "quickbooks-import-uploader-card");
-        }
-    }
-
     private const string DefaultAssistantAnswer = "Load a QuickBooks preview, then ask a question about the rows or troubleshooting steps.";
     private const string DefaultAssistantContext = "No QuickBooks preview has been loaded yet.";
 
@@ -544,6 +520,18 @@
     private string RowCountDisplay => PreviewResponse?.TotalRows.ToString(CultureInfo.InvariantCulture) ?? "0";
 
     private string DuplicateCountDisplay => PreviewResponse?.DuplicateRows.ToString(CultureInfo.InvariantCulture) ?? "0";
+
+    private bool HasPreviewLoaded => PreviewResponse is not null;
+
+    private int StepperDisplayStep
+        => ActiveStep switch
+        {
+            3 => 3,
+            2 => 2,
+            1 => 2,
+            0 when SelectedFileBytes is { Length: > 0 } => 1,
+            _ => 0
+        };
 
     private string WizardStageTitle
         => ActiveStep switch

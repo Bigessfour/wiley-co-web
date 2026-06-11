@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   breakEvenPanelSpinbuttons,
+  expandBreakEvenApartmentAccordion,
   gotoWorkspacePanel,
   setNumericInputValue,
 } from "./support/workspace";
@@ -18,6 +19,7 @@ test.describe("Core Panel Proof", () => {
       page.locator("#break-even-quadrant-grid > section"),
     ).toHaveCount(4);
     await expect(page.locator("#break-even-input-row")).toBeVisible();
+    await expandBreakEvenApartmentAccordion(page);
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
     await expect(page.locator("#break-even-panel")).not.toContainText(
       /pending/i,
@@ -69,7 +71,7 @@ test.describe("Core Panel Proof", () => {
       .toMatch(/Recommended Rate\s*\$60\.00/);
 
     await expect(page.locator("#break-even-quadrant-grid")).toContainText(
-      /Break-even\s*\$60\.00/,
+      /Break-Even\s*\$60\.00/i,
     );
     await expect(page.locator("#break-even-quadrant-grid")).toContainText(
       "Water Utility",
@@ -89,6 +91,7 @@ test.describe("Core Panel Proof", () => {
       timeout: 10000,
     });
     await expect(page.locator("#break-even-quadrant-grid")).toBeVisible();
+    await expandBreakEvenApartmentAccordion(page);
     await expect(page.locator("#apartment-config-panel")).toBeVisible();
   });
 });

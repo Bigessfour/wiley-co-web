@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Action = System.Action;
+using Syncfusion.Blazor.Popups;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
 using WileyCoWeb.State;
@@ -111,6 +112,17 @@ public partial class CustomerViewerPanel : ComponentBase
         editorEditContext = null;
     }
 
+    private void OnEditorDialogClosing(BeforeCloseEventArgs args)
+    {
+        if (isSavingCustomer)
+        {
+            args.Cancel = true;
+            return;
+        }
+
+        CloseEditorDialog();
+    }
+
     private void CloseDeleteDialog()
     {
         if (isDeletingCustomer)
@@ -120,6 +132,17 @@ public partial class CustomerViewerPanel : ComponentBase
 
         isDeleteDialogOpen = false;
         pendingDeleteCustomer = null;
+    }
+
+    private void OnDeleteDialogClosing(BeforeCloseEventArgs args)
+    {
+        if (isDeletingCustomer)
+        {
+            args.Cancel = true;
+            return;
+        }
+
+        CloseDeleteDialog();
     }
 
     private void BeginDeleteCustomer(UtilityCustomerRecord customer)

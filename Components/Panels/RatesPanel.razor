@@ -7,151 +7,121 @@
 @using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.State
 
-<div id="rates-panel" aria-busy="@IsSavingSnapshot" class="space-y-4">
-    @* Removed: the old ad-hoc rates-kpi-grid that only mimicked a KPI board with two plain placements.
-       Replacement: a full SfCard hierarchy so each metric gets native header/content rhythm, better scanability,
-       and a more boardroom-ready visual hierarchy. *@
-    <section id="rates-overview-section" class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <SfCard ID="rates-overview-card" CssClass="wiley-panel-card">
-            <CardHeader Title="Rate Position"
-                        SubTitle="Live summary of the active customer charge against the current break-even target." />
-            <CardContent>
-                <div class="grid gap-3 md:grid-cols-3">
-                    <SfCard ID="rates-kpi-current-card">
-                        <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
-                        <CardContent Content="The working rate used immediately across the workspace model." />
-                    </SfCard>
-
-                    <SfCard ID="rates-kpi-target-card">
-                        <CardHeader Title="Break-Even Rate" SubTitle="@BreakEvenRateDisplay" />
-                        <CardContent Content="The model-calculated rate needed to fully cover current costs." />
-                    </SfCard>
-
-                    <SfCard ID="rates-kpi-delta-card">
-                        <CardHeader Title="Spread" SubTitle="@RateDeltaDisplay" />
-                        <CardContent Content="Positive means the modeled charge sits above break-even; negative means it trails the target." />
-                    </SfCard>
-                </div>
-            </CardContent>
+<div id="rates-panel" aria-busy="@IsSavingSnapshot" class="wiley-analytics-panel">
+    <div class="wiley-analytics-panel-scroll flex flex-col gap-4">
+    <section id="rates-kpi-grid" class="wiley-kpi-strip wiley-kpi-strip--3">
+        <SfCard ID="rates-kpi-current-card" CssClass="wiley-panel-card wiley-kpi-card">
+            <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
+            <CardContent Content="The working rate used immediately across the workspace model." />
         </SfCard>
 
-        <SfCard ID="rates-decision-card" CssClass="wiley-panel-card">
-            <CardHeader Title="Decision Signal"
-                        SubTitle="@RateAlignmentTitle" />
-            <CardContent>
-                <div class="space-y-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="e-badge @(IsRateAtOrAboveBreakEven ? "e-badge-info" : "e-badge-dark")" role="status">@RateAlignmentBadgeText</span>
-                        <span class="text-sm font-medium wiley-text-muted">@BreakEvenCoverageDisplay</span>
-                    </div>
+        <SfCard ID="rates-kpi-target-card" CssClass="wiley-panel-card wiley-kpi-card">
+            <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
+            <CardContent Content="The model-calculated rate needed to fully cover current costs." />
+        </SfCard>
 
-                    <SfCard ID="rates-narrative-card">
-                        <CardHeader Title="Narrative" SubTitle="@RateNarrativeSubtitle" />
-                        <CardContent Content="@RateNarrativeBody" />
-                    </SfCard>
-                </div>
-            </CardContent>
+        <SfCard ID="rates-kpi-delta-card" CssClass="wiley-panel-card wiley-kpi-card">
+            <CardHeader Title="Spread" SubTitle="@RateDeltaDisplay" />
+            <CardContent Content="Positive means the modeled charge sits above break-even; negative means it trails the target." />
         </SfCard>
     </section>
 
-    @* Removed: the plain rates-input-chart-grid and helper paragraph.
-       Replacement: separate Syncfusion workbench cards so editing, save behavior, and comparison analytics all live
-       inside native card surfaces instead of loose div/flex groupings and ad-hoc helper text. *@
-    <section id="rates-workbench-section" class="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
-        <SfCard ID="rates-editor-card" CssClass="wiley-panel-card">
-            <CardHeader Title="Rate Workbench"
-                        SubTitle="Native Syncfusion editing, tooltip guidance, and save feedback replace the former loose helper copy." />
-            <CardContent>
-                @* Syncfusion ProgressBar replaces a passive text-only busy indicator so snapshot saves read as an intentional workflow. *@
-                <SfProgressBar ID="rates-save-progress"
-                               Type="ProgressType.Linear"
-                               IsIndeterminate="@IsSavingSnapshot"
-                               Visible="@IsSavingSnapshot"
-                               Value="100"
-                               Maximum="100"
-                               ShowProgressValue="false"
-                               Height="4px"
-                               TrackColor="transparent"
-                               ProgressColor="#0f6cbd" />
+    <SfCard ID="rates-decision-card" CssClass="wiley-panel-card">
+        <CardHeader Title="Decision Signal"
+                    SubTitle="@RateAlignmentTitle" />
+        <CardContent>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="e-badge @(IsRateAtOrAboveBreakEven ? "e-badge-info" : "e-badge-dark")" role="status">@RateAlignmentBadgeText</span>
+                <span class="text-sm font-medium wiley-text-muted">@BreakEvenCoverageDisplay</span>
+            </div>
+            <p class="mt-3 text-sm wiley-text-muted">@RateNarrativeBody</p>
+        </CardContent>
+    </SfCard>
 
-                <div class="mt-4 space-y-4">
-                    @* Syncfusion NumericTextBox remains the authoritative editor, now tightened with decimal precision,
-                       native formatting, and tooltip-based guidance instead of a raw paragraph beneath the control. *@
-                    <SfTooltip Content="Update the modeled current customer charge. The workspace recomputes comparison visuals as soon as the value changes."
-                               Position="Syncfusion.Blazor.Popups.Position.TopCenter"
-                               OpensOn="Hover Focus"
-                               ShowTipPointer="true"
-                               CloseDelay="200">
-                        <SfNumericTextBox ID="current-rate-input"
-                                          TValue="decimal"
-                                          Value="@CurrentRate"
-                                          Placeholder="Current Rate"
-                                          FloatLabelType="FloatLabelType.Auto"
-                                          ShowSpinButton="false"
-                                          Min="0m"
-                                          Step="0.01m"
-                                          Decimals="2"
-                                          Width="100%"
-                                          Format="C2">
-                            <NumericTextBoxEvents TValue="decimal" ValueChange="OnCurrentRateChanged" />
-                        </SfNumericTextBox>
-                    </SfTooltip>
+    <SfCard ID="rates-editor-card" CssClass="wiley-panel-card wiley-input-section">
+        <CardHeader Title="Rate Workbench"
+                    SubTitle="Edit the modeled current customer charge, then capture a snapshot for council review." />
+        <CardContent>
+            <SfProgressBar ID="rates-save-progress"
+                           Type="ProgressType.Linear"
+                           IsIndeterminate="@IsSavingSnapshot"
+                           Visible="@IsSavingSnapshot"
+                           Value="100"
+                           Maximum="100"
+                           ShowProgressValue="false"
+                           Height="4px"
+                           TrackColor="transparent"
+                           ProgressColor="#0f6cbd" />
 
-                    <SfCard ID="rates-save-card">
-                        <CardHeader Title="Snapshot"
-                                    SubTitle="Capture the current rate posture for audit, council review, and later comparison." />
-                        <CardContent>
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div class="flex items-center gap-2">
-                                    @* The save action stays an SfButton per Syncfusion guidance; the adjacent SfSpinner makes the transition feel deliberate and enterprise-grade without inventing custom loaders. *@
-                                    <SfTooltip Content="Persist the current modeled rate as a workspace snapshot."
-                                               Position="Syncfusion.Blazor.Popups.Position.TopCenter"
-                                               OpensOn="Hover Focus"
-                                               ShowTipPointer="true"
-                                               CloseDelay="200">
-                                        <SfButton CssClass="e-primary"
-                                                  IsPrimary="true"
-                                                  Disabled="@IsSavingSnapshot"
-                                                  OnClick="OnSaveRateSnapshot">
-                                            @(IsSavingSnapshot ? "Saving snapshot..." : "Save rate snapshot")
-                                        </SfButton>
-                                    </SfTooltip>
+            <div class="mt-4 space-y-4">
+                <div class="rates-current-rate-field">
+                    <div class="mb-2 flex items-center gap-2">
+                        <span class="text-sm font-semibold wiley-text-primary">Current Rate</span>
+                        <SfTooltip Content="Update the modeled current customer charge. The workspace recomputes comparison visuals as soon as the value changes."
+                                   Position="Syncfusion.Blazor.Popups.Position.BottomCenter"
+                                   OpensOn="Hover Focus"
+                                   ShowTipPointer="true"
+                                   WindowCollision="true"
+                                   CloseDelay="200">
+                            <span class="e-badge e-badge-info" tabindex="0" role="img" aria-label="Current rate guidance">Help</span>
+                        </SfTooltip>
+                    </div>
 
-                                    <div class="flex h-9 items-center">
-                                        <SfSpinner Visible="@IsSavingSnapshot" Size="18" Label="" Type="SpinnerType.Material" />
-                                    </div>
-                                </div>
-
-                                @* Removed: the non-Syncfusion loose status paragraph.
-                                   Replacement: the status text now lives inside a Syncfusion card workflow alongside ProgressBar and Spinner, so the message reads as part of the save system rather than an orphaned note. *@
-                                <span id="snapshot-save-status" role="status" aria-live="polite" class="text-sm wiley-text-muted">@SnapshotStatusText</span>
-                            </div>
-                        </CardContent>
-                    </SfCard>
+                    <SfNumericTextBox ID="current-rate-input"
+                                      TValue="decimal"
+                                      Value="@CurrentRate"
+                                      Placeholder="Current Rate"
+                                      FloatLabelType="FloatLabelType.Auto"
+                                      ShowSpinButton="false"
+                                      Min="0m"
+                                      Step="0.01m"
+                                      Decimals="2"
+                                      Width="100%"
+                                      Format="C2">
+                        <NumericTextBoxEvents TValue="decimal" ValueChange="OnCurrentRateChanged" />
+                    </SfNumericTextBox>
                 </div>
-            </CardContent>
-        </SfCard>
 
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-2">
+                        <SfTooltip Content="Persist the current modeled rate as a workspace snapshot."
+                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                   OpensOn="Hover Focus"
+                                   ShowTipPointer="true"
+                                   WindowCollision="true"
+                                   CloseDelay="200">
+                            <SfButton CssClass="e-primary"
+                                      IsPrimary="true"
+                                      Disabled="@IsSavingSnapshot"
+                                      OnClick="OnSaveRateSnapshot">
+                                @(IsSavingSnapshot ? "Saving snapshot..." : "Save rate snapshot")
+                            </SfButton>
+                        </SfTooltip>
+
+                        <SfSpinner Visible="@IsSavingSnapshot" Size="18" Label="" Type="SpinnerType.Material" />
+                    </div>
+
+                    <span id="snapshot-save-status" role="status" aria-live="polite" class="text-sm wiley-text-muted">@SnapshotStatusText</span>
+                </div>
+            </div>
+        </CardContent>
+    </SfCard>
+
+    <section id="rates-panel-chart-section">
         <SfCard ID="rates-chart-card" CssClass="wiley-panel-card">
             <CardHeader Title="Rate Comparison"
-                        SubTitle="Production chart settings, built-in accessibility text, animation, and tooltips replace the former raw chart wrapper." />
+                        SubTitle="@ChartInsightTitle" />
             <CardContent>
-                <div class="space-y-4">
-                    <SfCard ID="rates-chart-insight-card">
-                        <CardHeader Title="Comparison Readout"
-                                    SubTitle="@ChartInsightTitle" />
-                        <CardContent Content="@ChartInsightBody" />
-                    </SfCard>
+                <p class="mb-4 text-sm wiley-text-muted">@ChartInsightBody</p>
 
-                    @* Removed: role="img" and aria-label wrappers around the chart.
-                       Replacement: AccessibilityDescription is owned by SfChart itself, which keeps accessibility intent attached to the component actually rendering the data. *@
+                <div class="wiley-chart-viewport--primary">
                     <SfChart ID="rates-comparison-chart"
                              Title="Rate Comparison"
                              AccessibilityDescription="Column chart comparing the current customer rate with the live break-even rate."
                              EnableAnimation="true"
                              UseGroupingSeparator="true"
                              Width="100%"
-                             Height="300px"
+                             Height="100%"
                              Background="transparent"
                              Theme="Syncfusion.Blazor.Theme.Fluent2">
                         <ChartArea>
@@ -187,6 +157,7 @@
             </CardContent>
         </SfCard>
     </section>
+    </div>
 </div>
 
 @code {
@@ -199,8 +170,6 @@
     [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnCurrentRateChanged { get; set; }
     [Parameter] public EventCallback OnSaveRateSnapshot { get; set; }
 
-    @* These derived properties keep the panel visually reactive without introducing a second state source.
-       Everything is recomputed from the authoritative parameter payload pushed by WorkspaceState. *@
     private decimal BreakEvenRate => GetRatePointValue("Break-Even", 0m);
 
     private decimal RateDelta => CurrentRate - BreakEvenRate;
@@ -211,7 +180,7 @@
 
     private string SnapshotStatusText
         => string.IsNullOrWhiteSpace(SnapshotSaveStatus)
-            ? "Ready to capture the current modeled rate as a formal snapshot."
+            ? "Ready to save rate snapshot"
             : SnapshotSaveStatus.Trim();
 
     private string RateAlignmentTitle
@@ -227,11 +196,6 @@
             ? $"{(double)(CurrentRate / BreakEvenRate * 100m):N0}% of break-even covered"
             : "Break-even coverage updates when a target rate is available";
 
-    private string RateNarrativeSubtitle
-        => IsRateAtOrAboveBreakEven
-            ? $"Current pricing is {Math.Abs(RateDelta):C2} above the live target."
-            : $"Current pricing is {Math.Abs(RateDelta):C2} below the live target.";
-
     private string RateNarrativeBody
         => IsRateAtOrAboveBreakEven
             ? "The current modeled charge is producing a positive spread relative to the break-even rate, giving the council room to discuss reserves, reinvestment, or subsidy policy with clearer context."
@@ -243,7 +207,7 @@
             : "Break-even target remains ahead";
 
     private string ChartInsightBody
-        => $"The comparison chart is intentionally compact and high-contrast: animation makes workspace updates feel immediate, built-in chart tooltips preserve precision on hover, and data labels keep the two benchmark values readable even in quick executive walkthroughs. Current spread: {RateDeltaDisplay}.";
+        => $"Built-in chart tooltips preserve precision on hover, and data labels keep the two benchmark values readable during executive walkthroughs. Current spread: {RateDeltaDisplay}.";
 
     private decimal GetRatePointValue(string label, decimal fallbackValue)
     {

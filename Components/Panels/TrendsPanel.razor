@@ -3,7 +3,8 @@
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 
-<div id="trends-panel" class="space-y-4" aria-label="Historical and projected rates trend panel">
+<div id="trends-panel" class="wiley-analytics-panel" aria-label="Historical and projected rates trend panel">
+    <div class="wiley-analytics-panel-scroll space-y-4">
     @if (!ProjectionSeries.Any())
     {
         @* Graceful empty state: renders when no projection data is available yet
@@ -22,20 +23,20 @@
     {
         <section id="trends-summary-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
             <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Trend Summary</p>
-            <div id="trends-kpi-grid" class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <SfCard>
+            <div id="trends-kpi-grid" class="wiley-kpi-strip wiley-kpi-strip--4 mt-3">
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                     <CardHeader Title="Starting Rate" SubTitle="@FirstRateDisplay" />
                     <CardContent Content="First projected period in the active series." />
                 </SfCard>
-                <SfCard>
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                     <CardHeader Title="Ending Rate" SubTitle="@LastRateDisplay" />
                     <CardContent Content="Latest projected period in the active series." />
                 </SfCard>
-                <SfCard>
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                     <CardHeader Title="Horizon" SubTitle="@HorizonDisplay" />
                     <CardContent Content="Number of fiscal periods in the projection line." />
                 </SfCard>
-                <SfCard>
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card">
                     <CardHeader Title="Net Change" SubTitle="@NetChangeDisplay" />
                     <CardContent Content="Difference between ending and starting projected rates." />
                 </SfCard>
@@ -44,46 +45,45 @@
 
         <section id="trends-workbench-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
             <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Projection Workbench</p>
-            <div class="mt-3 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <div id="trends-chart-region" class="trends-chart-viewport rounded-2xl border border-[var(--wiley-border)] p-3" role="img" aria-label="Projected rate trend chart">
-                    @* Theme: Fluent2 aligns the chart palette with the Syncfusion theme loaded app-wide *@
-                    @* ChartLegendSettings: required when the panel is printed or exported as PDF so series are identifiable *@
-                    @* ChartZoomSettings: allows council users to zoom into specific fiscal-year bands for detailed analysis *@
-                    <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%" Theme="Syncfusion.Blazor.Theme.Fluent2">
-                        <ChartArea>
-                            <ChartAreaBorder Width="0"></ChartAreaBorder>
-                        </ChartArea>
-                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
-                            <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
-                        </ChartPrimaryXAxis>
-                        <ChartPrimaryYAxis LabelFormat="C2">
-                            <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
-                        </ChartPrimaryYAxis>
-                        <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top" />
-                        <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="true" EnablePinchZooming="true" />
-                        <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
-                        <ChartSeriesCollection>
-                            <ChartSeries DataSource="@ProjectionSeries" XName="Year" YName="Rate" Type="ChartSeriesType.Line" Name="Projection" Width="3">
-                                <ChartMarker Visible="true" Width="8" Height="8"></ChartMarker>
-                            </ChartSeries>
-                        </ChartSeriesCollection>
-                    </SfChart>
-                </div>
-                <div class="rounded-2xl wiley-surface-panel-secondary p-4">
-                    <p class="text-sm font-semibold wiley-text">Series detail</p>
-                    <ul class="mt-3 space-y-2 text-sm wiley-text-muted">
-                        @foreach (var row in ProjectionSeries)
-                        {
-                            <li class="flex items-center justify-between gap-3 border-b border-[var(--wiley-border)] pb-2 last:border-0">
-                                <span>@row.Year</span>
-                                <span class="font-semibold wiley-text">@row.Rate.ToString("C2")</span>
-                            </li>
-                        }
-                    </ul>
-                </div>
+            <div id="trends-chart-region" class="wiley-chart-viewport--primary mt-3 rounded-2xl border border-[var(--wiley-border)] p-3" role="img" aria-label="Projected rate trend chart">
+                @* Theme: Fluent2 aligns the chart palette with the Syncfusion theme loaded app-wide *@
+                @* ChartLegendSettings: required when the panel is printed or exported as PDF so series are identifiable *@
+                @* ChartZoomSettings: allows council users to zoom into specific fiscal-year bands for detailed analysis *@
+                <SfChart ID="trends-projection-chart" Title="Historical and Projected Rates" AccessibilityDescription="Projected rate trend chart." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="100%" Theme="Syncfusion.Blazor.Theme.Fluent2">
+                    <ChartArea>
+                        <ChartAreaBorder Width="0"></ChartAreaBorder>
+                    </ChartArea>
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" LabelIntersectAction="LabelIntersectAction.Rotate45">
+                        <ChartAxisMajorGridLines Width="0"></ChartAxisMajorGridLines>
+                    </ChartPrimaryXAxis>
+                    <ChartPrimaryYAxis LabelFormat="C2">
+                        <ChartAxisLineStyle Width="0"></ChartAxisLineStyle>
+                    </ChartPrimaryYAxis>
+                    <ChartLegendSettings Visible="true" Position="Syncfusion.Blazor.Charts.LegendPosition.Top" />
+                    <ChartZoomSettings EnableSelectionZooming="true" EnableScrollbar="true" EnablePinchZooming="true" />
+                    <ChartTooltipSettings Enable="true" Shared="false" Format="${point.x}: ${point.y}" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="@ProjectionSeries" XName="Year" YName="Rate" Type="ChartSeriesType.Line" Name="Projection" Width="3">
+                            <ChartMarker Visible="true" Width="8" Height="8"></ChartMarker>
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            </div>
+            <div class="mt-4 rounded-2xl wiley-surface-panel-secondary p-4">
+                <p class="text-sm font-semibold wiley-text">Series detail</p>
+                <ul class="mt-3 space-y-2 text-sm wiley-text-muted">
+                    @foreach (var row in ProjectionSeries)
+                    {
+                        <li class="flex items-center justify-between gap-3 border-b border-[var(--wiley-border)] pb-2 last:border-0">
+                            <span>@row.Year</span>
+                            <span class="font-semibold wiley-text">@row.Rate.ToString("C2")</span>
+                        </li>
+                    }
+                </ul>
             </div>
         </section>
     }
+    </div>
 </div>
 
 @code {

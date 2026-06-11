@@ -4,151 +4,173 @@
 @using Syncfusion.Blazor.DropDowns
 @using Syncfusion.Blazor.Grids
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Navigations
 @using Syncfusion.Blazor.Popups
 @using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 
-<div id="customer-viewer-panel" aria-busy="@IsBusy()" class="space-y-4">
-    <div id="customer-viewer-dashboard" class="space-y-4">
-        <section id="customer-summary-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Summary</p>
-        <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SfCard>
-                <CardHeader Title="Visible Customers" SubTitle="@GetLiveFilteredCustomerCountDisplay()" />
-                <CardContent Content="Live utility-customer rows matching the active customer filters." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Active Accounts" SubTitle="@GetActiveCustomerCountDisplay()" />
-                <CardContent Content="Accounts currently marked Active in the utility-customer directory." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="Customer Type" SubTitle="@GetSelectedCustomerServiceDisplay()" />
-                <CardContent Content="Filter the directory by the persisted customer classification." />
-            </SfCard>
-            <SfCard>
-                <CardHeader Title="City Limits" SubTitle="@GetSelectedCustomerCityLimitsDisplay()" />
-                <CardContent Content="Review inside-versus-outside city service locations at a glance." />
-            </SfCard>
-        </div>
-    </section>
+<div id="customer-viewer-panel" aria-busy="@IsBusy()" class="flex min-h-0 flex-col gap-3">
+    <div id="customer-viewer-dashboard" class="flex min-h-0 flex-1 flex-col gap-3">
+        <section id="customer-summary-panel" class="wiley-surface-panel shrink-0 p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Summary</p>
+            <div id="customer-kpi-grid" class="wiley-kpi-strip wiley-kpi-strip--4 mt-2">
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Visible Customers" SubTitle="@GetLiveFilteredCustomerCountDisplay()" />
+                    <CardContent Content="Live utility-customer rows matching the active customer filters." />
+                </SfCard>
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Active Accounts" SubTitle="@GetActiveCustomerCountDisplay()" />
+                    <CardContent Content="Accounts currently marked Active in the utility-customer directory." />
+                </SfCard>
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="Customer Type" SubTitle="@GetSelectedCustomerServiceDisplay()" />
+                    <CardContent Content="Filter the directory by the persisted customer classification." />
+                </SfCard>
+                <SfCard CssClass="wiley-panel-card wiley-kpi-card min-w-0">
+                    <CardHeader Title="City Limits" SubTitle="@GetSelectedCustomerCityLimitsDisplay()" />
+                    <CardContent Content="Review inside-versus-outside city service locations at a glance." />
+                </SfCard>
+            </div>
+        </section>
 
-    <section id="customer-filters-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Filters</p>
-        <div class="mt-3 grid gap-3 md:grid-cols-3">
-            <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
-            <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@GetCustomerServiceOptions()" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Customer Type" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-            <SfDropDownList ID="customer-city-limits-filter" TValue="string" TItem="string" DataSource="@GetCustomerCityLimitOptions()" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
-        </div>
+        <section id="customer-filters-panel" class="customer-command-band wiley-surface-panel shrink-0 p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Filters</p>
 
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel-secondary px-4 py-3">
-            <div id="customer-directory-status" role="status" aria-live="polite" class="text-sm wiley-text-muted">
+            <div id="customer-filters-row" class="mt-2 grid min-w-0 gap-2 md:grid-cols-3">
+                <SfTextBox ID="customer-search-input" Placeholder="Search live customers" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="SearchTermProxy" />
+                <SfDropDownList ID="customer-service-filter" TValue="string" TItem="string" DataSource="@GetCustomerServiceOptions()" @bind-Value="SelectedCustomerServiceProxy" Placeholder="Customer Type" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                <SfDropDownList ID="customer-city-limits-filter" TValue="string" TItem="string" DataSource="@GetCustomerCityLimitOptions()" @bind-Value="SelectedCustomerCityLimitsProxy" Placeholder="City Limits" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+            </div>
+
+            <SfToolbar ID="customer-directory-toolbar" CssClass="customer-directory-toolbar mt-3" OverflowMode="OverflowMode.Popup" Width="100%">
+                <ToolbarItems>
+                    <ToolbarItem Align="ItemAlign.Left">
+                        <Template>
+                            <SfButton ID="refresh-customer-directory-button" IconCss="e-icons e-refresh" Disabled="@IsBusy()" OnClick="RefreshCustomerDirectoryAsync">Refresh</SfButton>
+                        </Template>
+                    </ToolbarItem>
+                    <ToolbarItem Align="ItemAlign.Left">
+                        <Template>
+                            <SfButton ID="clear-customer-filters-button" Disabled="@IsBusy()" OnClick="ClearFiltersAsync">Clear filters</SfButton>
+                        </Template>
+                    </ToolbarItem>
+                    <ToolbarItem Align="ItemAlign.Left">
+                        <Template>
+                            <SfButton ID="export-customer-grid-excel-button" Disabled="@IsBusy()" OnClick="ExportCustomerDirectoryAsync">Export to Excel</SfButton>
+                        </Template>
+                    </ToolbarItem>
+                    <ToolbarItem Type="ItemType.Spacer" />
+                    <ToolbarItem Align="ItemAlign.Right">
+                        <Template>
+                            <SfButton ID="add-customer-button" CssClass="e-primary" IconCss="e-icons e-plus" IsPrimary="true" Disabled="@IsBusy()" OnClick="BeginCreateCustomer">Add customer</SfButton>
+                        </Template>
+                    </ToolbarItem>
+                </ToolbarItems>
+            </SfToolbar>
+
+            <div id="customer-directory-status" role="status" aria-live="polite" class="mt-2 text-sm wiley-text-muted">
                 <span class="font-semibold wiley-text-muted">Directory status:</span> @GetCustomerDirectoryStatus()
             </div>
-            <div class="flex flex-wrap gap-2">
-                <SfButton ID="refresh-customer-directory-button" IconCss="e-icons e-refresh" Disabled="@IsBusy()" OnClick="RefreshCustomerDirectoryAsync">Refresh</SfButton>
-                <SfButton ID="clear-customer-filters-button" Disabled="@IsBusy()" OnClick="ClearFiltersAsync">Clear filters</SfButton>
-                <SfButton ID="export-customer-grid-excel-button" Disabled="@IsBusy()" OnClick="ExportCustomerDirectoryAsync">Export to Excel</SfButton>
-                <SfButton ID="add-customer-button" CssClass="e-primary" IconCss="e-icons e-plus" IsPrimary="true" Disabled="@IsBusy()" OnClick="BeginCreateCustomer">Add customer</SfButton>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="customer-grid-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Directory</p>
-        @if (isLoadingCustomers)
+        <section id="customer-grid-panel" class="customer-grid-panel wiley-surface-panel flex min-h-0 flex-1 flex-col p-4">
+            <p class="shrink-0 text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Customer Directory</p>
+            @if (isLoadingCustomers)
+            {
+                <div class="customer-grid-loading-host mt-3" aria-busy="true" aria-label="Loading customer directory">
+                    <div class="wiley-panel-spinner-host">
+                        <SfSpinner Visible="true"
+                                   Label="Loading customer directory…"
+                                   Size="36"
+                                   Type="SpinnerType.Material" />
+                    </div>
+                    <div class="mt-2 space-y-2 px-2">
+                        <div class="wiley-skeleton-row"></div>
+                        <div class="wiley-skeleton-row"></div>
+                        <div class="wiley-skeleton-row"></div>
+                        <div class="wiley-skeleton-row"></div>
+                        <div class="wiley-skeleton-row"></div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="workspace-syncfusion-grid-host customer-grid-host mt-3 min-h-0" aria-busy="@IsBusy()">
+                    <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="100%" Width="100%" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v1">
+                        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+                        <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
+                        <GridPageSettings PageSize="10" PageCount="5" />
+                        <GridTemplates>
+                            <EmptyRecordTemplate>
+                                <div class="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--wiley-border)] wiley-surface-panel-secondary px-6 py-10 text-center">
+                                    <div>
+                                        <div class="text-sm font-semibold wiley-text-muted">No utility customers found</div>
+                                        <div class="mt-2 text-sm wiley-text-muted">Use QuickBooks Import to load live records, or add a customer manually to seed this workspace.</div>
+                                    </div>
+                                    <div class="flex flex-wrap justify-center gap-2 text-xs wiley-text-muted">
+                                        <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">QuickBooks Import</span>
+                                        <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">Load sample data</span>
+                                        <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">Add customer</span>
+                                    </div>
+                                </div>
+                            </EmptyRecordTemplate>
+                        </GridTemplates>
+                        <GridColumns>
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.AccountNumber) HeaderText="Account #" Width="125" />
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.DisplayName) HeaderText="Customer" Width="190" />
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.CustomerType) HeaderText="Customer Type" Width="140" />
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.ServiceLocation) HeaderText="Location" Width="150" />
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.Status) HeaderText="Status" Width="110" />
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.CurrentBalance) HeaderText="Balance" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
+                            <GridColumn Field=@nameof(UtilityCustomerRecord.PhoneNumber) HeaderText="Phone" Width="135" />
+                            <GridColumn HeaderText="Actions" Width="180" AllowSorting="false" AllowFiltering="false">
+                                <Template Context="customerContext">
+                                    @{
+                                        var customer = (UtilityCustomerRecord)customerContext;
+                                    }
+                                    <div class="flex flex-wrap gap-2">
+                                        <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
+                                        <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
+                                    </div>
+                                </Template>
+                            </GridColumn>
+                        </GridColumns>
+                    </SfGrid>
+                </div>
+            }
+        </section>
+
+        @if (HasApiFeedback())
         {
-            @* Loading skeleton: shows while the API call resolves on first mount
-               or after a manual refresh.  Prevents a blank grid appearing momentarily. *@
-            <div class="mt-3" aria-busy="true" aria-label="Loading customer directory" style="min-height: 16rem;">
-                <div class="wiley-panel-spinner-host">
-                    <SfSpinner Visible="true"
-                               Label="Loading customer directory…"
-                               Size="36"
-                               Type="SpinnerType.Material" />
-                </div>
-                <div class="mt-2 px-2 space-y-2">
-                    <div class="wiley-skeleton-row"></div>
-                    <div class="wiley-skeleton-row"></div>
-                    <div class="wiley-skeleton-row"></div>
-                    <div class="wiley-skeleton-row"></div>
-                    <div class="wiley-skeleton-row"></div>
-                </div>
+            <div class="shrink-0 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert" aria-live="polite">
+                <div class="font-semibold">@GetCustomerApiError()</div>
+                @if (GetValidationSummaryItems().Count > 0)
+                {
+                    <ul class="mt-2 list-disc space-y-1 pl-5">
+                        @foreach (var validationMessage in GetValidationSummaryItems())
+                        {
+                            <li>@validationMessage</li>
+                        }
+                    </ul>
+                }
             </div>
         }
-        else
-        {
-        <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--tall mt-3 min-h-0" aria-busy="@IsBusy()">
-            @* EnablePersistence: restores sort order, page number, and column widths across browser sessions *@
-            @* AllowFiltering with FilterType.Menu: provides per-column filter menus for council-grade data interrogation *@
-            <SfGrid ID="customer-directory-grid" TValue="UtilityCustomerRecord" DataSource="@GetFilteredCustomers()" AllowPaging="true" AllowSorting="true" AllowTextWrap="true" AllowResizing="true" AllowReordering="true" AllowFiltering="true" EnableHover="true" EnableStickyHeader="true" GridLines="GridLine.Horizontal" ClipMode="ClipMode.EllipsisWithTooltip" Height="100%" EnablePersistence="true" PersistenceKey="wiley.customer-grid.v1">
-                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
-                <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row" Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
-                <GridPageSettings PageSize="10" PageCount="5" />
-                <GridTemplates>
-                    <EmptyRecordTemplate>
-                        <div class="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--wiley-border)] wiley-surface-panel-secondary px-6 py-10 text-center">
-                            <div>
-                                <div class="text-sm font-semibold wiley-text-muted">No utility customers found</div>
-                                <div class="mt-2 text-sm wiley-text-muted">Use QuickBooks Import to load live records, or add a customer manually to seed this workspace.</div>
-                            </div>
-                            <div class="flex flex-wrap justify-center gap-2 text-xs wiley-text-muted">
-                                <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">QuickBooks Import</span>
-                                <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">Load sample data</span>
-                                <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">Add customer</span>
-                            </div>
-                        </div>
-                    </EmptyRecordTemplate>
-                </GridTemplates>
-                <GridColumns>
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.AccountNumber) HeaderText="Account #" Width="125" />
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.DisplayName) HeaderText="Customer" Width="190" />
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.CustomerType) HeaderText="Customer Type" Width="140" />
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.ServiceLocation) HeaderText="Location" Width="150" />
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.Status) HeaderText="Status" Width="110" />
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.CurrentBalance) HeaderText="Balance" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" Width="120" />
-                    <GridColumn Field=@nameof(UtilityCustomerRecord.PhoneNumber) HeaderText="Phone" Width="135" />
-                    <GridColumn HeaderText="Actions" Width="180" AllowSorting="false" AllowFiltering="false">
-                        <Template Context="customerContext">
-                            @{
-                                var customer = (UtilityCustomerRecord)customerContext;
-                            }
-                            <div class="flex flex-wrap gap-2">
-                                <SfButton IconCss="e-icons e-edit" Disabled="@IsBusy()" OnClick="@(() => BeginEditCustomer(customer))">Edit</SfButton>
-                                <SfButton IconCss="e-icons e-trash" Disabled="@IsBusy()" OnClick="@(() => BeginDeleteCustomer(customer))">Delete</SfButton>
-                            </div>
-                        </Template>
-                    </GridColumn>
-                </GridColumns>
-            </SfGrid>
-        </div>
-        } @* end else (not loading) *@
-    </section>
 
-    @if (HasApiFeedback())
-    {
-        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert" aria-live="polite">
-            <div class="font-semibold">@GetCustomerApiError()</div>
-            @if (GetValidationSummaryItems().Count > 0)
-            {
-                <ul class="mt-2 list-disc space-y-1 pl-5">
-                    @foreach (var validationMessage in GetValidationSummaryItems())
-                    {
-                        <li>@validationMessage</li>
-                    }
-                </ul>
-            }
-        </div>
-    }
-
-    <p class="text-xs wiley-text-muted">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
+        <p class="shrink-0 text-xs wiley-text-muted">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
+    </div>
 
     @if (IsEditorDialogOpen())
     {
-        @* ID: exposes the editor dialog for test targeting *@
-        @* Target: scopes the modal overlay to the panel rather than the full viewport *@
-        @* DialogAnimationSettings SlideTop: enterprise-grade entry animation consistent with Syncfusion Fluent2 patterns *@
-        <SfDialog ID="customer-editor-dialog" Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true" Target="#customer-viewer-panel">
+        <SfDialog ID="customer-editor-dialog"
+                  Width="min(48rem, 96vw)"
+                  IsModal="true"
+                  ShowCloseIcon="true"
+                  CloseOnEscape="true"
+                  AllowDragging="true"
+                  AllowPrerender="false"
+                  Visible="true">
             <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="200" />
+            <DialogEvents OnClose="OnEditorDialogClosing" />
             <DialogTemplates>
                 <Header>@GetEditorDialogTitle()</Header>
                 <Content>
@@ -156,91 +178,104 @@
                     {
                         <EditForm EditContext="@GetEditorEditContext()">
                             <DataAnnotationsValidator />
-                            <div class="space-y-4">
+                            <div id="customer-editor-form" class="customer-editor-form">
                                 <ValidationSummary class="text-sm text-rose-700" />
 
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                    <div>
-                                        <SfTextBox ID="customer-editor-account-number" Placeholder="Account number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.AccountNumber" />
-                                        <ValidationMessage For="() => EditorModel.AccountNumber" />
+                                <fieldset class="customer-editor-section">
+                                    <legend class="customer-editor-section-title">Identity</legend>
+                                    <div class="customer-editor-grid">
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-account-number" Placeholder="Account number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.AccountNumber" />
+                                            <ValidationMessage For="() => EditorModel.AccountNumber" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-first-name" Placeholder="First name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.FirstName" />
+                                            <ValidationMessage For="() => EditorModel.FirstName" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-last-name" Placeholder="Last name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.LastName" />
+                                            <ValidationMessage For="() => EditorModel.LastName" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-company-name" Placeholder="Company name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.CompanyName" />
+                                            <ValidationMessage For="() => EditorModel.CompanyName" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <SfTextBox ID="customer-editor-first-name" Placeholder="First name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.FirstName" />
-                                        <ValidationMessage For="() => EditorModel.FirstName" />
-                                    </div>
-                                    <div>
-                                        <SfTextBox ID="customer-editor-last-name" Placeholder="Last name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.LastName" />
-                                        <ValidationMessage For="() => EditorModel.LastName" />
-                                    </div>
-                                    <div>
-                                        <SfTextBox ID="customer-editor-company-name" Placeholder="Company name" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.CompanyName" />
-                                        <ValidationMessage For="() => EditorModel.CompanyName" />
-                                    </div>
-                                </div>
+                                </fieldset>
 
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                    <div>
-                                        <SfDropDownList TValue="CustomerType" TItem="EnumOption<CustomerType>" DataSource="@CustomerTypeOptions" @bind-Value="EditorModel.CustomerType" Placeholder="Customer type" FloatLabelType="FloatLabelType.Auto" Width="100%">
-                                            <DropDownListFieldSettings Text="Text" Value="Value" />
-                                        </SfDropDownList>
+                                <fieldset class="customer-editor-section">
+                                    <legend class="customer-editor-section-title">Classification</legend>
+                                    <div class="customer-editor-grid">
+                                        <div class="customer-editor-field">
+                                            <SfDropDownList ID="customer-editor-customer-type" TValue="CustomerType" TItem="EnumOption<CustomerType>" DataSource="@CustomerTypeOptions" @bind-Value="EditorModel.CustomerType" Placeholder="Customer type" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                                <DropDownListFieldSettings Text="Text" Value="Value" />
+                                            </SfDropDownList>
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfDropDownList ID="customer-editor-service-location" TValue="ServiceLocation" TItem="EnumOption<ServiceLocation>" DataSource="@ServiceLocationOptions" @bind-Value="EditorModel.ServiceLocation" Placeholder="Service location" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                                <DropDownListFieldSettings Text="Text" Value="Value" />
+                                            </SfDropDownList>
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfDropDownList ID="customer-editor-status" TValue="CustomerStatus" TItem="EnumOption<CustomerStatus>" DataSource="@CustomerStatusOptions" @bind-Value="EditorModel.Status" Placeholder="Account status" FloatLabelType="FloatLabelType.Auto" Width="100%">
+                                                <DropDownListFieldSettings Text="Text" Value="Value" />
+                                            </SfDropDownList>
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfDatePicker ID="customer-editor-account-open-date" TValue="DateTime?" Placeholder="Account open date" FloatLabelType="FloatLabelType.Auto" Width="100%" @bind-Value="EditorModel.AccountOpenDate" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <SfDropDownList TValue="ServiceLocation" TItem="EnumOption<ServiceLocation>" DataSource="@ServiceLocationOptions" @bind-Value="EditorModel.ServiceLocation" Placeholder="Service location" FloatLabelType="FloatLabelType.Auto" Width="100%">
-                                            <DropDownListFieldSettings Text="Text" Value="Value" />
-                                        </SfDropDownList>
-                                    </div>
-                                    <div>
-                                        <SfDropDownList TValue="CustomerStatus" TItem="EnumOption<CustomerStatus>" DataSource="@CustomerStatusOptions" @bind-Value="EditorModel.Status" Placeholder="Account status" FloatLabelType="FloatLabelType.Auto" Width="100%">
-                                            <DropDownListFieldSettings Text="Text" Value="Value" />
-                                        </SfDropDownList>
-                                    </div>
-                                    <div>
-                                        <SfDatePicker TValue="DateTime?" Placeholder="Account open date" FloatLabelType="FloatLabelType.Auto" Width="100%" @bind-Value="EditorModel.AccountOpenDate" />
-                                    </div>
-                                </div>
+                                </fieldset>
 
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                    <div class="md:col-span-2 xl:col-span-2">
-                                        <SfTextBox ID="customer-editor-service-address" Placeholder="Service address" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceAddress" />
-                                        <ValidationMessage For="() => EditorModel.ServiceAddress" />
+                                <fieldset class="customer-editor-section">
+                                    <legend class="customer-editor-section-title">Service address</legend>
+                                    <div class="customer-editor-grid">
+                                        <div class="customer-editor-field customer-editor-field--wide">
+                                            <SfTextBox ID="customer-editor-service-address" Placeholder="Service address" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceAddress" />
+                                            <ValidationMessage For="() => EditorModel.ServiceAddress" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-service-city" Placeholder="City" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceCity" />
+                                            <ValidationMessage For="() => EditorModel.ServiceCity" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-service-state" Placeholder="State" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceState" />
+                                            <ValidationMessage For="() => EditorModel.ServiceState" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-service-zip-code" Placeholder="ZIP code" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceZipCode" />
+                                            <ValidationMessage For="() => EditorModel.ServiceZipCode" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <SfTextBox ID="customer-editor-service-city" Placeholder="City" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceCity" />
-                                        <ValidationMessage For="() => EditorModel.ServiceCity" />
-                                    </div>
-                                    <div>
-                                        <SfTextBox ID="customer-editor-service-state" Placeholder="State" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceState" />
-                                        <ValidationMessage For="() => EditorModel.ServiceState" />
-                                    </div>
-                                </div>
+                                </fieldset>
 
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                    <div>
-                                        <SfTextBox ID="customer-editor-service-zip-code" Placeholder="ZIP code" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.ServiceZipCode" />
-                                        <ValidationMessage For="() => EditorModel.ServiceZipCode" />
+                                <fieldset class="customer-editor-section">
+                                    <legend class="customer-editor-section-title">Billing and contact</legend>
+                                    <div class="customer-editor-grid">
+                                        <div class="customer-editor-field">
+                                            <SfNumericTextBox ID="customer-editor-current-balance" TValue="decimal" Placeholder="Current balance" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" ShowSpinButton="false" @bind-Value="EditorModel.CurrentBalance" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-phone-number" Placeholder="Phone number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.PhoneNumber" />
+                                            <ValidationMessage For="() => EditorModel.PhoneNumber" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-email-address" Placeholder="Email address" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.EmailAddress" />
+                                            <ValidationMessage For="() => EditorModel.EmailAddress" />
+                                        </div>
+                                        <div class="customer-editor-field">
+                                            <SfTextBox ID="customer-editor-meter-number" Placeholder="Meter number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.MeterNumber" />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <SfNumericTextBox TValue="decimal" Placeholder="Current balance" FloatLabelType="FloatLabelType.Auto" Width="100%" Format="C2" @bind-Value="EditorModel.CurrentBalance" />
-                                    </div>
-                                    <div>
-                                        <SfTextBox Placeholder="Phone number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.PhoneNumber" />
-                                        <ValidationMessage For="() => EditorModel.PhoneNumber" />
-                                    </div>
-                                    <div>
-                                        <SfTextBox Placeholder="Email address" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.EmailAddress" />
-                                        <ValidationMessage For="() => EditorModel.EmailAddress" />
-                                    </div>
-                                </div>
+                                </fieldset>
 
-                                <div class="grid gap-3 md:grid-cols-2">
-                                    <div>
-                                        <SfTextBox Placeholder="Meter number" FloatLabelType="FloatLabelType.Auto" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.MeterNumber" />
-                                    </div>
-                                    <div>
-                                        <SfTextBox Placeholder="Notes" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.Notes" />
+                                <fieldset class="customer-editor-section">
+                                    <legend class="customer-editor-section-title">Notes</legend>
+                                    <div class="customer-editor-field">
+                                        <SfTextBox ID="customer-editor-notes" Placeholder="Notes" FloatLabelType="FloatLabelType.Auto" Multiline="true" Rows="3" ShowClearButton="true" Width="100%" @bind-Value="EditorModel.Notes" />
                                         <ValidationMessage For="() => EditorModel.Notes" />
                                     </div>
-                                </div>
+                                </fieldset>
                             </div>
                         </EditForm>
                     }
@@ -255,13 +290,18 @@
         </SfDialog>
     }
 
-        @if (IsDeleteDialogOpen() && GetPendingDeleteCustomer() is not null)
-        {
-            @* ID: exposes the delete dialog for test targeting *@
-            @* Target: scopes the confirm overlay to the panel *@
-            @* DialogAnimationSettings Zoom: brief zoom is appropriate for a destructive-action confirm *@
-            <SfDialog ID="customer-delete-dialog" Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true" Target="#customer-viewer-panel">
+    @if (IsDeleteDialogOpen() && GetPendingDeleteCustomer() is not null)
+    {
+        <SfDialog ID="customer-delete-dialog"
+                  Width="28rem"
+                  IsModal="true"
+                  ShowCloseIcon="true"
+                  CloseOnEscape="true"
+                  AllowDragging="false"
+                  AllowPrerender="false"
+                  Visible="true">
             <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="150" />
+            <DialogEvents OnClose="OnDeleteDialogClosing" />
             <DialogTemplates>
                 <Header>Delete Customer</Header>
                 <Content>
@@ -274,7 +314,6 @@
                     </div>
                 </FooterTemplate>
             </DialogTemplates>
-            </SfDialog>
-        }
-    </div>
+        </SfDialog>
+    }
 </div>

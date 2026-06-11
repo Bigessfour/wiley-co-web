@@ -265,7 +265,11 @@
         _layoutContext.SetJarvisOpen(false);
     }
 
-    private void HandleLayoutContextChanged() => _ = InvokeAsync(StateHasChanged);
+    private void HandleLayoutContextChanged() => _ = InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        await PersistLayoutStateAsync();
+    });
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

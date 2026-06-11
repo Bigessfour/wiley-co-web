@@ -91,7 +91,7 @@ public partial class JarvisChatPanel : ComponentBase, IDisposable
     // Always offer a dev-only key manager (local only) for easy access/rotation
     // even after the initial prompt. This completes the "add xai key via jarvis chat window" flow.
     // The server endpoint is guarded to Development only.
-    protected bool ShowDevKeyManager => true; // Always available in the panel for local dev convenience
+    protected bool ShowDevKeyManager => DevKeyManagerExpanded;
 
     // Simple flag to toggle the manager UI (collapsed by default after first use)
     protected bool DevKeyManagerExpanded { get; set; } = false;
