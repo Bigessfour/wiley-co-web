@@ -437,7 +437,7 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
 
             if (overview == null)
             {
-                _logger.LogWarning("No budget entries found for fiscal year {FiscalYear}", fiscalYear);
+                _logger.LogDebug("No budget entries found for fiscal year {FiscalYear} (this is common for pure QB-imported data sets before reference data is seeded).", fiscalYear);
                 return new BudgetOverviewData();
             }
 
@@ -567,7 +567,7 @@ public sealed class BudgetAnalyticsRepository : IBudgetAnalyticsRepository
 
             if (summary == null)
             {
-                _logger.LogWarning("No budget entries found for KPIs in fiscal year {FiscalYear}", fiscalYear);
+                _logger.LogDebug("No budget entries found for KPIs in fiscal year {FiscalYear} (expected until reference data or full budgets are present).", fiscalYear);
                 return new List<SummaryKpi>();
             }
 

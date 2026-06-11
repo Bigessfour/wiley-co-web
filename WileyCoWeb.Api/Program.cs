@@ -215,7 +215,17 @@ public partial class Program
         }
         catch (Exception ex)
         {
-            bootstrapLogger.LogWarning(ex, "Workspace API could not promote persisted AppSettings AI configuration; continuing with environment and secret-based configuration.");
+            // Common in dev after model changes (e.g. overhead % columns like LaborPercent added to AppSettings but DB not migrated).
+            // This is logged prominently so operators see the promotion skipped and fall back to env/secret config (still functional).
+            var isSchemaIssue = ex.Message.Contains("column", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase);
+            if (isSchemaIssue)
+            {
+                bootstrapLogger.LogWarning(ex, "Workspace API AppSettings schema mismatch during AI config promotion (likely new overhead % columns not in this dev DB). Falling back to environment/secret config. Run migrations or reseed if full persisted settings are needed.");
+            }
+            else
+            {
+                bootstrapLogger.LogWarning(ex, "Workspace API could not promote persisted AppSettings AI configuration; continuing with environment and secret-based configuration.");
+            }
         }
     }
 
@@ -363,6 +373,15 @@ public partial class Program
         EnforceXaiApiKeyStartupGuards(builder, bootstrapLogger, effectiveXaiKey);
         var xaiKeyFingerprint = XaiApiKeyGuards.ComputeFingerprint(effectiveXaiKey);
         var xaiKeyLength = string.IsNullOrWhiteSpace(effectiveXaiKey) ? 0 : effectiveXaiKey.Trim().Length;
+
+        // Explicit top-level structured log for the key process at startup so operators can immediately see if live AI / Jarvis is armed or in safe fallback.
+        bootstrapLogger.LogInformation(
+            "Workspace API XAI key resolution complete at startup. XaiKeyResolved={XaiKeyResolved} XaiKeySource={XaiKeySource} XaiKeyPresent={XaiKeyPresent} ApiKeySource={ApiKeySource} SemanticKernelWillBeAvailable={SemanticKernelWillBeAvailable}",
+            !string.IsNullOrWhiteSpace(effectiveXaiKey),
+            xaiKeySource,
+            !string.IsNullOrWhiteSpace(effectiveXaiKey),
+            xaiSecretResolution.ResolvedKeySource ?? "not-found",
+            !string.IsNullOrWhiteSpace(effectiveXaiKey));
 
         return new StartupRuntimeOptions(
             syncfusionLicenseResult,
@@ -907,9 +926,7 @@ public partial class Program
             "XaiConfigNamedKeyPresent={XaiConfigNamedKeyPresent} XaiSecretFetchAttempted={XaiSecretFetchAttempted} " +
             "XaiSecretName={XaiSecretName} XaiAwsRegion={XaiAwsRegion} XaiSecretFetchStatus={XaiSecretFetchStatus} " +
             "XaiSecretFetchErrorCode={XaiSecretFetchErrorCode} XaiSecretFetchErrorMessage={XaiSecretFetchErrorMessage} " +
-            "XaiConfigurationInjected={XaiConfigurationInjected} " +
-            "XaiSsmParameterName={XaiSsmParameterName} XaiSsmFetchAttempted={XaiSsmFetchAttempted} XaiSsmFetchStatus={XaiSsmFetchStatus} " +
-            "XaiSsmFetchErrorCode={XaiSsmFetchErrorCode} XaiSsmFetchErrorMessage={XaiSsmFetchErrorMessage}",
+            "XaiConfigurationInjected={XaiConfigurationInjected}",
             environmentName,
             logData.SyncfusionKeySource,
             logData.SyncfusionKeyPresent,
@@ -928,12 +945,7 @@ public partial class Program
             logData.XaiSecretFetchStatus,
             logData.XaiSecretFetchErrorCode,
             logData.XaiSecretFetchErrorMessage,
-            logData.XaiConfigurationInjected,
-            logData.XaiSsmParameterName,
-            logData.XaiSsmFetchAttempted,
-            logData.XaiSsmFetchStatus,
-            logData.XaiSsmFetchErrorCode,
-            logData.XaiSsmFetchErrorMessage);
+            logData.XaiConfigurationInjected);
     }
 
     private static void LogXaiEndpointResolution(ILogger logger, XaiEndpointResolution resolution, string environmentName)
@@ -980,12 +992,7 @@ public partial class Program
             xaiSecretResolution.SecretFetchStatus,
             xaiSecretResolution.SecretFetchErrorCode,
             TruncateForLog(xaiSecretResolution.SecretFetchErrorMessage),
-            xaiSecretResolution.ConfigurationInjected,
-            xaiSecretResolution.SsmParameterName,
-            xaiSecretResolution.SsmFetchAttempted,
-            xaiSecretResolution.SsmFetchStatus,
-            xaiSecretResolution.SsmFetchErrorCode,
-            TruncateForLog(xaiSecretResolution.SsmFetchErrorMessage));
+            xaiSecretResolution.ConfigurationInjected);
     }
 
     private static string KeyFingerprint(string? key)
@@ -1028,13 +1035,7 @@ public partial class Program
         string XaiSecretFetchStatus,
         string? XaiSecretFetchErrorCode,
         string? XaiSecretFetchErrorMessage,
-        bool XaiConfigurationInjected,
-        // SSM Parameter Store (mirrors Secret* fields; populated on XAI:ParameterName resolution path)
-        string? XaiSsmParameterName,
-        bool XaiSsmFetchAttempted,
-        string XaiSsmFetchStatus,
-        string? XaiSsmFetchErrorCode,
-        string? XaiSsmFetchErrorMessage);
+        bool XaiConfigurationInjected);
 
     private sealed record XaiEndpointResolution(
         bool XaiChatEndpointPresent,

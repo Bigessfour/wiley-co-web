@@ -103,7 +103,7 @@ public sealed class WorkspaceAiKernelProvider : IWorkspaceAiKernelProvider
                 IsApiKeyVisibleToProcess: true,
                 ApiKeySource: apiKeyResolution.ApiKeySource,
                 StatusCode: "available",
-                StatusMessage: "Semantic Kernel initialized successfully.");
+                StatusMessage: "Semantic Kernel initialized successfully. Live Grok/Jarvis is armed for this process.");
         }
         catch (Exception ex)
         {

@@ -44,59 +44,6 @@
                 </EmptyRecordTemplate>
             </GridTemplates>
         </SfGrid>
-    <SfCard ID="apartment-config-grid-card" CssClass="wiley-panel-card">
-        <CardHeader Title="Unit Type Mix"
-                    SubTitle="Use the toolbar to add, edit, or delete apartment unit types. Dialog editing keeps fields readable on smaller screens." />
-        <CardContent>
-            <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-[320px]">
-                <SfGrid ID="apartment-config-grid"
-                        TValue="ApartmentUnitTypeData"
-                        DataSource="@editableUnitTypes"
-                        Toolbar="@ToolbarItems"
-                        Width="100%"
-                        Height="320px"
-                        AllowPaging="true"
-                        AllowSorting="true"
-                        AllowEditing="true"
-                        AllowAdding="true"
-                        AllowDeleting="true"
-                        AllowTextWrap="true"
-                        EnableHover="true"
-                        EnableStickyHeader="true"
-                        GridLines="GridLine.Horizontal"
-                        ClipMode="ClipMode.EllipsisWithTooltip"
-                        EnablePersistence="true"
-                        PersistenceKey="wiley.apartment-config-grid.v1">
-                    <GridEvents TValue="ApartmentUnitTypeData"
-                                OnActionBegin="HandleActionBegin"
-                                OnActionComplete="HandleActionComplete" />
-                    <GridSelectionSettings Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"
-                                           Type="Syncfusion.Blazor.Grids.SelectionType.Single" />
-                    <GridPageSettings PageSize="8" PageCount="4" />
-                    <GridEditSettings AllowAdding="true"
-                                      AllowEditing="true"
-                                      AllowDeleting="true"
-                                      AllowEditOnDblClick="false"
-                                      ShowDeleteConfirmDialog="true"
-                                      Mode="Syncfusion.Blazor.Grids.EditMode.Dialog" />
-                    <GridColumns>
-                        <GridColumn Field="@nameof(ApartmentUnitTypeData.Id)" IsPrimaryKey="true" Visible="false" IsIdentity="false" Width="0" />
-                        <GridColumn Field="@nameof(ApartmentUnitTypeData.Name)" HeaderText="Unit Type" Width="180" />
-                        <GridColumn Field="@nameof(ApartmentUnitTypeData.BedroomCount)" HeaderText="Bedrooms" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
-                        <GridColumn Field="@nameof(ApartmentUnitTypeData.UnitCount)" HeaderText="Units" Width="120" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
-                        <GridColumn Field="@nameof(ApartmentUnitTypeData.MonthlyRent)" HeaderText="Monthly Rent" Format="C2" Width="140" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
-                    </GridColumns>
-                    <GridTemplates>
-                        <EmptyRecordTemplate>
-                            <div class="p-4 text-sm wiley-text-muted">
-                                <p class="font-semibold wiley-text-primary">No unit types defined</p>
-                                <p class="mt-1">Add apartment configurations to model revenue. Use the toolbar above to add your first unit type.</p>
-                            </div>
-                        </EmptyRecordTemplate>
-                    </GridTemplates>
-                </SfGrid>
-            </div>
-        </CardContent>
     </SfCard>
 </section>
 
