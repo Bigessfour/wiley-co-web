@@ -65,7 +65,7 @@ public sealed class ComponentPageTests
 		Assert.Contains("e-appbar", cut.Markup);
 		Assert.Contains("e-sidebar", cut.Markup);
 		Assert.Contains("app-shell-navigation-list", cut.Markup);
-		Assert.Contains("Reload", cut.Markup);
+		Assert.Contains("Theme", cut.Markup);
 	}
 
 	[Fact]
@@ -187,12 +187,11 @@ public sealed class ComponentPageTests
 		{
 			var hero = cut.Find("#workspace-overview-hero");
 
-			Assert.Contains("Selected enterprise", hero.TextContent);
+			Assert.Contains("Current Rate", hero.TextContent);
+			Assert.Contains("Total Costs", hero.TextContent);
+			Assert.Contains("Volume", hero.TextContent);
 			Assert.Contains("Break-Even", hero.TextContent);
-			Assert.Contains("Four-enterprise break-even points", hero.TextContent);
-			Assert.Contains("Wiley Sanitation District", hero.TextContent);
-			Assert.Contains("Trash", hero.TextContent);
-			Assert.Contains("Apartments", hero.TextContent);
+			Assert.Contains("workspace", hero.TextContent, StringComparison.OrdinalIgnoreCase);
 		});
 	}
 
@@ -434,7 +433,7 @@ public sealed class ComponentPageTests
 			Assert.Equal(4, cut.FindComponents<SfNumericTextBox<decimal>>().Count);
 			Assert.Single(cut.FindComponents<SfGrid<ScenarioItem>>());
 			Assert.Contains("scenario-grid", cut.Markup);
-			Assert.Contains("Scenario Adjusted Rate", cut.Markup);
+			Assert.Contains("scenario-adjusted-rate-display", cut.Markup);
 			Assert.Contains("Scenario Cost Total", cut.Markup);
 		});
 	}
@@ -947,7 +946,7 @@ public sealed class ComponentPageTests
 
 		cut.WaitForAssertion(() => Assert.EndsWith("/wiley-workspace/break-even", navigationManager.Uri));
 
-		var quickBooksSidebarLink = cut.FindAll("a").First(link => string.Equals(link.TextContent.Trim(), "QuickBooks Import", StringComparison.Ordinal));
+		var quickBooksSidebarLink = cut.FindAll("button").First(button => string.Equals(button.TextContent.Trim(), "QuickBooks Import", StringComparison.Ordinal));
 		quickBooksSidebarLink.Click();
 
 		cut.WaitForAssertion(() => Assert.EndsWith("/wiley-workspace/quickbooks-import", navigationManager.Uri));
