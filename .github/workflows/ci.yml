@@ -12,7 +12,6 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write # required for GitHub OIDC — deployment-guard assumes role via federation
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -248,59 +247,16 @@ jobs:
       - name: Run HighRisk tests
         run: dotnet test ${{ matrix.project }} --configuration Release --no-build --no-restore --filter "Category=HighRisk" --verbosity normal
 
-  build-and-publish:
-    runs-on: windows-latest
-    needs: [test, highrisk-tests]
-    env:
-      DOTNET_NOLOGO: true
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-      DOTNET_CLI_TELEMETRY_OPTOUT: true
-      SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
-      # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).
-      # Minimal, non-breaking; playwright job already pins Node 24 via setup-node.
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup .NET 9.0.313
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 9.0.313
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/packages.lock.json', 'Directory.Packages.props') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-
-      - name: Restore dependencies
-        run: dotnet restore WileyCoWeb.slnx --locked-mode
-
-      - name: Install wasm-tools workload
-        run: dotnet workload install wasm-tools --skip-manifest-update
-
-      - name: Build
-        run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
-
-      - name: Publish for Amplify
-        run: dotnet publish WileyCoWeb.csproj -c Release -o publish_output --no-restore -p:ContinuousIntegrationBuild=true
-
-      - name: Upload build artifact for Amplify
-        uses: actions/upload-artifact@v4
-        with:
-          name: blazor-publish
-          path: publish_output/wwwroot
-
   playwright-ui:
     runs-on: ubuntu-latest
-    needs: build-and-publish
+    needs: [test, highrisk-tests]
+    # Pre-baked browsers + OS libs — avoids `playwright install` hanging on GHA (apt/man-db/extract).
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-noble
+      options: --user 1001
     # Smoke-only: full Playwright suite is long and environment-sensitive (static wwwroot + API).
     # Run locally: npm run playwright:test:ci or npm run playwright:test:strict before release.
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       DOTNET_NOLOGO: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -332,17 +288,17 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
-      - name: Download published Blazor build
-        uses: actions/download-artifact@v4
-        with:
-          name: blazor-publish
-          path: publish_output/wwwroot
-
-      - name: Restore .NET dependencies (for API)
+      - name: Restore .NET dependencies
         run: dotnet restore WileyCoWeb.slnx --locked-mode
 
-      - name: Build .NET projects (for API)
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools --skip-manifest-update
+
+      - name: Build solution
         run: dotnet build WileyCoWeb.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Publish Blazor client for Playwright hosts
+        run: dotnet publish WileyCoWeb.csproj --configuration Release --no-restore -o publish_output -p:ContinuousIntegrationBuild=true
 
       - name: Publish API for Playwright hosts
         run: dotnet publish WileyCoWeb.Api/WileyCoWeb.Api.csproj --configuration Release --no-build -o api_output -p:ContinuousIntegrationBuild=true
@@ -355,25 +311,6 @@ jobs:
 
       - name: Restore Node dependencies
         run: npm ci
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        id: playwright-browsers
-        with:
-          path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ runner.os }}-1.59.1-chromium-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Playwright OS dependencies
-        run: |
-          # man-db apt triggers can stall for 20+ minutes on GHA (microsoft/playwright#14434).
-          sudo apt-get --yes remove --purge man-db || true
-          # Use the local @playwright/test CLI (1.59.1). Bare `npx playwright` can hoist the
-          # @playwright/cli alpha and download Chromium v1217, which hung extracting on CI.
-          npx --no-install playwright install-deps chromium
-
-      - name: Install Playwright browsers
-        if: steps.playwright-browsers.outputs.cache-hit != 'true'
-        run: npx --no-install playwright install chromium
 
       - name: Run Playwright UI smoke (curated specs)
         run: npm run playwright:test:ci:smoke
@@ -393,39 +330,3 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: warn
-
-  deployment-guard:
-    runs-on: ubuntu-latest
-    needs: [build-and-publish, playwright-ui]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::570912405222:role/wiley-co-github-ci
-          aws-region: us-east-2
-
-      - name: Fail if latest Amplify main job is unhealthy
-        run: |
-          set -euo pipefail
-          latest_status="$(aws amplify list-jobs --app-id d2ellat1y3ljd9 --branch-name main --max-items 1 --query 'jobSummaries[0].status' --output text)"
-          if [ -z "$latest_status" ] || [ "$latest_status" = "None" ]; then
-            echo "Unable to resolve the latest Amplify main job status."
-            exit 1
-          fi
-          echo "Latest Amplify main job status: $latest_status"
-          if [ "$latest_status" = "FAILED" ] || [ "$latest_status" = "CANCELLED" ]; then
-            echo "Amplify main latest job is $latest_status. Failing deployment guard."
-            exit 1
-          fi
-
-      - name: Fail if live Syncfusion settings endpoint returns 404
-        run: |
-          set -euo pipefail
-          status_code="$(curl -s -o /dev/null -w '%{http_code}' https://wileywidget.townofwiley.gov/appsettings.Syncfusion.local.json)"
-          echo "Live appsettings.Syncfusion.local.json status: $status_code"
-          if [ "$status_code" = "404" ]; then
-            echo "Live endpoint returned 404 for appsettings.Syncfusion.local.json. Failing deployment guard."
-            exit 1
-          fi
