@@ -253,7 +253,11 @@ jobs:
     # Pre-baked browsers + OS libs — avoids `playwright install` hanging on GHA (apt/man-db/extract).
     container:
       image: mcr.microsoft.com/playwright:v1.59.1-noble
-      options: --user 1001
+      options: --user root
+    # Run as root so `actions/setup-dotnet` + `dotnet workload install wasm-tools` can create
+    # /usr/share/dotnet (or /root/.dotnet). The pwuser:1001 default from the base image is overridden here.
+    # Headless Playwright tests execute fine as root in this ephemeral CI context (consistent with how
+    # docker-proof runs the baked image by default).
     # Smoke-only: full Playwright suite is long and environment-sensitive (static wwwroot + API).
     # Run locally: npm run playwright:test:ci or npm run playwright:test:strict before release.
     timeout-minutes: 45

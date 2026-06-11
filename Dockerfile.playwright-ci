@@ -1,7 +1,6 @@
 FROM mcr.microsoft.com/playwright:v1.59.1-noble
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    DOTNET_ROOT=/root/.dotnet
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git \
@@ -12,8 +11,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 9.0.313 --channel 9.0 \
-    && ln -sf /root/.dotnet/dotnet /usr/local/bin/dotnet
+# Install .NET to a shared location (not /root) so it is accessible when the container
+# runs as the image's default pwuser:1001 (non-root). Also used by GHA playwright job.
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --version 9.0.313 --channel 9.0 --install-dir /usr/share/dotnet \
+    && ln -sf /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
+    && chmod -R a+rX /usr/share/dotnet
+
+ENV DOTNET_ROOT=/usr/share/dotnet
 
 RUN dotnet workload install wasm-tools --skip-manifest-update
 
@@ -54,5 +58,10 @@ RUN dotnet publish WileyCoWeb.Api/WileyCoWeb.Api.csproj \
     -p:DebugSymbols=false \
     -p:UseAppHost=false \
     -p:ContinuousIntegrationBuild=true
+
+# Chown /workspace so the image's default non-root user (pwuser:1001) can write
+# test reports, results, and other runtime artifacts when the container is run
+# without an explicit --user root override (e.g. local `docker run` via run-playwright-docker-proof.ps1).
+RUN chown -R pwuser:pwuser /workspace || true
 
 CMD ["bash"]
