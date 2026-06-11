@@ -116,6 +116,7 @@ public sealed class UserContextPluginTests
             DateTime.UtcNow,
             Array.Empty<WorkspaceKnowledgeInsight>(),
             new[] { new WorkspaceKnowledgeAction("Raise rates", "Increase rates gradually.", "High") },
-            new[] { new WorkspaceKnowledgeVariance("Chemicals", 1000m, 1200m, 200m, 20m) });
+            new[] { new WorkspaceKnowledgeVariance("Chemicals", 1000m, 1200m, 200m, 20m) },
+            50000m, 4500m, 375m, true, 0m); // Direct, Burden, NetContrib, Holds, Impact (for overhead-aware Jarvis context in plugin tests)
     }
 }

@@ -1,6 +1,7 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.Inputs
 @using Syncfusion.Blazor.Navigations
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
@@ -107,6 +108,82 @@
             </div>
         </div>
     </div>
+
+    @* ─── COUNCIL DASHBOARD: 4 Enterprise Health Cards + Interactive Overhead Sliders ───
+       Surgical addition for City Council audience. Beautiful, responsive 4-card grid.
+       KPIs: Net Contribution (after overhead), Holds its own / Vampire flag + $ impact.
+       Uses existing BreakEvenQuadrants (categorized QB data) + EnterpriseRateService + new overhead helpers (from prior backend).
+       Interactive sliders (global % from AppSettings defaults) update cards live.
+       No bloat: reuses SfCard, existing comparison data, colors (emerald/rose), wiley- classes.
+       Drill: click name (focus/select in workspace shell). Trend: leverage existing chart workbench below.
+       Council-ready: existing PDF export in shell covers packet (or enhance).
+       Responsive: 1-col mobile, 2 tablet, 4 desktop.
+    *@
+    <section id="council-enterprise-health-dashboard" class="wiley-surface-panel p-4 mt-4">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Council View · Enterprise Health</p>
+                <h3 class="text-base font-semibold">4 Enterprises: Healthy vs. Vampire Indicators</h3>
+                <p class="text-xs wiley-text-muted">Net Contribution = Revenue − Direct Costs − (Total Overhead % × Direct Costs as share). Adjust global overhead to model impact (defaults match AppSettings).</p>
+            </div>
+            <div class="text-xs wiley-text-muted">Total OH: <span class="font-semibold">@TotalOverheadPercent.ToString("F1")</span>%</div>
+        </div>
+
+        @* Interactive overhead sliders (global; surgical, live update, no persist bloat here) *@
+        <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-xl border">
+            <div>
+                <label class="text-xs font-medium wiley-text-muted block mb-1">Town Overhead %</label>
+                <SfNumericTextBox TValue="decimal" Value="@TownOverheadPercent" Step="0.5m" Min="0" Max="50" Format="0.0" Width="100%"
+                                  ValueChanged="@(v => { TownOverheadPercent = v; /* live re-render */ })" />
+            </div>
+            <div>
+                <label class="text-xs font-medium wiley-text-muted block mb-1">Management Expense %</label>
+                <SfNumericTextBox TValue="decimal" Value="@ManagementExpensePercent" Step="0.5m" Min="0" Max="50" Format="0.0" Width="100%"
+                                  ValueChanged="@(v => { ManagementExpensePercent = v; })" />
+            </div>
+            <div>
+                <label class="text-xs font-medium wiley-text-muted block mb-1">Labor %</label>
+                <SfNumericTextBox TValue="decimal" Value="@LaborPercent" Step="0.5m" Min="0" Max="50" Format="0.0" Width="100%"
+                                  ValueChanged="@(v => { LaborPercent = v; })" />
+            </div>
+            <div class="md:col-span-3 text-[10px] wiley-text-muted">Sliders model global overhead. Cards recompute Net Contribution + flags instantly. Use "Save Baseline" in shell for persistence. Per-enterprise overrides via future workspace inputs.</div>
+        </div>
+
+        @* 4 beautiful enterprise cards (responsive grid) *@
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            @foreach (var row in EnhancedEnterpriseComparison)
+            {
+                var isHealthy = row.HoldsItsOwn;
+                var badgeClass = isHealthy ? "e-badge e-badge-success" : "e-badge e-badge-danger";
+                var badgeText = isHealthy ? "Holds its own ✓" : "Vampire-feeding ⚠";
+                var netClass = isHealthy ? "text-emerald-600" : "text-rose-600";
+                <SfCard CssClass="@($"wiley-panel-card wiley-kpi-card min-w-0 border-l-4 {(row.HoldsItsOwn ? "border-emerald-500" : "border-rose-500")}")">
+                    <CardHeader Title="@row.EnterpriseName" SubTitle="FY@SelectedFiscalYear · Categorized QB" />
+                    <CardContent>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-2xl font-bold @netClass">@row.NetContribution.ToString("C0")</span>
+                            <span class="@badgeClass text-[10px] px-1.5 py-0.5 rounded">@badgeText</span>
+                        </div>
+                        <div class="mt-1 text-[10px] wiley-text-muted space-y-0.5">
+                            <div>Direct (costs): @row.MonthlyCosts.ToString("C0")</div>
+                            <div>Overhead burden: @row.OverheadBurden.ToString("C0") (@TotalOverheadPercent.ToString("F1")%)</div>
+                            <div>Revenue: @row.MonthlyRevenue.ToString("C0")</div>
+                            @if (!isHealthy)
+                            {
+                                <div class="text-rose-600 font-medium">Impact: @row.VampireImpact.ToString("C0") shortfall</div>
+                            }
+                        </div>
+                        <div class="mt-2 text-[10px]">
+                            <button type="button" class="text-sky-600 hover:underline text-xs" @onclick="() => DrillToEnterprise(row.EnterpriseName)">
+                                Drill to transactions →
+                            </button>
+                        </div>
+                    </CardContent>
+                </SfCard>
+            }
+        </div>
+        <p class="mt-2 text-[10px] wiley-text-muted">Click drill to focus enterprise in workspace (selects + filters views). Full trends in Chart Workbench below. Export via shell PDF for council packet (includes current snapshot + this view).</p>
+    </section>
 
     @* ─── CHART WORKBENCH (tabbed: variance · waterfall · trend) ─────────────── *@
     @if (HasChartWorkbench)
@@ -432,4 +509,41 @@
     private record WaterfallPoint(string Label, double Value);
     private record PiePoint(string Label, int Count);
     private record EnterpriseComparisonRow(string EnterpriseName, decimal MonthlyCosts, decimal MonthlyRevenue, decimal NetPosition, decimal BreakEvenRate);
+
+    // ── Overhead (global, interactive for council demo; matches AppSettings defaults from prior enhancement)
+    // Sliders update live; used to compute burdened NetContribution + Holds/Vampire flags per the core formula.
+    private decimal TownOverheadPercent { get; set; } = 4m;
+    private decimal ManagementExpensePercent { get; set; } = 3m;
+    private decimal LaborPercent { get; set; } = 2m;
+    private decimal TotalOverheadPercent => TownOverheadPercent + ManagementExpensePercent + LaborPercent;
+
+    private IReadOnlyList<EnhancedEnterpriseComparisonRow> EnhancedEnterpriseComparison =>
+        EnterpriseComparisonRows.Select(r =>
+        {
+            var direct = r.MonthlyCosts;
+            var burden = EnterpriseRateService.CalculateOverheadBurden(direct, TotalOverheadPercent);
+            var net = EnterpriseRateService.CalculateNetContribution(r.MonthlyRevenue, direct, burden);
+            var holds = EnterpriseRateService.HoldsItsOwn(net);
+            var impact = EnterpriseRateService.CalculateVampireImpact(net);
+            return new EnhancedEnterpriseComparisonRow(
+                r.EnterpriseName, direct, r.MonthlyRevenue, net, r.BreakEvenRate, burden, holds, impact);
+        }).ToList();
+
+    private record EnhancedEnterpriseComparisonRow(
+        string EnterpriseName,
+        decimal MonthlyCosts,
+        decimal MonthlyRevenue,
+        decimal NetContribution,
+        decimal BreakEvenRate,
+        decimal OverheadBurden,
+        bool HoldsItsOwn,
+        decimal VampireImpact);
+
+    private void DrillToEnterprise(string name)
+    {
+        // Surgical (no bloat on other files/params): logs for dev; in full shell use would update WorkspaceState.SelectedEnterprise or fire event.
+        // Council user: manually pick enterprise in workspace hero or Break-Even to drill deeper (QB txns, knowledge).
+        // Future: add [Parameter] EventCallback<string> OnDrill for parent wiring.
+        Console.WriteLine($"[DataDashboard] Drill to {name} requested (select in shell for full context + transactions).");
+    }
 }

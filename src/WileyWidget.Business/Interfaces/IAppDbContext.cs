@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 using WileyWidget.Models;
 using System;
 

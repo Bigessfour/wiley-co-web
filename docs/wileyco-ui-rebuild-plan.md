@@ -698,7 +698,7 @@ This is the target UI shape the current backend and middle-layer files should fe
 - **Enterprise context rail**: `EnterpriseRepository`, `AppDbContext`, shared enterprise models, and the import lineage tables should drive enterprise selection, fiscal year selection, and active scenario context.
 - **Break-even tile**: `DashboardService`, `AnalyticsService`, `BudgetAnalyticsRepository`, `AnalyticsPipeline`, and the rate-calculation services should feed total cost, projected volume, current rate, break-even rate, and delta.
 - **Scenario planner tile**: `ScenarioSnapshotRepository`, `SavedScenarioSnapshot`, `BudgetRepository`, and the scenario engine should drive add-cost items, compare-before/after views, and save/load actions.
-- **Customer viewer tile**: `AmplifySchemaEntities`, `AppDbContext`, and the customer-focused repository layer should provide light customer records only, with filters for enterprise, search, and city-limits flags.
+- **Customer viewer tile**: `ImportSchemaEntities` (formerly AmplifySchemaEntities), `AppDbContext`, and the customer-focused repository layer should provide light customer records only, with filters for enterprise, search, and city-limits flags.
 - **Trends and projections tile**: `BudgetAnalyticsRepository`, `TownOfWileyBudget2026`, `MonthlyRevenue`-style models, and projection services should provide historical and forward-looking series for charts.
 - **Rates tile**: `DashboardService`, manual rate input state, and scenario comparison models should keep current rate, recommended rate, and visual comparison in sync.
 - **AI chat rail**: `ChatBridgeService`, `SemanticSearchService`, `XAIService`, and the AI context/logging services should provide explainable rate summaries and scenario answers.

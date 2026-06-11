@@ -5,7 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using WileyWidget.Data;
 using WileyWidget.Models;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 using WileyWidget.Services.Abstractions;
 
 namespace WileyWidget.Services;

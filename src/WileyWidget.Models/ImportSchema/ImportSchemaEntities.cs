@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace WileyWidget.Models.Amplify;
+namespace WileyWidget.Models.ImportSchema;
 
 [Table("import_batches")]
 public class ImportBatch

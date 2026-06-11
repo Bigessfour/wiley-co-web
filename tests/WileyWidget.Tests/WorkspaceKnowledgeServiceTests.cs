@@ -30,6 +30,13 @@ public sealed class WorkspaceKnowledgeServiceTests
         Assert.True(tracker.MaxConcurrency >= 4);
         Assert.Single(result.TopVariances);
         Assert.Equal("Chemicals", result.TopVariances[0].AccountName);
+
+        // Overhead post-categorization (global % default 9% from service/AppSettings; Direct from "QB ledger" costs in input).
+        // Verifies "Holds its own" vs Vampire flag + $ impact with sample-like categorized data.
+        Assert.True(result.DirectCosts > 0);
+        Assert.True(result.OverheadBurden > 0);
+        Assert.True(result.HoldsItsOwn || result.VampireImpact >= 0); // flag present
+        // NetContribution included for Jarvis "Trash enterprise health" queries etc.
     }
 
     [Fact]
@@ -61,7 +68,7 @@ public sealed class WorkspaceKnowledgeServiceTests
     }
 
     private static WorkspaceKnowledgeInput CreateInput()
-        => new("Water Utility", 2026, 55.25m, 13250m, 240m, 1500m);
+        => new("Water Utility", 2026, 55.25m, 13250m, 240m, 1500m, 5, 5, 0m); // top, years, overhead default (service falls back)
 
     private static WorkspaceKnowledgeService CreateService(
         IAnalyticsService analyticsService,

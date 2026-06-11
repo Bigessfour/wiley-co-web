@@ -920,7 +920,8 @@ public sealed class WorkspaceAiAssistantServiceTests
                 DateTime.UtcNow,
                 [new WorkspaceKnowledgeInsight("Adjusted gap", "$9.14", "Current rate remains below the adjusted break-even target.")],
                 [new WorkspaceKnowledgeAction("Close the gap", "Increase the rate or lower modeled costs.", "High")],
-                [new WorkspaceKnowledgeVariance("Chemicals", 10000m, 12500m, 2500m, 25m)]);
+                [new WorkspaceKnowledgeVariance("Chemicals", 10000m, 12500m, 2500m, 25m)],
+                98000m, 8820m, 34000m, true, 0m); // Direct, OverheadBurden (9%), NetContrib (mock), HoldsOwn, VampireImpact (post-overhead for Jarvis health queries)
         }
     }
 

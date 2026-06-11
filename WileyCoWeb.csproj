@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RuntimeFrameworkVersion>9.0.14</RuntimeFrameworkVersion>
     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
-    <!-- Client-side XlsIO/PDF exports require full Syncfusion document assemblies in Release (Amplify publish). -->
+    <!-- Client-side XlsIO/PDF exports require full Syncfusion document assemblies in Release. -->
     <PublishTrimmed>false</PublishTrimmed>
     <BlazorWebAssemblyEnableLinking>false</BlazorWebAssemblyEnableLinking>
     <UserSecretsId>f6ce628b-59d0-4238-ad1f-5b6f977fd5b9</UserSecretsId>

@@ -114,4 +114,32 @@ public sealed class EnterpriseRateServiceTests
         Assert.Equal(0m, adj);
         Assert.Equal(5m, EnterpriseRateService.CalculateRateDelta(5m, 0m)); // current - be
     }
+
+    // Overhead / net contribution (post-categorization, for "holds its own" vs "vampire" per mission).
+    // Deterministic, currency-rounded. "Enterprise Share" base = direct costs.
+    [Fact]
+    [Trait("Category", "HighRisk")]
+    public void CalculateOverheadAndNetContribution_Basic()
+    {
+        decimal revenue = 10000m, direct = 4000m, town = 5, mgmt = 3, labor = 2;
+        var totalOh = EnterpriseRateService.CalculateTotalOverheadPercent(town, mgmt, labor);
+        Assert.Equal(10m, totalOh);
+        var burden = EnterpriseRateService.CalculateOverheadBurden(direct, totalOh);
+        Assert.Equal(400m, burden); // 4k * 0.1
+        var net = EnterpriseRateService.CalculateNetContribution(revenue, direct, burden);
+        Assert.True(net > 0); // holds after overhead
+    }
+
+    [Fact]
+    [Trait("Category", "HighRisk")]
+    public void NetContribution_HoldsItsOwn_Vs_Vampire_FlagAndImpact()
+    {
+        var netPositive = EnterpriseRateService.CalculateNetContribution(12000m, 5000m, 300m);
+        Assert.True(EnterpriseRateService.HoldsItsOwn(netPositive));
+        Assert.Equal(0m, EnterpriseRateService.CalculateVampireImpact(netPositive));
+
+        var netNegative = EnterpriseRateService.CalculateNetContribution(4000m, 5000m, 300m);
+        Assert.False(EnterpriseRateService.HoldsItsOwn(netNegative));
+        Assert.Equal(1300m, EnterpriseRateService.CalculateVampireImpact(netNegative)); // shortfall after overhead
+    }
 }

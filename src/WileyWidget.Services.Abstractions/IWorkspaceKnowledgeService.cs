@@ -20,7 +20,10 @@ public sealed record WorkspaceKnowledgeInput(
     decimal ProjectedVolume,
     decimal ScenarioCostTotal = 0m,
     int TopVarianceCount = 5,
-    int ForecastYears = 5);
+    int ForecastYears = 5,
+    // Global or per-enterprise overhead % (Town + mgmt + labor). From AppSettings or override.
+    // Applied as: NetContribution = Revenue - DirectCosts - (OverheadPercent * DirectCosts / 100)
+    decimal OverheadPercent = 0m);
 
 public sealed record WorkspaceKnowledgeInsight(
     string Label,
@@ -62,7 +65,15 @@ public sealed record WorkspaceKnowledgeResult(
     DateTime GeneratedAtUtc,
     IReadOnlyList<WorkspaceKnowledgeInsight> Insights,
     IReadOnlyList<WorkspaceKnowledgeAction> RecommendedActions,
-    IReadOnlyList<WorkspaceKnowledgeVariance> TopVariances);
+    IReadOnlyList<WorkspaceKnowledgeVariance> TopVariances,
+    // Overhead-adjusted (post-categorization, using global % from AppSettings or per override in input).
+    // DirectCosts = TotalCosts (from categorized ledger). Enterprise Share base = DirectCosts.
+    // NetContribution = Revenue - DirectCosts - (OverheadPercent * DirectCosts / 100)
+    decimal DirectCosts,
+    decimal OverheadBurden,
+    decimal NetContribution,
+    bool HoldsItsOwn,
+    decimal VampireImpact);
 
 public sealed class WorkspaceKnowledgeNotFoundException : InvalidOperationException
 {

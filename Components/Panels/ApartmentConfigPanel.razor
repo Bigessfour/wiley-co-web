@@ -28,13 +28,13 @@
         <CardHeader Title="Unit Type Mix"
                     SubTitle="Use the toolbar to add, edit, or delete apartment unit types. Dialog editing keeps fields readable on smaller screens." />
         <CardContent>
-            <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-0">
+            <div class="workspace-syncfusion-grid-host workspace-syncfusion-grid-host--compact min-h-[320px]">
                 <SfGrid ID="apartment-config-grid"
                         TValue="ApartmentUnitTypeData"
                         DataSource="@editableUnitTypes"
                         Toolbar="@ToolbarItems"
                         Width="100%"
-                        Height="100%"
+                        Height="320px"
                         AllowPaging="true"
                         AllowSorting="true"
                         AllowEditing="true"

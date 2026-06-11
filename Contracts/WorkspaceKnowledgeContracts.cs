@@ -45,4 +45,10 @@ public sealed record WorkspaceKnowledgeResponse(
     string GeneratedAtUtc,
     IReadOnlyList<WorkspaceKnowledgeInsightResponse> Insights,
     IReadOnlyList<WorkspaceKnowledgeActionResponse> RecommendedActions,
-    IReadOnlyList<WorkspaceKnowledgeVarianceResponse> TopVariances);
+    IReadOnlyList<WorkspaceKnowledgeVarianceResponse> TopVariances,
+    // Overhead post-categorization fields (global % from AppSettings or per input; Direct = categorized ledger costs).
+    decimal DirectCosts,
+    decimal OverheadBurden,
+    decimal NetContribution,
+    bool HoldsItsOwn,
+    decimal VampireImpact);

@@ -4,7 +4,8 @@ This file applies to **Grok CLI**, **Cursor**, and any other coding agent workin
 
 ## What this project is
 
-- **Blazor WebAssembly client** (`WileyCoWeb.csproj`) + **ASP.NET Core API** (`WileyCoWeb.Api/`) on AWS (Amplify + App Runner + Aurora PostgreSQL).
+- **Blazor WebAssembly client** (`WileyCoWeb.csproj`) + **ASP.NET Core API** (`WileyCoWeb.Api/`) — pure local .NET stack only.
+- Local dev: `http://localhost:5230` (client) + `http://localhost:5231` (API) via `start-local.sh` + `docker-compose.dev.yml` (postgres:16-alpine). No cloud, no Amplify, no App Runner, no Aurora, no AWS anywhere in runtime or deployment.
 - **Not** a WinForms desktop app. Do not assume desktop UI patterns.
 - Solution entry: `WileyCoWeb.slnx`. Shared domain libraries under `src/WileyWidget.*`.
 - Council-facing municipal finance / utility rate studies for the **Town of Wiley**.
@@ -14,6 +15,7 @@ This file applies to **Grok CLI**, **Cursor**, and any other coding agent workin
 - **.NET SDK 9.0.313** — see `global.json` (`rollForward: disable`). Do not bump SDK without updating CI and Dockerfiles.
 - **Syncfusion Blazor 33.x** — license required for builds; see `README.md`.
 - Local dev: client `http://localhost:5230`, API `http://localhost:5231`.
+- MCP tools (github, chrome-devtools via Scripts/start-chrome-debug.sh + ui-audit, @syncfusion/blazor-assistant via Scripts/mcp-sf-blazor-assistant.sh, playwright-mcp, mermaid) are approved for audits, control param inspection, verification, and exploration. They complement (do not replace) file reads, grep, builds, and Playwright E2E.
 
 ## Non-negotiable principles
 
@@ -35,6 +37,29 @@ These differ from older council briefs — **keep the repo version**:
 | Rate math                  | Static `EnterpriseRateService` in `src/WileyWidget.Abstractions/`. No `growthRate` parameter in current domain model. `RateCalculator.cs` is a thin forwarder only. |
 | Jarvis                     | Routes under `/api/ai/*` (health alias: `/api/jarvis/health`). Response uses `latestUsedFallback`, not `usedFallback`.                                              |
 | Playwright helpers         | `gotoWorkspacePanel` from `tests/playwright/support/workspace.ts` — not `workspaceLogin`.                                                                           |
+
+## RAG for Agents (mandatory — prevents drift)
+
+**Before any non-trivial planning, code change, review, or architectural decision, you MUST query the local RAG first** to retrieve relevant context from AGENTS.md (this file), canonical implementations, core loop code (QuickBooks import → routing/categorize/allocate overhead → EnterpriseRateService + WorkspaceKnowledge net/vampire analysis → DataDashboard/BreakEven/Rates viz → Jarvis), and supporting docs/specs.
+
+1. Run (from repo root):
+   ```bash
+   python -m Scripts.rag.query "your question + AGENTS.md rules + canonicals"   # or use Scripts/rag/rag.sh query "..."
+   # Examples:
+   # python -m Scripts.rag.query "AGENTS.md canonical implementations and prohibited changes"
+   # python -m Scripts.rag.query "How is overhead applied? EnterpriseRateService + AppSettings + DataDashboard sliders"
+   # python -m Scripts.rag.query "QuickBooks duplicate guard + routing to the exact 4 enterprises"
+   # python -m Scripts.rag.query "Jarvis grounding via WorkspaceKnowledgeService (DirectCosts, OverheadBurden, NetContribution, HoldsItsOwn, VampireImpact)"
+   ```
+2. Incorporate the returned chunks (they include source paths) into your reasoning.
+3. Cite them explicitly (e.g. "Per AGENTS.md:36 and EnterpriseRateService.cs:XX...").
+4. Still use your native tools (read_file, grep, list_dir, terminal builds/tests, Playwright) for precise implementation details and verification. RAG is retrieval augmentation, not a replacement.
+
+The index lives in `.rag-index/` (gitignored; rebuild with `python Scripts/rag/index.py` or `Scripts/rag/rag.sh index` after big changes/culls/docs updates).
+
+See `docs/rag-for-agents.md` for the full process, chunking rationale (structure-aware + recursive, governing docs prioritized), and research notes (hybrid agentic + vector; Chroma + local embeddings).
+
+This is the mechanism to keep the repo true to its established methods (post-cull local-only core loop, surgical changes, HighRisk gates, etc.).
 
 ## Where to work
 
