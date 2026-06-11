@@ -1,4 +1,4 @@
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 
 namespace WileyCoWeb.IntegrationTests.Infrastructure;
 

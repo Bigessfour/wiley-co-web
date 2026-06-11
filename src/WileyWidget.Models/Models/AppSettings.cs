@@ -99,4 +99,11 @@ public class AppSettings
     public DateTime? LastReportEndDate { get; set; }
     public bool IncludeChartsInReports { get; set; } = true;
     public int LastSelectedEnterpriseId { get; set; }
+
+    // Global overhead configuration (Town management + labor). Stored in DB via AppSettings.
+    // Applied after categorization to compute full burdened costs and "holds its own" vs "vampire" analysis.
+    // Per-enterprise can override via call-site input; global default here.
+    public decimal TownOverheadPercent { get; set; } = 4.0m;
+    public decimal ManagementExpensePercent { get; set; } = 3.0m;
+    public decimal LaborPercent { get; set; } = 2.0m;
 }

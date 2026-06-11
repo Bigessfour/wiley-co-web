@@ -62,4 +62,27 @@ public static class EnterpriseRateService
     {
         return Math.Round(monthlyRevenue - totalCosts, 2, MidpointRounding.AwayFromZero);
     }
+
+    // Overhead application (post-categorization, per core mission).
+    // Global % (Town + management + labor) stored in AppSettings (or per via input).
+    // Enterprise Share base = direct costs (standard absorption). Net Contribution = Revenue - Direct - (oh% * Direct).
+    // Deterministic, round to 2 decimals for currency impact. Testable (see EnterpriseRateServiceTests).
+    public static decimal CalculateTotalOverheadPercent(decimal townPercent, decimal managementPercent, decimal laborPercent)
+        => townPercent + managementPercent + laborPercent;
+
+    public static decimal CalculateOverheadBurden(decimal directCosts, decimal totalOverheadPercent)
+    {
+        if (directCosts <= 0) return 0m;
+        return Math.Round(directCosts * (totalOverheadPercent / 100m), 2, MidpointRounding.AwayFromZero);
+    }
+
+    public static decimal CalculateNetContribution(decimal revenue, decimal directCosts, decimal overheadBurden)
+    {
+        return Math.Round(revenue - directCosts - overheadBurden, 2, MidpointRounding.AwayFromZero);
+    }
+
+    public static bool HoldsItsOwn(decimal netContribution) => netContribution >= 0m;
+
+    public static decimal CalculateVampireImpact(decimal netContribution)
+        => netContribution >= 0m ? 0m : Math.Abs(netContribution);
 }

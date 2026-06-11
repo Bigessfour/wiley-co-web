@@ -9,9 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.SecretsManager" />
-    <PackageReference Include="AWSSDK.SimpleSystemsManagement" />
-    <PackageReference Include="AWSXRayRecorder.Handlers.AspNetCore" />
+    <!-- AWS packages removed during lean cull (pure local stack; no cloud secrets/observability) -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <ProjectReference Include="..\src\WileyWidget.Data\WileyWidget.Data.csproj" />

@@ -76,6 +76,9 @@ test-results/
 .playwright/
 .playwright-mcp/
 logs/
+
+# RAG index for agents (local Chroma persistent store — rebuild as needed)
+.rag-index/
 jarvis-*.json
 playwright-live-*.json
 CRAP-Analysis-Report.md

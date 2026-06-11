@@ -5,7 +5,7 @@ using WileyCoWeb.Contracts;
 using WileyWidget.Abstractions;
 using WileyWidget.Data;
 using WileyWidget.Models;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 using WileyWidget.Services.Abstractions;
 
 namespace WileyCoWeb.Api;

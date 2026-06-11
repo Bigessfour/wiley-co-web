@@ -2,33 +2,6 @@
   "version": 2,
   "dependencies": {
     "net9.0": {
-      "AWSSDK.SecretsManager": {
-        "type": "Direct",
-        "requested": "[4.0.4.16, )",
-        "resolved": "4.0.4.16",
-        "contentHash": "SEDD9H08cRWMBZFuNFOURKmGh7fanbvsakba4vXrn0Vu3rtIR2e/Dm+46NOz/YWqeYgKptkpaQVT9TwEW4e9ng==",
-        "dependencies": {
-          "AWSSDK.Core": "[4.0.3.28, 5.0.0)"
-        }
-      },
-      "AWSSDK.SimpleSystemsManagement": {
-        "type": "Direct",
-        "requested": "[4.0.4.16, )",
-        "resolved": "4.0.5",
-        "contentHash": "WwPSpUPe2HGBMks0NZ45yTP5FgErGHKGCO4Vuf7tdzOh25i2e0K5DL6Yt8gCAkaQiBK54siA07afZfxPLCTXxg==",
-        "dependencies": {
-          "AWSSDK.Core": "[4.0.1.1, 5.0.0)"
-        }
-      },
-      "AWSXRayRecorder.Handlers.AspNetCore": {
-        "type": "Direct",
-        "requested": "[2.13.0, )",
-        "resolved": "2.13.0",
-        "contentHash": "s9w1xopeNQszV8Jj6SQrP3KspequT6D4upQerU935x5dwOGHydrJp5ArIqJ5IbFFkKqfb59GwBbWEqjO+3MBQQ==",
-        "dependencies": {
-          "AWSXRayRecorder.Core": "2.16.0"
-        }
-      },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
         "type": "Direct",
         "requested": "[9.0.14, )",
@@ -57,31 +30,6 @@
           "Microsoft.Extensions.Logging": "9.0.4",
           "Mono.TextTemplating": "3.0.0",
           "System.Text.Json": "9.0.4"
-        }
-      },
-      "Amazon.Lambda.Core": {
-        "type": "Transitive",
-        "resolved": "2.8.0",
-        "contentHash": "mZnqCrLuNvB9T9/bCIcu/7H8HWd3yi6sEDzRE76D9ym06D+CoEfJ/EG4w7FucclvpSXO7ui/MKpzqhEnR2FAVg=="
-      },
-      "Amazon.Lambda.SQSEvents": {
-        "type": "Transitive",
-        "resolved": "2.1.0",
-        "contentHash": "a1xaCIuXDleJ8iRE3vHWWhtPqUiURmoQUS68INMEQmtfHr4wTz837TQZONo4cyubv5sZj78DDrYessZEzgFRGQ=="
-      },
-      "AWSSDK.Core": {
-        "type": "Transitive",
-        "resolved": "4.0.3.28",
-        "contentHash": "OKvL+4Z/SFpOo7lbDbsT7bgcZY03fZkIQNFVV5LDZAt9hVhpX9z1Xn2MsGKSpXo4hwxXeiINv2j5Bb4n1KrVaQ=="
-      },
-      "AWSXRayRecorder.Core": {
-        "type": "Transitive",
-        "resolved": "2.16.0",
-        "contentHash": "I4BMYX4Fs7SiDHtvKoS/TsRUp2flCrfotJOsYRvvn4+gU1wPjD6LEHkIiLNDSwS9Vbh2784dxeWfdAG7oct5MQ==",
-        "dependencies": {
-          "AWSSDK.Core": "3.3.25.1",
-          "Amazon.Lambda.Core": "2.8.0",
-          "Amazon.Lambda.SQSEvents": "2.1.0"
         }
       },
       "Azure.AI.OpenAI": {

@@ -252,7 +252,6 @@
                             <p class="text-xs font-medium @adequacyCss">@adequacyLabel</p>
                             <p class="text-[10px] wiley-text-muted">@adequacy.ToString("N0")% of break-even covered</p>
                         </div>
-
                         
                         <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2">
                             <SfChart ID="@GetQuadrantChartId(quadrant)"
@@ -309,6 +308,15 @@
                                 </ChartSeriesCollection>
                             </SfChart>
                         </div>
+        <SfAccordion ID="break-even-apartment-accordion" ExpandMode="ExpandMode.Single" LoadOnDemand="false">
+            <AccordionItems>
+                <AccordionItem Header="Apartment Configuration" Expanded="true" CssClass="break-even-apartment-item">
+                    <ContentTemplate>
+                        <ApartmentConfigPanel UnitTypes="@ApartmentUnitTypes" OnUnitTypesChanged="OnApartmentUnitTypesChanged" />
+                    </ContentTemplate>
+                </AccordionItem>
+            </AccordionItems>
+        </SfAccordion>
 
                     </div>
                 </section>

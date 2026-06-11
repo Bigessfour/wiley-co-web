@@ -6,11 +6,6 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Amazon;
-using Amazon.SecretsManager;
-using Amazon.SecretsManager.Model;
-using Amazon.XRay.Recorder.Core;
-using Amazon.XRay.Recorder.Handlers.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +21,7 @@ using WileyCoWeb.Contracts;
 using WileyWidget.Data;
 using WileyWidget.Business.Interfaces;
 using WileyWidget.Models;
-using WileyWidget.Models.Amplify;
+using WileyWidget.Models.ImportSchema;
 using WileyWidget.Services;
 using WileyWidget.Services.Abstractions;
 using WileyWidget.Services.Telemetry;
@@ -98,7 +93,7 @@ public partial class Program
                 builder.Environment.ApplicationName,
                 Environment.CurrentDirectory);
 
-            TracingBootstrapper.InitializeTracing(builder);
+            // TracingBootstrapper.InitializeTracing(builder); // AWS XRay removed (lean local)
 
             var startupOptions = await PrepareStartupRuntimeOptionsAsync(builder, bootstrapLogger).ConfigureAwait(false);
 
@@ -735,7 +730,7 @@ public partial class Program
             }
         });
 
-        app.UseXRay("WileyCoWeb.Api");
+        // app.UseXRay // removed("WileyCoWeb.Api");
         app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
         app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
@@ -2150,7 +2145,8 @@ public partial class Program
             snapshot.ProjectedVolume ?? 0m,
             snapshot.ScenarioItems?.Sum(item => item.Cost) ?? 0m,
             Math.Clamp(request.TopVarianceCount, 1, 20),
-            Math.Clamp(request.ForecastYears, 1, 10));
+            Math.Clamp(request.ForecastYears, 1, 10),
+            0m); // OverheadPercent: 0 = use service default (9% matching AppSettings global Town+Mgmt+Labor). Per-enterprise override possible via extended callers.
     }
 
     private static UtilityCustomerRecord ToUtilityCustomerRecord(UtilityCustomer customer)
@@ -2952,7 +2948,12 @@ public partial class Program
                 knowledge.GeneratedAtUtc.ToString("O"),
             knowledge.Insights.Select(item => new WorkspaceKnowledgeInsightResponse(item.Label, item.Value, item.Description)).ToArray(),
             knowledge.RecommendedActions.Select(item => new WorkspaceKnowledgeActionResponse(item.Title, item.Description, item.Priority)).ToArray(),
-            knowledge.TopVariances.Select(item => new WorkspaceKnowledgeVarianceResponse(item.AccountName, item.BudgetedAmount, item.ActualAmount, item.VarianceAmount, item.VariancePercentage)).ToArray());
+            knowledge.TopVariances.Select(item => new WorkspaceKnowledgeVarianceResponse(item.AccountName, item.BudgetedAmount, item.ActualAmount, item.VarianceAmount, item.VariancePercentage)).ToArray(),
+            knowledge.DirectCosts,
+            knowledge.OverheadBurden,
+            knowledge.NetContribution,
+            knowledge.HoldsItsOwn,
+            knowledge.VampireImpact);
     }
 
     private static string? ExtractDescription(string notes)
