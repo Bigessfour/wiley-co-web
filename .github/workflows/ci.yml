@@ -356,8 +356,24 @@ jobs:
       - name: Restore Node dependencies
         run: npm ci
 
-      - name: Install Playwright browsers + Linux deps
-        run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-1.59.1-chromium-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright OS dependencies
+        run: |
+          # man-db apt triggers can stall for 20+ minutes on GHA (microsoft/playwright#14434).
+          sudo apt-get --yes remove --purge man-db || true
+          # Use the local @playwright/test CLI (1.59.1). Bare `npx playwright` can hoist the
+          # @playwright/cli alpha and download Chromium v1217, which hung extracting on CI.
+          npx --no-install playwright install-deps chromium
+
+      - name: Install Playwright browsers
+        if: steps.playwright-browsers.outputs.cache-hit != 'true'
+        run: npx --no-install playwright install chromium
 
       - name: Run Playwright UI smoke (curated specs)
         run: npm run playwright:test:ci:smoke
