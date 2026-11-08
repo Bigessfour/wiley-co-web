@@ -164,6 +164,12 @@ public sealed class GlobalExceptionHandlerTests : IClassFixture<ApiApplicationFa
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/workspace/debt-coverage", new { SelectedEnterprise = "Water Utility", SelectedFiscalYear = 2026 })).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/workspace/capital-gap", new { SelectedEnterprise = "Water Utility", SelectedFiscalYear = 2026 })).StatusCode);
 
+        // Shared-contracts reference-data ingest/read
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/reference-data/actuals")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/reference-data/events")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/reference-data/actuals", new { enterpriseId = "tow-water-utility", period = "2026-10", amountsBasis = "fy-ytd", income = 1, expenses = 1, cashBalance = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/reference-data/events", new[] { new { source = "council-packet", type = "check", date = "2026-10-06", amount = 1, description = "x", metadata = new { enterpriseId = "tow-water-utility" } } })).StatusCode);
+
         // Health stays anonymous for ops probes
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/ai/health")).StatusCode);
     }

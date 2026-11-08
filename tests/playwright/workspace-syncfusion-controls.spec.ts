@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { expect, test } from "@playwright/test";
 import {
   enterNumericValue,
+  expandDocumentCenter,
   gotoWorkspacePanel,
   seedLeftNavCollapsed,
   waitForWorkspacePanel,
@@ -244,9 +245,10 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
     await waitForWorkspacePanel(page, "#workspace-overview-dashboard");
 
     const documentCenter = page.locator("#workspace-document-center");
-    const exportStatus = documentCenter.locator("div.rounded-xl.bg-slate-50");
+    const exportStatus = documentCenter.locator("#document-export-status");
     const enterpriseCard = page.locator("#workspace-enterprise-context-card");
     const comboboxes = enterpriseCard.getByRole("combobox");
+    await expandDocumentCenter(page);
     const exportCustomersButton = documentCenter.getByRole("button", {
       name: "Export customers to Excel",
     });
@@ -333,7 +335,6 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     const sidebarToggle = page.locator("#app-shell-nav-toggle");
     const panelToggle = page.locator("#workspace-panel-toggle");
-    const sidebarRail = page.locator("aside.workspace-sidebar");
     const sidebarShell = page.locator("#workspace-sidebar-shell");
     const jarvisLauncher = page.locator("#workspace-jarvis-launcher");
     const jarvisDock = page.locator("#workspace-jarvis-dock");
@@ -347,8 +348,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
 
     await panelToggle.click();
     await expect(panelToggle).toContainText("Open workspace panel");
-    await expect(sidebarRail).toHaveClass(/hidden lg:block lg:w-16/);
-    await expect(sidebarShell).toBeVisible();
+    await expect(sidebarShell).toBeAttached();
 
     await jarvisLauncher.click();
     await expect(jarvisDock).toBeVisible();

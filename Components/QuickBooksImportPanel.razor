@@ -453,6 +453,7 @@
           CloseOnEscape="true"
           ShowCloseIcon="true"
           Target="#quickbooks-import-drop-area">
+    <DialogEvents Opened="OnCommitDialogOpenedAsync" Closed="OnCommitDialogClosedAsync" />
     <DialogAnimationSettings Effect="DialogEffect.Zoom" Duration="200" />
     <DialogTemplates>
         <Content>
@@ -710,6 +711,18 @@
     {
         ShowCommitDialog = false;
         return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnCommitDialogOpenedAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("wileyFocus.remember");
+        // Prefer the primary confirm control inside the Syncfusion dialog footer.
+        await JSRuntime.InvokeVoidAsync("wileyFocus.focusById", "quickbooks-commit-dialog");
+    }
+
+    private async Task OnCommitDialogClosedAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("wileyFocus.restore");
     }
 
     private async Task CommitImportAsync()

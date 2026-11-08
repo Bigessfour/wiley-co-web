@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "itemSchema": "customer-usage",
+  "items": [
+    {
+      "schemaVersion": "1.0.0",
+      "accountId": "tow-wu-acct-1001",
+      "enterpriseId": "tow-water-utility",
+      "period": "2026-10",
+      "gallons": 4200,
+      "alerts": []
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "accountId": "tow-wu-acct-1042",
+      "enterpriseId": "tow-water-utility",
+      "period": "2026-10",
+      "gallons": 18500,
+      "alerts": [
+        {
+          "code": "HIGH_USAGE",
+          "severity": "warning",
+          "message": "October usage exceeds 3x median residential volume for this route."
+        }
+      ]
+    }
+  ]
+}

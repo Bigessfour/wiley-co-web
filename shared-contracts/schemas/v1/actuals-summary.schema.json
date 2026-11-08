@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wiley-widget.local/schemas/v1/actuals-summary.schema.json",
+  "title": "ActualsSummary",
+  "description": "Period rollup of income, expenses, and cash for one enterprise. Money values are USD numbers with two-decimal convention. period is the reporting month label; income/expenses follow amountsBasis (which may be YTD, not that single month).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["enterpriseId", "period", "amountsBasis", "income", "expenses", "cashBalance"],
+  "properties": {
+    "enterpriseId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Enterprise.id of the enterprise this summary belongs to.",
+      "examples": ["tow-water-utility"]
+    },
+    "period": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+      "description": "Reporting month label in YYYY-MM (e.g. 2026-10). Not necessarily the exclusive window for income/expenses — see amountsBasis.",
+      "examples": ["2026-10"]
+    },
+    "amountsBasis": {
+      "type": "string",
+      "enum": ["fy-ytd", "monthly"],
+      "description": "Window for income and expenses. fy-ytd = fiscal-year-to-date through period (council budget comparison style). monthly = that calendar month only. cashBalance is always an as-of snapshot for period, not controlled by this field."
+    },
+    "income": {
+      "type": "number",
+      "description": "Income / revenue actual for the window described by amountsBasis."
+    },
+    "expenses": {
+      "type": "number",
+      "description": "Expense actual for the window described by amountsBasis."
+    },
+    "cashBalance": {
+      "type": "number",
+      "description": "Cash / bank position for the enterprise as of the period snapshot (typically period month-end). Sum only the bank accounts listed in cashBalanceAccounts when that field is present."
+    },
+    "cashBalanceAccounts": {
+      "type": "array",
+      "description": "Bank account labels from the source bank-balances export that were summed into cashBalance.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "examples": [["UTILITY", "UTILITY SAVINGS"]]
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Optional human-readable contract version for this payload.",
+      "examples": ["1.0.0"]
+    }
+  }
+}

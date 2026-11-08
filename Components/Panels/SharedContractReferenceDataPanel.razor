@@ -1,0 +1,294 @@
+@namespace WileyCoWeb.Components.Panels
+@using System.Net.Http.Json
+@using System.Text.Json
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.Services
+@inject SharedContractReferenceDataApiService ReferenceDataApi
+@inject ToastService ToastService
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<section id="shared-contract-reference-data-panel" class="space-y-4" aria-live="polite">
+    <section class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 p-5 text-white shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-sky-300">Shared contracts</p>
+                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Reference data (read-only)</h2>
+                <p class="mt-2 max-w-3xl text-sm text-slate-300">
+                    Displays ActualsSummary and OperationalEvent batches ingested via
+                    <code class="text-sky-200">/api/reference-data/*</code>.
+                    Does not change QuickBooks import, snapshots, or break-even math.
+                    CLI ingest: <code class="text-sky-200">Scripts/ingest-shared-contracts.sh</code>.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button"
+                        class="rounded-lg border border-sky-400/50 bg-transparent px-4 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/40 disabled:opacity-60"
+                        disabled="@(IsLoading || IsIngesting)"
+                        @onclick="IngestOctoberExamplesAsync">
+                    @(IsIngesting ? "Ingesting…" : "Ingest Oct 2026 examples")
+                </button>
+                <button type="button"
+                        class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60"
+                        disabled="@(IsLoading || IsIngesting)"
+                        @onclick="RefreshAsync">
+                    @(IsLoading ? "Refreshing…" : "Refresh")
+                </button>
+            </div>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <section class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
+            @ErrorMessage
+        </section>
+    }
+
+    <section class="rounded-2xl wiley-surface-panel p-4">
+        <div class="flex items-baseline justify-between gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Actuals summaries</p>
+                <h3 class="mt-1 text-lg font-semibold wiley-text">GET /api/reference-data/actuals</h3>
+            </div>
+            <span class="text-xs wiley-text-muted">@Actuals.Count stored</span>
+        </div>
+
+        @if (IsLoading && Actuals.Count == 0)
+        {
+            <p class="mt-4 text-sm wiley-text-muted">Loading actuals…</p>
+        }
+        else if (Actuals.Count == 0)
+        {
+            <p class="mt-4 text-sm wiley-text-muted">
+                No actuals ingested yet. POST an ActualsSummary (see
+                <code>shared-contracts/examples/actuals-summary-utility-oct-2026.json</code>) to populate this list.
+            </p>
+        }
+        else
+        {
+            <div class="mt-4 overflow-x-auto">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="border-b border-[var(--wiley-border)] text-xs uppercase tracking-wide wiley-text-muted">
+                        <tr>
+                            <th class="py-2 pr-3 font-semibold">Accepted</th>
+                            <th class="py-2 pr-3 font-semibold">Enterprise</th>
+                            <th class="py-2 pr-3 font-semibold">Period</th>
+                            <th class="py-2 pr-3 font-semibold">Basis</th>
+                            <th class="py-2 pr-3 font-semibold">Income</th>
+                            <th class="py-2 pr-3 font-semibold">Expenses</th>
+                            <th class="py-2 pr-3 font-semibold">Cash</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Actuals)
+                        {
+                            <tr class="border-b border-[var(--wiley-border)]/60">
+                                <td class="py-2 pr-3 whitespace-nowrap">@FormatAccepted(row.AcceptedAt)</td>
+                                <td class="py-2 pr-3">@row.Actuals.EnterpriseId</td>
+                                <td class="py-2 pr-3">@row.Actuals.Period</td>
+                                <td class="py-2 pr-3">@row.Actuals.AmountsBasis</td>
+                                <td class="py-2 pr-3">@row.Actuals.Income.ToString("C2")</td>
+                                <td class="py-2 pr-3">@row.Actuals.Expenses.ToString("C2")</td>
+                                <td class="py-2 pr-3">@row.Actuals.CashBalance.ToString("C2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="rounded-2xl wiley-surface-panel p-4">
+        <div class="flex items-baseline justify-between gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Operational event batches</p>
+                <h3 class="mt-1 text-lg font-semibold wiley-text">GET /api/reference-data/events</h3>
+            </div>
+            <span class="text-xs wiley-text-muted">@Events.Count batches</span>
+        </div>
+
+        @if (IsLoading && Events.Count == 0)
+        {
+            <p class="mt-4 text-sm wiley-text-muted">Loading events…</p>
+        }
+        else if (Events.Count == 0)
+        {
+            <p class="mt-4 text-sm wiley-text-muted">
+                No event batches ingested yet. POST an OperationalEvent array (items from
+                <code>shared-contracts/examples/operational-events-oct-2026-checks.json</code>).
+            </p>
+        }
+        else
+        {
+            <div class="mt-4 space-y-4">
+                @foreach (var batch in Events)
+                {
+                    <article class="rounded-xl border border-[var(--wiley-border)] p-3">
+                        <div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                            <p class="font-semibold wiley-text">Batch @batch.Id</p>
+                            <p class="text-xs wiley-text-muted">@FormatAccepted(batch.AcceptedAt) · @batch.Events.Count events</p>
+                        </div>
+                        <div class="mt-3 overflow-x-auto">
+                            <table class="min-w-full text-left text-sm">
+                                <thead class="border-b border-[var(--wiley-border)] text-xs uppercase tracking-wide wiley-text-muted">
+                                    <tr>
+                                        <th class="py-2 pr-3 font-semibold">Date</th>
+                                        <th class="py-2 pr-3 font-semibold">Type</th>
+                                        <th class="py-2 pr-3 font-semibold">Source</th>
+                                        <th class="py-2 pr-3 font-semibold">Amount</th>
+                                        <th class="py-2 pr-3 font-semibold">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var evt in batch.Events.Take(12))
+                                    {
+                                        <tr class="border-b border-[var(--wiley-border)]/60">
+                                            <td class="py-2 pr-3 whitespace-nowrap">@evt.Date</td>
+                                            <td class="py-2 pr-3">@evt.Type</td>
+                                            <td class="py-2 pr-3">@evt.Source</td>
+                                            <td class="py-2 pr-3">@evt.Amount.ToString("C2")</td>
+                                            <td class="py-2 pr-3">@evt.Description</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (batch.Events.Count > 12)
+                        {
+                            <p class="mt-2 text-xs wiley-text-muted">Showing first 12 of @batch.Events.Count events.</p>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</section>
+
+@code {
+    private const string ActualsExamplePath = "shared-contracts/examples/actuals-summary-utility-oct-2026.json";
+    private const string EventsExamplePath = "shared-contracts/examples/operational-events-oct-2026-checks.json";
+
+    private static readonly JsonSerializerOptions FixtureJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private readonly CancellationTokenSource _lifetime = new();
+
+    private bool IsLoading { get; set; }
+    private bool IsIngesting { get; set; }
+    private string? ErrorMessage { get; set; }
+    private IReadOnlyList<ReferenceDataActualsDocument> Actuals { get; set; } = [];
+    private IReadOnlyList<ReferenceDataEventsDocument> Events { get; set; } = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (IsLoading)
+        {
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+        try
+        {
+            var actualsTask = ReferenceDataApi.GetActualsAsync(_lifetime.Token);
+            var eventsTask = ReferenceDataApi.GetEventsAsync(_lifetime.Token);
+            await Task.WhenAll(actualsTask, eventsTask);
+            Actuals = await actualsTask;
+            Events = await eventsTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // disposed
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            ToastService.ShowError("Reference data", "Could not load shared-contract reference data.");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Prompt 4 UI path: load fixtures from wwwroot (copied from shared-contracts/examples) and POST to reference-data.
+    /// Prefer <c>Scripts/ingest-shared-contracts.sh</c> for CLI / drop-folder workflows.
+    /// </summary>
+    private async Task IngestOctoberExamplesAsync()
+    {
+        if (IsIngesting)
+        {
+            return;
+        }
+
+        IsIngesting = true;
+        ErrorMessage = null;
+        try
+        {
+            // Fixture files are on the WASM host; default HttpClient BaseAddress is the API.
+            var actualsUri = new Uri(new Uri(Navigation.BaseUri), ActualsExamplePath);
+            var actuals = await Http.GetFromJsonAsync<ActualsSummaryContract>(actualsUri, FixtureJsonOptions, _lifetime.Token)
+                ?? throw new InvalidOperationException($"Could not load {ActualsExamplePath}.");
+
+            await ReferenceDataApi.PostActualsAsync(actuals, _lifetime.Token);
+
+            var eventsUri = new Uri(new Uri(Navigation.BaseUri), EventsExamplePath);
+            await using var eventsStream = await Http.GetStreamAsync(eventsUri, _lifetime.Token);
+            using var eventsDoc = await JsonDocument.ParseAsync(eventsStream, cancellationToken: _lifetime.Token);
+            if (!eventsDoc.RootElement.TryGetProperty("items", out var itemsElement))
+            {
+                throw new InvalidOperationException("Events fixture is missing items[] (PayloadBatch envelope).");
+            }
+
+            var events = JsonSerializer.Deserialize<List<OperationalEventContract>>(itemsElement.GetRawText(), FixtureJsonOptions)
+                ?? throw new InvalidOperationException("Events fixture items[] could not be deserialized.");
+            if (events.Count == 0)
+            {
+                throw new InvalidOperationException("Events fixture items[] is empty.");
+            }
+
+            await ReferenceDataApi.PostEventsAsync(events, _lifetime.Token);
+            ToastService.ShowSuccess("Reference data", "October 2026 examples accepted (202).");
+            await RefreshAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // disposed
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            ToastService.ShowError("Reference data", "Could not ingest shared-contract examples.");
+        }
+        finally
+        {
+            IsIngesting = false;
+        }
+    }
+
+    private static string FormatAccepted(string acceptedAt)
+    {
+        if (DateTimeOffset.TryParse(acceptedAt, out var value))
+        {
+            return value.ToLocalTime().ToString("g");
+        }
+
+        return acceptedAt;
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

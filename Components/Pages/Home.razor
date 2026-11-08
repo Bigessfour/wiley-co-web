@@ -1,56 +1,410 @@
 ﻿@page "/"
+@page "/town-hub"
+@using System.Globalization
+@using System.Text.Json
+@using Microsoft.Extensions.Configuration
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.Options
+@using WileyCoWeb.Services
+@inject IConfiguration Configuration
+@inject SharedContractReferenceDataApiService ReferenceDataApi
+@inject ToastService ToastService
+@inject NavigationManager Navigation
 
-<PageTitle>Wiley.co</PageTitle>
+<PageTitle>Town Hub — Town of Wiley</PageTitle>
 
-<section class="home-hub">
+<section class="home-hub town-hub">
 	<div class="home-hub-hero">
-		<p class="home-hub-kicker">Wiley Widget</p>
-		<h1>Rate Study Console</h1>
+		<p class="home-hub-kicker">Town of Wiley</p>
+		<h1>Town Hub</h1>
 		<p class="home-hub-copy">
-			Start from a focused route instead of loading the full workspace overview on the domain root.
-			This keeps the entry screen lighter and makes panel navigation predictable.
+			Single entry point for town apps. Cards open the existing UIs (local or App Runner).
+			Summary tiles below read shared-contract reference data — full grid lives on the
+			<a href="/wiley-workspace/reference-data">Reference Data</a> workspace panel.
 		</p>
 		<div class="home-hub-actions">
-			<a class="home-hub-primary" href="/wiley-workspace">Open workspace overview</a>
-			<a class="home-hub-secondary" href="/wiley-workspace/data-dashboard">Open data dashboard</a>
+			<a class="home-hub-primary" href="/wiley-workspace">Open Wiley Widget workspace</a>
+			<a class="home-hub-secondary" href="/wiley-workspace/reference-data">Full reference data</a>
 		</div>
 	</div>
 
-	<div class="home-hub-grid">
-		<a class="home-hub-card" href="/wiley-workspace/break-even">
-			<span class="home-hub-card-index">01</span>
-			<strong>Break-Even</strong>
-			<p>Cost, volume, rate delta, and baseline capture.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/rates">
-			<span class="home-hub-card-index">02</span>
-			<strong>Rates</strong>
-			<p>Current-rate editing and comparison chart review.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/scenario">
-			<span class="home-hub-card-index">03</span>
-			<strong>Scenario Planner</strong>
-			<p>What-if modeling and adjusted break-even analysis.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/customers">
-			<span class="home-hub-card-index">04</span>
-			<strong>Customer Viewer</strong>
-			<p>Filtered customer review and export-ready exploration.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/trends">
-			<span class="home-hub-card-index">05</span>
-			<strong>Trends</strong>
-			<p>Projected rate movement and year-over-year view.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/reserve-trajectory">
-			<span class="home-hub-card-index">06</span>
-			<strong>Reserve Trajectory</strong>
-			<p>Reserve forecast and stress-band review.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/decision-support">
-			<span class="home-hub-card-index">07</span>
-			<strong>Decision Support</strong>
-			<p>Jarvis guidance and supporting analysis context.</p>
-		</a>
+	<div class="home-hub-grid town-hub-apps">
+		@foreach (var app in _apps)
+		{
+			var status = ResolveCardStatus(app);
+			<a class="home-hub-card"
+			   href="@app.Url"
+			   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
+			   rel="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "noopener noreferrer" : null)">
+				<span class="home-hub-card-index">@app.Id</span>
+				<strong>@app.Title</strong>
+				<p>@app.Description</p>
+				<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
+				<span class="town-hub-url">@DisplayUrl(app.Url)</span>
+			</a>
+		}
 	</div>
+
+	<section class="town-hub-summary" aria-labelledby="town-hub-summary-heading">
+		<div class="town-hub-summary-header">
+			<h2 id="town-hub-summary-heading">Reference data snapshot</h2>
+			<button type="button" class="home-hub-secondary town-hub-refresh" @onclick="LoadSummaryAsync" disabled="@_loading">
+				@(_loading ? "Loading…" : "Refresh")
+			</button>
+		</div>
+		@if (!string.IsNullOrWhiteSpace(_error))
+		{
+			<p class="town-hub-error" role="alert">@_error</p>
+		}
+		else if (_loading && _latestActual is null && _eventBatches.Count == 0)
+		{
+			<p class="town-hub-muted">Loading latest ActualsSummary and OperationalEvents…</p>
+		}
+		else
+		{
+			<div class="town-hub-tiles">
+				<article class="town-hub-tile town-hub-tile-actuals" aria-labelledby="latest-actuals-heading">
+					<h3 id="latest-actuals-heading">Latest actuals</h3>
+					@if (_latestActual is null)
+					{
+						<p class="town-hub-muted">No ActualsSummary yet. POST via <code>/api/reference-data/actuals</code> or run <code>./Scripts/verify-shared-contracts.sh</code>.</p>
+					}
+					else
+					{
+						var a = _latestActual.Actuals;
+						var net = a.Income - a.Expenses;
+						<p class="town-hub-actuals-entity">
+							<strong>@a.EnterpriseId</strong>
+							<span class="town-hub-muted"> · @a.Period · @a.AmountsBasis</span>
+						</p>
+						<p class="town-hub-actuals-row">
+							<span>Income <strong>@a.Income.ToString("N2", CultureInfo.InvariantCulture)</strong></span>
+							<span class="town-hub-actuals-sep">vs</span>
+							<span>Expense <strong>@a.Expenses.ToString("N2", CultureInfo.InvariantCulture)</strong></span>
+						</p>
+						<p class="town-hub-muted">
+							Net @(net >= 0 ? "+" : "")@net.ToString("N2", CultureInfo.InvariantCulture)
+							· cash @a.CashBalance.ToString("N2", CultureInfo.InvariantCulture)
+							· accepted @FormatAcceptedAt(_latestActual.AcceptedAt)
+						</p>
+					}
+				</article>
+				<article class="town-hub-tile">
+					<h3>Recent OperationalEvents</h3>
+					@if (_recentEvents.Count == 0)
+					{
+						<p class="town-hub-muted">No events yet.</p>
+					}
+					else
+					{
+						<ul class="town-hub-event-list">
+							@foreach (var ev in _recentEvents)
+							{
+								<li>
+									<strong>@ev.Source</strong>
+									<span class="town-hub-muted">@ev.Date · @ev.Type · @ev.Amount.ToString("N0")</span>
+									@if (!string.IsNullOrWhiteSpace(ev.Description))
+									{
+										<span> — @Truncate(ev.Description, 80)</span>
+									}
+								</li>
+							}
+						</ul>
+					}
+				</article>
+			</div>
+			<p class="town-hub-muted">
+				Tiles only — open
+				<a href="/wiley-workspace/reference-data">Reference Data</a>
+				for the full read-only grids (does not replace QuickBooks import).
+			</p>
+		}
+	</section>
 </section>
+
+@code {
+	private List<TownHubAppLink> _apps = [];
+	private IReadOnlyList<ReferenceDataActualsDocument> _actuals = [];
+	private IReadOnlyList<ReferenceDataEventsDocument> _eventBatches = [];
+	private ReferenceDataActualsDocument? _latestActual;
+	private List<OperationalEventContract> _recentEvents = [];
+	private bool _loading;
+	private string? _error;
+
+	protected override void OnInitialized()
+	{
+		var options = new TownHubOptions();
+		Configuration.GetSection(TownHubOptions.SectionName).Bind(options);
+		_apps = options.Apps.Count > 0 ? options.Apps : DefaultApps();
+		// wwwroot/appsettings.json is gitignored locally — fill status match keys when omitted.
+		ApplyReferenceDefaults(_apps);
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadSummaryAsync();
+	}
+
+	private async Task LoadSummaryAsync()
+	{
+		_loading = true;
+		_error = null;
+		try
+		{
+			_actuals = await ReferenceDataApi.GetActualsAsync();
+			_latestActual = _actuals.Count > 0 ? _actuals[0] : null;
+
+			_eventBatches = await ReferenceDataApi.GetEventsAsync();
+			_recentEvents = _eventBatches
+				.SelectMany(b => b.Events ?? Array.Empty<OperationalEventContract>())
+				.Take(5)
+				.ToList();
+		}
+		catch (Exception ex)
+		{
+			_error = ex.Message;
+			_actuals = [];
+			_eventBatches = [];
+			_latestActual = null;
+			_recentEvents = [];
+			ToastService.ShowError("Town Hub", "Could not load reference-data summary.");
+		}
+		finally
+		{
+			_loading = false;
+		}
+	}
+
+	private CardStatus ResolveCardStatus(TownHubAppLink app)
+	{
+		DateTimeOffset? latest = null;
+
+		foreach (var doc in _actuals)
+		{
+			if (!MatchesEnterprise(app, doc.Actuals.EnterpriseId))
+			{
+				continue;
+			}
+
+			if (TryParseAccepted(doc.AcceptedAt, out var at) && (!latest.HasValue || at > latest))
+			{
+				latest = at;
+			}
+		}
+
+		foreach (var batch in _eventBatches)
+		{
+			var events = batch.Events ?? Array.Empty<OperationalEventContract>();
+			if (!events.Any(ev => MatchesEvent(app, ev)))
+			{
+				continue;
+			}
+
+			if (TryParseAccepted(batch.AcceptedAt, out var at) && (!latest.HasValue || at > latest))
+			{
+				latest = at;
+			}
+		}
+
+		if (!latest.HasValue)
+		{
+			return new CardStatus(false, "No data yet");
+		}
+
+		return new CardStatus(true, $"Updated {FormatRelative(latest.Value)}");
+	}
+
+	private static bool MatchesEnterprise(TownHubAppLink app, string? enterpriseId)
+	{
+		if (string.IsNullOrWhiteSpace(app.ReferenceEnterpriseId) || string.IsNullOrWhiteSpace(enterpriseId))
+		{
+			return false;
+		}
+
+		return string.Equals(app.ReferenceEnterpriseId.Trim(), enterpriseId.Trim(), StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool MatchesEvent(TownHubAppLink app, OperationalEventContract ev)
+	{
+		if (app.ReferenceSources is { Count: > 0 }
+		    && app.ReferenceSources.Any(s => string.Equals(s, ev.Source, StringComparison.OrdinalIgnoreCase)))
+		{
+			return true;
+		}
+
+		var enterprise = MetaString(ev.Metadata, "enterpriseId");
+		if (MatchesEnterprise(app, enterprise))
+		{
+			return true;
+		}
+
+		var publisher = MetaString(ev.Metadata, "publisherSystem");
+		if (!string.IsNullOrWhiteSpace(app.ReferencePublisherSystem)
+		    && string.Equals(app.ReferencePublisherSystem.Trim(), publisher?.Trim(), StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		// CSV adapter uses wiley-apartments-csv — treat as apartments when publisher prefix matches.
+		if (!string.IsNullOrWhiteSpace(app.ReferencePublisherSystem)
+		    && !string.IsNullOrWhiteSpace(publisher)
+		    && publisher.StartsWith(app.ReferencePublisherSystem.Trim(), StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private static string? MetaString(JsonElement metadata, string name)
+	{
+		if (metadata.ValueKind != JsonValueKind.Object
+		    || !metadata.TryGetProperty(name, out var prop))
+		{
+			return null;
+		}
+
+		return prop.ValueKind switch
+		{
+			JsonValueKind.String => prop.GetString(),
+			JsonValueKind.Null => null,
+			_ => prop.ToString()
+		};
+	}
+
+	private static bool TryParseAccepted(string? value, out DateTimeOffset at)
+	{
+		at = default;
+		return !string.IsNullOrWhiteSpace(value)
+		       && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out at);
+	}
+
+	private static string FormatAcceptedAt(string? value) =>
+		TryParseAccepted(value, out var at)
+			? at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+			: (value ?? "—");
+
+	private static string FormatRelative(DateTimeOffset at)
+	{
+		var delta = DateTimeOffset.UtcNow - at.ToUniversalTime();
+		if (delta.TotalMinutes < 1)
+		{
+			return "just now";
+		}
+
+		if (delta.TotalHours < 1)
+		{
+			return $"{(int)delta.TotalMinutes}m ago";
+		}
+
+		if (delta.TotalDays < 1)
+		{
+			return $"{(int)delta.TotalHours}h ago";
+		}
+
+		if (delta.TotalDays < 14)
+		{
+			return $"{(int)delta.TotalDays}d ago";
+		}
+
+		return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+	}
+
+	private static void ApplyReferenceDefaults(List<TownHubAppLink> apps)
+	{
+		foreach (var app in apps)
+		{
+			switch (app.Id)
+			{
+				case "01":
+					app.ReferenceEnterpriseId ??= "tow-water-utility";
+					if (app.ReferenceSources.Count == 0)
+					{
+						app.ReferenceSources = ["council-packet", "quickbooks-desktop", "nas-export"];
+					}
+
+					break;
+				case "02":
+					app.ReferenceEnterpriseId ??= "tow-apartments";
+					app.ReferencePublisherSystem ??= "wiley-apartments";
+					break;
+				case "03":
+					app.ReferenceEnterpriseId ??= "tow-wsd";
+					break;
+			}
+		}
+	}
+
+	private static List<TownHubAppLink> DefaultApps() =>
+	[
+		new()
+		{
+			Id = "01",
+			Title = "Wiley Widget",
+			Description = "Rate study console and financial workspace (this app).",
+			Url = "/wiley-workspace",
+			OpenInNewTab = false,
+			ReferenceEnterpriseId = "tow-water-utility",
+			ReferenceSources = ["council-packet", "quickbooks-desktop", "nas-export"]
+		},
+		new()
+		{
+			Id = "02",
+			Title = "Apartments",
+			Description = "ClerkSuite apartments operations.",
+			Url = "http://localhost:8082",
+			OpenInNewTab = true,
+			ReferenceEnterpriseId = "tow-apartments",
+			ReferencePublisherSystem = "wiley-apartments"
+		},
+		new()
+		{
+			Id = "03",
+			Title = "Rural Water",
+			Description = "Rural water operations app.",
+			Url = "http://localhost:8083",
+			OpenInNewTab = true,
+			ReferenceEnterpriseId = "tow-wsd"
+		},
+		new()
+		{
+			Id = "04",
+			Title = "Trash Truck",
+			Description = "Trash / sanitation routing app.",
+			Url = "http://localhost:8084",
+			OpenInNewTab = true
+		},
+		new()
+		{
+			Id = "05",
+			Title = "TIKR",
+			Description = "TIKR Blazor Server + API.",
+			Url = "http://localhost:5080",
+			OpenInNewTab = true
+		}
+	];
+
+	private static bool IsAbsolute(string url) =>
+		Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+		(uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+	private string DisplayUrl(string url)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+		{
+			return "(not configured)";
+		}
+
+		if (!IsAbsolute(url))
+		{
+			return Navigation.ToAbsoluteUri(url).ToString();
+		}
+
+		return url;
+	}
+
+	private static string Truncate(string value, int max) =>
+		value.Length <= max ? value : value[..(max - 1)] + "…";
+
+	private sealed record CardStatus(bool HasData, string Label);
+}

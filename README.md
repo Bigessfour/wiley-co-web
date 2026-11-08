@@ -258,7 +258,9 @@ This workspace now carries a separate Node-based Playwright setup for the VS Cod
 - `.vscode/mcp.json` registers the `playwright` MCP server with the standard `npx @playwright/mcp@latest` wiring so Copilot and other MCP-capable clients can drive a browser through Playwright tools.
 - `package.json` adds `playwright:*` scripts for browser install, test runs, UI mode, codegen, reports, and agent CLI helpers.
 
-Use the Node-based setup for VS Code testing UI and agent automation, but use the Docker proof as the pre-push validation path. The container mirrors the Ubuntu 24.04 GitHub Actions environment, publishes the app, serves `publish_output/wwwroot`, and runs the Chromium + WebKit Playwright pass in one shot.
+**Required before `git push`:** `./Scripts/run-ci-local.sh` (HighRisk + Release publish + Playwright CI smoke/highrisk). It writes `.local-ci-ok` for the current `HEAD`; Cursor agents are blocked from pushing until that stamp matches. Use `--full` for the longer matrix. Emergency bypass: `SKIP_LOCAL_CI=1`.
+
+Optional stronger proof: `npm run playwright:test:docker-proof` mirrors Ubuntu 24.04 GH Actions (Chromium + WebKit) in Docker Desktop.
 
 The managed local `dotnet run` path in `playwright.config.ts` remains available for interactive debugging in the editor, but it is no longer the recommended proof before pushing.
 

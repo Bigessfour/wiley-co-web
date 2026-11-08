@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  expandDocumentCenter,
   gotoWorkspacePanel,
   readCurrencyValueByLabel,
 } from "./support/workspace";
@@ -55,6 +56,7 @@ test.describe("Council staffing scenario (scenario planner)", () => {
       )
       .toBe(true);
 
+    await expandDocumentCenter(page);
     await expect(
       page.getByRole("button", { name: "Export Council Rate Packet" }).first(),
     ).toBeVisible();

@@ -7,8 +7,12 @@ WileyCoWeb.Api/appsettings.Development.local.json
 wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 wwwroot/appsettings.Auth.local.json
+wwwroot/shared-contracts/
 .DS_Store
-.cursor/
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
 bin/
 obj/
 wwwroot/appsettings.json
@@ -37,6 +41,7 @@ Thumbs.db
 *.bak
 publish_output/
 api_output/
+.local-ci-ok
 node_modules/
 *.user
 *.suo
@@ -112,4 +117,9 @@ build/Release
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
+**/.terraform/
+**/terraform.tfvars
+**/terraform.tfvars.json
+**/tfplan
+**/*.tfplan
 .vscode/settings.json

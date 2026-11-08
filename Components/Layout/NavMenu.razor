@@ -1,30 +1,39 @@
-﻿<div class="app-nav-shell" role="navigation" aria-label="Primary workspace navigation">
-    <SfListView ID="app-shell-navigation-list"
-                CssClass="app-nav-list"
-                ShowHeader="true"
-                HeaderTitle="Workspace navigation"
-                DataSource="@NavigationItems"
-                EnableVirtualization="true">
-                @* EnableVirtualization: future-proofs the nav list as workspace routes grow *@
-        <Template Context="navItem">
-            <SfTooltip Content="@navItem.Tooltip"
-                       OpensOn="Hover"
-                       Position="Position.RightCenter"
-                       ShowTipPointer="true"
-                       OpenDelay="300"
-                       CloseDelay="100">
-                       @* OpenDelay/CloseDelay: prevents tooltip flickering on fast cursor sweeps across the nav rail *@
-                <NavLink class="app-nav-link"
-                         href="@navItem.Href"
-                         Match="@navItem.Match"
-                         aria-label="@navItem.Label"
-                         aria-current="@(IsNavItemActive(navItem) ? "page" : null)">
-                    <span class="app-nav-link-index" aria-hidden="true">@navItem.Index</span>
-                    <span class="app-nav-link-label">@navItem.Label</span>
-                </NavLink>
-            </SfTooltip>
-        </Template>
-    </SfListView>
+﻿@using Syncfusion.Blazor.Popups
+
+<div class="app-nav-shell" role="navigation" aria-label="Primary workspace navigation">
+    <div id="app-shell-navigation-list" class="app-nav-grouped-list">
+        <div class="app-nav-list-header">Workspace navigation</div>
+
+        @foreach (var navSection in NavigationSections)
+        {
+            <div class="app-nav-section" aria-label="@navSection.Title">
+                <div class="app-nav-section-title">@navSection.Title</div>
+                <ul class="app-nav-section-list">
+                    @foreach (var navItem in navSection.Items)
+                    {
+                        <li class="app-nav-section-item">
+                            <SfTooltip Content="@navItem.Tooltip"
+                                       OpensOn="Hover"
+                                       Position="Position.RightCenter"
+                                       ShowTipPointer="true"
+                                       OpenDelay="300"
+                                       CloseDelay="100">
+                                <NavLink class="app-nav-link"
+                                         href="@navItem.Href"
+                                         Match="@navItem.Match"
+                                         aria-label="@navItem.Label"
+                                         aria-current="@(IsNavItemActive(navItem) ? "page" : null)">
+                                    <span class="app-nav-link-index" aria-hidden="true">@navItem.Index</span>
+                                    <span class="app-nav-link-icon e-icons @navItem.IconCss" aria-hidden="true"></span>
+                                    <span class="app-nav-link-label">@navItem.Label</span>
+                                </NavLink>
+                            </SfTooltip>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
 
     <div class="app-sidebar-footer" aria-label="Version information">
         <span class="e-badge e-badge-dark" role="status">Syncfusion 33.2.3</span>
@@ -36,22 +45,33 @@
     [Inject]
     private NavigationManager Nav { get; set; } = default!;
 
-    private static readonly IReadOnlyList<WorkspaceNavItem> NavigationItems =
+    private static readonly IReadOnlyList<WorkspaceNavSection> NavigationSections =
     [
-        new("01", "Workspace Overview", "/wiley-workspace", NavLinkMatch.All, "Open the workspace overview"),
-        new("02", "Break-Even", "/wiley-workspace/break-even", NavLinkMatch.Prefix, "Inspect rate balance and gauge inputs"),
-        new("03", "Apartment Config", "/wiley-workspace/apartment-config", NavLinkMatch.Prefix, "Jump to the apartment configuration section"),
-        new("04", "Rates", "/wiley-workspace/rates", NavLinkMatch.Prefix, "Adjust the live rate controls"),
-        new("05", "QuickBooks Import", "/wiley-workspace/quickbooks-import", NavLinkMatch.Prefix, "Stage and validate QuickBooks exports"),
-        new("06", "Scenario Planner", "/wiley-workspace/scenario", NavLinkMatch.Prefix, "Model what-if scenarios and saved snapshots"),
-        new("07", "Customer Viewer", "/wiley-workspace/customers", NavLinkMatch.Prefix, "Review customer impacts and exports"),
-        new("08", "Affordability", "/wiley-workspace/affordability", NavLinkMatch.Prefix, "Inspect bill burden versus MHI"),
-        new("09", "Debt Coverage", "/wiley-workspace/debt-coverage", NavLinkMatch.Prefix, "Inspect DSCR and covenant headroom"),
-        new("10", "Capital Gap", "/wiley-workspace/capital-gap", NavLinkMatch.Prefix, "Inspect capital needs against rate revenue"),
-        new("11", "Reserve Trajectory", "/wiley-workspace/reserve-trajectory", NavLinkMatch.Prefix, "Inspect reserve forecast and policy floor"),
-        new("12", "Trends", "/wiley-workspace/trends", NavLinkMatch.Prefix, "Inspect projected rate movement"),
-        new("13", "Decision Support", "/wiley-workspace/decision-support", NavLinkMatch.Prefix, "Open Jarvis decision support"),
-        new("14", "Data Dashboard", "/wiley-workspace/data-dashboard", NavLinkMatch.Prefix, "Open the executive dashboard")
+        new("Support",
+        [
+            new("00", "Town Hub", "/", NavLinkMatch.All, "Open the Town Hub suite cards and reference-data snapshot", "e-home"),
+            new("01", "Workspace Overview", "/wiley-workspace", NavLinkMatch.All, "Open the workspace overview", "e-home"),
+            new("13", "Decision Support", "/wiley-workspace/decision-support", NavLinkMatch.Prefix, "Open Jarvis decision support", "e-comment-show")
+        ]),
+        new("Analysis",
+        [
+            new("02", "Break-Even", "/wiley-workspace/break-even", NavLinkMatch.Prefix, "Inspect rate balance and gauge inputs", "e-chart"),
+            new("04", "Rates", "/wiley-workspace/rates", NavLinkMatch.Prefix, "Adjust the live rate controls", "e-edit"),
+            new("06", "Scenario Planner", "/wiley-workspace/scenario", NavLinkMatch.Prefix, "Model what-if scenarios and saved snapshots", "e-changes-track"),
+            new("08", "Affordability", "/wiley-workspace/affordability", NavLinkMatch.Prefix, "Inspect bill burden versus MHI", "e-circle-info"),
+            new("09", "Debt Coverage", "/wiley-workspace/debt-coverage", NavLinkMatch.Prefix, "Inspect DSCR and covenant headroom", "e-percentage"),
+            new("10", "Capital Gap", "/wiley-workspace/capital-gap", NavLinkMatch.Prefix, "Inspect capital needs against rate revenue", "e-critical-path"),
+            new("11", "Reserve Trajectory", "/wiley-workspace/reserve-trajectory", NavLinkMatch.Prefix, "Inspect reserve forecast and policy floor", "e-timeline-work-week"),
+            new("12", "Trends", "/wiley-workspace/trends", NavLinkMatch.Prefix, "Inspect projected rate movement", "e-chart"),
+            new("14", "Data Dashboard", "/wiley-workspace/data-dashboard", NavLinkMatch.Prefix, "Open the executive dashboard", "e-dashboard-layout")
+        ]),
+        new("Data",
+        [
+            new("03", "Apartment Config", "/wiley-workspace/apartment-config", NavLinkMatch.Prefix, "Jump to the apartment configuration section", "e-table-1"),
+            new("05", "QuickBooks Import", "/wiley-workspace/quickbooks-import", NavLinkMatch.Prefix, "Stage and validate QuickBooks exports", "e-upload-1"),
+            new("07", "Customer Viewer", "/wiley-workspace/customers", NavLinkMatch.Prefix, "Review customer impacts and exports", "e-people"),
+            new("15", "Reference Data", "/wiley-workspace/reference-data", NavLinkMatch.Prefix, "View shared-contract actuals and events (read-only)", "e-file-document")
+        ])
     ];
 
     /// <summary>
@@ -74,6 +94,13 @@
                    || relativeCurrent[relativeHref.Length] == '/');
     }
 
-    private sealed record WorkspaceNavItem(string Index, string Label, string Href, NavLinkMatch Match, string Tooltip);
-}
+    private sealed record WorkspaceNavSection(string Title, IReadOnlyList<WorkspaceNavItem> Items);
 
+    private sealed record WorkspaceNavItem(
+        string Index,
+        string Label,
+        string Href,
+        NavLinkMatch Match,
+        string Tooltip,
+        string IconCss);
+}

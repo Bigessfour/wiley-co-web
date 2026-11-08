@@ -20,62 +20,89 @@
 <div class="wiley-workspace min-h-screen wiley-surface-panel-secondary px-4 py-4 md:px-6 lg:px-8">
     <div class="flex w-full flex-col gap-4">
         <div id="workspace-overview-hero" class="rounded-3xl border px-6 py-5 shadow-lg wiley-hero">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley Widget</p>
-                    <h1 class="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">Utility Rate Study Workspace</h1>
-                    <p class="mt-2 max-w-3xl text-sm wiley-text-muted md:text-base">
-                        Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.
-                    </p>
-                    <div id="workspace-hero-data-source" class="mt-4 max-w-3xl rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-left text-xs leading-relaxed wiley-text-muted md:text-sm">
-                        <div class="font-semibold text-sky-200">Data source</div>
-                        <div class="mt-1"><span class="wiley-text-muted">Workspace API:</span> @HostingApiHealth · <span class="wiley-text-muted">Bootstrap:</span> <span class="@(IsUsingStartupFallback ? "text-amber-200" : "text-emerald-200")">@StartupSourceStatus</span></div>
-                        <div class="mt-1 line-clamp-2"><span class="wiley-text-muted">Current state:</span> @CurrentStateSourceStatus</div>
+            <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley Widget</p>
+                        <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">Utility Rate Study Workspace</h1>
+                        <p class="workspace-hero-subtitle mt-2 max-w-3xl text-sm md:text-base">
+                            Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.
+                        </p>
+                        <div id="workspace-hero-data-source" class="mt-3">
+                            <span class="workspace-status-pill @(IsUsingStartupFallback ? "workspace-status-pill--warn" : "workspace-status-pill--ok")"
+                                  title="@HeroStatusDetailTitle"
+                                  role="status">
+                                <span class="workspace-status-dot" aria-hidden="true"></span>
+                                <span class="e-badge @(IsUsingStartupFallback ? "e-badge-warning" : "e-badge-success")">@HeroStatusBadgeText</span>
+                            </span>
+                            <details class="workspace-status-details mt-2 max-w-3xl">
+                                <summary class="workspace-status-details-summary">Data source details</summary>
+                                <div class="workspace-status-details-body">
+                                    <div><span class="wiley-text-muted">Workspace API:</span> @HostingApiHealth</div>
+                                    <div><span class="wiley-text-muted">Bootstrap:</span> <span class="@(IsUsingStartupFallback ? "text-amber-200" : "text-emerald-200")">@StartupSourceStatus</span></div>
+                                    <div class="line-clamp-3"><span class="wiley-text-muted">Current state:</span> @CurrentStateSourceStatus</div>
+                                </div>
+                            </details>
+                        </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3 text-right text-xs wiley-text-muted sm:grid-cols-4 lg:text-sm">
-                    <div>
-                        <div class="wiley-text-muted">Selected enterprise</div>
-                        <div class="font-semibold text-white">@SelectedEnterprise</div>
+
+                <div class="workspace-hero-kpi-block">
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <span class="e-badge e-badge-info workspace-enterprise-badge" role="status">@SelectedEnterprise</span>
+                        <span class="text-xs uppercase tracking-[0.2em] text-sky-200/80">Selected enterprise</span>
                     </div>
-                    <div>
-                        <div class="wiley-text-muted">Fiscal Year</div>
-                        <div class="font-semibold text-white">@SelectedFiscalYear</div>
-                    </div>
-                    <div>
-                        <div class="wiley-text-muted">Current Rate</div>
-                        <div class="font-semibold text-white">@CurrentRateDisplay</div>
-                    </div>
-                    <div>
-                        <div class="wiley-text-muted">Break-Even</div>
-                        <div class="font-semibold text-emerald-300">@BreakEvenRateDisplay</div>
-                    </div>
-                    <div class="col-span-2 sm:col-span-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left">
-                        <div class="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-sky-200">Four-enterprise break-even points</div>
-                        <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            @foreach (var quadrant in HeroBreakEvenQuadrants)
-                            {
-                                <div class="rounded-xl border border-white/10 bg-white/10 px-3 py-2">
-                                    <div class="text-sm font-semibold text-white">@GetHeroBreakEvenLabel(quadrant)</div>
-                                    <div class="mt-1 text-xs wiley-text-muted">Break-even</div>
-                                    <div class="text-lg font-semibold text-emerald-300">@quadrant.BreakEvenRate.ToString("C2")</div>
-                                </div>
-                            }
+                    <div class="workspace-kpi-strip grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div class="workspace-kpi-tile @(IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
+                            <div class="workspace-kpi-label">Current Rate</div>
+                            <div class="workspace-kpi-value">@CurrentRateDisplay</div>
                         </div>
+                        <div class="workspace-kpi-tile workspace-kpi-tile--accent">
+                            <div class="workspace-kpi-label">Break-Even</div>
+                            <div class="workspace-kpi-value workspace-kpi-value--break-even">@BreakEvenRateDisplay</div>
+                        </div>
+                        <div class="workspace-kpi-tile @(IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
+                            <div class="workspace-kpi-label">Variance</div>
+                            <div class="workspace-kpi-value">@RateDeltaDisplay</div>
+                        </div>
+                        <div class="workspace-kpi-tile">
+                            <div class="workspace-kpi-label">Fiscal Year</div>
+                            <div class="workspace-kpi-value">@SelectedFiscalYear</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="workspace-hero-break-even-quadrants" class="workspace-quad-section">
+                    <div class="workspace-quad-section-title">Four-enterprise break-even points</div>
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        @foreach (var quadrant in HeroBreakEvenQuadrants)
+                        {
+                            <div class="workspace-quad-card @GetHeroQuadrantAccentClass(quadrant)">
+                                <div class="text-sm font-semibold text-white">@GetHeroBreakEvenLabel(quadrant)</div>
+                                <div class="workspace-kpi-label mt-1">Break-even</div>
+                                <div class="workspace-kpi-value workspace-kpi-value--break-even text-lg">@quadrant.BreakEvenRate.ToString("C2")</div>
+                                <div class="workspace-quad-secondary">vs current @quadrant.CurrentRate.ToString("C2")</div>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
         </div>
 
-        <div id="workspace-document-center" class="rounded-2xl border px-5 py-4 shadow-sm wiley-surface-panel">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Document Center</p>
-                    <h2 class="mt-1 text-lg font-semibold wiley-text-muted">Syncfusion Excel & PDF Deliverables</h2>
-                    <p class="mt-1 text-sm wiley-text-muted">Export the filtered customer set, the active scenario workbook, or a PDF rate packet from the current workspace state.</p>
-                </div>
-                <div class="flex flex-col gap-3 xl:min-w-[38rem]">
-                    <div class="grid gap-3 md:grid-cols-3">
+        <div id="workspace-document-center" class="rounded-2xl border px-5 py-3 shadow-sm wiley-surface-panel">
+            <details id="workspace-document-center-details"
+                     class="workspace-document-center-details"
+                     aria-label="Document Center, Deliverables">
+                <summary class="workspace-document-center-summary">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Document Center</p>
+                        <p class="mt-1 text-base font-semibold wiley-text">Deliverables</p>
+                        <p class="mt-0.5 text-sm wiley-text-muted">Excel and PDF exports from the live workspace or a saved scenario.</p>
+                    </div>
+                    <span class="workspace-document-center-chevron e-icons e-chevron-down" aria-hidden="true"></span>
+                </summary>
+                <div class="workspace-document-center-body mt-3 flex flex-col gap-3">
+                    <div class="workspace-document-toolbar flex flex-wrap gap-2">
                         @* Export buttons disable during any export operation so concurrent file-writes are prevented *@
                         <SfButton id="export-customers-excel-button"
                                   CssClass="e-primary"
@@ -85,17 +112,36 @@
                                   OnClick="ExportCustomerWorkbookAsync">
                             @(IsExportingDocuments ? "Exporting…" : "Export customers to Excel")
                         </SfButton>
+                        <SfButton id="export-workspace-pdf-button"
+                                  CssClass="e-primary"
+                                  IsPrimary="true"
+                                  Disabled="@IsExportingDocuments"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
+                                  OnClick="ExportWorkspacePdfAsync">
+                            @(IsExportingDocuments ? "Building PDF…" : WorkspacePdfExportLabel)
+                        </SfButton>
                         <SfButton id="export-scenario-excel-button"
+                                  CssClass="e-outline"
                                   Disabled="@IsExportingDocuments"
                                   IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
                                   OnClick="ExportScenarioWorkbookAsync">
                             @(IsExportingDocuments ? "Exporting…" : "Export scenario to Excel")
                         </SfButton>
-                        <SfButton id="export-workspace-pdf-button"
-                                  Disabled="@IsExportingDocuments"
+                        <SfButton id="export-archived-scenario-excel-button"
+                                  CssClass="e-outline"
+                                  aria-label="Archive Excel packet from the selected saved scenario"
+                                  Disabled="@(IsExportingDocuments || !CanApplySelectedScenario)"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
+                                  OnClick="ExportArchivedSnapshotExcelAsync">
+                            @(IsExportingDocuments ? "Archiving…" : "Archive saved scenario Excel")
+                        </SfButton>
+                        <SfButton id="export-archived-scenario-pdf-button"
+                                  CssClass="e-outline"
+                                  aria-label="Archive PDF packet from the selected saved scenario"
+                                  Disabled="@(IsExportingDocuments || !CanApplySelectedScenario)"
                                   IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
-                                  OnClick="ExportWorkspacePdfAsync">
-                            @(IsExportingDocuments ? "Building PDF…" : WorkspacePdfExportLabel)
+                                  OnClick="ExportArchivedSnapshotPdfAsync">
+                            @(IsExportingDocuments ? "Archiving…" : "Archive saved scenario PDF")
                         </SfButton>
                     </div>
                     @* Export status row: shows inline spinner dot while export is in-flight *@
@@ -104,21 +150,21 @@
                         {
                             <span class="wiley-export-spinner-inline">
                                 <span class="wiley-pulse-dot" aria-hidden="true"></span>
-                                <span role="status" aria-live="polite"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
+                                <span id="document-export-status" role="status" aria-live="polite"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
                             </span>
                         }
                         else
                         {
-                            <span role="status"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
+                            <span id="document-export-status" role="status" aria-live="polite"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
                         }
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
 
         <SfSplitter @ref="_workspaceSplitter"
                     ID="workspace-main-splitter"
-                    Height="calc(100vh - 20rem)"
+                    Height="calc(100vh - 26rem)"
                     Width="100%"
                     EnablePersistence="true"
                     CssClass="workspace-splitter">
@@ -354,6 +400,15 @@
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("quickbooks-import")'>Open Import</button>
                                 </article>
 
+                                <article id="overview-reference-data" class="workspace-overview-card">
+                                    <div class="workspace-overview-card-copy">
+                                        <p class="workspace-overview-card-kicker">Reference Data</p>
+                                        <h3>View shared-contract ingest</h3>
+                                        <p>Read-only ActualsSummary and OperationalEvent batches from /api/reference-data. Separate from QuickBooks import.</p>
+                                    </div>
+                                    <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("reference-data")'>Open Reference Data</button>
+                                </article>
+
                                 <article id="overview-scenario" class="workspace-overview-card">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Scenario Planner</p>
@@ -488,6 +543,9 @@
                                         break;
                                     case "quickbooks-import":
                                         <QuickBooksImportPanelWrapper @key="ActivePanelKey" WorkspaceState="@WorkspaceState" />
+                                        break;
+                                    case "reference-data":
+                                        <SharedContractReferenceDataPanel @key="ActivePanelKey" />
                                         break;
                                     case "scenario":
                                         <ScenarioPlannerPanel @key="ActivePanelKey"
@@ -704,11 +762,6 @@
         --wiley-sf-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
-    .wiley-workspace .workspace-sidebar {
-        max-height: calc(100vh - 14rem);
-        overflow: auto;
-    }
-
     /* Cards: natural height in content areas (no global stretch). */
     .wiley-workspace .e-card {
         border: 1px solid var(--wiley-sf-border);
@@ -899,6 +952,207 @@
         .wiley-workspace .workspace-overview-grid {
             grid-template-columns: 1fr;
         }
+    }
+
+    /* ── Hero decision surface (KPI strip, status, quads, deliverables) ── */
+
+    .wiley-hero .workspace-hero-subtitle {
+        color: rgba(226, 232, 240, 0.72);
+        line-height: 1.45;
+    }
+
+    .wiley-hero .workspace-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .wiley-hero .workspace-status-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        flex: 0 0 auto;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+        background: #34d399;
+    }
+
+    .wiley-hero .workspace-status-pill--warn .workspace-status-dot {
+        background: #fbbf24;
+        box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+    }
+
+    .wiley-hero .workspace-status-details-summary {
+        cursor: pointer;
+        color: rgba(186, 230, 253, 0.85);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        list-style: none;
+        border-radius: 0.35rem;
+    }
+
+    .wiley-hero .workspace-status-details-summary:focus-visible {
+        outline: 2px solid #38bdf8;
+        outline-offset: 2px;
+    }
+
+    .wiley-hero .workspace-status-details-summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .wiley-hero .workspace-status-details-body {
+        margin-top: 0.5rem;
+        padding: 0.65rem 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(15, 23, 42, 0.35);
+        color: rgba(226, 232, 240, 0.88);
+        font-size: 0.75rem;
+        line-height: 1.5;
+    }
+
+    .wiley-hero .workspace-enterprise-badge {
+        letter-spacing: 0.04em;
+    }
+
+    .wiley-hero .workspace-kpi-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    @@media (min-width: 1024px) {
+        .wiley-hero .workspace-kpi-strip {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    .wiley-hero .workspace-kpi-tile {
+        border-radius: 0.9rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        padding: 0.75rem 0.85rem;
+        border-left: 3px solid rgba(148, 163, 184, 0.55);
+    }
+
+    .wiley-hero .workspace-kpi-tile--ok {
+        border-left-color: #34d399;
+    }
+
+    .wiley-hero .workspace-kpi-tile--warn {
+        border-left-color: #fbbf24;
+    }
+
+    .wiley-hero .workspace-kpi-tile--accent {
+        border-left-color: #38bdf8;
+    }
+
+    .wiley-hero .workspace-kpi-label {
+        color: rgba(186, 230, 253, 0.78);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    .wiley-hero .workspace-kpi-value {
+        margin-top: 0.35rem;
+        color: #f8fafc;
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+    }
+
+    .wiley-hero .workspace-kpi-value--break-even {
+        color: #6ee7b7;
+    }
+
+    .wiley-hero .workspace-quad-section-title {
+        color: rgba(186, 230, 253, 0.9);
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+    }
+
+    .wiley-hero #workspace-hero-break-even-quadrants > .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    @@media (min-width: 1280px) {
+        .wiley-hero #workspace-hero-break-even-quadrants > .grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    .wiley-hero .workspace-quad-card {
+        border-radius: 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.07);
+        padding: 0.65rem 0.75rem;
+        border-left: 3px solid rgba(148, 163, 184, 0.55);
+    }
+
+    .wiley-hero .workspace-quad-accent-water {
+        border-left-color: #38bdf8;
+    }
+
+    .wiley-hero .workspace-quad-accent-sanitation {
+        border-left-color: #a78bfa;
+    }
+
+    .wiley-hero .workspace-quad-accent-trash {
+        border-left-color: #fb923c;
+    }
+
+    .wiley-hero .workspace-quad-accent-apartments {
+        border-left-color: #34d399;
+    }
+
+    .wiley-hero .workspace-quad-accent-default {
+        border-left-color: #94a3b8;
+    }
+
+    .wiley-hero .workspace-quad-secondary {
+        margin-top: 0.25rem;
+        color: rgba(203, 213, 225, 0.78);
+        font-size: 0.72rem;
+    }
+
+    .workspace-document-center-summary {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        cursor: pointer;
+        list-style: none;
+        border-radius: 0.5rem;
+    }
+
+    .workspace-document-center-summary:focus-visible {
+        outline: 2px solid var(--wiley-accent, #0ea5e9);
+        outline-offset: 2px;
+    }
+
+    .workspace-document-center-summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .workspace-document-center-chevron {
+        margin-top: 0.35rem;
+        color: var(--wiley-text-muted);
+        transition: transform 120ms ease;
+    }
+
+    .workspace-document-center-details[open] .workspace-document-center-chevron {
+        transform: rotate(180deg);
+    }
+
+    .workspace-document-toolbar .e-btn {
+        min-height: 2.35rem;
     }
 </style>
 

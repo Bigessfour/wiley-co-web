@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "1.0.0",
+  "itemSchema": "operational-event",
+  "items": [
+    {
+      "schemaVersion": "1.0.0",
+      "source": "council-packet",
+      "type": "check",
+      "date": "2026-10-06",
+      "amount": 344.84,
+      "description": "MAY VALLEY — HOTSPOT/CHLORINE",
+      "metadata": {
+        "enterpriseId": "tow-water-utility",
+        "checkNumber": "12378",
+        "payee": "MAY VALLEY",
+        "memo": "HOTSPOT/CHLORINE",
+        "account": "Utility:Water Supplies",
+        "listingFile": "utility-transactions-oct-2026.csv"
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "source": "council-packet",
+      "type": "check",
+      "date": "2026-10-08",
+      "amount": 592.91,
+      "description": "FAST STOP — FUEL",
+      "metadata": {
+        "enterpriseId": "tow-water-utility",
+        "checkNumber": "12379",
+        "payee": "FAST STOP",
+        "memo": "FUEL",
+        "account": "Utility:Fuel",
+        "listingFile": "utility-transactions-oct-2026.csv"
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "source": "council-packet",
+      "type": "check",
+      "date": "2026-10-06",
+      "amount": 396.00,
+      "description": "SE&EC RECYCLING — OCT-DEC",
+      "metadata": {
+        "enterpriseId": "tow-general",
+        "checkNumber": "17387",
+        "payee": "SE&EC RECYCLING",
+        "memo": "OCT-DEC",
+        "account": "General:Expenses",
+        "listingFile": "general-transactions-oct-2026.csv"
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "source": "council-packet",
+      "type": "check",
+      "date": "2026-10-30",
+      "amount": 1220.00,
+      "description": "TOWN OF WILEY UTILITY — WATER/TRASH/SEWER",
+      "metadata": {
+        "enterpriseId": "tow-apartments",
+        "checkNumber": "5174",
+        "payee": "TOWN OF WILEY UTILITY",
+        "memo": "WATER/TRASH/SEWER",
+        "account": "Brookside:Expenses",
+        "listingFile": "brookside-transactions-oct-2026.csv"
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "source": "council-packet",
+      "type": "check",
+      "date": "2026-10-12",
+      "amount": 404.62,
+      "description": "TOWN OF WILEY UTILITY — REBUILD LAGOON LOCK",
+      "metadata": {
+        "enterpriseId": "tow-wsd",
+        "checkNumber": "5270",
+        "payee": "TOWN OF WILEY UTILITY",
+        "memo": "REBUILD LAGOON LOCK",
+        "account": "WSD:Enterprise:Lagoon",
+        "listingFile": "wsd-enterprise-transactions-oct-2026.csv",
+        "wsdFund": "enterprise"
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "source": "council-packet",
+      "type": "summary",
+      "date": "2026-10-31",
+      "amount": 62008.71,
+      "description": "October 2026 council meeting check listing grand total (all enterprises)",
+      "metadata": {
+        "period": "2026-10",
+        "grandTotal": 62008.71,
+        "byEnterprise": {
+          "tow-water-utility": 39077.79,
+          "tow-general": 17189.56,
+          "tow-apartments": 3757.99,
+          "tow-wsd": 1983.37
+        },
+        "sourcePack": "Import Data/tow-october-2026",
+        "notes": "Do not sum this summary with sibling check rows. WSD combined = enterprise 1533.37 + general 450.00; both use enterpriseId tow-wsd."
+      }
+    }
+  ]
+}

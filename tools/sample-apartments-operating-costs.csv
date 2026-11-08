@@ -1,0 +1,5 @@
+date,amount,vendor,category,unitNumber,notes
+2026-10-03,245.50,Valley Electric,Utility,12,electric
+2026-10-12,890.00,Front Range Plumbing,Repair,8,water heater
+2026-10-18,120.00,,CommonUpkeep,,lawn
+2026-10-22,65.75,City of Wiley,Utility,3,trash

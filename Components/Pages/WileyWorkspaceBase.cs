@@ -267,7 +267,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         new("capital-gap", "Capital Gap"),
         new("trends", "Trends"),
         new("decision-support", "Decision Support"),
-        new("data-dashboard", "Data Dashboard")
+        new("data-dashboard", "Data Dashboard"),
+        new("reference-data", "Reference Data")
     ];
 
     protected static string GetPanelRoute(string panelKey)
@@ -643,6 +644,70 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "workspace-pdf");
     }
 
+    protected Task ExportArchivedSnapshotExcelAsync()
+        => ExportArchivedSnapshotArtifactAsync(
+            "scenario-workbook",
+            "Archiving Excel packet from the selected saved scenario...");
+
+    protected Task ExportArchivedSnapshotPdfAsync()
+        => ExportArchivedSnapshotArtifactAsync(
+            "workspace-pdf",
+            "Archiving PDF packet from the selected saved scenario...");
+
+    private async Task ExportArchivedSnapshotArtifactAsync(string documentKind, string pendingStatus)
+    {
+        if (IsExportingDocuments)
+        {
+            return;
+        }
+
+        if (SelectedScenarioSnapshotId is not > 0)
+        {
+            DocumentExportStatus = "Select a saved scenario before creating an archived export.";
+            StateHasChanged();
+            return;
+        }
+
+        IsExportingDocuments = true;
+        DocumentExportStatus = pendingStatus;
+        StateHasChanged();
+
+        try
+        {
+            var snapshotId = SelectedScenarioSnapshotId.Value;
+            var batch = await WorkspaceSnapshotApiService.CreateSnapshotExportsAsync(
+                snapshotId,
+                new WorkspaceSnapshotArtifactRequest([documentKind], ReplaceExisting: true));
+
+            var artifact = batch.Artifacts.FirstOrDefault(item =>
+                string.Equals(item.DocumentKind, documentKind, StringComparison.OrdinalIgnoreCase));
+            if (artifact is null)
+            {
+                throw new InvalidOperationException($"The API did not return a {documentKind} artifact for snapshot {snapshotId}.");
+            }
+
+            var document = await WorkspaceSnapshotApiService.DownloadSnapshotArtifactAsync(artifact);
+            await BrowserDownloadService.DownloadAsync(document);
+            DocumentExportStatus = $"Archived {artifact.FileName} (artifact {artifact.ArtifactId}).";
+            WorkspaceState.SetLastExported($"archived-{documentKind}", DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogWarning(
+                ex,
+                "Archived snapshot export failed for SnapshotId={SnapshotId} Kind={DocumentKind}.",
+                SelectedScenarioSnapshotId,
+                documentKind);
+            DocumentExportStatus = $"Archived export failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
+        }
+        finally
+        {
+            IsExportingDocuments = false;
+            StateHasChanged();
+        }
+    }
+
     protected Task LoadNewHireImpactTemplateAsync()
     {
         var clerkAllocation = PartTimeClerkAnnualSalary * PartTimeClerkEnterpriseShare;
@@ -865,6 +930,52 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             : quadrant.EnterpriseName;
     }
 
+    /// <summary>
+    /// Presentation helper: selected enterprise rate sits at or above modeled break-even.
+    /// </summary>
+    protected bool IsSelectedRateAtOrAboveBreakEven => CurrentRate >= RecommendedRate;
+
+    /// <summary>
+    /// Compact hero status pill label (Healthy vs Fallback). Detail stays in tooltip.
+    /// </summary>
+    protected string HeroStatusBadgeText =>
+        IsUsingStartupFallback ? "Fallback · Startup data" : "Healthy · Live snapshot";
+
+    /// <summary>
+    /// Full data-source detail for the hero status tooltip / expand panel.
+    /// </summary>
+    protected string HeroStatusDetailTitle =>
+        $"Workspace API: {HostingApiHealth}. Bootstrap: {StartupSourceStatus}. Current state: {CurrentStateSourceStatus}";
+
+    /// <summary>
+    /// Left-accent CSS class for hero break-even quadrant cards.
+    /// </summary>
+    protected static string GetHeroQuadrantAccentClass(BreakEvenQuadrantData quadrant)
+    {
+        var key = $"{quadrant.EnterpriseName} {quadrant.EnterpriseType}".ToLowerInvariant();
+        if (key.Contains("water", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-water";
+        }
+
+        if (key.Contains("sanit", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-sanitation";
+        }
+
+        if (key.Contains("trash", StringComparison.Ordinal) || key.Contains("solid", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-trash";
+        }
+
+        if (key.Contains("apart", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-apartments";
+        }
+
+        return "workspace-quad-accent-default";
+    }
+
     private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)
     {
         if (IsLoadingWorkspace)
@@ -1036,6 +1147,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "capital-gap" => "capital-gap",
             "decision-support" => "decision-support",
             "data-dashboard" => "data-dashboard",
+            "reference-data" => "reference-data",
             _ => "overview"
         };
     }
