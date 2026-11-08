@@ -54,8 +54,10 @@ namespace WileyWidget.Services
                     return null;
                 }
 
-                // Use model from configuration (supports Grok:Model, XAI:Model, defaults to grok-4.1)
-                var model = _configuration["Grok:Model"] ?? _configuration["XAI:Model"] ?? "grok-4.1";
+                // Use model from configuration (supports Grok:Model, XAI:Model; blank/retired → grok-4.7)
+                var model = WorkspaceAiKernelFactory.NormalizeModelId(
+                    _configuration["Grok:Model"] ?? _configuration["XAI:Model"],
+                    WorkspaceAiKernelFactory.DefaultSemanticKernelModel);
 
                 var kernelBuilder = Kernel.CreateBuilder();
                 kernelBuilder.AddOpenAIChatCompletion(

@@ -50,15 +50,26 @@ public sealed class WorkspaceAiAssistantServiceTests
         Assert.Equal("https://api.x.ai/v1/responses", defaultAiConfiguration.LegacyResponsesEndpoint.ToString());
         Assert.False(defaultAiConfiguration.StoreResponses);
 
+        var retiredConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["XaiModel"] = "grok-4.20-0309-reasoning",
+            ["XAI:ChatEndpoint"] = "https://proxy.example/v1"
+        }).Build();
+        var retiredAiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(retiredConfiguration);
+
+        Assert.Equal(
+            WorkspaceAiKernelFactory.DefaultSemanticKernelModel,
+            retiredAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
+
         var configuredConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["XaiApiEndpoint"] = "https://alias.example/v1",
-            ["XaiModel"] = "grok-4.20-0309-reasoning",
+            ["XaiModel"] = "grok-4.10",
             ["XAI:ChatEndpoint"] = "https://proxy.example/v1"
         }).Build();
         var configuredAiConfiguration = WorkspaceAiKernelFactory.ResolveConfiguration(configuredConfiguration);
 
-        Assert.Equal("grok-4.20-0309-reasoning", configuredAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
+        Assert.Equal("grok-4.10", configuredAiConfiguration.ResolveModelOrDefault(WorkspaceAiAssistantService.GetDefaultSemanticKernelModel()));
         Assert.Equal("https://proxy.example/v1", configuredAiConfiguration.ChatCompletionEndpoint.ToString());
 
         var executionSettings = WorkspaceAiAssistantService.CreateSemanticKernelExecutionSettings();
@@ -772,7 +783,7 @@ public sealed class WorkspaceAiAssistantServiceTests
                 "\"id\":\"chatcmpl-test\"," +
                 "\"object\":\"chat.completion\"," +
                 "\"created\":1735689600," +
-                "\"model\":\"grok-4.20-0309-reasoning\"," +
+                "\"model\":\"grok-4.7\"," +
                 "\"choices\":[{" +
                     "\"index\":0," +
                     "\"message\":{\"role\":\"assistant\",\"content\":\"Direct Semantic Kernel retry answer.\"}," +
@@ -944,7 +955,7 @@ public sealed class WorkspaceAiAssistantServiceTests
         private static readonly WorkspaceAiServiceConfiguration Configuration = new(
             new WorkspaceAiApiKeyResolution("test-api-key", "test-provider", true, false, false, false, null),
             true,
-            "grok-4.20-0309-reasoning",
+            WorkspaceAiKernelFactory.DefaultSemanticKernelModel,
             false,
             new global::System.Uri("https://proxy.example/prod/v1"),
             new global::System.Uri("https://proxy.example/prod/v1/responses"));

@@ -586,12 +586,13 @@
 
         @if (!string.Equals(ActivePanelKey, "decision-support", StringComparison.Ordinal) && !IsJarvisOpen)
         {
-            <SfButton id="workspace-jarvis-launcher"
+            <SfButton ID="workspace-jarvis-launcher"
                       CssClass="e-primary fixed bottom-6 right-6 z-40 shadow-xl"
                       IsPrimary="true"
                       OnClick="ToggleJarvisAsync"
                       title="Open Jarvis AI guidance rail"
-                      aria-expanded="false">
+                      aria-expanded="@(IsJarvisOpen ? "true" : "false")"
+                      aria-controls="workspace-jarvis-rail">
                 <span class="e-icons e-ai-chat" aria-hidden="true"></span>
                 Jarvis
             </SfButton>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
 using Microsoft.Extensions.Configuration;
@@ -34,7 +35,9 @@ public sealed record WorkspaceAiServiceConfiguration(
     Uri LegacyResponsesEndpoint)
 {
     public string ResolveModelOrDefault(string fallbackModel)
-        => string.IsNullOrWhiteSpace(Model) ? fallbackModel : Model.Trim();
+        => WorkspaceAiKernelFactory.NormalizeModelId(
+            string.IsNullOrWhiteSpace(Model) ? fallbackModel : Model,
+            fallbackModel);
 }
 
 public sealed record WorkspaceAiKernelContext(Kernel Kernel, IChatCompletionService ChatService);
@@ -49,11 +52,37 @@ public sealed record WorkspaceAiKernelInitializationResult(
 
 public static class WorkspaceAiKernelFactory
 {
-    public const string DefaultSemanticKernelModel = "grok-4-1-fast-reasoning";
+    public const string DefaultSemanticKernelModel = "grok-4.7";
     public const string HttpClientName = "WorkspaceAiTransport";
+
+    private static readonly HashSet<string> RetiredModelIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "grok-4-1-fast-reasoning",
+        "grok-4.1",
+        "grok-4.20-0309-reasoning"
+    };
 
     private static readonly Uri DirectResponsesEndpoint = NormalizeResponsesEndpoint("https://api.x.ai/v1");
     private static readonly Uri DirectChatCompletionEndpoint = NormalizeChatCompletionEndpoint("https://api.x.ai/v1");
+
+    /// <summary>
+    /// Blank or retired xAI model ids rewrite to <paramref name="fallbackModel"/> (default grok-4.7).
+    /// Newer explicit ids (for example grok-4.10) are kept.
+    /// </summary>
+    public static string NormalizeModelId(string? modelId, string? fallbackModel = null)
+    {
+        var fallback = string.IsNullOrWhiteSpace(fallbackModel)
+            ? DefaultSemanticKernelModel
+            : fallbackModel.Trim();
+
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return fallback;
+        }
+
+        var normalized = modelId.Trim();
+        return RetiredModelIds.Contains(normalized) ? fallback : normalized;
+    }
 
     public static WorkspaceAiServiceConfiguration ResolveConfiguration(IConfiguration configuration, IGrokApiKeyProvider? apiKeyProvider = null)
     {

@@ -80,7 +80,9 @@ public sealed class WorkspaceAiAssistantService
         legacyXaiEndpoint = aiConfiguration.LegacyResponsesEndpoint;
         // Per xAI docs (docs.x.ai/developers/models): prefer a reasoning-capable, function-capable Grok model for the live SK path.
         semanticKernelModel = aiConfiguration.ResolveModelOrDefault(DefaultSemanticKernelModel);
-        legacyXaiModel = GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model") ?? "grok-4-1-fast-reasoning";
+        legacyXaiModel = WorkspaceAiKernelFactory.NormalizeModelId(
+            GetConfiguredString("XaiModel", "XAI:Model", "Grok:Model"),
+            DefaultSemanticKernelModel);
         legacyXaiTemperature = GetConfiguredDouble(0.3d, "XaiTemperature", "XAI:Temperature");
         legacyXaiMaxTokens = GetConfiguredInt(800, "XaiMaxTokens", "XAI:MaxTokens");
         semanticKernelTimeoutSeconds = GetConfiguredInt(30, "SemanticKernelTimeoutSeconds", "XAI:SemanticKernelTimeoutSeconds", "XAI:TimeoutSeconds");
