@@ -1078,7 +1078,7 @@ public partial class Program
         var config = app.Configuration;
         app.MapPost("/api/ai/chat", MapWorkspaceAiChatMessageEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapPost("/api/ai/chat/reset", MapWorkspaceAiChatResetEndpoint).RequireWorkspaceMutatingAuth(config);
-        app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint);
+        app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint).RequireWorkspaceReadAuth(config);
         app.MapGet("/api/ai/health", MapWorkspaceAiHealthEndpoint);
         app.MapGet("/api/jarvis/health", MapWorkspaceAiHealthEndpoint);
     }
@@ -1699,11 +1699,11 @@ public partial class Program
     {
         var customers = app.MapGroup("/api/utility-customers");
 
-        MapUtilityCustomerReadEndpoints(customers);
+        MapUtilityCustomerReadEndpoints(customers, app.Configuration);
         MapUtilityCustomerWriteEndpoints(customers, app.Configuration);
     }
 
-    private static void MapUtilityCustomerReadEndpoints(RouteGroupBuilder customers)
+    private static void MapUtilityCustomerReadEndpoints(RouteGroupBuilder customers, IConfiguration configuration)
     {
         customers.MapGet(string.Empty, async (
             IDbContextFactory<AppDbContext> contextFactory,
@@ -1719,7 +1719,7 @@ public partial class Program
                 .ToListAsync(cancellationToken);
 
             return Results.Ok(records);
-        });
+        }).RequireWorkspaceReadAuth(configuration);
 
         customers.MapGet("/{id:int}", async (
             int id,
@@ -1734,7 +1734,7 @@ public partial class Program
             return customer == null
                 ? Results.NotFound()
                 : Results.Ok(ToUtilityCustomerRecord(customer));
-        });
+        }).RequireWorkspaceReadAuth(configuration);
     }
 
     private static void MapUtilityCustomerWriteEndpoints(RouteGroupBuilder customers, IConfiguration configuration)
@@ -1885,7 +1885,7 @@ public partial class Program
                     detail: ex.Message,
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
-        });
+        }).RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static void MapWorkspaceCapitalGapEndpoint(WebApplication app)
@@ -1922,7 +1922,7 @@ public partial class Program
                     detail: ex.Message,
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
-        });
+        }).RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static bool TryValidateDebtCoverageRequest(DebtCoverageRequest request, out IResult? validationError)
@@ -2324,7 +2324,8 @@ public partial class Program
 
     private static void MapWorkspaceScenarioListEndpoint(WebApplication app)
     {
-        app.MapGet("/api/workspace/scenarios", MapWorkspaceScenarioListAsync);
+        app.MapGet("/api/workspace/scenarios", MapWorkspaceScenarioListAsync)
+            .RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceScenarioListAsync(
@@ -2399,7 +2400,8 @@ public partial class Program
 
     private static void MapWorkspaceScenarioGetEndpoint(WebApplication app)
     {
-        app.MapGet("/api/workspace/scenarios/{snapshotId:long}", MapWorkspaceScenarioGetAsync);
+        app.MapGet("/api/workspace/scenarios/{snapshotId:long}", MapWorkspaceScenarioGetAsync)
+            .RequireWorkspaceReadAuth(app.Configuration);
     }
 
     private static async Task<IResult> MapWorkspaceScenarioGetAsync(

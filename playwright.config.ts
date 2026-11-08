@@ -58,16 +58,22 @@ const finalBaseURL = isCI
   : normalizeBaseURL(process.env.WILEYCO_E2E_BASE_URL ?? defaultLocalBaseURL);
 
 const useManagedWebServer = !isCI && finalBaseURL === defaultLocalBaseURL;
+// Prefer the SDK that built the API (avoid login-shell PATH picking a mismatched /usr/local/share/dotnet).
+const dotnetRoot = process.env.DOTNET_ROOT?.trim() || "";
+const pathWithDotnet = dotnetRoot
+  ? `${dotnetRoot}${process.platform === "win32" ? ";" : ":"}${process.env.PATH ?? ""}`
+  : process.env.PATH;
 const finalWebServer = isCI
   ? [
       {
-        command:
-          'bash -lc "cd ./api_output && dotnet ./WileyCoWeb.Api.dll --urls http://127.0.0.1:5231"',
+        command: "dotnet ./WileyCoWeb.Api.dll --urls http://127.0.0.1:5231",
+        cwd: "./api_output",
         url: `${defaultLocalApiURL}/health`,
         reuseExistingServer: true,
         timeout: 120_000,
         env: {
           ASPNETCORE_ENVIRONMENT: "Development",
+          ...(dotnetRoot ? { DOTNET_ROOT: dotnetRoot, PATH: pathWithDotnet } : {}),
         },
       },
       {

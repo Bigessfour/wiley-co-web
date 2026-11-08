@@ -296,7 +296,8 @@ jobs:
           path: publish_output/wwwroot
 
   playwright-ui:
-    runs-on: ubuntu-latest
+    # Pin 24.04: ubuntu-latest is 26.04 and Playwright 1.59.1 cannot install Chromium there.
+    runs-on: ubuntu-24.04
     needs: build-and-publish
     # Smoke-only: full Playwright suite is long and environment-sensitive (static wwwroot + API).
     # Run locally: npm run playwright:test:ci or npm run playwright:test:strict before release.
@@ -308,7 +309,7 @@ jobs:
       SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
       PLAYWRIGHT_HTML_OPEN: never
       CI: true
-      # Full Chromium + WebKit roughly doubles wall time on ubuntu-latest; CI gates on Chromium only.
+      # Full Chromium + WebKit roughly doubles wall time; CI gates on Chromium only.
       # Run both locally: unset PLAYWRIGHT_CI_BROWSERS or `npm run playwright:test:strict`.
       PLAYWRIGHT_CI_BROWSERS: chromium
       # Mitigate GitHub Actions Node 20 -> Node 24 deprecation for actions/cache@v4 (and similar JS actions).

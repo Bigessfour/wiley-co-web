@@ -1,9 +1,12 @@
 using WileyCoWeb;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Syncfusion.Blazor;
 using Syncfusion.Licensing;
 using WileyCoWeb.Components;
+using WileyCoWeb.Services.Auth;
 using WileyCoWeb.State;
 using System.Diagnostics;
 using System.Linq;
@@ -45,6 +48,7 @@ namespace WileyCoWeb.Services
             var clientBaseAddress = builder.HostEnvironment.BaseAddress;
 
             var startupState = await ResolveClientStartupStateAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
+            await MergeAuthLocalSettingsAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
 
             ConfigureClientBuilder(builder, startupState.ResolvedApiBaseAddress!);
 
@@ -225,10 +229,54 @@ namespace WileyCoWeb.Services
 
         static void ConfigureClientServices(WebAssemblyHostBuilder builder, Uri resolvedApiBaseAddress)
         {
-            builder.Services.AddScoped(sp => new HttpClient
+            var cognitoAuthOptions = new CognitoAuthOptions();
+            builder.Configuration.GetSection(CognitoAuthOptions.SectionName).Bind(cognitoAuthOptions);
+            builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(cognitoAuthOptions));
+            var authEnabled = cognitoAuthOptions.Enabled;
+
+            builder.Services.AddAuthorizationCore(options =>
             {
-                BaseAddress = resolvedApiBaseAddress,
-                Timeout = TimeSpan.FromMinutes(4)
+                if (authEnabled)
+                {
+                    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                        .RequireAuthenticatedUser()
+                        .Build();
+                }
+            });
+            builder.Services.AddScoped<CognitoTokenStore>();
+            builder.Services.AddHttpClient("CognitoIdp", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+            builder.Services.AddScoped<CognitoAuthService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("CognitoIdp");
+                return new CognitoAuthService(
+                    httpClient,
+                    sp.GetRequiredService<CognitoTokenStore>(),
+                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CognitoAuthOptions>>(),
+                    sp.GetRequiredService<ILogger<CognitoAuthService>>());
+            });
+            builder.Services.AddScoped<CognitoAuthenticationStateProvider>();
+            builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<CognitoAuthenticationStateProvider>());
+            builder.Services.AddCascadingAuthenticationState();
+            builder.Services.AddScoped<CognitoAuthorizationMessageHandler>();
+
+            builder.Services.AddScoped(sp =>
+            {
+                HttpMessageHandler pipeline = new HttpClientHandler();
+                if (authEnabled)
+                {
+                    var authHandler = sp.GetRequiredService<CognitoAuthorizationMessageHandler>();
+                    authHandler.InnerHandler = pipeline;
+                    pipeline = authHandler;
+                }
+
+                return new HttpClient(pipeline)
+                {
+                    BaseAddress = resolvedApiBaseAddress,
+                    Timeout = TimeSpan.FromMinutes(4)
+                };
             });
             builder.Services.AddScoped(sp => new WorkspaceLocalBootstrapService(
                 new HttpClient

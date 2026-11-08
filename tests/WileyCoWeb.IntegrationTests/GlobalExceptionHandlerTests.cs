@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -155,6 +156,16 @@ public sealed class GlobalExceptionHandlerTests : IClassFixture<ApiApplicationFa
         // Exports list (read protected)
         var exports = await client.GetAsync("/api/workspace/snapshot/1/exports");
         Assert.Equal(HttpStatusCode.Unauthorized, exports.StatusCode);
+
+        // Phase 1 coverage: customers, scenarios, analysis POSTs, recommendations
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/utility-customers")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/workspace/scenarios?enterprise=Water%20Utility&fiscalYear=2026")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/ai/recommendations?enterprise=Water%20Utility&fiscalYear=2026")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/workspace/debt-coverage", new { SelectedEnterprise = "Water Utility", SelectedFiscalYear = 2026 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/workspace/capital-gap", new { SelectedEnterprise = "Water Utility", SelectedFiscalYear = 2026 })).StatusCode);
+
+        // Health stays anonymous for ops probes
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/ai/health")).StatusCode);
     }
 
     /// <summary>
