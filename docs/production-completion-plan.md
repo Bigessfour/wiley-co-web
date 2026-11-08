@@ -10,9 +10,7 @@ Done. Rate math is decision support (revenue requirement). Issues #27 and #25 cl
 
 ## Phase 1. Auth, before any new production image
 
-[#15](https://github.com/Bigessfour/wiley-co-web/issues/15)
-
-**Done on disk (2026-11-08): staff Cognito login.**
+[#15](https://github.com/Bigessfour/wiley-co-web/issues/15) — staff Cognito login. **Merged** via PR #28.
 
 Decision: staff Cognito only. No public-read exception. Pool `us-east-2_DmY7BCBIp`, app client `2m6vp91m9938jpbg2efivr2p8k` (no client secret).
 
@@ -28,10 +26,21 @@ Decision: staff Cognito only. No public-read exception. Pool `us-east-2_DmY7BCBI
 | Local override           | `Scripts/generate-auth-appsettings.sh` → `wwwroot/appsettings.Auth.local.json`                                              |
 | Dev                      | `Auth:Enabled=false` keeps workspace open for local/tests                                                                   |
 
-Ops before next hosted publish: confirm Cognito pool/client allow `USER_PASSWORD_AUTH`; create staff users; prove anonymous 401 and signed-in workspace load (`Scripts/get-cognito-smoke-token.ps1` when present).
+Ops before next hosted publish: confirm Cognito pool/client allow `USER_PASSWORD_AUTH`; create staff users; prove anonymous 401 and signed-in workspace load.
 
-Run `/code-review` on the auth pull request before merge. Keep auth separate from Jarvis.
+## Phase 2. Prove `grok-4.7`, then delete the dead stack
 
-## Later phases
+[#16](https://github.com/Bigessfour/wiley-co-web/issues/16), then [#24](https://github.com/Bigessfour/wiley-co-web/issues/24)
 
-Phase 2+ (Jarvis model prove, AWS egress, deploy, polish, ECS) remain after Phase 1 merges. See `docs/post-production-operations-handbook.md` for day-two ops.
+**Decision:** Jarvis, QuickBooks assistant, and the model default are `grok-4.7`. Blank or retired ids (`grok-4-1-fast-reasoning`, `grok-4.1`, `grok-4.20-0309-reasoning`) rewrite to that default via `WorkspaceAiKernelFactory.NormalizeModelId`. Newer explicit ids (for example `grok-4.10`) are kept. Do not edit historical EF migration seed strings.
+
+PR #14 (`grok-4.3` + launcher) is superseded; do not merge it red.
+
+1. PR #29: default model `grok-4.7`, launcher `#workspace-jarvis-launcher`, local health prove (`semantic_kernel`, no fallback) when `XAI_API_KEY` is available.
+2. After #29 merges: PR #30 for #24 deletes leftover AI types and strips `IAIService` / `AICacheWarmingService` DI; cull list matches the tree.
+
+Keep Phase 2b egress and Phase 3 deploy out of these PRs.
+
+## Phase 2b / 3+
+
+AWS egress hardening, deploy, polish, and ECS remain after Phase 2. See `docs/post-production-operations-handbook.md`.

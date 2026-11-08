@@ -75,7 +75,9 @@ public class XAIService : IAIService, IDisposable
 
         _enabled = bool.Parse(configuration["XAI:Enabled"] ?? "false");
         _endpoint = NormalizeResponsesEndpoint(configuration["XAI:Endpoint"]);
-        _model = configuration["XAI:Model"] ?? "grok-4.1";
+        _model = WileyWidget.Services.Abstractions.WorkspaceAiKernelFactory.NormalizeModelId(
+            configuration["XAI:Model"],
+            WileyWidget.Services.Abstractions.WorkspaceAiKernelFactory.DefaultSemanticKernelModel);
         _temperature = double.Parse(configuration["XAI:Temperature"] ?? "0.3", CultureInfo.InvariantCulture);
         _maxTokens = int.Parse(configuration["XAI:MaxTokens"] ?? "800", CultureInfo.InvariantCulture);
 

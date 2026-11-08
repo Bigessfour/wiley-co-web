@@ -166,7 +166,7 @@ public class AppOptions
 
     [Category("AI")]
     [Display(Name = "Model")]
-    public string XaiModel { get; set; } = "grok-4-1-fast-reasoning";
+    public string XaiModel { get; set; } = "grok-4.7";
 
     [Category("AI")]
     [Display(Name = "Response Style")]

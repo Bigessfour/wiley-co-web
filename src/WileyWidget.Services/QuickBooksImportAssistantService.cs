@@ -80,7 +80,9 @@ public sealed class QuickBooksImportAssistantService
 				return null;
 			}
 
-			var model = configuration["Grok:Model"] ?? configuration["XAI:Model"] ?? "grok-4.1";
+			var model = WorkspaceAiKernelFactory.NormalizeModelId(
+				configuration["Grok:Model"] ?? configuration["XAI:Model"],
+				WorkspaceAiKernelFactory.DefaultSemanticKernelModel);
 
 			var kernelBuilder = Kernel.CreateBuilder();
 			kernelBuilder.AddOpenAIChatCompletion(
