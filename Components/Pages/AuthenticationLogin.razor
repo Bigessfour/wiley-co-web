@@ -1,0 +1,132 @@
+@page "/authentication/login"
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using Microsoft.AspNetCore.Components.Authorization
+@using WileyCoWeb.Services.Auth
+@inject CognitoAuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Staff sign-in | Wiley.co</PageTitle>
+
+<section class="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-8 text-slate-900 shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Town of Wiley</p>
+    <h1 class="mt-2 text-2xl font-semibold tracking-tight">Staff sign-in</h1>
+    <p class="mt-2 text-sm text-slate-600">
+        Use your Cognito staff account to load live workspace data. Anonymous API calls return 401 when JWT is enabled in production.
+    </p>
+
+    @if (!AuthService.IsEnabled)
+    {
+        <p class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Client auth is disabled for this build (`Auth:Enabled=false`). Local development keeps the workspace open without Cognito.
+        </p>
+        <a class="mt-4 inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/wiley-workspace">
+            Open workspace
+        </a>
+    }
+    else
+    {
+        <EditForm Model="_model" OnValidSubmit="SignInAsync" class="mt-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700" for="staff-username">Username</label>
+                <InputText id="staff-username"
+                           @bind-Value="_model.Username"
+                           class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                           autocomplete="username" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700" for="staff-password">Password</label>
+                <input id="staff-password"
+                       @bind="_model.Password"
+                       type="password"
+                       class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                       autocomplete="current-password" />
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <p class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">@_error</p>
+            }
+
+            <button id="staff-sign-in-submit"
+                    type="submit"
+                    class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    disabled="@_busy">
+                @(_busy ? "Signing in…" : "Sign in")
+            </button>
+        </EditForm>
+    }
+</section>
+
+@code {
+    private readonly LoginModel _model = new();
+    private bool _busy;
+    private string? _error;
+    private string? _returnUrl;
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _returnUrl = SanitizeReturnUrl(ReturnUrl);
+    }
+
+    private async Task SignInAsync()
+    {
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            await AuthService.SignInAsync(_model.Username, _model.Password).ConfigureAwait(false);
+            if (AuthStateProvider is CognitoAuthenticationStateProvider cognitoAuthStateProvider)
+            {
+                cognitoAuthStateProvider.NotifyAuthenticationStateChanged();
+            }
+
+            Navigation.NavigateTo(string.IsNullOrWhiteSpace(_returnUrl) ? "/wiley-workspace" : _returnUrl!);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string? SanitizeReturnUrl(string? candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return null;
+        }
+
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out var absolute))
+        {
+            var appOrigin = Navigation.ToAbsoluteUri("/").GetLeftPart(UriPartial.Authority);
+            if (!string.Equals(absolute.GetLeftPart(UriPartial.Authority), appOrigin, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return absolute.PathAndQuery;
+        }
+
+        if (candidate.StartsWith('/') && !candidate.StartsWith("//", StringComparison.Ordinal))
+        {
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private sealed class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+
+        public string Password { get; set; } = string.Empty;
+    }
+}

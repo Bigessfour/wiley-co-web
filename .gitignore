@@ -2,9 +2,11 @@
 *.log
 appsettings.Syncfusion.local.json
 appsettings.Workspace.local.json
+appsettings.Auth.local.json
 WileyCoWeb.Api/appsettings.Development.local.json
 wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
+wwwroot/appsettings.Auth.local.json
 .DS_Store
 .cursor/
 bin/

@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Globalization;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
@@ -1188,6 +1189,15 @@ public sealed class ComponentPageTests
 		context.Services.AddSingleton(workspaceState);
 		context.Services.AddSingleton<ToastService>();
 		context.Services.AddSingleton<IJSRuntime>(jsRuntime);
+		context.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new WileyCoWeb.Services.Auth.CognitoAuthOptions()));
+		context.Services.AddScoped<WileyCoWeb.Services.Auth.CognitoTokenStore>();
+		context.Services.AddScoped(sp => new WileyCoWeb.Services.Auth.CognitoAuthService(
+			new HttpClient { BaseAddress = new Uri("https://cognito.test/") },
+			sp.GetRequiredService<WileyCoWeb.Services.Auth.CognitoTokenStore>(),
+			sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WileyCoWeb.Services.Auth.CognitoAuthOptions>>(),
+			sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<WileyCoWeb.Services.Auth.CognitoAuthService>>()));
+		var authContext = context.AddTestAuthorization();
+		authContext.SetAuthorized("local-dev");
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
 		snapshotClient ??= CreateSnapshotClient();
 		var snapshotService = new WorkspaceSnapshotApiService(snapshotClient);

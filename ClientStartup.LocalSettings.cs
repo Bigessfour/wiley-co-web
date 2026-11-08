@@ -1,12 +1,39 @@
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 
 namespace WileyCoWeb.Services;
 
 static partial class ClientStartup
 {
+    static async Task MergeAuthLocalSettingsAsync(
+        WebAssemblyHostBuilder builder,
+        string baseAddress,
+        IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
+    {
+        var json = await LoadLocalSettingsJsonAsync(
+            baseAddress,
+            "appsettings.Auth.local.json",
+            "The client will continue with appsettings.json / appsettings.{Environment}.json Auth values.",
+            startupDiagnostics).ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        builder.Configuration.AddJsonStream(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+        AddLocalSettingsDiagnostic(
+            startupDiagnostics,
+            LogLevel.Information,
+            "appsettings.Auth.local.json was merged into client configuration for staff Cognito sign-in.",
+            null);
+    }
+
     static string? NormalizeSyncfusionLicenseKey(string? rawLicenseKey)
     {
         if (string.IsNullOrWhiteSpace(rawLicenseKey)) return null;
