@@ -134,3 +134,9 @@ Wiley Widget API stores these payloads without touching QuickBooks import or wor
 - `POST` / `GET` `/api/reference-data/events` (+ `GET .../events/{id}`; body is `OperationalEvent[]`, not the PayloadBatch envelope)
 
 Local ports: client `http://127.0.0.1:5230`, API `http://127.0.0.1:5231`. Exact `curl` examples (ActualsSummary + OperationalEvent `items[]`) are in [`docs/shared-contracts-reference-data-api.md`](../docs/shared-contracts-reference-data-api.md#local-curl-exact).
+
+Repeatable smoke test (hard-coded Oct 2026 numbers, POST + GET assert):
+
+```bash
+./Scripts/verify-shared-contracts.sh
+```

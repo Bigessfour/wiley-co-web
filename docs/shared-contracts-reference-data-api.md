@@ -81,6 +81,18 @@ curl -sS "http://127.0.0.1:5231/api/reference-data/actuals" | jq .
 curl -sS "http://127.0.0.1:5231/api/reference-data/events" | jq .
 ```
 
+### Round-trip script (preferred smoke test)
+
+Hard-coded October 2026 ActualsSummary + 4 OperationalEvents (3 checks + summary). POSTs, GETs by id, asserts money fields, exits non-zero on failure:
+
+```bash
+# From wiley-co-web/ with WileyCoWeb.Api on http://127.0.0.1:5231
+./Scripts/verify-shared-contracts.sh
+```
+
+Optional: `./Scripts/verify-shared-contracts.sh --api http://127.0.0.1:5231`  
+Requires `curl` + `jq`. Does **not** touch QuickBooks import, snapshots, or break-even.
+
 ## Prompt 4 — file / HTTPS ingest helper
 
 Does **not** touch QuickBooks CSV import (`/api/imports/quickbooks/*`).
