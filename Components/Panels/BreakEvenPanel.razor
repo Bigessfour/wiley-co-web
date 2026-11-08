@@ -165,7 +165,7 @@
 
                 <section id="@GetQuadrantSectionId(quadrant)" class="flex h-full flex-col rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel-secondary shadow-sm overflow-hidden">
 
-                    
+
                     <div class="flex items-center justify-between bg-[#0f172a] px-4 py-3">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">@quadrant.EnterpriseType</p>
@@ -178,7 +178,7 @@
 
                     <div class="flex flex-1 flex-col gap-3 p-4">
 
-                        
+
                         <div class="grid grid-cols-3 gap-2 text-center">
                             <SfTooltip Content="Current rate charged per customer per month."
                                        Position="Syncfusion.Blazor.Popups.Position.TopCenter"
@@ -214,7 +214,7 @@
                             </SfTooltip>
                         </div>
 
-                        
+
                         <div class="flex flex-col items-center gap-1">
                             <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Rate Adequacy</p>
                             <SfCircularGauge ID="@GetQuadrantGaugeId(quadrant)"
@@ -252,7 +252,7 @@
                             <p class="text-xs font-medium @adequacyCss">@adequacyLabel</p>
                             <p class="text-[10px] wiley-text-muted">@adequacy.ToString("N0")% of break-even covered</p>
                         </div>
-                        
+
                         <div class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel p-2">
                             <SfChart ID="@GetQuadrantChartId(quadrant)"
                                      Title="@($"{quadrant.EnterpriseName} break-even")"
@@ -308,15 +308,6 @@
                                 </ChartSeriesCollection>
                             </SfChart>
                         </div>
-        <SfAccordion ID="break-even-apartment-accordion" ExpandMode="ExpandMode.Single" LoadOnDemand="false">
-            <AccordionItems>
-                <AccordionItem Header="Apartment Configuration" Expanded="true" CssClass="break-even-apartment-item">
-                    <ContentTemplate>
-                        <ApartmentConfigPanel UnitTypes="@ApartmentUnitTypes" OnUnitTypesChanged="OnApartmentUnitTypesChanged" />
-                    </ContentTemplate>
-                </AccordionItem>
-            </AccordionItems>
-        </SfAccordion>
 
                     </div>
                 </section>
