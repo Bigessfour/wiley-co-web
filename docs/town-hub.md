@@ -7,6 +7,8 @@ Minimal suite entry page at `/` and `/town-hub` inside Wiley Widget (Blazor WASM
 - Cognito login when `Auth:Enabled` is true (same as the rest of wiley-co-web); local default keeps auth off for mock/local testing.
 - Five cards: Wiley Widget, Apartments, Rural Water, Trash Truck, TIKR — each opens the **existing** app URL (no embedded UIs).
 - Compact summary tiles that call `GET /api/reference-data/actuals` and `GET /api/reference-data/events` via the existing `SharedContractReferenceDataApiService`.
+  - **Latest actuals** — most recent ActualsSummary (enterprise, period, income vs expense). Empty API → muted “No ActualsSummary yet”.
+  - App cards show **Updated …** / **No data yet** from matching `ReferenceEnterpriseId`, `ReferencePublisherSystem`, or `ReferenceSources` (no extra AWS calls).
 - Full grids stay on `/wiley-workspace/reference-data` (`SharedContractReferenceDataPanel`) — Town Hub does **not** duplicate that panel.
 
 ## Pointing cards at local vs App Runner
@@ -28,9 +30,13 @@ Each app entry:
   "Title": "Apartments",
   "Description": "ClerkSuite apartments operations.",
   "Url": "http://localhost:8082",
-  "OpenInNewTab": true
+  "OpenInNewTab": true,
+  "ReferenceEnterpriseId": "tow-apartments",
+  "ReferencePublisherSystem": "wiley-apartments"
 }
 ```
+
+Optional status match fields: `ReferenceEnterpriseId`, `ReferencePublisherSystem`, `ReferenceSources[]`. Omit them for apps with no reference-data yet (card shows “No data yet”).
 
 ### Local defaults (dev)
 

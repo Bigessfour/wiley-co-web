@@ -24,4 +24,21 @@ public sealed class TownHubAppLink
     public string Url { get; set; } = string.Empty;
     /// <summary>When true, open in a new tab (typical for sibling apps).</summary>
     public bool OpenInNewTab { get; set; } = true;
+
+    /// <summary>
+    /// Optional <c>metadata.enterpriseId</c> / ActualsSummary enterprise match for card status
+    /// (e.g. <c>tow-apartments</c>). Empty = no enterprise match for this card.
+    /// </summary>
+    public string? ReferenceEnterpriseId { get; set; }
+
+    /// <summary>
+    /// Optional <c>metadata.publisherSystem</c> match (e.g. <c>wiley-apartments</c>).
+    /// </summary>
+    public string? ReferencePublisherSystem { get; set; }
+
+    /// <summary>
+    /// Optional OperationalEvent <c>source</c> values that count for this card
+    /// (e.g. council-packet for Widget).
+    /// </summary>
+    public List<string> ReferenceSources { get; set; } = [];
 }

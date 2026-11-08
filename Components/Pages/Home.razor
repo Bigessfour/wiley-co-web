@@ -1,5 +1,7 @@
 ﻿@page "/"
 @page "/town-hub"
+@using System.Globalization
+@using System.Text.Json
 @using Microsoft.Extensions.Configuration
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Options
@@ -29,6 +31,7 @@
 	<div class="home-hub-grid town-hub-apps">
 		@foreach (var app in _apps)
 		{
+			var status = ResolveCardStatus(app);
 			<a class="home-hub-card"
 			   href="@app.Url"
 			   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
@@ -36,6 +39,7 @@
 				<span class="home-hub-card-index">@app.Id</span>
 				<strong>@app.Title</strong>
 				<p>@app.Description</p>
+				<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 				<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 			</a>
 		}
@@ -52,27 +56,37 @@
 		{
 			<p class="town-hub-error" role="alert">@_error</p>
 		}
-		else if (_loading && _latestActual is null && _recentEvents.Count == 0)
+		else if (_loading && _latestActual is null && _eventBatches.Count == 0)
 		{
 			<p class="town-hub-muted">Loading latest ActualsSummary and OperationalEvents…</p>
 		}
 		else
 		{
 			<div class="town-hub-tiles">
-				<article class="town-hub-tile">
-					<h3>Latest ActualsSummary</h3>
+				<article class="town-hub-tile town-hub-tile-actuals" aria-labelledby="latest-actuals-heading">
+					<h3 id="latest-actuals-heading">Latest actuals</h3>
 					@if (_latestActual is null)
 					{
-						<p class="town-hub-muted">No documents yet. POST samples via <code>/api/reference-data/actuals</code>.</p>
+						<p class="town-hub-muted">No ActualsSummary yet. POST via <code>/api/reference-data/actuals</code> or run <code>./Scripts/verify-shared-contracts.sh</code>.</p>
 					}
 					else
 					{
 						var a = _latestActual.Actuals;
-						<p><strong>@a.EnterpriseId</strong> · @a.Period</p>
-						<p class="town-hub-muted">
-							Basis: @a.AmountsBasis · Income @a.Income.ToString("N0") · Expenses @a.Expenses.ToString("N0") · Cash @a.CashBalance.ToString("N0")
+						var net = a.Income - a.Expenses;
+						<p class="town-hub-actuals-entity">
+							<strong>@a.EnterpriseId</strong>
+							<span class="town-hub-muted"> · @a.Period · @a.AmountsBasis</span>
 						</p>
-						<p class="town-hub-muted">Id @_latestActual.Id · @_latestActual.AcceptedAt</p>
+						<p class="town-hub-actuals-row">
+							<span>Income <strong>@a.Income.ToString("N2", CultureInfo.InvariantCulture)</strong></span>
+							<span class="town-hub-actuals-sep">vs</span>
+							<span>Expense <strong>@a.Expenses.ToString("N2", CultureInfo.InvariantCulture)</strong></span>
+						</p>
+						<p class="town-hub-muted">
+							Net @(net >= 0 ? "+" : "")@net.ToString("N2", CultureInfo.InvariantCulture)
+							· cash @a.CashBalance.ToString("N2", CultureInfo.InvariantCulture)
+							· accepted @FormatAcceptedAt(_latestActual.AcceptedAt)
+						</p>
 					}
 				</article>
 				<article class="town-hub-tile">
@@ -110,6 +124,8 @@
 
 @code {
 	private List<TownHubAppLink> _apps = [];
+	private IReadOnlyList<ReferenceDataActualsDocument> _actuals = [];
+	private IReadOnlyList<ReferenceDataEventsDocument> _eventBatches = [];
 	private ReferenceDataActualsDocument? _latestActual;
 	private List<OperationalEventContract> _recentEvents = [];
 	private bool _loading;
@@ -120,6 +136,8 @@
 		var options = new TownHubOptions();
 		Configuration.GetSection(TownHubOptions.SectionName).Bind(options);
 		_apps = options.Apps.Count > 0 ? options.Apps : DefaultApps();
+		// wwwroot/appsettings.json is gitignored locally — fill status match keys when omitted.
+		ApplyReferenceDefaults(_apps);
 	}
 
 	protected override async Task OnInitializedAsync()
@@ -133,11 +151,11 @@
 		_error = null;
 		try
 		{
-			var actuals = await ReferenceDataApi.GetActualsAsync();
-			_latestActual = actuals.Count > 0 ? actuals[0] : null;
+			_actuals = await ReferenceDataApi.GetActualsAsync();
+			_latestActual = _actuals.Count > 0 ? _actuals[0] : null;
 
-			var batches = await ReferenceDataApi.GetEventsAsync();
-			_recentEvents = batches
+			_eventBatches = await ReferenceDataApi.GetEventsAsync();
+			_recentEvents = _eventBatches
 				.SelectMany(b => b.Events ?? Array.Empty<OperationalEventContract>())
 				.Take(5)
 				.ToList();
@@ -145,11 +163,175 @@
 		catch (Exception ex)
 		{
 			_error = ex.Message;
+			_actuals = [];
+			_eventBatches = [];
+			_latestActual = null;
+			_recentEvents = [];
 			ToastService.ShowError("Town Hub", "Could not load reference-data summary.");
 		}
 		finally
 		{
 			_loading = false;
+		}
+	}
+
+	private CardStatus ResolveCardStatus(TownHubAppLink app)
+	{
+		DateTimeOffset? latest = null;
+
+		foreach (var doc in _actuals)
+		{
+			if (!MatchesEnterprise(app, doc.Actuals.EnterpriseId))
+			{
+				continue;
+			}
+
+			if (TryParseAccepted(doc.AcceptedAt, out var at) && (!latest.HasValue || at > latest))
+			{
+				latest = at;
+			}
+		}
+
+		foreach (var batch in _eventBatches)
+		{
+			var events = batch.Events ?? Array.Empty<OperationalEventContract>();
+			if (!events.Any(ev => MatchesEvent(app, ev)))
+			{
+				continue;
+			}
+
+			if (TryParseAccepted(batch.AcceptedAt, out var at) && (!latest.HasValue || at > latest))
+			{
+				latest = at;
+			}
+		}
+
+		if (!latest.HasValue)
+		{
+			return new CardStatus(false, "No data yet");
+		}
+
+		return new CardStatus(true, $"Updated {FormatRelative(latest.Value)}");
+	}
+
+	private static bool MatchesEnterprise(TownHubAppLink app, string? enterpriseId)
+	{
+		if (string.IsNullOrWhiteSpace(app.ReferenceEnterpriseId) || string.IsNullOrWhiteSpace(enterpriseId))
+		{
+			return false;
+		}
+
+		return string.Equals(app.ReferenceEnterpriseId.Trim(), enterpriseId.Trim(), StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool MatchesEvent(TownHubAppLink app, OperationalEventContract ev)
+	{
+		if (app.ReferenceSources is { Count: > 0 }
+		    && app.ReferenceSources.Any(s => string.Equals(s, ev.Source, StringComparison.OrdinalIgnoreCase)))
+		{
+			return true;
+		}
+
+		var enterprise = MetaString(ev.Metadata, "enterpriseId");
+		if (MatchesEnterprise(app, enterprise))
+		{
+			return true;
+		}
+
+		var publisher = MetaString(ev.Metadata, "publisherSystem");
+		if (!string.IsNullOrWhiteSpace(app.ReferencePublisherSystem)
+		    && string.Equals(app.ReferencePublisherSystem.Trim(), publisher?.Trim(), StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		// CSV adapter uses wiley-apartments-csv — treat as apartments when publisher prefix matches.
+		if (!string.IsNullOrWhiteSpace(app.ReferencePublisherSystem)
+		    && !string.IsNullOrWhiteSpace(publisher)
+		    && publisher.StartsWith(app.ReferencePublisherSystem.Trim(), StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private static string? MetaString(JsonElement metadata, string name)
+	{
+		if (metadata.ValueKind != JsonValueKind.Object
+		    || !metadata.TryGetProperty(name, out var prop))
+		{
+			return null;
+		}
+
+		return prop.ValueKind switch
+		{
+			JsonValueKind.String => prop.GetString(),
+			JsonValueKind.Null => null,
+			_ => prop.ToString()
+		};
+	}
+
+	private static bool TryParseAccepted(string? value, out DateTimeOffset at)
+	{
+		at = default;
+		return !string.IsNullOrWhiteSpace(value)
+		       && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out at);
+	}
+
+	private static string FormatAcceptedAt(string? value) =>
+		TryParseAccepted(value, out var at)
+			? at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+			: (value ?? "—");
+
+	private static string FormatRelative(DateTimeOffset at)
+	{
+		var delta = DateTimeOffset.UtcNow - at.ToUniversalTime();
+		if (delta.TotalMinutes < 1)
+		{
+			return "just now";
+		}
+
+		if (delta.TotalHours < 1)
+		{
+			return $"{(int)delta.TotalMinutes}m ago";
+		}
+
+		if (delta.TotalDays < 1)
+		{
+			return $"{(int)delta.TotalHours}h ago";
+		}
+
+		if (delta.TotalDays < 14)
+		{
+			return $"{(int)delta.TotalDays}d ago";
+		}
+
+		return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+	}
+
+	private static void ApplyReferenceDefaults(List<TownHubAppLink> apps)
+	{
+		foreach (var app in apps)
+		{
+			switch (app.Id)
+			{
+				case "01":
+					app.ReferenceEnterpriseId ??= "tow-water-utility";
+					if (app.ReferenceSources.Count == 0)
+					{
+						app.ReferenceSources = ["council-packet", "quickbooks-desktop", "nas-export"];
+					}
+
+					break;
+				case "02":
+					app.ReferenceEnterpriseId ??= "tow-apartments";
+					app.ReferencePublisherSystem ??= "wiley-apartments";
+					break;
+				case "03":
+					app.ReferenceEnterpriseId ??= "tow-wsd";
+					break;
+			}
 		}
 	}
 
@@ -161,7 +343,9 @@
 			Title = "Wiley Widget",
 			Description = "Rate study console and financial workspace (this app).",
 			Url = "/wiley-workspace",
-			OpenInNewTab = false
+			OpenInNewTab = false,
+			ReferenceEnterpriseId = "tow-water-utility",
+			ReferenceSources = ["council-packet", "quickbooks-desktop", "nas-export"]
 		},
 		new()
 		{
@@ -169,7 +353,9 @@
 			Title = "Apartments",
 			Description = "ClerkSuite apartments operations.",
 			Url = "http://localhost:8082",
-			OpenInNewTab = true
+			OpenInNewTab = true,
+			ReferenceEnterpriseId = "tow-apartments",
+			ReferencePublisherSystem = "wiley-apartments"
 		},
 		new()
 		{
@@ -177,7 +363,8 @@
 			Title = "Rural Water",
 			Description = "Rural water operations app.",
 			Url = "http://localhost:8083",
-			OpenInNewTab = true
+			OpenInNewTab = true,
+			ReferenceEnterpriseId = "tow-wsd"
 		},
 		new()
 		{
@@ -218,4 +405,6 @@
 
 	private static string Truncate(string value, int max) =>
 		value.Length <= max ? value : value[..(max - 1)] + "…";
+
+	private sealed record CardStatus(bool HasData, string Label);
 }

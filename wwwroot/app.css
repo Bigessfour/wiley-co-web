@@ -486,11 +486,49 @@ body {
 
 .town-hub-url {
   display: block;
-  margin-top: 0.65rem;
+  margin-top: 0.35rem;
   font-size: 0.7rem;
   line-height: 1.35;
   color: var(--wiley-text-muted, #64748b);
   word-break: break-all;
+}
+
+.town-hub-card-status {
+  display: block;
+  margin-top: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--wiley-text-muted, #64748b);
+}
+
+.town-hub-card-status.is-live {
+  color: var(--wiley-accent, #0f766e);
+}
+
+.town-hub-card-status.is-empty {
+  color: var(--wiley-text-muted, #94a3b8);
+  font-weight: 500;
+}
+
+.town-hub-actuals-entity {
+  margin: 0 0 0.5rem;
+}
+
+.town-hub-actuals-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.town-hub-actuals-sep {
+  color: var(--wiley-text-muted, #64748b);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .town-hub-summary {
