@@ -3,10 +3,12 @@
 appsettings.Syncfusion.local.json
 appsettings.Workspace.local.json
 appsettings.Auth.local.json
+appsettings.TownHub.local.json
 WileyCoWeb.Api/appsettings.Development.local.json
 wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 wwwroot/appsettings.Auth.local.json
+wwwroot/appsettings.TownHub.local.json
 wwwroot/shared-contracts/
 .DS_Store
 .cursor/*

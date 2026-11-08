@@ -34,6 +34,30 @@ static partial class ClientStartup
             null);
     }
 
+    static async Task MergeTownHubLocalSettingsAsync(
+        WebAssemblyHostBuilder builder,
+        string baseAddress,
+        IList<(LogLevel Level, string Message, Exception? Exception)> startupDiagnostics)
+    {
+        var json = await LoadLocalSettingsJsonAsync(
+            baseAddress,
+            "appsettings.TownHub.local.json",
+            "The client will continue with appsettings.{Environment}.json TownHub card URLs.",
+            startupDiagnostics).ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        builder.Configuration.AddJsonStream(new MemoryStream(Encoding.UTF8.GetBytes(json)));
+        AddLocalSettingsDiagnostic(
+            startupDiagnostics,
+            LogLevel.Information,
+            "appsettings.TownHub.local.json was merged into client configuration for Town Hub card URLs.",
+            null);
+    }
+
     static string? NormalizeSyncfusionLicenseKey(string? rawLicenseKey)
     {
         if (string.IsNullOrWhiteSpace(rawLicenseKey)) return null;

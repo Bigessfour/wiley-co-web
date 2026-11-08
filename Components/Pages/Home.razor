@@ -32,16 +32,33 @@
 		@foreach (var app in _apps)
 		{
 			var status = ResolveCardStatus(app);
-			<a class="home-hub-card"
-			   href="@app.Url"
-			   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
-			   rel="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "noopener noreferrer" : null)">
-				<span class="home-hub-card-index">@app.Id</span>
-				<strong>@app.Title</strong>
-				<p>@app.Description</p>
-				<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
-				<span class="town-hub-url">@DisplayUrl(app.Url)</span>
-			</a>
+			var configured = !string.IsNullOrWhiteSpace(app.Url);
+			@if (configured)
+			{
+				<a class="home-hub-card"
+				   href="@app.Url"
+				   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
+				   rel="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "noopener noreferrer" : null)">
+					<span class="home-hub-card-index">@app.Id</span>
+					<strong>@app.Title</strong>
+					<p>@app.Description</p>
+					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
+					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
+				</a>
+			}
+			else
+			{
+				<div class="home-hub-card is-disabled"
+				     role="group"
+				     aria-disabled="true"
+				     aria-label="@($"{app.Title} — not configured")">
+					<span class="home-hub-card-index">@app.Id</span>
+					<strong>@app.Title</strong>
+					<p>@app.Description</p>
+					<span class="town-hub-card-status is-empty">@status.Label</span>
+					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
+				</div>
+			}
 		}
 	</div>
 
@@ -67,7 +84,11 @@
 					<h3 id="latest-actuals-heading">Latest actuals</h3>
 					@if (_latestActual is null)
 					{
-						<p class="town-hub-muted">No ActualsSummary yet. POST via <code>/api/reference-data/actuals</code> or run <code>./Scripts/verify-shared-contracts.sh</code>.</p>
+						<p class="town-hub-muted">
+							No actuals yet.
+							<a href="/wiley-workspace/reference-data">Open Reference Data</a>
+							to ingest or review shared-contract summaries.
+						</p>
 					}
 					else
 					{
@@ -93,7 +114,11 @@
 					<h3>Recent OperationalEvents</h3>
 					@if (_recentEvents.Count == 0)
 					{
-						<p class="town-hub-muted">No events yet.</p>
+						<p class="town-hub-muted">
+							No events yet.
+							<a href="/wiley-workspace/reference-data">Open Reference Data</a>
+							when operational events are available.
+						</p>
 					}
 					else
 					{
@@ -136,7 +161,8 @@
 		var options = new TownHubOptions();
 		Configuration.GetSection(TownHubOptions.SectionName).Bind(options);
 		_apps = options.Apps.Count > 0 ? options.Apps : DefaultApps();
-		// wwwroot/appsettings.json is gitignored locally — fill status match keys when omitted.
+		ApplyUrlOverrides(_apps, options);
+		// Fill status match keys when omitted from a partial override file.
 		ApplyReferenceDefaults(_apps);
 	}
 
@@ -310,6 +336,29 @@
 		return at.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 	}
 
+	private static void ApplyUrlOverrides(List<TownHubAppLink> apps, TownHubOptions options)
+	{
+		ApplyUrlOverride(apps, "01", options.WidgetUrl);
+		ApplyUrlOverride(apps, "02", options.ApartmentsUrl);
+		ApplyUrlOverride(apps, "03", options.RuralWaterUrl);
+		ApplyUrlOverride(apps, "04", options.TrashTruckUrl);
+		ApplyUrlOverride(apps, "05", options.TikrUrl);
+	}
+
+	private static void ApplyUrlOverride(List<TownHubAppLink> apps, string id, string? url)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+		{
+			return;
+		}
+
+		var app = apps.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.Ordinal));
+		if (app is not null)
+		{
+			app.Url = url.Trim();
+		}
+	}
+
 	private static void ApplyReferenceDefaults(List<TownHubAppLink> apps)
 	{
 		foreach (var app in apps)
@@ -335,6 +384,10 @@
 		}
 	}
 
+	/// <summary>
+	/// Last-resort card structure when no TownHub:Apps section is present.
+	/// Prefer wwwroot/appsettings.Development.json / Production.json (and TownHub.local overrides).
+	/// </summary>
 	private static List<TownHubAppLink> DefaultApps() =>
 	[
 		new()
@@ -352,7 +405,7 @@
 			Id = "02",
 			Title = "Apartments",
 			Description = "ClerkSuite apartments operations.",
-			Url = "http://localhost:8082",
+			Url = string.Empty,
 			OpenInNewTab = true,
 			ReferenceEnterpriseId = "tow-apartments",
 			ReferencePublisherSystem = "wiley-apartments"
@@ -362,7 +415,7 @@
 			Id = "03",
 			Title = "Rural Water",
 			Description = "Rural water operations app.",
-			Url = "http://localhost:8083",
+			Url = string.Empty,
 			OpenInNewTab = true,
 			ReferenceEnterpriseId = "tow-wsd"
 		},
@@ -371,7 +424,7 @@
 			Id = "04",
 			Title = "Trash Truck",
 			Description = "Trash / sanitation routing app.",
-			Url = "http://localhost:8084",
+			Url = string.Empty,
 			OpenInNewTab = true
 		},
 		new()
@@ -379,7 +432,7 @@
 			Id = "05",
 			Title = "TIKR",
 			Description = "TIKR Blazor Server + API.",
-			Url = "http://localhost:5080",
+			Url = string.Empty,
 			OpenInNewTab = true
 		}
 	];

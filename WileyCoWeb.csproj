@@ -10,6 +10,7 @@
     <UserSecretsId>f6ce628b-59d0-4238-ad1f-5b6f977fd5b9</UserSecretsId>
     <SyncfusionLocalSettingsFile>$(ProjectDir)appsettings.Syncfusion.local.json</SyncfusionLocalSettingsFile>
     <WorkspaceLocalSettingsFile>$(ProjectDir)appsettings.Workspace.local.json</WorkspaceLocalSettingsFile>
+    <TownHubLocalSettingsFile>$(ProjectDir)appsettings.TownHub.local.json</TownHubLocalSettingsFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -145,6 +146,36 @@
       SourceFiles="$(WorkspaceLocalSettingsFile)"
       DestinationFiles="$(ProjectDir)wwwroot\appsettings.Workspace.local.json"
       SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="GenerateTownHubAppSettings" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <_TownHubWidgetUrl>$([System.Environment]::GetEnvironmentVariable('TOWN_HUB_WIDGET_URL'))</_TownHubWidgetUrl>
+      <_TownHubApartmentsUrl>$([System.Environment]::GetEnvironmentVariable('TOWN_HUB_APARTMENTS_URL'))</_TownHubApartmentsUrl>
+      <_TownHubRuralWaterUrl>$([System.Environment]::GetEnvironmentVariable('TOWN_HUB_RURAL_WATER_URL'))</_TownHubRuralWaterUrl>
+      <_TownHubTrashTruckUrl>$([System.Environment]::GetEnvironmentVariable('TOWN_HUB_TRASH_TRUCK_URL'))</_TownHubTrashTruckUrl>
+      <_TownHubTikrUrl>$([System.Environment]::GetEnvironmentVariable('TOWN_HUB_TIKR_URL'))</_TownHubTikrUrl>
+      <_HasTownHubEnv Condition="'$(_TownHubWidgetUrl)$(_TownHubApartmentsUrl)$(_TownHubRuralWaterUrl)$(_TownHubTrashTruckUrl)$(_TownHubTikrUrl)' != ''">true</_HasTownHubEnv>
+      <!-- Mirror Workspace: when no env and no root local file, emit {} so a stale wwwroot copy cannot leak into publish. -->
+      <_TownHubClearStale Condition="'$(_HasTownHubEnv)' != 'true' and !Exists('$(TownHubLocalSettingsFile)')">true</_TownHubClearStale>
+    </PropertyGroup>
+
+    <Exec Condition="'$(_HasTownHubEnv)' == 'true'"
+          Command="node &quot;$(ProjectDir)Scripts/generate-townhub-appsettings.cjs&quot;"
+          WorkingDirectory="$(ProjectDir)"
+          IgnoreExitCode="false" />
+
+    <Copy
+      Condition="'$(_HasTownHubEnv)' != 'true' and Exists('$(TownHubLocalSettingsFile)')"
+      SourceFiles="$(TownHubLocalSettingsFile)"
+      DestinationFiles="$(ProjectDir)wwwroot\appsettings.TownHub.local.json"
+      SkipUnchangedFiles="true" />
+
+    <WriteLinesToFile Condition="'$(_TownHubClearStale)' == 'true'"
+      File="$(ProjectDir)wwwroot\appsettings.TownHub.local.json"
+      Lines="{}"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
   </Target>
 
   <!-- Prompt 4: mirror shared-contracts examples into wwwroot for optional UI ingest. -->

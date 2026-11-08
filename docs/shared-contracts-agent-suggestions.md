@@ -51,7 +51,8 @@ Status: **done**.
 - `/` and `/town-hub`: suite cards (Widget, Apartments, Rural Water, Trash Truck, TIKR)
 - Compact ActualsSummary + OperationalEvents tiles via existing API client
 - Links to full Reference Data panel; no second grid UI
-- `TownHub:Apps` in `appsettings.json` / `appsettings.Production.json` — see `docs/town-hub.md`
+- `TownHub:Apps` in `appsettings.Development.json` / `appsettings.Production.json`, plus optional `TOWN_HUB_*_URL` → `appsettings.TownHub.local.json` — see `docs/town-hub.md`
+- Post-login defaults to `/` (Town Hub)
 
 ### Prompt 4 — File / HTTPS ingest helper (first consumer adapter)
 

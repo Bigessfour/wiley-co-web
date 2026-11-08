@@ -20,8 +20,8 @@
         <p class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             Client auth is disabled for this build (`Auth:Enabled=false`). Local development keeps the workspace open without Cognito.
         </p>
-        <a class="mt-4 inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/wiley-workspace">
-            Open workspace
+        <a class="mt-4 inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/">
+            Open Town Hub
         </a>
     }
     else
@@ -85,7 +85,7 @@
                 cognitoAuthStateProvider.NotifyAuthenticationStateChanged();
             }
 
-            Navigation.NavigateTo(string.IsNullOrWhiteSpace(_returnUrl) ? "/wiley-workspace" : _returnUrl!);
+            Navigation.NavigateTo(string.IsNullOrWhiteSpace(_returnUrl) ? "/" : _returnUrl!);
         }
         catch (Exception ex)
         {

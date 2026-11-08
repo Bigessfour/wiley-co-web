@@ -446,7 +446,13 @@ body {
     box-shadow 80ms ease;
 }
 
-.home-hub-card:hover {
+.home-hub-card.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.home-hub-card:hover:not(.is-disabled) {
   transform: translateY(-1px);
   border-color: var(--wiley-accent);
   box-shadow: var(--wiley-shadow-md);

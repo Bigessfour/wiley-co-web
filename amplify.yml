@@ -66,6 +66,14 @@ frontend:
             echo "No WILEY_WORKSPACE_API_BASE_ADDRESS provided; the client will default to same-origin API routing."
           fi
 
+          if [ -n "${TOWN_HUB_WIDGET_URL:-}${TOWN_HUB_APARTMENTS_URL:-}${TOWN_HUB_RURAL_WATER_URL:-}${TOWN_HUB_TRASH_TRUCK_URL:-}${TOWN_HUB_TIKR_URL:-}" ]; then
+            echo "Generating wwwroot/appsettings.TownHub.local.json from TOWN_HUB_*_URL environment variables."
+            node Scripts/generate-townhub-appsettings.cjs
+          else
+            echo "No TOWN_HUB_*_URL overrides provided; clearing wwwroot/appsettings.TownHub.local.json so stale overrides cannot publish."
+            node Scripts/generate-townhub-appsettings.cjs --clear
+          fi
+
           # Amplify hardening per plan and Amazon Q evaluation: load xAI key from AWS Secrets Manager "Grok" (unifies with Program.cs ConfigureXaiSecretAsync; node parser matches existing Syncfusion pattern to avoid jq in build image)
           if secret_string="$(aws secretsmanager get-secret-value --secret-id "Grok" --query SecretString --output text 2>/dev/null)"; then
             export XAI_API_KEY="$(node -e '
