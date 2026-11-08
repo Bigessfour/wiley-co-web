@@ -114,13 +114,23 @@ On `/wiley-workspace/reference-data`, **Ingest Oct 2026 examples** loads the sam
 
 ### First live publisher (Wiley Apartments)
 
-ClerkSuite exposes read-only operating-cost events:
+**Why Apartments (not Trash Truck):** ClerkSuite already stores landlord operating costs (`UnitOperatingCost`). Trash Truck is routes/scale tickets — no fuel/repairs ledger without inventing data. Apartments export is **read-only** (rent ledger / P/L / cost CRUD unchanged).
+
+| Apartments field | OperationalEvent |
+| ---------------- | ---------------- |
+| (publisher) | `source=other`, `metadata.publisherSystem=wiley-apartments` |
+| amount / incurred date | `type=check`, `amount`, `date` (positive outflow) |
+| category / vendor / unit | `metadata.costCategory`, `vendor`/`payee`, `unitNumber` |
+| enterprise | `metadata.enterpriseId=tow-apartments` |
+
+v1 has **no** `source=trash-truck` or `type=cost` — put system identity in metadata.
 
 ```bash
-GET http://localhost:5077/api/exports/shared-contracts/operational-events?period=2026-10
-# → OperationalEvent[]  then:
-curl -X POST http://127.0.0.1:5231/api/reference-data/events \
-  -H "Content-Type: application/json" --data-binary @events.json
+# Live: ClerkSuite on 5077 + Widget API on 5231 (from wiley-co-web/)
+PERIOD=2026-10 ./tools/post-apartments-operating-costs.sh
+
+# Offline CSV adapter (sample rows included)
+./tools/csv-to-reference-data-events.sh tools/sample-apartments-operating-costs.csv
 ```
 
-See `Wiley_Apartments/docs/shared-contracts-export.md` and `scripts/post-operating-costs-to-widget.sh`.
+Also: `Wiley_Apartments/docs/shared-contracts-export.md` and `scripts/post-operating-costs-to-widget.sh`.
