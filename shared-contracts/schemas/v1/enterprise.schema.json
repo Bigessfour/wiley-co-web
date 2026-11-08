@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wiley-widget.local/schemas/v1/enterprise.schema.json",
+  "title": "Enterprise",
+  "description": "Stable cross-system identity for a Town of Wiley enterprise or fund. Use string ids (not database integers).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "fiscalYear"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable string identifier, e.g. tow-water-utility.",
+      "examples": ["tow-water-utility", "tow-wsd", "tow-trash", "tow-apartments", "tow-general"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable enterprise or fund name.",
+      "examples": ["Water Utility", "Wiley Sanitation District"]
+    },
+    "fiscalYear": {
+      "type": "integer",
+      "minimum": 2000,
+      "maximum": 2100,
+      "description": "Fiscal year label used by council packets and QuickBooks imports (e.g. 2026 for FY 2026)."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Optional human-readable contract version for this payload.",
+      "examples": ["1.0.0"]
+    }
+  }
+}

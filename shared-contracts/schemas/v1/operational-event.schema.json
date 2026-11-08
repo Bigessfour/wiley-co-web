@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wiley-widget.local/schemas/v1/operational-event.schema.json",
+  "title": "OperationalEvent",
+  "description": "A single operational or financial event. For type=check, amount is a positive outflow (not a signed ledger debit). For type=summary, amount is an aggregate total — do not add summary rows to check-line totals. Consumers that need signed accounting amounts must convert explicitly.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "type", "date", "amount", "description", "metadata"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Origin system or packet.",
+      "enum": ["council-packet", "quickbooks-desktop", "nas-export", "other"]
+    },
+    "type": {
+      "type": "string",
+      "description": "Event kind. summary rows are aggregates; check/deposit/transfer are line items.",
+      "enum": ["check", "deposit", "transfer", "summary"]
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+      "description": "Event date as YYYY-MM-DD (pattern-enforced; format annotation alone is not enough for all validators)."
+    },
+    "amount": {
+      "type": "number",
+      "description": "USD amount. check/deposit/transfer: positive means outflow on council check listings. summary: aggregate total for the described rollup — never sum with sibling line items."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short human-readable description (payee + memo or summary label)."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Extensible bag. check rows should include enterpriseId, checkNumber, payee when available. summary rows should include byEnterprise and/or grandTotal.",
+      "additionalProperties": true
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Optional human-readable contract version for this payload.",
+      "examples": ["1.0.0"]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "const": "check" } },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["enterpriseId"],
+            "properties": {
+              "enterpriseId": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "summary" } },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "required": ["grandTotal"],
+            "properties": {
+              "grandTotal": { "type": "number" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

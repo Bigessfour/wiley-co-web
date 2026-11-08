@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "description": "Maps stable shared-contract enterprise ids to Wiley Widget display names and import-panel aliases. Use this until the API/UI join on tow-* ids directly.",
+  "enterprises": [
+    {
+      "id": "tow-water-utility",
+      "displayName": "Water Utility",
+      "aliases": ["Water", "WTR", "Utility"],
+      "notes": "October utility check listing and utility budget comparison map here. Trash activity in the same utility packet stays under this id in the October examples."
+    },
+    {
+      "id": "tow-wsd",
+      "displayName": "Wiley Sanitation District",
+      "aliases": ["WSD", "Sewer", "Wiley Sanitation"],
+      "notes": "Rolls WSD enterprise and WSD general check listings into one id for v1. Publishers of either CSV should set enterpriseId to tow-wsd."
+    },
+    {
+      "id": "tow-trash",
+      "displayName": "Trash",
+      "aliases": ["Trash"],
+      "notes": "Seeded workspace enterprise. October council utility listing is not split into tow-trash in the example pack."
+    },
+    {
+      "id": "tow-apartments",
+      "displayName": "Apartments",
+      "aliases": ["Brookside", "WHA", "Brookside/WHA"],
+      "notes": "Brookside check listing maps here."
+    },
+    {
+      "id": "tow-general",
+      "displayName": "General",
+      "aliases": ["Town of Wiley", "General Fund", "General / town fund"],
+      "notes": "Town general-fund check listing and related bank accounts. Not one of the four seeded utility enterprises; still a valid cross-system id."
+    }
+  ]
+}

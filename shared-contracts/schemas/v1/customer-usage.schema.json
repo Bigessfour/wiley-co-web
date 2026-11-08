@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wiley-widget.local/schemas/v1/customer-usage.schema.json",
+  "title": "CustomerUsage",
+  "description": "Metered customer usage for one account and period, with optional alerts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["accountId", "enterpriseId", "period", "gallons", "alerts"],
+  "properties": {
+    "accountId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable customer / meter account identifier."
+    },
+    "enterpriseId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Enterprise.id that owns this usage record.",
+      "examples": ["tow-water-utility"]
+    },
+    "period": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+      "description": "Usage period in YYYY-MM form.",
+      "examples": ["2026-10"]
+    },
+    "gallons": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Water consumption in gallons for the period."
+    },
+    "alerts": {
+      "type": "array",
+      "description": "Usage or billing alerts for the period. Empty array when none.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Machine-readable alert code.",
+            "examples": ["HIGH_USAGE"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "critical"],
+            "description": "Alert severity."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable alert text."
+          }
+        }
+      }
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Optional human-readable contract version for this payload.",
+      "examples": ["1.0.0"]
+    }
+  }
+}

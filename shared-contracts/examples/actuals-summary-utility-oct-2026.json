@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0.0",
+  "enterpriseId": "tow-water-utility",
+  "period": "2026-10",
+  "amountsBasis": "fy-ytd",
+  "income": 259177.18,
+  "expenses": 188843.30,
+  "cashBalance": 152007.37,
+  "cashBalanceAccounts": ["UTILITY", "UTILITY SAVINGS"]
+}
