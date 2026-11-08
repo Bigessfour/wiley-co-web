@@ -295,6 +295,7 @@ namespace WileyCoWeb.Services
             builder.Services.AddScoped<CapitalGapApiService>();
             builder.Services.AddScoped<WorkspaceKnowledgeApiService>();
             builder.Services.AddScoped<QuickBooksImportApiService>();
+            builder.Services.AddScoped<SharedContractReferenceDataApiService>();
             builder.Services.AddScoped<WorkspaceAiApiService>();
             builder.Services.AddScoped<WorkspaceDocumentExportService>();
             builder.Services.AddScoped<BrowserDownloadService>();

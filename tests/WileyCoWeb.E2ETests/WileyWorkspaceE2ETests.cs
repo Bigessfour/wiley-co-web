@@ -354,6 +354,8 @@ public sealed class WileyWorkspaceE2ETests
 	{
 		await RunWorkspaceTestAsync(async page =>
 		{
+			await ExpandDocumentCenterAsync(page);
+
 			var customerExportButton = page.Locator("text=Export customers to Excel").First;
 			var customerDownload = await page.RunAndWaitForDownloadAsync(() => customerExportButton.ClickAsync());
 			Assert.EndsWith(".xlsx", customerDownload.SuggestedFilename, StringComparison.OrdinalIgnoreCase);
@@ -365,6 +367,7 @@ public sealed class WileyWorkspaceE2ETests
 			await OpenPanelAsync(page, "scenario");
 			await page.Locator("#load-new-hire-impact-template-button").ClickAsync();
 			await Expect(page.Locator("#scenario-name-input")).ToHaveValueAsync(new System.Text.RegularExpressions.Regex("HIRES-2026-Q2-001"), new() { Timeout = 30000 });
+			await ExpandDocumentCenterAsync(page);
 			await Expect(page.Locator("#export-workspace-pdf-button")).ToContainTextAsync("Export Council Rate Packet", new() { Timeout = 30000 });
 
 			var pdfExportButton = page.Locator("#export-workspace-pdf-button");
@@ -442,6 +445,19 @@ public sealed class WileyWorkspaceE2ETests
 			   "01/02/2026,Payment,1002,Town of Wiley,Payment Received,Accounts Receivable,Water Revenue,-125.00,0.00,C\n";
 	}
 
+	private static async Task ExpandDocumentCenterAsync(IPage page)
+	{
+		var details = page.Locator("#workspace-document-center-details");
+		await Expect(details).ToBeAttachedAsync(new() { Timeout = 30000 });
+		var isOpen = await details.EvaluateAsync<bool>("element => element.open");
+		if (!isOpen)
+		{
+			await details.Locator("summary").ClickAsync();
+		}
+
+		await Expect(page.Locator("#export-customers-excel-button")).ToBeVisibleAsync(new() { Timeout = 30000 });
+	}
+
 	private static async Task OpenPanelAsync(IPage page, string panelKey)
 	{
 		var buttonName = panelKey switch
@@ -452,6 +468,7 @@ public sealed class WileyWorkspaceE2ETests
 			"customers" => "Open Customer Viewer",
 			"trends" => "Open Trends",
 			"quickbooks-import" => "Open Import",
+			"reference-data" => "Open Reference Data",
 			"decision-support" => "Open Decision Support",
 			"data-dashboard" => "Open Data Dashboard",
 			_ => throw new ArgumentOutOfRangeException(nameof(panelKey), panelKey, "Unsupported workspace panel key.")

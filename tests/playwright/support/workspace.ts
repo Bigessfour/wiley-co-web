@@ -42,6 +42,19 @@ export async function waitForWorkspacePanel(
   });
 }
 
+/** Expand the collapsible Document Center so export buttons are actionable. */
+export async function expandDocumentCenter(page: Page) {
+  const details = page.locator("#workspace-document-center-details");
+  await expect(details).toBeAttached();
+  const isOpen = await details.evaluate(
+    (element) => (element as HTMLDetailsElement).open,
+  );
+  if (!isOpen) {
+    await details.locator("summary").click();
+  }
+  await expect(page.locator("#export-customers-excel-button")).toBeVisible();
+}
+
 export async function waitForWorkspaceShell(page: Page, timeout = 30_000) {
   const effectiveTimeout = Math.max(timeout, 90_000);
   const sidebarToggle = page.locator("#app-shell-nav-toggle");

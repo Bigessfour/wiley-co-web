@@ -77,7 +77,9 @@ public sealed class ComponentPageTests
 
 		Assert.Contains("Primary workspace navigation", cut.Markup);
 		Assert.Contains("Workspace navigation", cut.Markup);
-		Assert.Contains("e-listview", cut.Markup);
+		Assert.Contains("app-shell-navigation-list", cut.Markup);
+		Assert.Contains("app-nav-section-title", cut.Markup);
+		Assert.Contains("Analysis", cut.Markup);
 		Assert.Contains("Syncfusion 33.2.3", cut.Markup);
 		Assert.Contains("AWS Amplify", cut.Markup);
 		Assert.Contains("app-nav-shell", cut.Markup);
@@ -759,6 +761,7 @@ public sealed class ComponentPageTests
 	[InlineData("apartment-config", "apartment-config", false)]
 	[InlineData("rates", "rates", false)]
 	[InlineData("quickbooks-import", "quickbooks-import", false)]
+	[InlineData("reference-data", "reference-data", false)]
 	[InlineData("scenario", "scenario", false)]
 	[InlineData("customers", "customers", false)]
 	[InlineData("trends", "trends", false)]
@@ -862,6 +865,7 @@ public sealed class ComponentPageTests
 	[InlineData("apartment-config", "Apartment Config")]
 	[InlineData("rates", "Rates")]
 	[InlineData("quickbooks-import", "QuickBooks Import")]
+	[InlineData("reference-data", "Reference Data")]
 	[InlineData("scenario", "Scenario Planner")]
 	[InlineData("customers", "Customer Viewer")]
 	[InlineData("trends", "Trends")]
@@ -913,6 +917,23 @@ public sealed class ComponentPageTests
 			Assert.Single(cut.FindComponents<SfProgressBar>());
 			Assert.Single(cut.FindComponents<SfStepper>());
 			Assert.Single(cut.FindComponents<QuickBooksImportPanel>());
+		});
+	}
+
+	[Fact]
+	public void WileyWorkspace_ReferenceDataRoute_RendersReadOnlyPanel()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.Add(p => p.Panel, "reference-data"));
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.Contains("shared-contract-reference-data-panel", cut.Markup);
+			Assert.Contains("Reference data (read-only)", cut.Markup);
+			Assert.Contains("GET /api/reference-data/actuals", cut.Markup);
+			Assert.Single(cut.FindComponents<SharedContractReferenceDataPanel>());
 		});
 	}
 
@@ -1224,6 +1245,7 @@ public sealed class ComponentPageTests
 		context.Services.AddScoped(_ => new WorkspaceAiApiService(CreateAiClient()));
 		context.Services.AddScoped(_ => new WorkspaceKnowledgeApiService(CreateKnowledgeClient()));
 		context.Services.AddScoped(_ => new QuickBooksImportApiService(CreateImportClient()));
+		context.Services.AddScoped(_ => new SharedContractReferenceDataApiService(CreateReferenceDataClient()));
 		context.Services.AddScoped(_ => telemetryClient);
 		context.Services.AddScoped(_ => new BrowserDownloadService(jsRuntime));
 		context.Services.AddSingleton(new WorkspaceLocalBootstrapService(CreateLocalBootstrapClient()));
@@ -1583,6 +1605,36 @@ public sealed class ComponentPageTests
 				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
 				{
 					Content = new StringContent(JsonSerializer.Serialize(response, JsonOptions), Encoding.UTF8, "application/json")
+				});
+			}
+
+			return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+		}))
+		{
+			BaseAddress = new Uri("https://example.test/")
+		};
+	}
+
+	private static HttpClient CreateReferenceDataClient()
+	{
+		return new HttpClient(new RoutedHttpMessageHandler(request =>
+		{
+			var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+			if (request.Method == HttpMethod.Get
+			    && path.EndsWith("/api/reference-data/actuals", StringComparison.OrdinalIgnoreCase))
+			{
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				{
+					Content = new StringContent("[]", Encoding.UTF8, "application/json")
+				});
+			}
+
+			if (request.Method == HttpMethod.Get
+			    && path.EndsWith("/api/reference-data/events", StringComparison.OrdinalIgnoreCase))
+			{
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+				{
+					Content = new StringContent("[]", Encoding.UTF8, "application/json")
 				});
 			}
 

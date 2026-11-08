@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForWorkspacePanel } from "./support/workspace";
+import { expandDocumentCenter, waitForWorkspacePanel } from "./support/workspace";
 
 test("index.html boot shell includes Wiley static headline", async ({
   request,
@@ -24,6 +24,7 @@ test("document center exposes archived snapshot exports and live status", async 
 }) => {
   await page.goto("/wiley-workspace");
   await waitForWorkspacePanel(page, "#workspace-document-center");
+  await expandDocumentCenter(page);
 
   const status = page.locator("#document-export-status");
   await expect(status).toBeVisible();

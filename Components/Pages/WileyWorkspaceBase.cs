@@ -267,7 +267,8 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         new("capital-gap", "Capital Gap"),
         new("trends", "Trends"),
         new("decision-support", "Decision Support"),
-        new("data-dashboard", "Data Dashboard")
+        new("data-dashboard", "Data Dashboard"),
+        new("reference-data", "Reference Data")
     ];
 
     protected static string GetPanelRoute(string panelKey)
@@ -929,6 +930,52 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             : quadrant.EnterpriseName;
     }
 
+    /// <summary>
+    /// Presentation helper: selected enterprise rate sits at or above modeled break-even.
+    /// </summary>
+    protected bool IsSelectedRateAtOrAboveBreakEven => CurrentRate >= RecommendedRate;
+
+    /// <summary>
+    /// Compact hero status pill label (Healthy vs Fallback). Detail stays in tooltip.
+    /// </summary>
+    protected string HeroStatusBadgeText =>
+        IsUsingStartupFallback ? "Fallback · Startup data" : "Healthy · Live snapshot";
+
+    /// <summary>
+    /// Full data-source detail for the hero status tooltip / expand panel.
+    /// </summary>
+    protected string HeroStatusDetailTitle =>
+        $"Workspace API: {HostingApiHealth}. Bootstrap: {StartupSourceStatus}. Current state: {CurrentStateSourceStatus}";
+
+    /// <summary>
+    /// Left-accent CSS class for hero break-even quadrant cards.
+    /// </summary>
+    protected static string GetHeroQuadrantAccentClass(BreakEvenQuadrantData quadrant)
+    {
+        var key = $"{quadrant.EnterpriseName} {quadrant.EnterpriseType}".ToLowerInvariant();
+        if (key.Contains("water", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-water";
+        }
+
+        if (key.Contains("sanit", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-sanitation";
+        }
+
+        if (key.Contains("trash", StringComparison.Ordinal) || key.Contains("solid", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-trash";
+        }
+
+        if (key.Contains("apart", StringComparison.Ordinal))
+        {
+            return "workspace-quad-accent-apartments";
+        }
+
+        return "workspace-quad-accent-default";
+    }
+
     private async Task ReloadWorkspaceAsync(string enterprise, int fiscalYear)
     {
         if (IsLoadingWorkspace)
@@ -1100,6 +1147,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "capital-gap" => "capital-gap",
             "decision-support" => "decision-support",
             "data-dashboard" => "data-dashboard",
+            "reference-data" => "reference-data",
             _ => "overview"
         };
     }
