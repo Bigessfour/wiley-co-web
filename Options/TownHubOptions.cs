@@ -12,6 +12,20 @@ public sealed class TownHubOptions
 
     /// <summary>Apps shown as hub cards. Order is display order.</summary>
     public List<TownHubAppLink> Apps { get; set; } = [];
+
+    /// <summary>
+    /// Optional URL overrides (env / appsettings.TownHub.local.json).
+    /// Applied onto matching <see cref="TownHubAppLink.Id"/> values after Apps bind.
+    /// </summary>
+    public string? WidgetUrl { get; set; }
+
+    public string? ApartmentsUrl { get; set; }
+
+    public string? RuralWaterUrl { get; set; }
+
+    public string? TrashTruckUrl { get; set; }
+
+    public string? TikrUrl { get; set; }
 }
 
 /// <summary>One external or in-app destination for a Town Hub card.</summary>

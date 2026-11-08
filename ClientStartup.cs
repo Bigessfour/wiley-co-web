@@ -49,6 +49,7 @@ namespace WileyCoWeb.Services
 
             var startupState = await ResolveClientStartupStateAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
             await MergeAuthLocalSettingsAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
+            await MergeTownHubLocalSettingsAsync(builder, clientBaseAddress, startupDiagnostics).ConfigureAwait(false);
 
             ConfigureClientBuilder(builder, startupState.ResolvedApiBaseAddress!);
 

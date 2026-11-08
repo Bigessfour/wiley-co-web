@@ -47,9 +47,21 @@ test("town hub lists app cards and workspace entry points", async ({ page }) => 
     ).toBeVisible();
   }
 
+  // Each card shows a status chip (live Updated … or empty No data yet).
+  await expect(page.locator(".town-hub-card-status")).toHaveCount(5);
+
   await expect(page.locator('a.home-hub-primary[href="/wiley-workspace"]')).toBeVisible();
   await expect(
     page.locator('a.home-hub-secondary[href="/wiley-workspace/reference-data"]'),
   ).toBeVisible();
   await expect(page.locator(".town-hub-summary")).toBeVisible();
+
+  // Clerk path into Widget panels remains available from the hub CTAs / nav shell.
+  await expect(page.locator('a.app-nav-link[href="/"]', { hasText: "Town Hub" })).toBeVisible();
+  await expect(
+    page.locator('a.app-nav-link[href="/wiley-workspace/break-even"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('a.app-nav-link[href="/wiley-workspace/quickbooks-import"]'),
+  ).toBeVisible();
 });

@@ -2,6 +2,14 @@
 
 Wiley Widget for AWS
 
+## Town Hub (clerk starting point)
+
+The clerk entry point is **Town Hub** at `/` (also `/town-hub`). Suite cards open Wiley Widget, Apartments, Rural Water, Trash Truck, and TIKR. Workspace panels (Break-Even, Rates, QuickBooks import, Reference Data, and the rest) stay reachable from the left nav after opening the Widget shell.
+
+Card URLs come from `TownHub:Apps` in `wwwroot/appsettings.Development.json` (local ports) and `wwwroot/appsettings.Production.json` (App Runner placeholders). Build-time env overrides (`TOWN_HUB_APARTMENTS_URL`, `TOWN_HUB_RURAL_WATER_URL`, `TOWN_HUB_TRASH_TRUCK_URL`, `TOWN_HUB_TIKR_URL`, optional `TOWN_HUB_WIDGET_URL`) write `wwwroot/appsettings.TownHub.local.json` via `node Scripts/generate-townhub-appsettings.cjs` (also wired in `amplify.yml` / MSBuild; `--clear` when unset).
+
+See [docs/town-hub.md](docs/town-hub.md) for full configuration examples.
+
 ## Amplify Hosting
 
 This app is hosted on AWS Amplify in `us-east-2`.
