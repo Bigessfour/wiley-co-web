@@ -4,9 +4,21 @@ How to host the Town of Wiley application suite on AWS while keeping **monthly c
 
 Audience: operators and agents planning infra for Wiley Widget, TIKR, Wiley Apartments, Colorado Rural Water, and Trash Truck. This is an architecture target, not a deploy runbook.
 
-Status date: 2026-11-08.
+Status date: 2026-11-08 (updated same day for Town Hub / shared-contracts PR).
 
-Related: [`post-production-operations-handbook.md`](post-production-operations-handbook.md), [`shared-contracts-agent-suggestions.md`](shared-contracts-agent-suggestions.md), Cognito notes in [`production-completion-plan.md`](production-completion-plan.md).
+Related: [`post-production-operations-handbook.md`](post-production-operations-handbook.md), [`shared-contracts-agent-suggestions.md`](shared-contracts-agent-suggestions.md), Cognito notes in [`production-completion-plan.md`](production-completion-plan.md), [`town-hub.md`](town-hub.md).
+
+## Current status (where things run today)
+
+| System | Today | Notes |
+| ------ | ----- | ----- |
+| **Wiley Widget** (Blazor WASM + API) | **On AWS** | Amplify (or static host) + App Runner API + Aurora Postgres + Cognito (existing account). Reference-data ingest uses that Aurora table — no new paid service. |
+| **Colorado Rural Water** | **On AWS** | Lambda + API Gateway + S3 + Cognito (serverless). Leave as-is. |
+| **TIKR** | **Local / NAS first** | Docker + SQLite on Synology / Mac. Postgres/Aurora compose exists for later; not the day-to-day path. |
+| **Wiley Apartments (ClerkSuite)** | **Local / NAS first** | SQLite default on Mac + DS225+. Postgres/Aurora path optional via provider override; do not force it for local clerks. |
+| **Trash Truck** | Local / deferred | No cost ledger for shared-contracts yet; not in the next App Runner wave. |
+
+Town Hub cards already point at local ports in `appsettings.json` and App Runner placeholders in `appsettings.Production.json`. Flip URLs only after each service is live — no infra change required for the hub itself.
 
 ## Goals
 
@@ -14,6 +26,7 @@ Related: [`post-production-operations-handbook.md`](post-production-operations-h
 - Prefer **serverless or scale-to-near-zero** compute.
 - Reuse the **existing** Wiley Widget App Runner + Aurora pattern; do not invent a second cloud stack.
 - Stay under about **$50–80/month** for the whole suite at municipal traffic (staff users, occasional public hits), excluding one-off build minutes and xAI/third-party API usage.
+- **Preserve SQLite for local/NAS** on TIKR and Apartments forever as the default Development path; Aurora is Production-only.
 
 ## Platform constraint (App Runner)
 
@@ -96,24 +109,30 @@ flowchart LR
 
 Do not migrate Wiley Widget off App Runner for cost alone while the service is healthy. Do not add a second database for reference-data documents; they already use Aurora.
 
-### 2. TIKR and Wiley Apartments
+### 2. TIKR and Wiley Apartments (next App Runner wave)
 
-**Repos:** TIKR already ships multi-stage `docker/Dockerfile.api` + `Dockerfile.web`, Synology `docker-compose.prod.yml` (SQLite), and Aurora-oriented `docker/docker-compose.prod.postgres.yml` + `docker/PRODUCTION-AURORA.md`. Wiley Apartments ships root/`deploy/Dockerfile`, Synology SQLite compose, and `deploy/docker-compose.prod.yml` + `deploy/PRODUCTION-AURORA.md` (Postgres via `ClerkSuite__DatabaseProvider`). Local/NAS SQLite remains the default when Provider is unset or `Sqlite`.
+**Repos:** TIKR already ships multi-stage `docker/Dockerfile.api` + `Dockerfile.web`, Synology `docker-compose.prod.yml` (SQLite), and Aurora-oriented `docker/docker-compose.prod.postgres.yml` + `docker/PRODUCTION-AURORA.md`. Wiley Apartments ships root/`deploy/Dockerfile`, Synology SQLite compose, and `deploy/docker-compose.prod.yml` + `deploy/PRODUCTION-AURORA.md` (Postgres via `ClerkSuite__DatabaseProvider`). **Local/NAS SQLite remains the default** when Provider is unset or `Sqlite` — App Runner Production must not break `./scripts/run-local.sh` / Synology SQLite volumes.
 
-**Containerize with Docker.** Run on:
+#### Ordered next steps (preserve SQLite local path)
 
-1. **App Runner** (same account, if still creatable), **or**
-2. **One shared ECS Fargate service** with two task definitions / two target groups only if App Runner is unavailable and two Lambdas are a poor fit (long-lived connections, heavy frameworks).
-
-**Data:** move each app’s **SQLite → Postgres** on the **same Aurora cluster** as Wiley Widget (separate databases or schemas: e.g. `tikr`, `apartments`). Prefer schemas/databases on one cluster over a new RDS instance.
+1. **Confirm App Runner eligibility** in the Town account (`tow` / `818…`, `us-east-2`): can this account still create **new** App Runner services? If no → skip to step 1b (Lambda or one small Fargate service). Do not open a second AWS account for App Runner.
+2. **ECR images only** — push `linux/amd64` images for TIKR API/web and Apartments Web (reuse `infra/terraform` ECR repos or add twin repos). No Aurora/NAT in that Terraform footing.
+3. **Add Aurora databases/schemas** on the **existing** Widget cluster (`tikr`, `apartments`) — not a new RDS instance. Wire Production connection strings via Secrets Manager / SSM; leave Development on SQLite.
+4. **App Runner (or fallback) services** — one service per app (or API+web as that app’s Dockerfile already defines). Small CPU/memory; min instances 0 or 1 only if cold start is unacceptable for clerks.
+5. **Dual-path config (non-negotiable)**  
+   - **Local / NAS:** SQLite (Apartments: default provider; TIKR: Synology compose).  
+   - **App Runner Production:** Postgres/Aurora via env (`ClerkSuite__DatabaseProvider=Postgres`, TIKR Aurora docs). Never delete or “unify” the SQLite path.
+6. **Smoke** — health URL + one clerk login path; then set Town Hub `appsettings.Production.json` card URLs to the App Runner HTTPS endpoints.
+7. **shared-contracts** — Apartments already exports `OperationalEvent[]`; keep posting to Widget `/api/reference-data/events`. TIKR can join later; no new paid bus.
 
 | Do | Do not |
 | -- | ------ |
 | One Docker image per app, small footprint | Dedicated RDS Postgres per app |
 | Share Aurora; isolate by database/schema + IAM/secrets | Multi-AZ readers “for best practice” at this volume |
-| Public HTTPS via App Runner / ALB only if required | Private subnets that force **new NAT gateways** |
+| Public HTTPS via App Runner only if required | Private subnets that force **new NAT gateways** |
+| Keep SQLite for Mac + Synology forever | Force all environments onto Aurora |
 
-If both apps are low traffic and request/response oriented, **Lambda + Function URL or API Gateway** can undercut Fargate; use containers only when the runtime needs a persistent process.
+If both apps are low traffic and request/response oriented, **Lambda + Function URL or API Gateway** can undercut Fargate; use containers when the runtime needs a persistent Blazor Server / long-lived process (Apartments Interactive Server).
 
 ### 3. Colorado Rural Water
 
@@ -145,49 +164,51 @@ If both apps are low traffic and request/response oriented, **Lambda + Function 
 
 **Cross-system data:** exchange via `shared-contracts` JSON (file drop to S3 or HTTPS POST to Widget `/api/reference-data/*`). No shared OpenSearch, no EventBridge bus required for v1.
 
-## What we will NOT do
+## What we are deliberately NOT adding
 
-Explicit exclusions to protect the $50–80 target and operational simplicity:
+Explicit exclusions to protect the $50–80 target and operational simplicity. Do not “improve” the suite by sneaking these in:
 
-- **No separate VPC per system** (no mesh of peering / Transit Gateway for this suite).
-- **No new NAT gateways** unless a hard requirement appears; NAT alone can exceed the monthly budget.
-- **No provisioned Aurora / RDS instance classes** “for headroom” while Serverless meets load.
-- **No multi-AZ Aurora / multi-AZ ALB** unless compliance or an outage post-mortem requires it.
-- **No new OpenSearch / Elasticsearch** domain.
-- **No ElastiCache / Redis** until a measured need exists.
-- **No always-on EC2** jump boxes or app hosts.
-- **No second Cognito user pool** per app (use app clients / groups on one pool).
-- **No dedicated RDS Postgres** for TIKR or Apartments (use shared Aurora).
-- **No SQLite as the production system of record** after cutover (dev-only OK).
-- **No new paid AI / search / analytics SaaS** in this architecture doc (xAI usage is tracked separately from AWS infra).
-- **No App Runner image as long-term file storage** for imports (use S3).
+| Excluded | Why |
+| -------- | --- |
+| **NAT Gateway(s)** | ~$32+/month each + data; alone can blow the budget. |
+| **Multi-AZ Aurora / multi-AZ ALB** | Roughly doubles DB cost; not justified at clerk volume. |
+| **OpenSearch / Elasticsearch** | Paid domain with idle burn; use Postgres + S3 + shared-contracts. |
+| **ElastiCache / Redis** | No measured need. |
+| **Transit Gateway / VPC peering mesh** | No separate VPC per system. |
+| **Provisioned RDS / Aurora instance classes** “for headroom” | Use shared Serverless; low min ACU. |
+| **Dedicated RDS per app** (TIKR / Apartments) | Fixed floor; use shared Aurora DBs/schemas instead. |
+| **Always-on EC2** jump boxes or app hosts | Prefer App Runner / Lambda. |
+| **Second Cognito user pool** per app | One pool; app clients / groups. |
+| **EventBridge / SQS fan-out bus** for v1 contracts | HTTPS POST or S3 drop is enough. |
+| **New paid AI / search / analytics SaaS** in this AWS bill | xAI tracked separately. |
+| **Removing SQLite local/NAS path** | Development and Synology stay SQLite; Aurora is Production-only. |
 
-## Rough monthly cost estimate (USD, `us-east-2`)
+Also: no App Runner image as long-term file storage for imports (use S3); no SQLite as the **Production** system of record after an App Runner cutover.
 
-Assumptions (current municipal volume):
+## Rough monthly cost table (full suite, USD, `us-east-2`)
 
-- Staff-scale traffic, not viral public load.
-- Aurora Serverless v2 with **low minimum ACU** (0 or 0.5 when auto-pause / low min is available and safe for the engine features in use). Shared by Widget + TIKR + Apartments.
-- One App Runner service for Widget at ~0.25–0.5 vCPU / 0.5–1 GB, often idle.
-- Zero or one additional App Runner (or equivalent Lambda) for TIKR/Apartments/Trash.
-- Cognito well within free-tier MAUs.
-- S3 storage under ~20 GB; negligible request cost.
-- **Excludes** xAI / Syncfusion / domain registrar / Amplify build overages / data transfer surprises / support plans.
+Assumptions (municipal / staff volume):
 
-Prices below are **order-of-magnitude planning numbers** (list price ballpark). Re-validate in AWS Pricing Calculator and Cost Explorer before committing.
+- Widget + Rural Water already contributing; TIKR + Apartments added as small App Runner (or Lambda) against **shared** Aurora.
+- Aurora Serverless v2 with **low minimum ACU** (0 or 0.5 when safe). Shared by Widget + TIKR + Apartments.
+- Cognito within free-tier MAUs; S3 under ~20 GB.
+- Existing Lambda (CRW) + S3 + Cognito stay.
+- **Excludes** xAI / Syncfusion / domain registrar / Amplify build overages / support plans / NAT (we refuse NAT).
+
+Order-of-magnitude planning numbers — re-validate in Pricing Calculator and Cost Explorer.
 
 | Line item | Low month | Likely month | Notes |
 | --------- | --------- | ------------ | ----- |
-| Aurora Serverless v2 (shared) | $15–35 | $25–45 | Dominates the bill. Use min ACU 0 (auto-pause) or 0.5; avoid Performance Insights if it forces higher min ACU. Storage GB small. |
-| App Runner (Wiley Widget API) | $3–8 | $5–12 | Small CPU/memory; cost rises if min instances kept warm 24/7. |
-| App Runner or Lambda (TIKR + Apartments) | $0–8 | $2–10 | Lambda often cheaper at low QPS; App Runner if grandfathered and simple. |
-| Lambda + API Gateway (CRW + Trash) | $0–3 | $1–5 | Usually free-tier / near-zero at town volume. |
-| Amplify Hosting (Widget client + static sites) | $0–5 | $1–8 | Hosting cheap; watch build minutes. |
-| Cognito | $0 | $0 | Free tier MAUs typically cover staff + light public. |
-| S3 documents | $0–2 | $0–3 | Storage + PUT/GET for packets/exports. |
-| ECR + CloudWatch Logs | $1–4 | $2–6 | Image storage + log retention; trim retention to 7–14 days. |
-| Secrets Manager / SSM | $1–3 | $1–4 | Few secrets; prefer SSM Parameter Store where acceptable. |
-| **Suite total (infra)** | **~$20–55** | **~$40–80** | Fits target if Aurora min ACU stays disciplined and NAT/OpenSearch stay off the table. |
+| Aurora Serverless v2 (shared) | $15–35 | $25–45 | Dominates the bill. Min ACU 0–0.5; avoid Performance Insights if it raises min ACU. |
+| App Runner — Wiley Widget API | $3–8 | $5–12 | Existing; small CPU/memory. |
+| App Runner — TIKR + Apartments | $0–10 | $4–14 | Two small services if eligible; else Lambda / one Fargate. |
+| Lambda + API Gateway — Rural Water (+ Trash later) | $0–3 | $1–5 | Already near-zero at town volume. |
+| Amplify Hosting — Widget client | $0–5 | $1–8 | Watch build minutes. |
+| Cognito (shared pool) | $0 | $0 | Free-tier MAUs cover staff. |
+| S3 (documents + contracts drop) | $0–2 | $0–3 | Existing + optional contracts bucket. |
+| ECR + CloudWatch Logs | $1–4 | $2–6 | Trim log retention 7–14 days. |
+| Secrets Manager / SSM | $1–3 | $1–4 | Prefer SSM where acceptable. |
+| **Suite total (infra)** | **~$20–55** | **~$40–80** | Fits target if Aurora min ACU stays low and NAT/OpenSearch stay off. |
 
 ### Budget killers (avoid)
 
@@ -228,13 +249,15 @@ Does **not** create NAT, Aurora, or new App Runner. Existing Widget App Runner /
 
 ## Cutover sketch (order)
 
-1. Confirm account (`tow`) + region (`us-east-2`) + App Runner eligibility for new services.
-2. Apply `infra/terraform` (budgets + contracts S3 + ECR); keep Widget as-is.
-3. Create Cognito app clients for sibling apps.
-4. Add Aurora databases/schemas for TIKR and Apartments; migrate off SQLite.
-5. Deploy TIKR / Apartments containers (or Lambda) against shared Aurora.
-6. Point CRW and Trash at shared Cognito + S3; keep CRW Lambda stack.
-7. Exchange data with Widget via `shared-contracts` (S3 drop or `/api/reference-data/*`).
+Aligned with **Current status** and the TIKR/Apartments steps above:
+
+1. Confirm account (`tow`) + region (`us-east-2`) + App Runner eligibility for **new** services.
+2. Keep Widget + Rural Water as-is; apply `infra/terraform` only for budgets / contracts S3 / ECR if not already applied.
+3. Create Cognito app clients for TIKR / Apartments (same pool).
+4. Add Aurora databases/schemas for TIKR and Apartments on the **existing** cluster; wire **Production only**.
+5. Deploy TIKR then Apartments containers to App Runner (or fallback); **SQLite remains local/NAS default**.
+6. Update Town Hub Production card URLs; smoke shared-contracts Apartments → Widget.
+7. Trash Truck later (Lambda first); no NAT / multi-AZ / OpenSearch in any step.
 
 ## Successor note
 
