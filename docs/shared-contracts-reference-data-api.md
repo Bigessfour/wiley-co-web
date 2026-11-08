@@ -39,3 +39,40 @@ dotnet ef database update --project src/WileyWidget.Data/WileyWidget.Data.csproj
 ```
 
 Migration name: `AddSharedContractDocuments` (table + indexes only).
+
+## Prompt 4 — file / HTTPS ingest helper
+
+Does **not** touch QuickBooks CSV import (`/api/imports/quickbooks/*`).
+
+### CLI (preferred for drop-folder / automation)
+
+```bash
+# From wiley-co-web/
+./Scripts/ingest-shared-contracts.sh
+./Scripts/ingest-shared-contracts.sh --validate   # optional ajv via npx
+WILEY_WORKSPACE_API_BASE_ADDRESS=https://your-api ./Scripts/ingest-shared-contracts.sh
+```
+
+Posts:
+
+1. `shared-contracts/examples/actuals-summary-utility-oct-2026.json` → `POST /api/reference-data/actuals`
+2. `operational-events-oct-2026-checks.json` **`items` array only** → `POST /api/reference-data/events`
+
+Requires `curl` + `jq`. Point `--dir` at another folder of the same filenames if you stage files elsewhere first.
+
+### UI
+
+On `/wiley-workspace/reference-data`, **Ingest Oct 2026 examples** loads the same fixtures from `wwwroot/shared-contracts/examples/` (copied from `shared-contracts/examples` at build) and POSTs them. Town Hub summary tiles read the same GETs afterward.
+
+### First live publisher (Wiley Apartments)
+
+ClerkSuite exposes read-only operating-cost events:
+
+```bash
+GET http://localhost:5077/api/exports/shared-contracts/operational-events?period=2026-10
+# → OperationalEvent[]  then:
+curl -X POST http://127.0.0.1:5231/api/reference-data/events \
+  -H "Content-Type: application/json" --data-binary @events.json
+```
+
+See `Wiley_Apartments/docs/shared-contracts-export.md` and `scripts/post-operating-costs-to-widget.sh`.

@@ -7,6 +7,7 @@ WileyCoWeb.Api/appsettings.Development.local.json
 wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 wwwroot/appsettings.Auth.local.json
+wwwroot/shared-contracts/
 .DS_Store
 .cursor/*
 !.cursor/hooks.json
@@ -116,4 +117,9 @@ build/Release
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
+**/.terraform/
+**/terraform.tfvars
+**/terraform.tfvars.json
+**/tfplan
+**/*.tfplan
 .vscode/settings.json

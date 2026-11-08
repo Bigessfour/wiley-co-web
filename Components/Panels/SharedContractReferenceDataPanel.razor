@@ -1,8 +1,12 @@
 @namespace WileyCoWeb.Components.Panels
+@using System.Net.Http.Json
+@using System.Text.Json
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 @inject SharedContractReferenceDataApiService ReferenceDataApi
 @inject ToastService ToastService
+@inject HttpClient Http
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <section id="shared-contract-reference-data-panel" class="space-y-4" aria-live="polite">
@@ -15,14 +19,23 @@
                     Displays ActualsSummary and OperationalEvent batches ingested via
                     <code class="text-sky-200">/api/reference-data/*</code>.
                     Does not change QuickBooks import, snapshots, or break-even math.
+                    CLI ingest: <code class="text-sky-200">Scripts/ingest-shared-contracts.sh</code>.
                 </p>
             </div>
-            <button type="button"
-                    class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60"
-                    disabled="@IsLoading"
-                    @onclick="RefreshAsync">
-                @(IsLoading ? "Refreshing…" : "Refresh")
-            </button>
+            <div class="flex flex-wrap gap-2">
+                <button type="button"
+                        class="rounded-lg border border-sky-400/50 bg-transparent px-4 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/40 disabled:opacity-60"
+                        disabled="@(IsLoading || IsIngesting)"
+                        @onclick="IngestOctoberExamplesAsync">
+                    @(IsIngesting ? "Ingesting…" : "Ingest Oct 2026 examples")
+                </button>
+                <button type="button"
+                        class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60"
+                        disabled="@(IsLoading || IsIngesting)"
+                        @onclick="RefreshAsync">
+                    @(IsLoading ? "Refreshing…" : "Refresh")
+                </button>
+            </div>
         </div>
     </section>
 
@@ -154,9 +167,18 @@
 </section>
 
 @code {
+    private const string ActualsExamplePath = "shared-contracts/examples/actuals-summary-utility-oct-2026.json";
+    private const string EventsExamplePath = "shared-contracts/examples/operational-events-oct-2026-checks.json";
+
+    private static readonly JsonSerializerOptions FixtureJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly CancellationTokenSource _lifetime = new();
 
     private bool IsLoading { get; set; }
+    private bool IsIngesting { get; set; }
     private string? ErrorMessage { get; set; }
     private IReadOnlyList<ReferenceDataActualsDocument> Actuals { get; set; } = [];
     private IReadOnlyList<ReferenceDataEventsDocument> Events { get; set; } = [];
@@ -195,6 +217,62 @@
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Prompt 4 UI path: load fixtures from wwwroot (copied from shared-contracts/examples) and POST to reference-data.
+    /// Prefer <c>Scripts/ingest-shared-contracts.sh</c> for CLI / drop-folder workflows.
+    /// </summary>
+    private async Task IngestOctoberExamplesAsync()
+    {
+        if (IsIngesting)
+        {
+            return;
+        }
+
+        IsIngesting = true;
+        ErrorMessage = null;
+        try
+        {
+            // Fixture files are on the WASM host; default HttpClient BaseAddress is the API.
+            var actualsUri = new Uri(new Uri(Navigation.BaseUri), ActualsExamplePath);
+            var actuals = await Http.GetFromJsonAsync<ActualsSummaryContract>(actualsUri, FixtureJsonOptions, _lifetime.Token)
+                ?? throw new InvalidOperationException($"Could not load {ActualsExamplePath}.");
+
+            await ReferenceDataApi.PostActualsAsync(actuals, _lifetime.Token);
+
+            var eventsUri = new Uri(new Uri(Navigation.BaseUri), EventsExamplePath);
+            await using var eventsStream = await Http.GetStreamAsync(eventsUri, _lifetime.Token);
+            using var eventsDoc = await JsonDocument.ParseAsync(eventsStream, cancellationToken: _lifetime.Token);
+            if (!eventsDoc.RootElement.TryGetProperty("items", out var itemsElement))
+            {
+                throw new InvalidOperationException("Events fixture is missing items[] (PayloadBatch envelope).");
+            }
+
+            var events = JsonSerializer.Deserialize<List<OperationalEventContract>>(itemsElement.GetRawText(), FixtureJsonOptions)
+                ?? throw new InvalidOperationException("Events fixture items[] could not be deserialized.");
+            if (events.Count == 0)
+            {
+                throw new InvalidOperationException("Events fixture items[] is empty.");
+            }
+
+            await ReferenceDataApi.PostEventsAsync(events, _lifetime.Token);
+            ToastService.ShowSuccess("Reference data", "October 2026 examples accepted (202).");
+            await RefreshAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // disposed
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            ToastService.ShowError("Reference data", "Could not ingest shared-contract examples.");
+        }
+        finally
+        {
+            IsIngesting = false;
         }
     }
 

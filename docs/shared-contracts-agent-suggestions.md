@@ -2,13 +2,15 @@
 
 Living handoff for Cursor / Grok prompt series. Update status as prompts land.
 
-Last updated: 2026-11-08 (Prompt 3 Blazor reference-data panel landed locally; Prompt 2 API commit `3988d6d`).
+Last updated: 2026-11-08 (Prompts 1–4 + Town Hub + Terraform footing; ready for Prompt 5).
 
 Related docs:
 
 - [`shared-contracts/README.md`](../shared-contracts/README.md)
 - [`docs/shared-contracts-reference-data-api.md`](shared-contracts-reference-data-api.md)
+- [`docs/town-hub.md`](town-hub.md) — suite cards + local vs App Runner URLs
 - [`docs/aws-low-cost-architecture.md`](aws-low-cost-architecture.md) — suite hosting under ~$50–80/month
+- [`infra/terraform/README.md`](../infra/terraform/README.md) — budgets + S3 contracts + ECR + destroy
 
 ---
 
@@ -36,25 +38,45 @@ Status: **done** (commit `3988d6d`).
 
 ### Prompt 3 — Blazor read-only display of ingested reference data
 
-Status: **done** (local; commit when ready). Grok may replace/refine UI later.
+Status: **done**.
 
 - Panel `SharedContractReferenceDataPanel` at `/wiley-workspace/reference-data`
 - Nav + overview card; GET actuals/events via `SharedContractReferenceDataApiService`
 - Does **not** feed break-even / snapshot composers
-- Suggested `/code-review` before Prompt 4 or calculator wiring
+
+### Town Hub (Grok UI merge — not a duplicate panel)
+
+Status: **done**.
+
+- `/` and `/town-hub`: suite cards (Widget, Apartments, Rural Water, Trash Truck, TIKR)
+- Compact ActualsSummary + OperationalEvents tiles via existing API client
+- Links to full Reference Data panel; no second grid UI
+- `TownHub:Apps` in `appsettings.json` / `appsettings.Production.json` — see `docs/town-hub.md`
+
+### Prompt 4 — File / HTTPS ingest helper (first consumer adapter)
+
+Status: **done**.
+
+- `Scripts/ingest-shared-contracts.sh` — file → POST actuals + events `items[]`
+- Optional `--validate` via ajv; QB import untouched
+- UI: **Ingest Oct 2026 examples** on Reference Data panel + POST helpers on API client
+- **First live publisher:** Wiley Apartments `GET /api/exports/shared-contracts/operational-events` + `scripts/post-operating-costs-to-widget.sh` (Trash Truck skipped — no cost ledger yet)
+
+### Terraform footing (Widget + Apartments)
+
+Status: **done** (apply+destroy smoke on `tow` 818… succeeded; stack left destroyed).
+
+- `infra/terraform`: budgets $80/$100, S3 contracts drop, ECR, SSM, `scripts/destroy.sh`
+- No Aurora/NAT/App Runner in this state
+- **`/code-review`** still useful before Prompt 6 calculator wiring
+
+**Ready for Prompt 5** (schema/CI hardening) — non-blocking.
 
 ---
 
 ## Suggested next prompts (Cursor)
 
 Ordered for safe sequencing. Prefer one prompt at a time.
-
-### Prompt 4 — File / HTTPS ingest helper (first consumer adapter)
-
-- Optional: drop-folder or admin POST of `shared-contracts/examples` (and later council CSV → JSON)
-- Keep QuickBooks CSV import path completely separate
-- Validate against schemas (ajv / CI optional) before POST to `/api/reference-data/*`
-- **`/code-review`** after adapter, before rate/break-even coupling
 
 ### Prompt 5 — Optional schema/CI hardening (non-blocking)
 

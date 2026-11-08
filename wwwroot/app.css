@@ -484,6 +484,87 @@ body {
   font-weight: 700;
 }
 
+.town-hub-url {
+  display: block;
+  margin-top: 0.65rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--wiley-text-muted, #64748b);
+  word-break: break-all;
+}
+
+.town-hub-summary {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.town-hub-summary-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.town-hub-summary-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--wiley-text);
+}
+
+.town-hub-refresh {
+  cursor: pointer;
+  border: none;
+}
+
+.town-hub-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.town-hub-tile {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--wiley-border, #e2e8f0);
+  border-radius: var(--wiley-radius-md, 0.75rem);
+  background: var(--wiley-surface-1);
+  color: var(--wiley-text);
+}
+
+.town-hub-tile h3 {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  color: var(--wiley-text);
+}
+
+.town-hub-tile p,
+.town-hub-event-list li {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+  color: var(--wiley-text);
+}
+
+.town-hub-muted {
+  color: var(--wiley-text-muted);
+  font-size: 0.85rem;
+}
+
+.town-hub-error {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.town-hub-event-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .app-brand {
   display: flex;
   flex-direction: column;
@@ -915,6 +996,7 @@ h1:focus {
 
     /* Content cards, panels, home hub, workspace areas */
     .home-hub-card,
+    .town-hub-tile,
     .wiley-workspace,
     .app-content,
     .wiley-mobile-context-rail,
@@ -925,9 +1007,18 @@ h1:focus {
     }
 
     .home-hub-card p,
+    .town-hub-tile p,
+    .town-hub-muted,
+    .town-hub-event-list li .town-hub-muted,
     .app-sidebar-stat span,
     .home-hub-copy {
       color: #94a3b8;
+    }
+
+    .town-hub-tile h3,
+    .town-hub-summary-header h2,
+    .town-hub-event-list li {
+      color: #f8fafc;
     }
 
     /* Links and primary actions (sky accent to match brand/nav) */
@@ -1209,6 +1300,7 @@ details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
 
 /* Key surfaces, cards, workspace areas, skeleton, toast, focus (now global in dark) */
 [data-wiley-theme="dark"] .home-hub-card,
+[data-wiley-theme="dark"] .town-hub-tile,
 [data-wiley-theme="dark"] .wiley-workspace,
 [data-wiley-theme="dark"] .wiley-surface-panel,
 [data-wiley-theme="dark"] .wiley-panel-card,
@@ -1221,9 +1313,17 @@ details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
 }
 
 [data-wiley-theme="dark"] .home-hub-card p,
+[data-wiley-theme="dark"] .town-hub-tile p,
+[data-wiley-theme="dark"] .town-hub-muted,
 [data-wiley-theme="dark"] .home-hub-copy,
 [data-wiley-theme="dark"] .wiley-text-muted {
   color: #94a3b8;
+}
+
+[data-wiley-theme="dark"] .town-hub-tile h3,
+[data-wiley-theme="dark"] .town-hub-summary-header h2,
+[data-wiley-theme="dark"] .town-hub-event-list li {
+  color: #f8fafc;
 }
 
 /* Dark variants for Tailwind alert/status palettes (rose/amber/slate) used in

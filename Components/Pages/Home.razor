@@ -1,54 +1,221 @@
 ﻿@page "/"
+@page "/town-hub"
+@using Microsoft.Extensions.Configuration
+@using WileyCoWeb.Contracts
+@using WileyCoWeb.Options
+@using WileyCoWeb.Services
+@inject IConfiguration Configuration
+@inject SharedContractReferenceDataApiService ReferenceDataApi
+@inject ToastService ToastService
+@inject NavigationManager Navigation
 
-<PageTitle>Wiley.co</PageTitle>
+<PageTitle>Town Hub — Town of Wiley</PageTitle>
 
-<section class="home-hub">
+<section class="home-hub town-hub">
 	<div class="home-hub-hero">
-		<p class="home-hub-kicker">Wiley Widget</p>
-		<h1>Rate Study Console</h1>
+		<p class="home-hub-kicker">Town of Wiley</p>
+		<h1>Town Hub</h1>
 		<p class="home-hub-copy">
-			Start from a focused route instead of loading the full workspace overview on the domain root.
-			This keeps the entry screen lighter and makes panel navigation predictable.
+			Single entry point for town apps. Cards open the existing UIs (local or App Runner).
+			Summary tiles below read shared-contract reference data — full grid lives on the
+			<a href="/wiley-workspace/reference-data">Reference Data</a> workspace panel.
 		</p>
 		<div class="home-hub-actions">
-			<a class="home-hub-primary" href="/wiley-workspace">Open workspace overview</a>
-			<a class="home-hub-secondary" href="/wiley-workspace/data-dashboard">Open data dashboard</a>
+			<a class="home-hub-primary" href="/wiley-workspace">Open Wiley Widget workspace</a>
+			<a class="home-hub-secondary" href="/wiley-workspace/reference-data">Full reference data</a>
 		</div>
 	</div>
 
-	<div class="home-hub-grid">
-		@foreach (var item in HubItems)
+	<div class="home-hub-grid town-hub-apps">
+		@foreach (var app in _apps)
 		{
-			<a class="home-hub-card" href="@item.Href">
-				<span class="home-hub-card-index">@item.Index</span>
-				<strong>@item.Label</strong>
-				<p>@item.Description</p>
+			<a class="home-hub-card"
+			   href="@app.Url"
+			   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
+			   rel="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "noopener noreferrer" : null)">
+				<span class="home-hub-card-index">@app.Id</span>
+				<strong>@app.Title</strong>
+				<p>@app.Description</p>
+				<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 			</a>
 		}
 	</div>
+
+	<section class="town-hub-summary" aria-labelledby="town-hub-summary-heading">
+		<div class="town-hub-summary-header">
+			<h2 id="town-hub-summary-heading">Reference data snapshot</h2>
+			<button type="button" class="home-hub-secondary town-hub-refresh" @onclick="LoadSummaryAsync" disabled="@_loading">
+				@(_loading ? "Loading…" : "Refresh")
+			</button>
+		</div>
+		@if (!string.IsNullOrWhiteSpace(_error))
+		{
+			<p class="town-hub-error" role="alert">@_error</p>
+		}
+		else if (_loading && _latestActual is null && _recentEvents.Count == 0)
+		{
+			<p class="town-hub-muted">Loading latest ActualsSummary and OperationalEvents…</p>
+		}
+		else
+		{
+			<div class="town-hub-tiles">
+				<article class="town-hub-tile">
+					<h3>Latest ActualsSummary</h3>
+					@if (_latestActual is null)
+					{
+						<p class="town-hub-muted">No documents yet. POST samples via <code>/api/reference-data/actuals</code>.</p>
+					}
+					else
+					{
+						var a = _latestActual.Actuals;
+						<p><strong>@a.EnterpriseId</strong> · @a.Period</p>
+						<p class="town-hub-muted">
+							Basis: @a.AmountsBasis · Income @a.Income.ToString("N0") · Expenses @a.Expenses.ToString("N0") · Cash @a.CashBalance.ToString("N0")
+						</p>
+						<p class="town-hub-muted">Id @_latestActual.Id · @_latestActual.AcceptedAt</p>
+					}
+				</article>
+				<article class="town-hub-tile">
+					<h3>Recent OperationalEvents</h3>
+					@if (_recentEvents.Count == 0)
+					{
+						<p class="town-hub-muted">No events yet.</p>
+					}
+					else
+					{
+						<ul class="town-hub-event-list">
+							@foreach (var ev in _recentEvents)
+							{
+								<li>
+									<strong>@ev.Source</strong>
+									<span class="town-hub-muted">@ev.Date · @ev.Type · @ev.Amount.ToString("N0")</span>
+									@if (!string.IsNullOrWhiteSpace(ev.Description))
+									{
+										<span> — @Truncate(ev.Description, 80)</span>
+									}
+								</li>
+							}
+						</ul>
+					}
+				</article>
+			</div>
+			<p class="town-hub-muted">
+				Tiles only — open
+				<a href="/wiley-workspace/reference-data">Reference Data</a>
+				for the full read-only grids (does not replace QuickBooks import).
+			</p>
+		}
+	</section>
 </section>
 
 @code {
-	/// <summary>
-	/// Keep order, labels, and destinations aligned with <c>NavMenu</c> workspace links.
-	/// </summary>
-	private static readonly HubItem[] HubItems =
+	private List<TownHubAppLink> _apps = [];
+	private ReferenceDataActualsDocument? _latestActual;
+	private List<OperationalEventContract> _recentEvents = [];
+	private bool _loading;
+	private string? _error;
+
+	protected override void OnInitialized()
+	{
+		var options = new TownHubOptions();
+		Configuration.GetSection(TownHubOptions.SectionName).Bind(options);
+		_apps = options.Apps.Count > 0 ? options.Apps : DefaultApps();
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadSummaryAsync();
+	}
+
+	private async Task LoadSummaryAsync()
+	{
+		_loading = true;
+		_error = null;
+		try
+		{
+			var actuals = await ReferenceDataApi.GetActualsAsync();
+			_latestActual = actuals.Count > 0 ? actuals[0] : null;
+
+			var batches = await ReferenceDataApi.GetEventsAsync();
+			_recentEvents = batches
+				.SelectMany(b => b.Events ?? Array.Empty<OperationalEventContract>())
+				.Take(5)
+				.ToList();
+		}
+		catch (Exception ex)
+		{
+			_error = ex.Message;
+			ToastService.ShowError("Town Hub", "Could not load reference-data summary.");
+		}
+		finally
+		{
+			_loading = false;
+		}
+	}
+
+	private static List<TownHubAppLink> DefaultApps() =>
 	[
-		new("01", "Workspace Overview", "/wiley-workspace", "Open the workspace overview"),
-		new("02", "Break-Even", "/wiley-workspace/break-even", "Inspect rate balance and gauge inputs"),
-		new("03", "Apartment Config", "/wiley-workspace/apartment-config", "Jump to the apartment configuration section"),
-		new("04", "Rates", "/wiley-workspace/rates", "Adjust the live rate controls"),
-		new("05", "QuickBooks Import", "/wiley-workspace/quickbooks-import", "Stage and validate QuickBooks exports"),
-		new("06", "Scenario Planner", "/wiley-workspace/scenario", "Model what-if scenarios and saved snapshots"),
-		new("07", "Customer Viewer", "/wiley-workspace/customers", "Review customer impacts and exports"),
-		new("08", "Affordability", "/wiley-workspace/affordability", "Inspect bill burden versus MHI"),
-		new("09", "Debt Coverage", "/wiley-workspace/debt-coverage", "Inspect DSCR and covenant headroom"),
-		new("10", "Capital Gap", "/wiley-workspace/capital-gap", "Inspect capital needs against rate revenue"),
-		new("11", "Reserve Trajectory", "/wiley-workspace/reserve-trajectory", "Inspect reserve forecast and policy floor"),
-		new("12", "Trends", "/wiley-workspace/trends", "Inspect projected rate movement"),
-		new("13", "Decision Support", "/wiley-workspace/decision-support", "Open Jarvis decision support"),
-		new("14", "Data Dashboard", "/wiley-workspace/data-dashboard", "Open the executive dashboard"),
+		new()
+		{
+			Id = "01",
+			Title = "Wiley Widget",
+			Description = "Rate study console and financial workspace (this app).",
+			Url = "/wiley-workspace",
+			OpenInNewTab = false
+		},
+		new()
+		{
+			Id = "02",
+			Title = "Apartments",
+			Description = "ClerkSuite apartments operations.",
+			Url = "http://localhost:8082",
+			OpenInNewTab = true
+		},
+		new()
+		{
+			Id = "03",
+			Title = "Rural Water",
+			Description = "Rural water operations app.",
+			Url = "http://localhost:8083",
+			OpenInNewTab = true
+		},
+		new()
+		{
+			Id = "04",
+			Title = "Trash Truck",
+			Description = "Trash / sanitation routing app.",
+			Url = "http://localhost:8084",
+			OpenInNewTab = true
+		},
+		new()
+		{
+			Id = "05",
+			Title = "TIKR",
+			Description = "TIKR Blazor Server + API.",
+			Url = "http://localhost:5080",
+			OpenInNewTab = true
+		}
 	];
 
-	private sealed record HubItem(string Index, string Label, string Href, string Description);
+	private static bool IsAbsolute(string url) =>
+		Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+		(uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+	private string DisplayUrl(string url)
+	{
+		if (string.IsNullOrWhiteSpace(url))
+		{
+			return "(not configured)";
+		}
+
+		if (!IsAbsolute(url))
+		{
+			return Navigation.ToAbsoluteUri(url).ToString();
+		}
+
+		return url;
+	}
+
+	private static string Truncate(string value, int max) =>
+		value.Length <= max ? value : value[..(max - 1)] + "…";
 }

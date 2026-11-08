@@ -207,11 +207,30 @@ Prices below are **order-of-magnitude planning numbers** (list price ballpark). 
 - Keep CloudWatch log retention short.
 - Prefer S3 lifecycle rules on document prefixes (e.g. expire scratch uploads).
 
+## Terraform (Widget + Apartments first)
+
+Low-cost, **destroyable** footing lives in [`infra/terraform/`](../infra/terraform/README.md):
+
+- AWS Budgets at **$80** / **$100** (email kill-switch)
+- Private S3 drop bucket for `shared-contracts/`
+- ECR repos for Widget API + Apartments (`force_delete` so `terraform destroy` works)
+- Optional SSM parameters for Widget ingest URL
+
+```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars   # set budget_alert_emails
+./scripts/plan-apply.sh --apply
+# if costs climb:
+./scripts/destroy.sh
+```
+
+Does **not** create NAT, Aurora, or new App Runner. Existing Widget App Runner / Aurora stay outside this state.
+
 ## Cutover sketch (order)
 
 1. Confirm account (`tow`) + region (`us-east-2`) + App Runner eligibility for new services.
-2. Keep Widget as-is; document Aurora endpoints and Cognito pool id for reuse.
-3. Create shared S3 prefixes + Cognito app clients for sibling apps.
+2. Apply `infra/terraform` (budgets + contracts S3 + ECR); keep Widget as-is.
+3. Create Cognito app clients for sibling apps.
 4. Add Aurora databases/schemas for TIKR and Apartments; migrate off SQLite.
 5. Deploy TIKR / Apartments containers (or Lambda) against shared Aurora.
 6. Point CRW and Trash at shared Cognito + S3; keep CRW Lambda stack.

@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars (gitignored) and edit.
+# Confirm account first:
+#   aws sts get-caller-identity --profile tow
+
+aws_profile           = "tow"
+aws_region            = "us-east-2"
+expected_account_id   = "818904800844"
+require_town_account  = true
+name_prefix           = "tow-suite"
+environment           = "prod"
+
+# Cost kill-switch (required when enable_budgets = true)
+enable_budgets      = true
+budget_limit_usd    = "80"
+budget_hard_limit_usd = "100"
+budget_alert_emails = ["you@example.com"]
+
+# Cheap deployable pieces for Widget + Apartments shared-contracts
+enable_contracts_bucket = true
+enable_ecr              = true
+enable_publisher_user   = false
+
+# Optional: set after Widget App Runner URL is known
+# widget_reference_data_url = "https://REPLACE.us-east-2.awsapprunner.com"
+
+contracts_lifecycle_days = 30
+ecr_image_count_limit    = 10
