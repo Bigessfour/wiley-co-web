@@ -40,6 +40,47 @@ dotnet ef database update --project src/WileyWidget.Data/WileyWidget.Data.csproj
 
 Migration name: `AddSharedContractDocuments` (table + indexes only).
 
+## Local curl (exact)
+
+Local ports (from `Properties/launchSettings.json` + `WileyCoWeb.Api/Properties/launchSettings.json`):
+
+| Process | URL |
+| ------- | --- |
+| Blazor WASM client | `http://127.0.0.1:5230` |
+| API (`WileyCoWeb.Api`) | `http://127.0.0.1:5231` |
+
+Run from the `wiley-co-web/` repo root with the API listening on **5231**. Auth is off by default in Development (`Auth:Enabled` false).
+
+### POST ActualsSummary
+
+```bash
+curl -sS -i -X POST "http://127.0.0.1:5231/api/reference-data/actuals" \
+  -H "Content-Type: application/json" \
+  --data-binary @"shared-contracts/examples/actuals-summary-utility-oct-2026.json"
+```
+
+Expect `202 Accepted` and a `Location` like `/api/reference-data/actuals/{guid}`. Body is a single `ActualsSummary` object (October 2026 utility YTD: income `259177.18`, expenses `188843.30`, cash `152007.37`).
+
+### POST OperationalEvent[]
+
+The example file is a PayloadBatch envelope. The API wants the bare **`items` array**:
+
+```bash
+jq -c '.items' shared-contracts/examples/operational-events-oct-2026-checks.json \
+  | curl -sS -i -X POST "http://127.0.0.1:5231/api/reference-data/events" \
+    -H "Content-Type: application/json" \
+    --data-binary @-
+```
+
+Expect `202 Accepted` and `Location` `/api/reference-data/events/{guid}`.
+
+### Verify
+
+```bash
+curl -sS "http://127.0.0.1:5231/api/reference-data/actuals" | jq .
+curl -sS "http://127.0.0.1:5231/api/reference-data/events" | jq .
+```
+
 ## Prompt 4 — file / HTTPS ingest helper
 
 Does **not** touch QuickBooks CSV import (`/api/imports/quickbooks/*`).
@@ -53,12 +94,7 @@ Does **not** touch QuickBooks CSV import (`/api/imports/quickbooks/*`).
 WILEY_WORKSPACE_API_BASE_ADDRESS=https://your-api ./Scripts/ingest-shared-contracts.sh
 ```
 
-Posts:
-
-1. `shared-contracts/examples/actuals-summary-utility-oct-2026.json` → `POST /api/reference-data/actuals`
-2. `operational-events-oct-2026-checks.json` **`items` array only** → `POST /api/reference-data/events`
-
-Requires `curl` + `jq`. Point `--dir` at another folder of the same filenames if you stage files elsewhere first.
+Posts the same two fixtures as the curl section above (actuals file + events `items[]`). Requires `curl` + `jq`. Point `--dir` at another folder of the same filenames if you stage files elsewhere first.
 
 ### UI
 

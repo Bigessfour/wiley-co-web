@@ -11,12 +11,14 @@ Minimal suite entry page at `/` and `/town-hub` inside Wiley Widget (Blazor WASM
 
 ## Pointing cards at local vs App Runner
 
-Configure `TownHub:Apps` in:
+Town Hub cards bind from configuration section **`TownHub:Apps`** (`Home.razor` → `Configuration.GetSection("TownHub")`). Supported override path for the Blazor WASM client:
 
 | File | Typical use |
 | ---- | ----------- |
 | `wwwroot/appsettings.json` | Local ports (defaults below) |
 | `wwwroot/appsettings.Production.json` | App Runner (or Amplify) HTTPS URLs |
+
+Process **environment variables are not used** for card URLs in the WASM client (unlike `WILEY_WORKSPACE_API_BASE_ADDRESS` for the API base). Change local vs production by editing the matching `appsettings*.json` (or shipping a different Production file at deploy time).
 
 Each app entry:
 
@@ -40,7 +42,7 @@ Each app entry:
 | Trash Truck | `http://localhost:8084` |
 | TIKR | `http://localhost:5080` |
 
-Adjust ports to match your docker-compose / `launchSettings` if they differ.
+Adjust ports to match your docker-compose / `launchSettings` if they differ. Widget shell itself is `http://localhost:5230`; API is `http://localhost:5231`.
 
 ### Production / App Runner
 
