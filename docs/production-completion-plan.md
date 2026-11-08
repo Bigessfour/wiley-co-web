@@ -36,8 +36,8 @@ Ops before next hosted publish: confirm Cognito pool/client allow `USER_PASSWORD
 
 PR #14 (`grok-4.3` + launcher) is superseded; do not merge it red.
 
-1. PR #29: default model `grok-4.7`, launcher `#workspace-jarvis-launcher`, local health prove (`semantic_kernel`, no fallback) when `XAI_API_KEY` is available.
-2. After #29 merges: PR #30 for #24 deletes leftover AI types and strips `IAIService` / `AICacheWarmingService` DI; cull list matches the tree.
+1. PR #29: default model `grok-4.7`, launcher `#workspace-jarvis-launcher` — **merged**. Local health prove (`semantic_kernel`, no fallback) when `XAI_API_KEY` is available (#17).
+2. PR #30: delete leftover AI types and strip `IAIService` / `AICacheWarmingService` DI; cull list matches the tree (#24).
 
 Keep Phase 2b egress and Phase 3 deploy out of these PRs.
 

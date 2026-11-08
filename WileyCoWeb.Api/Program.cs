@@ -644,22 +644,10 @@ public partial class Program
         builder.Services.AddSingleton<IConversationRepository, EfConversationRepository>();
         builder.Services.AddSingleton<IWileyWidgetContextService, WileyWidgetContextService>();
 
-        // Fix 1 (P0 AICache DI regression): Always wire safe NullAIService fallback so any host (incl. ApiApplicationFactory IntegrationTest) can resolve IAIService.
-        // Mirrors TelemetryStartupService config-gate pattern but defaults *off* for AICache in test factories; real AI stack (when XAI keys present) can override or condition later.
-        builder.Services.AddSingleton<IAIService, NullAIService>();
-
-        // Slice 5a: register orphan hosted services behind config flags (defaults off for AICache to avoid IAIService resolution in test hosts without full AI).
         // TelemetryStartupService: DB health/startup telemetry (ops-expected, gate on Telemetry:StartupServiceEnabled).
         if (builder.Configuration.GetValue<bool>("Telemetry:StartupServiceEnabled", true))
         {
             builder.Services.AddHostedService<TelemetryStartupService>();
-        }
-        // AICacheWarmingService: config-gated (AI:CacheWarming:Enabled or AI:Enabled), explicitly skipped in IntegrationTest env per test factory pattern; Null fallback ensures ctor succeeds even if guard edge-triggered.
-        var isIntegrationTestEnv = builder.Environment.IsEnvironment("IntegrationTest");
-        if (!isIntegrationTestEnv &&
-            (builder.Configuration.GetValue<bool>("AI:Enabled", false) || builder.Configuration.GetValue<bool>("AI:CacheWarming:Enabled", false)))
-        {
-            builder.Services.AddHostedService<AICacheWarmingService>();
         }
 
         // Deterministic license tracking via health check (covers the new registration logic in this file)
