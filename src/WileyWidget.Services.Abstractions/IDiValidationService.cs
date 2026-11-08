@@ -32,7 +32,7 @@ namespace WileyWidget.Services.Abstractions
 
         /// <summary>
         /// Performs quick validation of only core/critical services that must be present
-        /// for the application to function (e.g., ISettingsService, IQuickBooksService, ITelemetryService).
+        /// for the application to function (e.g., IQuickBooksService, ITelemetryService).
         /// </summary>
         /// <returns>
         /// True if all core services can be resolved successfully, false if any are missing.
