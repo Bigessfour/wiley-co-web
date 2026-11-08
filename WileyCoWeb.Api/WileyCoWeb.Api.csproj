@@ -29,6 +29,8 @@
       Link="Contracts/DebtCoverageContracts.cs" />
     <Compile Include="..\Contracts\CapitalGapContracts.cs"
       Link="Contracts/CapitalGapContracts.cs" />
+    <Compile Include="..\Contracts\SharedContractReferenceDataContracts.cs"
+      Link="Contracts/SharedContractReferenceDataContracts.cs" />
   </ItemGroup>
 
 </Project>

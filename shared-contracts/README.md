@@ -126,8 +126,11 @@ python -c "import json,jsonschema; jsonschema.Draft202012Validator(json.load(ope
 
 For batch examples, validate against `payload-batch.schema.json`, then validate each `items[]` element against the named item schema.
 
-## Out of scope (for now)
+## API ingest (minimal)
 
-- C# DTO generation / NuGet package
-- API endpoints or EF migrations
-- Changing Blazor or API application code
+Wiley Widget API stores these payloads without touching QuickBooks import or workspace snapshots:
+
+- `POST` / `GET` `/api/reference-data/actuals` (+ `GET .../actuals/{id}`)
+- `POST` / `GET` `/api/reference-data/events` (+ `GET .../events/{id}`; body is `OperationalEvent[]`, not the PayloadBatch envelope)
+
+See [`docs/shared-contracts-reference-data-api.md`](../docs/shared-contracts-reference-data-api.md).

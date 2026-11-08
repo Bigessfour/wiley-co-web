@@ -507,6 +507,36 @@ public class ProfitLossMonthlyLine
     public decimal? TotalAmount { get; set; }
 }
 
+/// <summary>
+/// Minimal storage for shared-contracts ActualsSummary / OperationalEvent payloads.
+/// Separate from budget_snapshots and QuickBooks import tables.
+/// </summary>
+[Table("shared_contract_documents")]
+public class SharedContractDocument
+{
+    [Key]
+    [Column("id")]
+    public Guid Id { get; set; }
+
+    /// <summary>actuals-summary | operational-events</summary>
+    [Required]
+    [Column("kind")]
+    public string Kind { get; set; } = string.Empty;
+
+    [Column("enterprise_id")]
+    public string? EnterpriseId { get; set; }
+
+    [Column("period")]
+    public string? Period { get; set; }
+
+    [Required]
+    [Column("payload", TypeName = "jsonb")]
+    public string Payload { get; set; } = "{}";
+
+    [Column("accepted_at")]
+    public DateTimeOffset AcceptedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
 [Table("budget_snapshots")]
 public class BudgetSnapshot
 {

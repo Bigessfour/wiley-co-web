@@ -725,6 +725,7 @@ public partial class Program
         app.UseXRay("WileyCoWeb.Api");
         app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
+        ReferenceDataEndpoints.Map(app);
         app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
     }
 

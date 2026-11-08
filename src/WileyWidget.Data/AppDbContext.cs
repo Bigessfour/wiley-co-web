@@ -75,6 +75,7 @@ namespace WileyWidget.Data
         public DbSet<ProfitLossMonthlyLine> ProfitLossMonthlyLines { get; set; } = null!;
         public DbSet<BudgetSnapshot> BudgetSnapshots { get; set; } = null!;
         public DbSet<BudgetSnapshotArtifact> BudgetSnapshotArtifacts { get; set; } = null!;
+        public DbSet<SharedContractDocument> SharedContractDocuments { get; set; } = null!;
         public DbSet<QuickBooksRoutingRule> QuickBooksRoutingRules { get; set; } = null!;
         public DbSet<QuickBooksAllocationProfile> QuickBooksAllocationProfiles { get; set; } = null!;
         public DbSet<QuickBooksAllocationTarget> QuickBooksAllocationTargets { get; set; } = null!;
@@ -618,6 +619,19 @@ namespace WileyWidget.Data
                       .OnDelete(DeleteBehavior.Cascade);
                 entity.Property(e => e.LineLabel).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.LineType).HasMaxLength(100);
+            });
+
+            modelBuilder.Entity<SharedContractDocument>(entity =>
+            {
+                entity.ToTable("shared_contract_documents");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Kind).HasMaxLength(64).IsRequired();
+                entity.Property(e => e.EnterpriseId).HasMaxLength(128);
+                entity.Property(e => e.Period).HasMaxLength(7);
+                entity.Property(e => e.Payload).HasColumnType("jsonb").IsRequired();
+                entity.Property(e => e.AcceptedAt).HasColumnType(TimestampWithTimeZone);
+                entity.HasIndex(e => new { e.Kind, e.AcceptedAt });
+                entity.HasIndex(e => new { e.Kind, e.EnterpriseId, e.Period });
             });
 
             modelBuilder.Entity<BudgetSnapshot>(entity =>

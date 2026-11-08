@@ -815,6 +815,47 @@ namespace WileyWidget.Data.Migrations
                     b.ToTable("quickbooks_routing_rules", (string)null);
                 });
 
+            modelBuilder.Entity("WileyWidget.Models.Amplify.SharedContractDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<string>("EnterpriseId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("enterprise_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Period")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("period");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "AcceptedAt");
+
+                    b.HasIndex("Kind", "EnterpriseId", "Period");
+
+                    b.ToTable("shared_contract_documents", (string)null);
+                });
+
             modelBuilder.Entity("WileyWidget.Models.Amplify.SourceFile", b =>
                 {
                     b.Property<long>("Id")
@@ -1258,7 +1299,7 @@ namespace WileyWidget.Data.Migrations
                             UseFiscalYearForReporting = true,
                             XaiApiEndpoint = "https://api.x.ai/v1",
                             XaiMaxTokens = 2000,
-                            XaiModel = "grok-4-1-fast-reasoning",
+                            XaiModel = "grok-4.7",
                             XaiTemperature = 0.69999999999999996,
                             XaiTimeout = 30
                         });
