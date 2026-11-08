@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.JSInterop;
 using Action = System.Action;
 using WileyCoWeb.Contracts;
 using WileyCoWeb.Services;
@@ -16,6 +17,7 @@ public partial class CustomerViewerPanel : ComponentBase
     [Inject] private ToastService ToastService { get; set; } = default!;
     [Inject] private WorkspaceDocumentExportService WorkspaceDocumentExportService { get; set; } = default!;
     [Inject] private BrowserDownloadService BrowserDownloadService { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     private readonly List<UtilityCustomerRecord> allCustomers = [];
     private readonly Dictionary<string, string[]> customerValidationErrors = new(StringComparer.OrdinalIgnoreCase);
@@ -127,6 +129,28 @@ public partial class CustomerViewerPanel : ComponentBase
         ResetApiFeedback();
         pendingDeleteCustomer = customer;
         isDeleteDialogOpen = true;
+    }
+
+    private async Task OnCustomerEditorOpenedAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("wileyFocus.remember");
+        await JSRuntime.InvokeVoidAsync("wileyFocus.focusById", "customer-editor-account-number");
+    }
+
+    private async Task OnCustomerEditorClosedAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("wileyFocus.restore");
+    }
+
+    private async Task OnCustomerDeleteOpenedAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("wileyFocus.remember");
+        await JSRuntime.InvokeVoidAsync("wileyFocus.focusById", "customer-delete-confirm-button");
+    }
+
+    private async Task OnCustomerDeleteClosedAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("wileyFocus.restore");
     }
 
     private async Task SaveCustomerAsync()

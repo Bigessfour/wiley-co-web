@@ -17,40 +17,38 @@
 	</div>
 
 	<div class="home-hub-grid">
-		<a class="home-hub-card" href="/wiley-workspace/break-even">
-			<span class="home-hub-card-index">01</span>
-			<strong>Break-Even</strong>
-			<p>Cost, volume, rate delta, and baseline capture.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/rates">
-			<span class="home-hub-card-index">02</span>
-			<strong>Rates</strong>
-			<p>Current-rate editing and comparison chart review.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/scenario">
-			<span class="home-hub-card-index">03</span>
-			<strong>Scenario Planner</strong>
-			<p>What-if modeling and adjusted break-even analysis.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/customers">
-			<span class="home-hub-card-index">04</span>
-			<strong>Customer Viewer</strong>
-			<p>Filtered customer review and export-ready exploration.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/trends">
-			<span class="home-hub-card-index">05</span>
-			<strong>Trends</strong>
-			<p>Projected rate movement and year-over-year view.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/reserve-trajectory">
-			<span class="home-hub-card-index">06</span>
-			<strong>Reserve Trajectory</strong>
-			<p>Reserve forecast and stress-band review.</p>
-		</a>
-		<a class="home-hub-card" href="/wiley-workspace/decision-support">
-			<span class="home-hub-card-index">07</span>
-			<strong>Decision Support</strong>
-			<p>Jarvis guidance and supporting analysis context.</p>
-		</a>
+		@foreach (var item in HubItems)
+		{
+			<a class="home-hub-card" href="@item.Href">
+				<span class="home-hub-card-index">@item.Index</span>
+				<strong>@item.Label</strong>
+				<p>@item.Description</p>
+			</a>
+		}
 	</div>
 </section>
+
+@code {
+	/// <summary>
+	/// Keep order, labels, and destinations aligned with <c>NavMenu</c> workspace links.
+	/// </summary>
+	private static readonly HubItem[] HubItems =
+	[
+		new("01", "Workspace Overview", "/wiley-workspace", "Open the workspace overview"),
+		new("02", "Break-Even", "/wiley-workspace/break-even", "Inspect rate balance and gauge inputs"),
+		new("03", "Apartment Config", "/wiley-workspace/apartment-config", "Jump to the apartment configuration section"),
+		new("04", "Rates", "/wiley-workspace/rates", "Adjust the live rate controls"),
+		new("05", "QuickBooks Import", "/wiley-workspace/quickbooks-import", "Stage and validate QuickBooks exports"),
+		new("06", "Scenario Planner", "/wiley-workspace/scenario", "Model what-if scenarios and saved snapshots"),
+		new("07", "Customer Viewer", "/wiley-workspace/customers", "Review customer impacts and exports"),
+		new("08", "Affordability", "/wiley-workspace/affordability", "Inspect bill burden versus MHI"),
+		new("09", "Debt Coverage", "/wiley-workspace/debt-coverage", "Inspect DSCR and covenant headroom"),
+		new("10", "Capital Gap", "/wiley-workspace/capital-gap", "Inspect capital needs against rate revenue"),
+		new("11", "Reserve Trajectory", "/wiley-workspace/reserve-trajectory", "Inspect reserve forecast and policy floor"),
+		new("12", "Trends", "/wiley-workspace/trends", "Inspect projected rate movement"),
+		new("13", "Decision Support", "/wiley-workspace/decision-support", "Open Jarvis decision support"),
+		new("14", "Data Dashboard", "/wiley-workspace/data-dashboard", "Open the executive dashboard"),
+	];
+
+	private sealed record HubItem(string Index, string Label, string Href, string Description);
+}

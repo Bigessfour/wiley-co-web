@@ -148,6 +148,7 @@
         @* Target: scopes the modal overlay to the panel rather than the full viewport *@
         @* DialogAnimationSettings SlideTop: enterprise-grade entry animation consistent with Syncfusion Fluent2 patterns *@
         <SfDialog ID="customer-editor-dialog" Width="min(56rem, 96vw)" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="true" Visible="true" Target="#customer-viewer-panel">
+            <DialogEvents Opened="OnCustomerEditorOpenedAsync" Closed="OnCustomerEditorClosedAsync" />
             <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="200" />
             <DialogTemplates>
                 <Header>@GetEditorDialogTitle()</Header>
@@ -261,6 +262,7 @@
             @* Target: scopes the confirm overlay to the panel *@
             @* DialogAnimationSettings Zoom: brief zoom is appropriate for a destructive-action confirm *@
             <SfDialog ID="customer-delete-dialog" Width="28rem" IsModal="true" ShowCloseIcon="true" CloseOnEscape="true" AllowDragging="false" Visible="true" Target="#customer-viewer-panel">
+            <DialogEvents Opened="OnCustomerDeleteOpenedAsync" Closed="OnCustomerDeleteClosedAsync" />
             <DialogAnimationSettings Effect="DialogEffect.SlideTop" Duration="150" />
             <DialogTemplates>
                 <Header>Delete Customer</Header>

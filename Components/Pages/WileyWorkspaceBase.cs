@@ -643,6 +643,70 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "workspace-pdf");
     }
 
+    protected Task ExportArchivedSnapshotExcelAsync()
+        => ExportArchivedSnapshotArtifactAsync(
+            "scenario-workbook",
+            "Archiving Excel packet from the selected saved scenario...");
+
+    protected Task ExportArchivedSnapshotPdfAsync()
+        => ExportArchivedSnapshotArtifactAsync(
+            "workspace-pdf",
+            "Archiving PDF packet from the selected saved scenario...");
+
+    private async Task ExportArchivedSnapshotArtifactAsync(string documentKind, string pendingStatus)
+    {
+        if (IsExportingDocuments)
+        {
+            return;
+        }
+
+        if (SelectedScenarioSnapshotId is not > 0)
+        {
+            DocumentExportStatus = "Select a saved scenario before creating an archived export.";
+            StateHasChanged();
+            return;
+        }
+
+        IsExportingDocuments = true;
+        DocumentExportStatus = pendingStatus;
+        StateHasChanged();
+
+        try
+        {
+            var snapshotId = SelectedScenarioSnapshotId.Value;
+            var batch = await WorkspaceSnapshotApiService.CreateSnapshotExportsAsync(
+                snapshotId,
+                new WorkspaceSnapshotArtifactRequest([documentKind], ReplaceExisting: true));
+
+            var artifact = batch.Artifacts.FirstOrDefault(item =>
+                string.Equals(item.DocumentKind, documentKind, StringComparison.OrdinalIgnoreCase));
+            if (artifact is null)
+            {
+                throw new InvalidOperationException($"The API did not return a {documentKind} artifact for snapshot {snapshotId}.");
+            }
+
+            var document = await WorkspaceSnapshotApiService.DownloadSnapshotArtifactAsync(artifact);
+            await BrowserDownloadService.DownloadAsync(document);
+            DocumentExportStatus = $"Archived {artifact.FileName} (artifact {artifact.ArtifactId}).";
+            WorkspaceState.SetLastExported($"archived-{documentKind}", DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            WorkspaceLogger.LogWarning(
+                ex,
+                "Archived snapshot export failed for SnapshotId={SnapshotId} Kind={DocumentKind}.",
+                SelectedScenarioSnapshotId,
+                documentKind);
+            DocumentExportStatus = $"Archived export failed: {ex.Message}";
+            _apiHealth = WorkspaceApiHealth.Degraded;
+        }
+        finally
+        {
+            IsExportingDocuments = false;
+            StateHasChanged();
+        }
+    }
+
     protected Task LoadNewHireImpactTemplateAsync()
     {
         var clerkAllocation = PartTimeClerkAnnualSalary * PartTimeClerkEnterpriseShare;

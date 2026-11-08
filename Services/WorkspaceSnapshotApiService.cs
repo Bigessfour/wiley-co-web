@@ -142,6 +142,84 @@ public sealed class WorkspaceSnapshotApiService(HttpClient httpClient, ILogger<W
         return snapshot;
     }
 
+    public async Task<WorkspaceSnapshotArtifactBatchResponse> CreateSnapshotExportsAsync(
+        long snapshotId,
+        WorkspaceSnapshotArtifactRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var operationName = $"archived snapshot export for {snapshotId}";
+        logger?.LogInformation("Creating archived exports for snapshot {SnapshotId}", snapshotId);
+        var batch = await httpClient.SendJsonAsync<WorkspaceSnapshotArtifactBatchResponse>(
+            HttpMethod.Post,
+            $"api/workspace/snapshot/{snapshotId}/exports",
+            request,
+            JsonOptions,
+            $"The archived snapshot export response for {snapshotId} was not valid JSON.",
+            (statusCode, responseBody) => new InvalidOperationException(BuildFailureMessage(operationName, statusCode, responseBody)),
+            cancellationToken).ConfigureAwait(false);
+
+        if (batch == null)
+        {
+            throw new InvalidOperationException("The archived snapshot export response was empty.");
+        }
+
+        logger?.LogInformation(
+            "Archived exports created for snapshot {SnapshotId}: {ArtifactCount} artifact(s)",
+            snapshotId,
+            batch.Artifacts.Count);
+        return batch;
+    }
+
+    public async Task<WorkspaceExportDocument> DownloadSnapshotArtifactAsync(
+        WorkspaceSnapshotArtifactSummary artifact,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(artifact);
+
+        var relativeUrl = NormalizeArtifactDownloadUrl(artifact.DownloadUrl);
+        logger?.LogInformation("Downloading archived artifact {ArtifactId} ({FileName})", artifact.ArtifactId, artifact.FileName);
+
+        using var response = await httpClient.GetAsync(relativeUrl, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException(BuildFailureMessage(
+                $"archived artifact download for {artifact.ArtifactId}",
+                response.StatusCode,
+                body));
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        if (bytes.Length == 0)
+        {
+            throw new InvalidOperationException($"Archived artifact {artifact.ArtifactId} returned an empty payload.");
+        }
+
+        var contentType = response.Content.Headers.ContentType?.MediaType
+            ?? artifact.ContentType
+            ?? "application/octet-stream";
+        return new WorkspaceExportDocument(artifact.FileName, contentType, bytes);
+    }
+
+    private static string NormalizeArtifactDownloadUrl(string downloadUrl)
+    {
+        if (string.IsNullOrWhiteSpace(downloadUrl))
+        {
+            throw new InvalidOperationException("The archived artifact did not include a download URL.");
+        }
+
+        if (downloadUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || downloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            var absolute = new Uri(downloadUrl);
+            return absolute.PathAndQuery.TrimStart('/');
+        }
+
+        return downloadUrl.TrimStart('/');
+    }
+
     private static string BuildSnapshotRequestUri(string? enterprise, int? fiscalYear)
     {
         var query = BuildQueryString(enterprise, fiscalYear);

@@ -85,6 +85,34 @@ globalThis.wileyDownloads = {
   },
 };
 
+globalThis.wileyFocus = {
+  _previous: null,
+  remember: function () {
+    this._previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  },
+  focusById: function (elementId) {
+    const target = document.getElementById(elementId);
+    if (target instanceof HTMLElement) {
+      target.focus();
+      return true;
+    }
+
+    const nested = document.querySelector(`#${CSS.escape(elementId)} input, #${CSS.escape(elementId)} button, #${CSS.escape(elementId)} [tabindex]:not([tabindex='-1'])`);
+    if (nested instanceof HTMLElement) {
+      nested.focus();
+      return true;
+    }
+
+    return false;
+  },
+  restore: function () {
+    if (this._previous instanceof HTMLElement && document.contains(this._previous)) {
+      this._previous.focus();
+    }
+    this._previous = null;
+  },
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // wileyNetworkStatus — navigator.onLine bridge for WileyWorkspaceBase
 //

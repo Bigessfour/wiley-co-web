@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 # Mirror Wiley.co CI (.github/workflows/ci.yml) as far as macOS/local allows.
 # Skips: TruffleHog (optional), Windows runners, Amplify deployment-guard (OIDC/main only).
-# Usage: ./Scripts/run-ci-local.sh [--skip-playwright] [--skip-full-tests]
+#
+# Usage:
+#   ./Scripts/run-ci-local.sh              # pre-push gate (HighRisk + publish + Playwright CI specs)
+#   ./Scripts/run-ci-local.sh --pre-push   # same as default
+#   ./Scripts/run-ci-local.sh --full       # also run the full test matrix (slow)
+#   ./Scripts/run-ci-local.sh --skip-playwright
+#
+# On success writes .local-ci-ok (gitignored) with the HEAD SHA so Cursor can
+# block git push until this gate has been re-run after new commits.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,13 +37,19 @@ if [[ -n "${DOTNET_ROOT:-}" ]]; then
 fi
 
 SKIP_PLAYWRIGHT=0
-SKIP_FULL_TESTS=0
+# Default is the pre-push gate (skip full matrix). Use --full for GH-parity length.
+SKIP_FULL_TESTS=1
 for arg in "$@"; do
   case "$arg" in
+    --pre-push) SKIP_FULL_TESTS=1 ;;
+    --full) SKIP_FULL_TESTS=0 ;;
+    --skip-full-tests) SKIP_FULL_TESTS=1 ;; # back-compat
     --skip-playwright) SKIP_PLAYWRIGHT=1 ;;
-    --skip-full-tests) SKIP_FULL_TESTS=1 ;;
     -h|--help)
-      echo "Usage: $0 [--skip-playwright] [--skip-full-tests]"
+      echo "Usage: $0 [--pre-push|--full] [--skip-playwright]"
+      echo "  default/--pre-push  HighRisk + publish + Playwright CI smoke/highrisk (recommended before push)"
+      echo "  --full              Also run the full test matrix"
+      echo "  --skip-playwright   Skip Playwright (not recommended before push)"
       exit 0
       ;;
     *)
@@ -60,6 +74,8 @@ HIGHRISK_PROJECTS=(
   "tests/WileyCoWeb.IntegrationTests/WileyCoWeb.IntegrationTests.csproj"
   "tests/WileyWidget.Tests/WileyWidget.Tests.csproj"
 )
+
+STAMP_FILE="$ROOT/.local-ci-ok"
 
 step "secrets-guard (optional TruffleHog)"
 if command -v trufflehog >/dev/null 2>&1; then
@@ -91,7 +107,7 @@ if [[ "$SKIP_FULL_TESTS" -eq 0 ]]; then
       --blame-hang-timeout 5m
   done
 else
-  echo "Skipping full test matrix (--skip-full-tests)"
+  echo "Skipping full test matrix (pre-push gate). Use --full for GH-length matrix."
 fi
 
 step "build-and-publish"
@@ -117,5 +133,14 @@ else
   echo "Skipping Playwright (--skip-playwright)"
 fi
 
+HEAD_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+{
+  echo "sha=$HEAD_SHA"
+  echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "mode=$([ "$SKIP_FULL_TESTS" -eq 1 ] && echo pre-push || echo full)"
+  echo "playwright=$([ "$SKIP_PLAYWRIGHT" -eq 0 ] && echo yes || echo no)"
+} >"$STAMP_FILE"
+
 step "done"
 echo "Local CI mirror passed (deployment-guard skipped — main/OIDC only)."
+echo "Wrote $STAMP_FILE for HEAD $HEAD_SHA — git push is unlocked for this commit."

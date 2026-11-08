@@ -171,6 +171,21 @@ public sealed class ComponentPageTests
 	}
 
 	[Fact]
+	public void WileyWorkspace_DocumentCenter_ExposesArchivedSnapshotExportsAndLiveStatus()
+	{
+		using var context = CreateContext();
+
+		var cut = context.RenderComponent<WileyWorkspace>();
+
+		Assert.Contains("id=\"export-archived-scenario-excel-button\"", cut.Markup);
+		Assert.Contains("id=\"export-archived-scenario-pdf-button\"", cut.Markup);
+		Assert.Contains("id=\"document-export-status\"", cut.Markup);
+		Assert.Contains("aria-live=\"polite\"", cut.Markup);
+		Assert.Contains("Archive saved scenario Excel", cut.Markup);
+		Assert.Contains("Archive saved scenario PDF", cut.Markup);
+	}
+
+	[Fact]
 	public void WileyWorkspace_OverviewHero_RendersExpandedEnterpriseBreakEvenPoints()
 	{
 		using var context = CreateContext();

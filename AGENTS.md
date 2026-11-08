@@ -21,8 +21,9 @@ This file applies to **Grok CLI**, **Cursor**, and any other coding agent workin
 2. **High-impact areas need extra rigor** — workspace shell, `WorkspaceState`, Syncfusion wiring, snapshot composition, QuickBooks import, Jarvis, exports.
 3. **Documentation proximity** — if behavior or ops change, update `docs/` or `specs/` in the same PR.
 4. **Do not push to `main`** — branch-protected; open PRs and wait for CI.
-5. **Do not commit secrets** — `.env`, credentials, local Syncfusion keys.
-6. **Minimal diffs** — match existing naming, patterns, and abstractions; no drive-by refactors.
+5. **Run local CI before every `git push`** — `./Scripts/run-ci-local.sh` (default pre-push gate: HighRisk + publish + Playwright CI smoke/highrisk). Cursor blocks `git push` until `.local-ci-ok` matches `HEAD`. Bypass only with `SKIP_LOCAL_CI=1`. Prefer this over waiting for a red GitHub Actions run.
+6. **Do not commit secrets** — `.env`, credentials, local Syncfusion keys.
+7. **Minimal diffs** — match existing naming, patterns, and abstractions; no drive-by refactors.
 
 ## Canonical implementations (do not regress)
 
@@ -52,7 +53,14 @@ Extended guidance: `.cursor/skills/wiley-widget-completion/SKILL.md`.
 
 ## Testing workflow
 
-Run the **smallest set** that covers your blast radius:
+**Before push (required):**
+
+```bash
+./Scripts/run-ci-local.sh          # ~2–5 min: HighRisk + publish + Playwright CI specs
+# ./Scripts/run-ci-local.sh --full # optional GH-length full matrix
+```
+
+For a smaller blast-radius loop while editing:
 
 ```powershell
 # HighRisk gate (matches CI)

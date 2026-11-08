@@ -8,7 +8,10 @@ wwwroot/appsettings.Syncfusion.local.json
 wwwroot/appsettings.Workspace.local.json
 wwwroot/appsettings.Auth.local.json
 .DS_Store
-.cursor/
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
 bin/
 obj/
 wwwroot/appsettings.json
@@ -37,6 +40,7 @@ Thumbs.db
 *.bak
 publish_output/
 api_output/
+.local-ci-ok
 node_modules/
 *.user
 *.suo

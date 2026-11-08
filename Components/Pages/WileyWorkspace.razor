@@ -72,7 +72,7 @@
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Document Center</p>
                     <h2 class="mt-1 text-lg font-semibold wiley-text-muted">Syncfusion Excel & PDF Deliverables</h2>
-                    <p class="mt-1 text-sm wiley-text-muted">Export the filtered customer set, the active scenario workbook, or a PDF rate packet from the current workspace state.</p>
+                    <p class="mt-1 text-sm wiley-text-muted">Export from the live workspace, or archive Excel/PDF packets against a saved scenario snapshot.</p>
                 </div>
                 <div class="flex flex-col gap-3 xl:min-w-[38rem]">
                     <div class="grid gap-3 md:grid-cols-3">
@@ -98,18 +98,34 @@
                             @(IsExportingDocuments ? "Building PDF…" : WorkspacePdfExportLabel)
                         </SfButton>
                     </div>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <SfButton id="export-archived-scenario-excel-button"
+                                  aria-label="Archive Excel packet from the selected saved scenario"
+                                  Disabled="@(IsExportingDocuments || !CanApplySelectedScenario)"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-export-excel")"
+                                  OnClick="ExportArchivedSnapshotExcelAsync">
+                            @(IsExportingDocuments ? "Archiving…" : "Archive saved scenario Excel")
+                        </SfButton>
+                        <SfButton id="export-archived-scenario-pdf-button"
+                                  aria-label="Archive PDF packet from the selected saved scenario"
+                                  Disabled="@(IsExportingDocuments || !CanApplySelectedScenario)"
+                                  IconCss="@(IsExportingDocuments ? "" : "e-icons e-pdf")"
+                                  OnClick="ExportArchivedSnapshotPdfAsync">
+                            @(IsExportingDocuments ? "Archiving…" : "Archive saved scenario PDF")
+                        </SfButton>
+                    </div>
                     @* Export status row: shows inline spinner dot while export is in-flight *@
                     <div class="rounded-xl wiley-surface-panel-secondary px-4 py-3 text-sm wiley-text-muted">
                         @if (IsExportingDocuments)
                         {
                             <span class="wiley-export-spinner-inline">
                                 <span class="wiley-pulse-dot" aria-hidden="true"></span>
-                                <span role="status" aria-live="polite"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
+                                <span id="document-export-status" role="status" aria-live="polite"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
                             </span>
                         }
                         else
                         {
-                            <span role="status"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
+                            <span id="document-export-status" role="status" aria-live="polite"><span class="font-semibold wiley-text-muted">Export status:</span> @DocumentExportStatus</span>
                         }
                     </div>
                 </div>
