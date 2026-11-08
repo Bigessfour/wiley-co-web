@@ -34,31 +34,22 @@ test("document center exposes archived snapshot exports and live status", async 
   await expect(page.locator("#export-archived-scenario-pdf-button")).toBeVisible();
 });
 
-test("home hub cards match sidebar destinations", async ({ page }) => {
-  const sidebarHrefs = [
-    "/wiley-workspace",
-    "/wiley-workspace/break-even",
-    "/wiley-workspace/apartment-config",
-    "/wiley-workspace/rates",
-    "/wiley-workspace/quickbooks-import",
-    "/wiley-workspace/scenario",
-    "/wiley-workspace/customers",
-    "/wiley-workspace/affordability",
-    "/wiley-workspace/debt-coverage",
-    "/wiley-workspace/capital-gap",
-    "/wiley-workspace/reserve-trajectory",
-    "/wiley-workspace/trends",
-    "/wiley-workspace/decision-support",
-    "/wiley-workspace/data-dashboard",
-  ];
-
+test("town hub lists app cards and workspace entry points", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".home-hub-grid")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".home-hub.town-hub")).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".home-hub-grid.town-hub-apps")).toBeVisible();
 
-  for (const href of sidebarHrefs) {
+  // Default Town Hub app tiles (config can override URLs; titles stay stable).
+  for (const title of ["Wiley Widget", "Apartments", "Rural Water", "Trash Truck", "TIKR"]) {
     await expect(
-      page.locator(`.home-hub-card[href="${href}"]`),
-      `home hub missing sidebar href ${href}`,
+      page.locator(".home-hub-card strong", { hasText: title }),
+      `town hub missing app card ${title}`,
     ).toBeVisible();
   }
+
+  await expect(page.locator('a.home-hub-primary[href="/wiley-workspace"]')).toBeVisible();
+  await expect(
+    page.locator('a.home-hub-secondary[href="/wiley-workspace/reference-data"]'),
+  ).toBeVisible();
+  await expect(page.locator(".town-hub-summary")).toBeVisible();
 });
