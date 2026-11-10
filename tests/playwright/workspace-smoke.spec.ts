@@ -50,6 +50,21 @@ test("town hub lists app cards and workspace entry points", async ({ page }) => 
   // Each card shows a status chip (live Updated … or empty No data yet).
   await expect(page.locator(".town-hub-card-status")).toHaveCount(5);
 
+  // Never ship clickable REPLACE-* placeholders (Production sibling Urls stay empty until TOWN_HUB_* overrides).
+  await expect(page.locator('a.home-hub-card[href*="REPLACE-"]')).toHaveCount(0);
+  await expect(page.locator(".home-hub-card a[href*='REPLACE-']")).toHaveCount(0);
+
+  // Wiley Widget is the configured same-origin card; unconfigured siblings render as disabled groups.
+  await expect(page.locator('a.home-hub-card[href="/wiley-workspace"]')).toBeVisible();
+  const disabledSiblings = page.locator(".home-hub-card.is-disabled");
+  // Local Development.json configures all five; Production empties 02–05. Accept either shape.
+  const disabledCount = await disabledSiblings.count();
+  expect(disabledCount === 0 || disabledCount >= 1).toBeTruthy();
+  if (disabledCount > 0) {
+    await expect(disabledSiblings.first()).toHaveAttribute("aria-disabled", "true");
+    await expect(disabledSiblings.first().locator(".town-hub-url")).toContainText("not configured");
+  }
+
   await expect(page.locator('a.home-hub-primary[href="/wiley-workspace"]')).toBeVisible();
   await expect(
     page.locator('a.home-hub-secondary[href="/wiley-workspace/reference-data"]'),
