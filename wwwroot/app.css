@@ -1860,6 +1860,51 @@ html[data-wiley-theme="dark"] body {
   margin-right: 0.75rem;
 }
 
+/* Town field standard: 44px box, 14px text.
+   Same size in Wiley Widget, Apartments, TIKR, and Trash Truck.
+   Textareas keep a 44px minimum and grow with their content.
+   .e-small stays compact. */
+html .e-input-group.e-control-wrapper:not(.e-small):not(.e-multi-line-input) input,
+html .e-float-input.e-control-wrapper:not(.e-small):not(.e-multi-line-input) input {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+html .e-input-group.e-control-wrapper:not(.e-small) .e-input-group-icon {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+html textarea.e-input,
+html .e-input-group.e-control-wrapper textarea.e-input {
+  box-sizing: border-box;
+  height: auto;
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* Grid toolbars, filter rows, and pagers stay at the theme's compact size
+   so a 44px field does not spill out of the toolbar. */
+html .e-toolbar .e-input-group.e-control-wrapper:not(.e-small):not(.e-multi-line-input) input,
+html .e-grid .e-filterbar .e-input-group.e-control-wrapper:not(.e-small):not(.e-multi-line-input) input,
+html .e-pager .e-input-group.e-control-wrapper:not(.e-small):not(.e-multi-line-input) input {
+  height: 30px;
+  min-height: 30px;
+}
+
+html .e-toolbar .e-input-group.e-control-wrapper:not(.e-small) .e-input-group-icon,
+html .e-grid .e-filterbar .e-input-group.e-control-wrapper:not(.e-small) .e-input-group-icon,
+html .e-pager .e-input-group.e-control-wrapper:not(.e-small) .e-input-group-icon {
+  height: 30px;
+  min-height: 30px;
+}
+
 /* Workspace hero — dark brand header (always dark for visual impact + contrast with glass overlays and accent text).
    Replaces previous var() that broke text-white and white/ glass in light mode. */
 .wiley-hero {
