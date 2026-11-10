@@ -45,6 +45,58 @@ body {
   --wiley-shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
 }
 
+/* Beats Fluent 2's :root variables even when fluent2-dark.css loads after app.css.
+   Hover and focus fills read these names, so they stay slate instead of white. */
+html[data-wiley-theme="dark"] {
+  --color-sf-content-bg-color: var(--wiley-bg);
+  --color-sf-content-bg-color-alt1: #0f172a;
+  --color-sf-content-bg-color-alt2: var(--wiley-bg);
+  --color-sf-content-bg-color-alt3: var(--wiley-surface-1);
+  --color-sf-content-bg-color-hover: var(--wiley-surface-1);
+  --color-sf-content-bg-color-focus: var(--wiley-surface-1);
+  --color-sf-content-bg-color-selected: var(--wiley-surface-1);
+  --color-sf-flyout-bg-color: var(--wiley-surface-1);
+  --color-sf-flyout-bg-color-hover: var(--wiley-surface-2);
+  --color-sf-border: var(--wiley-border);
+  --color-sf-border-light: var(--wiley-surface-2);
+  --color-sf-border-hover: var(--wiley-accent);
+  --color-sf-border-focus: var(--wiley-accent);
+}
+
+/* Float labels (SfTextBox, SfNumericTextBox, SfDropDownList) use a 3-class
+   selector with a `background` shorthand. It beats a plain background-color
+   override and paints the field interior white on hover in the light theme.
+   These rules stay above that specificity in dark mode. */
+html[data-wiley-theme="dark"] .e-float-input.e-input-group.e-control-wrapper:not(.e-disabled),
+html[data-wiley-theme="dark"] .e-float-input.e-input-group.e-control-wrapper:not(.e-disabled):hover,
+html[data-wiley-theme="dark"] .e-float-input.e-input-group.e-control-wrapper:not(.e-disabled).e-input-focus,
+html[data-wiley-theme="dark"] .e-input-group.e-control-wrapper:not(.e-disabled):hover,
+html[data-wiley-theme="dark"] .e-input-group.e-control-wrapper:not(.e-disabled):focus-within {
+  background: #0f172a;
+  color: var(--wiley-text);
+  border-color: var(--wiley-border);
+}
+
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled) input.e-input,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled) textarea.e-input,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled):hover input.e-input,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled):hover textarea.e-input,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled).e-input-focus input.e-input,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled).e-input-focus textarea.e-input,
+html[data-wiley-theme="dark"] .e-input-group.e-control-wrapper:not(.e-disabled) input.e-input:hover,
+html[data-wiley-theme="dark"] .e-input-group.e-control-wrapper:not(.e-disabled) textarea.e-input:hover {
+  background: transparent;
+  color: var(--wiley-text);
+  -webkit-text-fill-color: var(--wiley-text);
+}
+
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled) .e-float-text,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled):hover .e-float-text,
+html[data-wiley-theme="dark"] .e-float-input.e-control-wrapper:not(.e-disabled).e-input-focus .e-float-text {
+  background: transparent;
+  color: var(--wiley-text-muted);
+}
+
 body {
   min-height: 100vh;
   background: var(--wiley-bg);
@@ -428,6 +480,13 @@ body {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+button.home-hub-card {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
 }
 
 .home-hub-card {
@@ -1672,20 +1731,31 @@ details.wiley-mobile-context-rail[open] .wiley-mobile-context-summary::after {
     color: #bae6fd;
   }
 
-  /* SfTextBox + SfDropDownList input surface */
-  .e-input-group,
-  .e-input-group.e-control-wrapper {
-    background-color: #1e293b;
+  /* SfTextBox, SfNumericTextBox, and SfDropDownList.
+     The light Fluent 2 theme sets `background` (not background-color) on
+     .e-float-input.e-input-group.e-control-wrapper, including :hover.
+     Match that specificity so the interior stays slate. */
+  html:not([data-wiley-theme="light"]) .e-float-input.e-input-group.e-control-wrapper:not(.e-disabled),
+  html:not([data-wiley-theme="light"]) .e-float-input.e-input-group.e-control-wrapper:not(.e-disabled):hover,
+  html:not([data-wiley-theme="light"]) .e-float-input.e-input-group.e-control-wrapper:not(.e-disabled).e-input-focus,
+  html:not([data-wiley-theme="light"]) .e-input-group.e-control-wrapper:not(.e-disabled):hover,
+  html:not([data-wiley-theme="light"]) .e-input-group.e-control-wrapper:not(.e-disabled):focus-within {
+    background: #0f172a;
     border-color: rgba(148, 163, 184, 0.22);
     color: #f1f5f9;
   }
-  .e-input-group .e-input,
-  .e-input-group input {
-    background-color: transparent;
+  html:not([data-wiley-theme="light"]) .e-float-input.e-control-wrapper:not(.e-disabled) input.e-input,
+  html:not([data-wiley-theme="light"]) .e-float-input.e-control-wrapper:not(.e-disabled) textarea.e-input,
+  html:not([data-wiley-theme="light"]) .e-float-input.e-control-wrapper:not(.e-disabled):hover input.e-input,
+  html:not([data-wiley-theme="light"]) .e-float-input.e-control-wrapper:not(.e-disabled):hover textarea.e-input,
+  html:not([data-wiley-theme="light"]) .e-input-group.e-control-wrapper:not(.e-disabled) input.e-input:hover,
+  html:not([data-wiley-theme="light"]) .e-input-group.e-control-wrapper:not(.e-disabled) textarea.e-input:hover {
+    background: transparent;
     color: #f1f5f9;
+    -webkit-text-fill-color: #f1f5f9;
   }
-  .e-input-group.e-input-focus,
-  .e-input-group:focus-within {
+  html:not([data-wiley-theme="light"]) .e-input-group.e-input-focus,
+  html:not([data-wiley-theme="light"]) .e-input-group:focus-within {
     border-color: #38bdf8;
     box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
   }

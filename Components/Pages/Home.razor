@@ -1,8 +1,10 @@
 ﻿@page "/"
 @page "/town-hub"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using System.Globalization
 @using System.Text.Json
 @using Microsoft.Extensions.Configuration
+@using Microsoft.JSInterop
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Options
 @using WileyCoWeb.Services
@@ -10,6 +12,7 @@
 @inject SharedContractReferenceDataApiService ReferenceDataApi
 @inject ToastService ToastService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Town Hub — Town of Wiley</PageTitle>
 
@@ -33,7 +36,17 @@
 		{
 			var status = ResolveCardStatus(app);
 			var configured = !string.IsNullOrWhiteSpace(app.Url);
-			@if (configured)
+			@if (configured && IsTrashTruck(app))
+			{
+				<button type="button" class="home-hub-card" @onclick="() => OpenTrashRoleDialog(app)">
+					<span class="home-hub-card-index">@app.Id</span>
+					<strong>@app.Title</strong>
+					<p>@app.Description</p>
+					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
+					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
+				</button>
+			}
+			else if (configured)
 			{
 				<a class="home-hub-card"
 				   href="@app.Url"
@@ -61,6 +74,25 @@
 			}
 		}
 	</div>
+
+	<SfDialog @bind-Visible="_trashRoleDialogOpen"
+	          Width="28rem"
+	          IsModal="true"
+	          ShowCloseIcon="true"
+	          CssClass="town-hub-role-dialog">
+		<DialogTemplates>
+			<Header>Open Trash Truck</Header>
+			<Content>
+				<p class="town-hub-muted">
+					Town Hub is already signed in. Choose driver or clerk and the route app opens on that page.
+				</p>
+			</Content>
+		</DialogTemplates>
+		<DialogButtons>
+			<DialogButton Content="Clerk" IsPrimary="true" OnClick="OpenTrashAsClerkAsync" />
+			<DialogButton Content="Driver" OnClick="OpenTrashAsDriverAsync" />
+		</DialogButtons>
+	</SfDialog>
 
 	<section class="town-hub-summary" aria-labelledby="town-hub-summary-heading">
 		<div class="town-hub-summary-header">
@@ -155,6 +187,8 @@
 	private List<OperationalEventContract> _recentEvents = [];
 	private bool _loading;
 	private string? _error;
+	private bool _trashRoleDialogOpen;
+	private TownHubAppLink? _trashApp;
 
 	protected override void OnInitialized()
 	{
@@ -397,6 +431,45 @@
 		new() { Id = "04", Title = "Trash Truck" },
 		new() { Id = "05", Title = "TIKR" }
 	];
+
+	private static bool IsTrashTruck(TownHubAppLink app) =>
+		string.Equals(app.Id, "04", StringComparison.Ordinal);
+
+	private void OpenTrashRoleDialog(TownHubAppLink app)
+	{
+		_trashApp = app;
+		_trashRoleDialogOpen = true;
+	}
+
+	private Task OpenTrashAsClerkAsync() => OpenTrashRoleAsync("clerk");
+
+	private Task OpenTrashAsDriverAsync() => OpenTrashRoleAsync("driver");
+
+	private async Task OpenTrashRoleAsync(string role)
+	{
+		_trashRoleDialogOpen = false;
+		var app = _trashApp;
+		if (app is null || string.IsNullOrWhiteSpace(app.Url))
+		{
+			return;
+		}
+
+		var target = BuildTrashRoleUrl(app.Url, role);
+		if (app.OpenInNewTab && IsAbsolute(target))
+		{
+			await JS.InvokeVoidAsync("open", target, "_blank", "noopener");
+			return;
+		}
+
+		Navigation.NavigateTo(target);
+	}
+
+	private static string BuildTrashRoleUrl(string baseUrl, string role)
+	{
+		var path = role == "driver" ? "/driver" : "/clerk";
+		var trimmed = baseUrl.Trim().TrimEnd('/');
+		return $"{trimmed}{path}?from=town-hub&role={role}";
+	}
 
 	private static bool IsAbsolute(string url) =>
 		Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
