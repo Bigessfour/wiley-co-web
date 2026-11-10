@@ -87,7 +87,7 @@ TOWN_HUB_TIKR_URL=http://localhost:5080 \
 
 ### Production / App Runner
 
-Replace the `REPLACE-*.awsapprunner.com` placeholders in `appsettings.Production.json` with the real service URLs after deploy, **or** set Amplify branch environment variables and let the build emit `appsettings.TownHub.local.json`.
+Production `TownHub:Apps` keeps sibling `Url` values **empty** so cards stay disabled until live hosts exist. Set Amplify branch environment variables (`TOWN_HUB_*_URL`) so the build emits `appsettings.TownHub.local.json`, **or** fill sibling URLs in `appsettings.Production.json` only after each service is live. Do not ship `REPLACE-*.awsapprunner.com` placeholders (they look configured and open broken tabs).
 
 Relative paths (Widget) stay same-origin; absolute HTTPS URLs open in a new tab when `OpenInNewTab` is true.
 

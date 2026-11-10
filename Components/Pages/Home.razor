@@ -385,56 +385,17 @@
 	}
 
 	/// <summary>
-	/// Last-resort card structure when no TownHub:Apps section is present.
-	/// Prefer wwwroot/appsettings.Development.json / Production.json (and TownHub.local overrides).
+	/// Last-resort card titles when no TownHub:Apps section is present.
+	/// URLs, descriptions, and reference-match keys come from appsettings / TownHub.local overrides
+	/// (<see cref="ApplyUrlOverrides"/> / <see cref="ApplyReferenceDefaults"/>).
 	/// </summary>
 	private static List<TownHubAppLink> DefaultApps() =>
 	[
-		new()
-		{
-			Id = "01",
-			Title = "Wiley Widget",
-			Description = "Rate study console and financial workspace (this app).",
-			Url = "/wiley-workspace",
-			OpenInNewTab = false,
-			ReferenceEnterpriseId = "tow-water-utility",
-			ReferenceSources = ["council-packet", "quickbooks-desktop", "nas-export"]
-		},
-		new()
-		{
-			Id = "02",
-			Title = "Apartments",
-			Description = "ClerkSuite apartments operations.",
-			Url = string.Empty,
-			OpenInNewTab = true,
-			ReferenceEnterpriseId = "tow-apartments",
-			ReferencePublisherSystem = "wiley-apartments"
-		},
-		new()
-		{
-			Id = "03",
-			Title = "Rural Water",
-			Description = "Rural water operations app.",
-			Url = string.Empty,
-			OpenInNewTab = true,
-			ReferenceEnterpriseId = "tow-wsd"
-		},
-		new()
-		{
-			Id = "04",
-			Title = "Trash Truck",
-			Description = "Trash / sanitation routing app.",
-			Url = string.Empty,
-			OpenInNewTab = true
-		},
-		new()
-		{
-			Id = "05",
-			Title = "TIKR",
-			Description = "TIKR Blazor Server + API.",
-			Url = string.Empty,
-			OpenInNewTab = true
-		}
+		new() { Id = "01", Title = "Wiley Widget" },
+		new() { Id = "02", Title = "Apartments" },
+		new() { Id = "03", Title = "Rural Water" },
+		new() { Id = "04", Title = "Trash Truck" },
+		new() { Id = "05", Title = "TIKR" }
 	];
 
 	private static bool IsAbsolute(string url) =>
