@@ -339,6 +339,17 @@ jobs:
           name: blazor-publish
           path: publish_output/wwwroot
 
+      - name: Serve Town Hub to Playwright with auth off
+        run: |
+          node -e '
+            const fs = require("fs");
+            const path = "publish_output/wwwroot/appsettings.Production.json";
+            const json = JSON.parse(fs.readFileSync(path, "utf8"));
+            json.Auth = json.Auth || {};
+            json.Auth.Enabled = false;
+            fs.writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+          '
+
       - name: Restore .NET dependencies (for API)
         run: dotnet restore WileyCoWeb.slnx --locked-mode
 

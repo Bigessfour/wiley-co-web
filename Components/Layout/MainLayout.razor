@@ -600,10 +600,24 @@
                 await JSRuntime.InvokeVoidAsync("eval",
                     $"var l=document.getElementById('syncfusion-theme'); if(l) l.href='{themeHref}';");
             }
+            else
+            {
+                // No saved choice. Follow the OS theme the early script already applied,
+                // and load fluent2-dark.css so input hover does not stay on the light palette.
+                var active = await JSRuntime.InvokeAsync<string?>(
+                    "eval",
+                    "document.documentElement.getAttribute('data-wiley-theme')");
+                _currentTheme = active == "dark" ? "dark" : "light";
+                var themeHref = _currentTheme == "dark"
+                    ? "_content/Syncfusion.Blazor.Themes/fluent2-dark.css"
+                    : "_content/Syncfusion.Blazor.Themes/fluent2.css";
+                await JSRuntime.InvokeVoidAsync("eval",
+                    $"var l=document.getElementById('syncfusion-theme'); if(l) l.href='{themeHref}';");
+            }
         }
         catch
         {
-            // OS default (set by the early script in index.html) remains; link stays fluent2.css (light).
+            // OS default (set by the early script in index.html) remains.
         }
     }
 

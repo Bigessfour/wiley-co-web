@@ -85,22 +85,21 @@ TOWN_HUB_TIKR_URL=http://localhost:5080 \
   ./Scripts/generate-townhub-appsettings.sh
 ```
 
-### Production / App Runner
+### Production (NAS-first)
 
-Production `TownHub:Apps` keeps sibling `Url` values **empty** so cards stay disabled until live hosts exist. Set Amplify branch environment variables (`TOWN_HUB_*_URL`) so the build emits `appsettings.TownHub.local.json`, **or** fill sibling URLs in `appsettings.Production.json` only after each service is live. Do not ship `REPLACE-*.awsapprunner.com` placeholders (they look configured and open broken tabs).
+Clerk databases stay on the Synology (`mr-storage`) over Tailscale. Production card URLs:
 
-Relative paths (Widget) stay same-origin; absolute HTTPS URLs open in a new tab when `OpenInNewTab` is true.
+| Card         | URL                                          | Host                                     |
+| ------------ | -------------------------------------------- | ---------------------------------------- |
+| Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open         |
+| Apartments   | `http://mr-storage:8082`                     | NAS, SQLite                              |
+| TIKR         | `http://mr-storage:8080`                     | NAS, SQLite                              |
+| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app on the Town account |
+| Rural Water  | empty (card disabled)                        | No stable public URL recorded yet        |
 
-AWS / Amplify example:
+`wwwroot/appsettings.Development.json` keeps `localhost` ports for Mac development. Tailscale names resolve only on the tailnet, which is the clerk path. Do not replace them with App Runner placeholders.
 
-```bash
-TOWN_HUB_APARTMENTS_URL=https://xxxxx.us-east-2.awsapprunner.com
-TOWN_HUB_RURAL_WATER_URL=https://yyyyy.us-east-2.awsapprunner.com
-TOWN_HUB_TRASH_TRUCK_URL=https://zzzzz.us-east-2.awsapprunner.com
-TOWN_HUB_TIKR_URL=https://ttttt.us-east-2.awsapprunner.com
-```
-
-If Amplify hosts the WASM shell and API separately, keep Widget as `/wiley-workspace` (or `TOWN_HUB_WIDGET_URL=/wiley-workspace`) and only swap sibling-app absolute URLs.
+Amplify `TOWN_HUB_*_URL` overrides still work when a card must move. Leave them unset to keep the Production file above.
 
 ## Auth
 
