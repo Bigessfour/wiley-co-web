@@ -10,27 +10,27 @@
 @implements IDisposable
 
 <section id="shared-contract-reference-data-panel" class="space-y-4" aria-live="polite">
-    <section class="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-950 via-slate-900 to-sky-950 p-5 text-white shadow-sm">
+    <section class="wiley-hero">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-sky-300">Shared contracts</p>
+                <p class="wiley-eyebrow wiley-eyebrow-on-dark">Shared contracts</p>
                 <h2 class="mt-2 text-2xl font-semibold tracking-tight">Reference data (read-only)</h2>
-                <p class="mt-2 max-w-3xl text-sm text-slate-300">
+                <p class="mt-2 max-w-3xl text-sm">
                     Displays ActualsSummary and OperationalEvent batches ingested via
-                    <code class="text-sky-200">/api/reference-data/*</code>.
+                    <code>/api/reference-data/*</code>.
                     Does not change QuickBooks import, snapshots, or break-even math.
-                    CLI ingest: <code class="text-sky-200">Scripts/ingest-shared-contracts.sh</code>.
+                    CLI ingest: <code>Scripts/ingest-shared-contracts.sh</code>.
                 </p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <button type="button"
-                        class="rounded-lg border border-sky-400/50 bg-transparent px-4 py-2 text-sm font-semibold text-sky-100 hover:bg-sky-950/40 disabled:opacity-60"
+                        class="wiley-button-ghost rounded-lg disabled:opacity-60"
                         disabled="@(IsLoading || IsIngesting)"
                         @onclick="IngestOctoberExamplesAsync">
                     @(IsIngesting ? "Ingesting…" : "Ingest Oct 2026 examples")
                 </button>
                 <button type="button"
-                        class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60"
+                        class="wiley-button-accent rounded-lg disabled:opacity-60"
                         disabled="@(IsLoading || IsIngesting)"
                         @onclick="RefreshAsync">
                     @(IsLoading ? "Refreshing…" : "Refresh")
@@ -41,7 +41,7 @@
 
     @if (!string.IsNullOrWhiteSpace(ErrorMessage))
     {
-        <section class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">
+        <section class="wiley-callout wiley-callout-danger rounded-2xl p-4 text-sm" role="alert">
             @ErrorMessage
         </section>
     }
@@ -49,7 +49,7 @@
     <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex items-baseline justify-between gap-3">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Actuals summaries</p>
+                <p class="wiley-eyebrow wiley-eyebrow-muted">Actuals summaries</p>
                 <h3 class="mt-1 text-lg font-semibold wiley-text">GET /api/reference-data/actuals</h3>
             </div>
             <span class="text-xs wiley-text-muted">@Actuals.Count stored</span>
@@ -70,7 +70,7 @@
         {
             <div class="mt-4 overflow-x-auto">
                 <table class="min-w-full text-left text-sm">
-                    <thead class="border-b border-[var(--wiley-border)] text-xs uppercase tracking-wide wiley-text-muted">
+                    <thead class="border-b text-xs uppercase tracking-wide wiley-text-muted">
                         <tr>
                             <th class="py-2 pr-3 font-semibold">Accepted</th>
                             <th class="py-2 pr-3 font-semibold">Enterprise</th>
@@ -84,7 +84,7 @@
                     <tbody>
                         @foreach (var row in Actuals)
                         {
-                            <tr class="border-b border-[var(--wiley-border)]/60">
+                            <tr class="border-b">
                                 <td class="py-2 pr-3 whitespace-nowrap">@FormatAccepted(row.AcceptedAt)</td>
                                 <td class="py-2 pr-3">@row.Actuals.EnterpriseId</td>
                                 <td class="py-2 pr-3">@row.Actuals.Period</td>
@@ -103,7 +103,7 @@
     <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex items-baseline justify-between gap-3">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Operational event batches</p>
+                <p class="wiley-eyebrow wiley-eyebrow-muted">Operational event batches</p>
                 <h3 class="mt-1 text-lg font-semibold wiley-text">GET /api/reference-data/events</h3>
             </div>
             <span class="text-xs wiley-text-muted">@Events.Count batches</span>
@@ -125,14 +125,14 @@
             <div class="mt-4 space-y-4">
                 @foreach (var batch in Events)
                 {
-                    <article class="rounded-xl border border-[var(--wiley-border)] p-3">
+                    <article class="rounded-xl wiley-border p-3">
                         <div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
                             <p class="font-semibold wiley-text">Batch @batch.Id</p>
                             <p class="text-xs wiley-text-muted">@FormatAccepted(batch.AcceptedAt) · @batch.Events.Count events</p>
                         </div>
                         <div class="mt-3 overflow-x-auto">
                             <table class="min-w-full text-left text-sm">
-                                <thead class="border-b border-[var(--wiley-border)] text-xs uppercase tracking-wide wiley-text-muted">
+                                <thead class="border-b text-xs uppercase tracking-wide wiley-text-muted">
                                     <tr>
                                         <th class="py-2 pr-3 font-semibold">Date</th>
                                         <th class="py-2 pr-3 font-semibold">Type</th>
@@ -144,7 +144,7 @@
                                 <tbody>
                                     @foreach (var evt in batch.Events.Take(12))
                                     {
-                                        <tr class="border-b border-[var(--wiley-border)]/60">
+                                        <tr class="border-b">
                                             <td class="py-2 pr-3 whitespace-nowrap">@evt.Date</td>
                                             <td class="py-2 pr-3">@evt.Type</td>
                                             <td class="py-2 pr-3">@evt.Source</td>

@@ -12,28 +12,28 @@
         <SfCard ID="kpi-net-position">
             <CardHeader Title="Net Monthly Position" SubTitle="@(SelectedEnterprise + " · FY" + SelectedFiscalYear)" />
             <CardContent>
-                <p class="text-2xl font-bold @(NetPosition >= 0 ? "text-emerald-600" : "text-rose-600")">@NetPosition.ToString("C0")</p>
+                <p class="text-2xl font-bold @(NetPosition >= 0 ? "wiley-status-ok" : "wiley-status-bad")">@NetPosition.ToString("C0")</p>
                 <p class="mt-1 text-xs wiley-text-muted">Monthly Revenue @MonthlyRevenue.ToString("C0") − Total Costs @TotalCosts.ToString("C0")</p>
             </CardContent>
         </SfCard>
         <SfCard ID="kpi-coverage-ratio">
             <CardHeader Title="Coverage Ratio" SubTitle="Revenue ÷ Costs" />
             <CardContent>
-                <p class="text-2xl font-bold @(CoverageRatio >= 1.25 ? "text-emerald-600" : (CoverageRatio >= 1.0 ? "text-amber-600" : "text-rose-600"))">@CoverageRatio.ToString("F2")×</p>
+                <p class="text-2xl font-bold @(CoverageRatio >= 1.25 ? "wiley-status-ok" : (CoverageRatio >= 1.0 ? "wiley-status-warn" : "wiley-status-bad"))">@CoverageRatio.ToString("F2")×</p>
                 <p class="mt-1 text-xs wiley-text-muted">Target ≥ 1.25×</p>
             </CardContent>
         </SfCard>
         <SfCard ID="kpi-rate-adequacy">
             <CardHeader Title="Rate Adequacy" SubTitle="Current ÷ Break-Even" />
             <CardContent>
-                <p class="text-2xl font-bold @(RateAdequacy >= 100 ? "text-emerald-600" : (RateAdequacy >= 85 ? "text-amber-600" : "text-rose-600"))">@RateAdequacy.ToString("F1")%</p>
+                <p class="text-2xl font-bold @(RateAdequacy >= 100 ? "wiley-status-ok" : (RateAdequacy >= 85 ? "wiley-status-warn" : "wiley-status-bad"))">@RateAdequacy.ToString("F1")%</p>
                 <p class="mt-1 text-xs wiley-text-muted">Current @CurrentRate.ToString("C2") · Break-Even @RecommendedRate.ToString("C2")</p>
             </CardContent>
         </SfCard>
         <SfCard ID="kpi-scenario-pressure">
             <CardHeader Title="Scenario Pressure" SubTitle="What-if cost additions" />
             <CardContent>
-                <p class="text-2xl font-bold @(ScenarioCostTotal > 0 ? "text-amber-600" : "wiley-text-muted")">@ScenarioCostTotal.ToString("C0")</p>
+                <p class="text-2xl font-bold @(ScenarioCostTotal > 0 ? "wiley-status-warn" : "wiley-text-muted")">@ScenarioCostTotal.ToString("C0")</p>
                 <p class="mt-1 text-xs wiley-text-muted">Scenario break-even @AdjustedRecommendedRate.ToString("C2")</p>
             </CardContent>
         </SfCard>
