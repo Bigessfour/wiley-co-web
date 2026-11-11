@@ -23,7 +23,7 @@
             <div class="flex flex-col gap-4">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0 flex-1">
-                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Wiley Widget</p>
+                        <p class="wiley-eyebrow wiley-eyebrow-on-dark">Wiley Widget</p>
                         <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">Utility Rate Study Workspace</h1>
                         <p class="workspace-hero-subtitle mt-2 max-w-3xl text-sm md:text-base">
                             Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.
@@ -39,7 +39,7 @@
                                 <summary class="workspace-status-details-summary">Data source details</summary>
                                 <div class="workspace-status-details-body">
                                     <div><span class="wiley-text-muted">Workspace API:</span> @HostingApiHealth</div>
-                                    <div><span class="wiley-text-muted">Bootstrap:</span> <span class="@(IsUsingStartupFallback ? "text-amber-200" : "text-emerald-200")">@StartupSourceStatus</span></div>
+                                    <div><span class="wiley-text-muted">Bootstrap:</span> <span class="@(IsUsingStartupFallback ? "wiley-status-warn-on-dark" : "wiley-status-ok-on-dark")">@StartupSourceStatus</span></div>
                                     <div class="line-clamp-3"><span class="wiley-text-muted">Current state:</span> @CurrentStateSourceStatus</div>
                                 </div>
                             </details>
@@ -50,7 +50,7 @@
                 <div class="workspace-hero-kpi-block">
                     <div class="mb-2 flex flex-wrap items-center gap-2">
                         <span class="e-badge e-badge-info workspace-enterprise-badge" role="status">@SelectedEnterprise</span>
-                        <span class="text-xs uppercase tracking-[0.2em] text-sky-200/80">Selected enterprise</span>
+                        <span class="wiley-eyebrow wiley-eyebrow-on-dark">Selected enterprise</span>
                     </div>
                     <div class="workspace-kpi-strip grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div class="workspace-kpi-tile @(IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
@@ -95,7 +95,7 @@
                      aria-label="Document Center, Deliverables">
                 <summary class="workspace-document-center-summary">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Document Center</p>
+                        <p class="wiley-eyebrow wiley-eyebrow-muted">Document Center</p>
                         <p class="mt-1 text-base font-semibold wiley-text">Deliverables</p>
                         <p class="mt-0.5 text-sm wiley-text-muted">Excel and PDF exports from the live workspace or a saved scenario.</p>
                     </div>
@@ -200,8 +200,8 @@
                             </CardContent>
                         </SfCard>
 
-                        <div id="workspace-hosting-information" class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel-secondary p-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">Hosting Information</p>
+                        <div id="workspace-hosting-information" class="rounded-xl wiley-border wiley-surface-panel-secondary p-3">
+                            <p class="wiley-eyebrow wiley-eyebrow-muted">Hosting Information</p>
                             <div class="mt-3 grid gap-2 text-xs wiley-text-muted">
                                 <div><span class="font-semibold wiley-text-muted">Environment:</span> @HostingEnvironmentName</div>
                                 <div><span class="font-semibold wiley-text-muted">Last synced:</span> @HostingLastSyncedDisplay</div>
@@ -211,13 +211,13 @@
                             </div>
                         </div>
 
-                        <div id="workspace-navigation-card" class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel-secondary p-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">Workspace Navigation</p>
+                        <div id="workspace-navigation-card" class="rounded-xl wiley-border wiley-surface-panel-secondary p-3">
+                            <p class="wiley-eyebrow wiley-eyebrow-muted">Workspace Navigation</p>
                             <div id="workspace-navigation-list" class="mt-2 grid gap-2">
                                 @foreach (var panelNavItem in PanelNavItems)
                                 {
                                     <a href="@GetPanelRoute(panelNavItem.Key)"
-                                       class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm transition-colors @(ActivePanelKey == panelNavItem.Key ? "bg-sky-100 text-sky-900 font-semibold border-sky-200" : "wiley-text-muted hover:bg-[var(--wiley-surface-2)]")"
+                                       class="workspace-panel-link block w-full text-left px-3 py-2 rounded-lg text-sm @(ActivePanelKey == panelNavItem.Key ? "is-active" : "wiley-text-muted")"
                                        @onclick="() => OpenPanel(panelNavItem.Key)"
                                        @onclick:preventDefault>
                                         @panelNavItem.Label
@@ -226,8 +226,8 @@
                             </div>
                         </div>
 
-                        <div id="workspace-global-actions-card" class="rounded-xl border border-[var(--wiley-border)] wiley-surface-panel-secondary p-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">Global Actions</p>
+                        <div id="workspace-global-actions-card" class="rounded-xl wiley-border wiley-surface-panel-secondary p-3">
+                            <p class="wiley-eyebrow wiley-eyebrow-muted">Global Actions</p>
                             <div class="mt-2 grid gap-2">
                                 <SfButton Disabled="@IsLoadingWorkspace" OnClick="RefreshWorkspaceAsync">@(IsLoadingWorkspace ? "Refreshing..." : "Reload workspace")</SfButton>
                                 <SfButton CssClass="e-primary" IsPrimary="true" Disabled="@IsSavingBaseline" OnClick="SaveWorkspaceBaselineAsync">@(IsSavingBaseline ? "Saving baseline..." : "Save baseline")</SfButton>
@@ -247,11 +247,11 @@
                             <div class="mt-2"><span class="font-semibold wiley-text-muted">Scenarios:</span> <span id="scenario-persistence-status">@ScenarioPersistenceStatus</span></div>
                             <div class="mt-2">
                                 <span class="font-semibold wiley-text-muted">Startup source:</span>
-                                <span class="@(IsUsingStartupFallback ? "text-amber-700" : "text-emerald-700")"> @StartupSourceStatus</span>
+                                <span class="@(IsUsingStartupFallback ? "wiley-status-warn" : "wiley-status-ok")"> @StartupSourceStatus</span>
                             </div>
                             <div class="mt-2">
                                 <span class="font-semibold wiley-text-muted">Current state:</span>
-                                <span class="@(IsUsingBrowserRestoredState ? "text-sky-700" : "text-emerald-700")"> @CurrentStateSourceStatus</span>
+                                <span class="@(IsUsingBrowserRestoredState ? "wiley-status-info" : "wiley-status-ok")"> @CurrentStateSourceStatus</span>
                             </div>
                         </div>
                         </div>
@@ -264,8 +264,8 @@
                         <div id="workspace-main-content" class="workspace-pane-main h-full overflow-y-auto overflow-x-hidden">
                         <div id="workspace-dashboard" class="w-full">
                     <div class="workspace-main-shell flex flex-col gap-4 p-4 md:p-5">
-                        <div id="workspace-breadcrumb" class="border-b border-[var(--wiley-border)] pb-3">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] wiley-text-muted">@BreadcrumbSection</p>
+                        <div id="workspace-breadcrumb" class="border-b pb-3">
+                            <p class="wiley-eyebrow wiley-eyebrow-muted">@BreadcrumbSection</p>
                             <div class="mt-1 flex items-center gap-2 text-sm wiley-text-muted">
                                 <span>Workspace</span>
                                 <span>/</span>
@@ -282,7 +282,7 @@
                         {
                             <div id="workspace-init-skeleton" aria-busy="true" aria-label="Workspace initializing" class="space-y-4">
                                 @* Spinner row with descriptive label *@
-                                <div class="flex items-center gap-4 rounded-2xl border border-dashed border-[var(--wiley-border)] wiley-surface-panel-secondary px-6 py-5">
+                                <div class="flex items-center gap-4 rounded-2xl border-dashed wiley-border wiley-surface-panel-secondary px-6 py-5">
                                     <div class="wiley-panel-spinner-host" style="min-height:3.5rem; width:3.5rem;">
                                         <SfSpinner Visible="true" Size="32" Type="SpinnerType.Material" />
                                     </div>
@@ -315,13 +315,13 @@
                         else if (IsLoadingWorkspace)
                         {
                             <div id="workspace-reload-skeleton" aria-busy="true" aria-label="Workspace reloading" class="space-y-4">
-                                <div class="flex items-center gap-4 rounded-2xl border border-sky-200 bg-sky-50 px-6 py-4">
+                                <div class="wiley-callout wiley-callout-info flex items-center gap-4 rounded-2xl px-6 py-4">
                                     <div class="wiley-panel-spinner-host" style="min-height:3rem; width:3rem;">
                                         <SfSpinner Visible="true" Size="28" Type="SpinnerType.Material" />
                                     </div>
                                     <div>
-                                        <p class="text-sm font-semibold text-sky-900">Loading workspace…</p>
-                                        <p class="mt-0.5 text-xs text-sky-700">@WorkspaceLoadStatus</p>
+                                        <p class="text-sm font-semibold">Loading workspace…</p>
+                                        <p class="mt-0.5 text-xs wiley-text-muted">@WorkspaceLoadStatus</p>
                                     </div>
                                 </div>
                                 @* Skeleton rows matching the active mode *@
@@ -340,7 +340,7 @@
                                 }
                                 else
                                 {
-                                    <div class="space-y-3 rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel p-6 shadow-sm">
+                                    <div class="space-y-3 rounded-2xl wiley-border wiley-surface-panel p-6 shadow-sm">
                                         <div class="wiley-skeleton h-6 w-1/2 rounded"></div>
                                         <div class="wiley-skeleton h-4 w-3/4 rounded"></div>
                                         <div class="wiley-skeleton h-4 w-2/3 rounded"></div>
@@ -626,10 +626,10 @@
                               CollapsedChanged="HandleJarvisPaneCollapsedChanged">
                     <ContentTemplate>
                         <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
-                            <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b border-[var(--wiley-border)] px-4 py-3 flex-shrink-0 wiley-surface-panel-secondary">
+                            <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b px-4 py-3 flex-shrink-0 wiley-surface-panel-secondary">
                                 <span class="e-icons e-ai-chat text-[var(--wiley-accent)] text-base flex-shrink-0" aria-hidden="true"></span>
                                 <div class="min-w-0">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Jarvis</p>
+                                    <p class="wiley-eyebrow wiley-eyebrow-muted">Jarvis</p>
                                     <p class="mt-0.5 text-[0.7rem] wiley-text-muted leading-tight">AI workspace guidance</p>
                                 </div>
                             </div>
@@ -659,15 +659,15 @@
 </div>
     </ChildContent>
     <ErrorContent>
-        <section id="workspace-error-boundary" class="rounded-3xl border border-[var(--wiley-border)] px-6 py-6 shadow-sm wiley-surface-panel">
-            <p class="text-xs font-semibold uppercase tracking-[0.25em] wiley-text-muted">Workspace Error</p>
+        <section id="workspace-error-boundary" class="rounded-3xl wiley-border px-6 py-6 shadow-sm wiley-surface-panel">
+            <p class="wiley-eyebrow wiley-eyebrow-muted">Workspace Error</p>
             <h2 class="mt-2 text-2xl font-semibold tracking-tight">The workspace hit an unexpected rendering error.</h2>
             <p class="mt-2 max-w-2xl text-sm wiley-text-muted">
                 Review the browser console and structured client logs for the full stack trace, then reopen the workspace panel or return to the overview.
             </p>
             <div class="mt-4 flex flex-wrap gap-3">
-                <a class="inline-flex items-center rounded-full bg-[var(--wiley-accent)] px-4 py-2 text-sm font-semibold text-white no-underline" href="/wiley-workspace">Reload workspace</a>
-                <a class="inline-flex items-center rounded-full border border-[var(--wiley-border)] px-4 py-2 text-sm font-semibold wiley-text-muted no-underline" href="/">Return home</a>
+                <a class="wiley-button-accent" href="/wiley-workspace">Reload workspace</a>
+                <a class="wiley-button-ghost" href="/">Return home</a>
             </div>
         </section>
     </ErrorContent>
@@ -721,10 +721,11 @@
 
     .workspace-main-shell {
         min-height: 100%;
-        background: #ffffff;
+        background: var(--wiley-surface-1);
+        color: var(--wiley-text);
         border-radius: 0.75rem;
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+        border: 1px solid var(--wiley-border);
+        box-shadow: var(--wiley-shadow-sm);
     }
 
     /* Dark mode support for the main content shell (respects Blazor CSS isolation).
@@ -742,7 +743,8 @@
     }
 
     .workspace-jarvis-rail-header {
-        background: linear-gradient(180deg, #f8fafc, #ffffff);
+        background: var(--wiley-surface-1);
+        color: var(--wiley-text);
         flex-shrink: 0;
     }
 
@@ -875,10 +877,11 @@
         gap: 1rem;
         min-height: 15rem;
         padding: 1.25rem;
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        border: 1px solid var(--wiley-border);
         border-radius: 1.25rem;
-        background: linear-gradient(180deg, #ffffff, #f8fafc);
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+        background: var(--wiley-surface-1);
+        color: var(--wiley-text);
+        box-shadow: var(--wiley-shadow-md);
         grid-column: span 4;
     }
 
@@ -890,7 +893,7 @@
     .wiley-workspace .workspace-overview-card-wide {
         grid-column: span 12;
         min-height: 13rem;
-        background: linear-gradient(135deg, #eff6ff, #f8fafc 60%, #ecfeff);
+        background: var(--wiley-surface-1);
     }
 
     .wiley-workspace .workspace-overview-card-copy {
@@ -900,23 +903,25 @@
 
     .wiley-workspace .workspace-overview-card-copy h3 {
         margin: 0;
-        color: #0f172a;
+        color: var(--wiley-text);
         font-size: 1.15rem;
-        line-height: 1.25;
+        line-height: 1.15;
+        font-weight: 600;
     }
 
     .wiley-workspace .workspace-overview-card-copy p {
         margin: 0;
-        color: #475569;
+        color: var(--wiley-text-muted);
         line-height: 1.6;
     }
 
     .wiley-workspace .workspace-overview-card-kicker {
         margin: 0;
-        color: #0284c7;
-        font-size: 0.74rem;
+        color: var(--wiley-accent);
+        font-size: 0.75rem;
         font-weight: 700;
-        letter-spacing: 0.2em;
+        letter-spacing: 0.15em;
+        line-height: 1.2;
         text-transform: uppercase;
     }
 
@@ -933,8 +938,8 @@
         min-height: 2rem;
         padding: 0.45rem 0.7rem;
         border-radius: 999px;
-        background: rgba(226, 232, 240, 0.75);
-        color: #334155;
+        background: var(--wiley-surface-2);
+        color: var(--wiley-text);
         font-size: 0.82rem;
         font-weight: 600;
     }
@@ -1049,9 +1054,10 @@
 
     .wiley-hero .workspace-kpi-label {
         color: rgba(186, 230, 253, 0.78);
-        font-size: 0.68rem;
+        font-size: 0.75rem;
         font-weight: 700;
-        letter-spacing: 0.16em;
+        letter-spacing: 0.15em;
+        line-height: 1.2;
         text-transform: uppercase;
     }
 
@@ -1070,9 +1076,10 @@
 
     .wiley-hero .workspace-quad-section-title {
         color: rgba(186, 230, 253, 0.9);
-        font-size: 0.68rem;
+        font-size: 0.75rem;
         font-weight: 700;
-        letter-spacing: 0.22em;
+        letter-spacing: 0.15em;
+        line-height: 1.2;
         text-transform: uppercase;
     }
 

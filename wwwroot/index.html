@@ -51,24 +51,22 @@
     </script>
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <!--
-      Syncfusion 33.x Fluent2 theme (light base) for native Fluent2 look and
-      proper dark/light inheritance via data-bs-theme + data-wiley-theme.
-      The id enables the theme toggle in MainLayout to swap to fluent2-dark.css
-      (and back) for full Syncfusion control surfaces (grids, cards, inputs, charts,
-      sidebar, appbar) in both modes. No hard-coded light-only assumptions.
+      Insert the Fluent2 stylesheet that matches data-wiley-theme.
+      appendChild requests that file directly. document.write would block the
+      parser on the multi-megabyte theme file and leave the boot screen stuck.
+      MainLayout still swaps this link when the user toggles theme.
     -->
-    <link
-      id="syncfusion-theme"
-      rel="stylesheet"
-      href="_content/Syncfusion.Blazor.Themes/fluent2.css"
-    />
     <script>
       (function () {
         var theme = document.documentElement.getAttribute("data-wiley-theme");
-        var link = document.getElementById("syncfusion-theme");
-        if (link && theme === "dark") {
-          link.href = "_content/Syncfusion.Blazor.Themes/fluent2-dark.css";
-        }
+        var link = document.createElement("link");
+        link.id = "syncfusion-theme";
+        link.rel = "stylesheet";
+        link.href =
+          theme === "dark"
+            ? "_content/Syncfusion.Blazor.Themes/fluent2-dark.css"
+            : "_content/Syncfusion.Blazor.Themes/fluent2.css";
+        document.head.appendChild(link);
       })();
     </script>
     <link rel="stylesheet" href="app.css" />
@@ -93,7 +91,7 @@
           <div>
             <div
               class="text-uppercase fw-semibold small text-primary"
-              style="letter-spacing: 0.28em"
+              style="letter-spacing: 0.15em"
             >
               Starting client
             </div>

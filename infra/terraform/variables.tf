@@ -78,8 +78,20 @@ variable "enable_publisher_user" {
 
 variable "widget_reference_data_url" {
   type        = string
-  description = "HTTPS base for Widget API (used in SSM parameter for publishers). Example: https://xxxxx.us-east-2.awsapprunner.com"
+  description = "HTTPS base for Widget API (used in SSM parameter for publishers). Leave empty while Widget stays off this account."
   default     = ""
+}
+
+variable "nas_apartments_url" {
+  type        = string
+  description = "ClerkSuite URL on the Synology via Tailscale MagicDNS. Empty skips the SSM parameter."
+  default     = "http://mr-storage:8082"
+}
+
+variable "nas_tikr_url" {
+  type        = string
+  description = "TIKR URL on the Synology via Tailscale MagicDNS. Empty skips the SSM parameter."
+  default     = "http://mr-storage:8080"
 }
 
 variable "contracts_lifecycle_days" {

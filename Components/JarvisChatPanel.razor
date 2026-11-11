@@ -12,7 +12,7 @@
             <div class="space-y-4">
                 @* Removed: the flat operational-status pill and plain brief container.
                    Replacement: Syncfusion cards turn the executive state and workspace brief into first-class rail surfaces that resize cleanly inside the parent splitter. *@
-                <div class="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                <div class="grid gap-4 wiley-split-wide">
                     <SfCard ID="jarvis-operational-status-card">
                         <CardHeader Title="Operational status" SubTitle="@StatusText" />
                         <CardContent>
@@ -128,7 +128,7 @@
 
                                 @* Removed: extra custom chat shell blocks that duplicated the assist surface.
                                    Replacement: the assist rail now owns the premium conversation experience, while surrounding cards focus on runtime and audit context. *@
-                                <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl border border-[var(--wiley-border)] wiley-surface-panel" aria-busy="@IsChatBusy">
+                                <div id="jarvis-chat-ui" class="overflow-hidden rounded-2xl wiley-border wiley-surface-panel" aria-busy="@IsChatBusy">
                                     <SfAIAssistView ID="jarvis-chat-surface"
                                                     @ref="JarvisAssistView"
                                                     Height="100%"
@@ -162,7 +162,7 @@
                                                             <SfCard>
                                                                 <CardHeader Title="Operator profile" SubTitle="User-context plugin summary" />
                                                                 <CardContent>
-                                                                    <div class="text-xs font-semibold uppercase tracking-[0.22em] wiley-text-muted">Profile summary</div>
+                                                                    <div class="wiley-eyebrow wiley-eyebrow-muted">Profile summary</div>
                                                                     <div class="text-sm leading-6 wiley-text-muted">@CurrentProfileSummary</div>
                                                                 </CardContent>
                                                             </SfCard>
@@ -295,7 +295,7 @@
                                     <CardContent>
                                         <div class="space-y-3" role="status" aria-live="polite" aria-busy="@IsChatBusy">
                                             <div>
-                                                <div class="text-xs font-semibold uppercase tracking-[0.22em] wiley-text-muted">Context</div>
+                                                <div class="wiley-eyebrow wiley-eyebrow-muted">Context</div>
                                                 <div class="mt-1 text-sm leading-6 wiley-text-muted">@ChatContextSummary</div>
                                             </div>
                                             <div class="whitespace-pre-line text-sm leading-6 wiley-text-muted">@ChatAnswer</div>

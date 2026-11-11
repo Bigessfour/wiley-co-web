@@ -8,19 +8,19 @@
 
 <PageTitle>Staff sign-in | Wiley.co</PageTitle>
 
-<section class="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-8 text-slate-900 shadow-sm">
-    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Town of Wiley</p>
+<section class="mx-auto max-w-md rounded-3xl wiley-border wiley-surface-1 px-6 py-8 wiley-text shadow-sm">
+    <p class="wiley-eyebrow wiley-eyebrow-muted">Town of Wiley</p>
     <h1 class="mt-2 text-2xl font-semibold tracking-tight">Staff sign-in</h1>
-    <p class="mt-2 text-sm text-slate-600">
+    <p class="mt-2 text-sm wiley-text-muted">
         Use your Cognito staff account to load live workspace data. Anonymous API calls return 401 when JWT is enabled in production.
     </p>
 
     @if (!AuthService.IsEnabled)
     {
-        <p class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p class="wiley-callout wiley-callout-warning mt-6 rounded-2xl px-4 py-3 text-sm">
             Client auth is disabled for this build (`Auth:Enabled=false`). Local development keeps the workspace open without Cognito.
         </p>
-        <a class="mt-4 inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white no-underline" href="/">
+        <a class="wiley-button-dark mt-4" href="/">
             Open Town Hub
         </a>
     }
@@ -28,29 +28,29 @@
     {
         <EditForm Model="_model" OnValidSubmit="SignInAsync" class="mt-6 space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-700" for="staff-username">Username</label>
+                <label class="block text-sm font-medium wiley-text-muted" for="staff-username">Username</label>
                 <InputText id="staff-username"
                            @bind-Value="_model.Username"
-                           class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                           class="mt-1 w-full rounded-xl wiley-border px-3 py-2 text-sm"
                            autocomplete="username" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700" for="staff-password">Password</label>
+                <label class="block text-sm font-medium wiley-text-muted" for="staff-password">Password</label>
                 <input id="staff-password"
                        @bind="_model.Password"
                        type="password"
-                       class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                       class="mt-1 w-full rounded-xl wiley-border px-3 py-2 text-sm"
                        autocomplete="current-password" />
             </div>
 
             @if (!string.IsNullOrWhiteSpace(_error))
             {
-                <p class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">@_error</p>
+                <p class="wiley-callout wiley-callout-danger rounded-2xl px-4 py-3 text-sm" role="alert">@_error</p>
             }
 
             <button id="staff-sign-in-submit"
                     type="submit"
-                    class="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                    class="wiley-button-dark disabled:opacity-60"
                     disabled="@_busy">
                 @(_busy ? "Signing in…" : "Sign in")
             </button>
