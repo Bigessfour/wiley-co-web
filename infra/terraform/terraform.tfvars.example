@@ -20,8 +20,12 @@ enable_contracts_bucket = true
 enable_ecr              = true
 enable_publisher_user   = false
 
-# Optional: set after Widget App Runner URL is known
-# widget_reference_data_url = "https://REPLACE.us-east-2.awsapprunner.com"
+# Clerk databases stay on the Synology (Tailscale). Empty string skips the SSM parameter.
+nas_apartments_url = "http://mr-storage:8082"
+nas_tikr_url       = "http://mr-storage:8080"
+
+# Leave empty while Widget compute stays off this account.
+# widget_reference_data_url = ""
 
 contracts_lifecycle_days = 30
 ecr_image_count_limit    = 10

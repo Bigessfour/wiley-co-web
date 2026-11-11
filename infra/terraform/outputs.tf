@@ -8,6 +8,16 @@ output "region" {
   value       = data.aws_region.current.name
 }
 
+output "nas_apartments_url" {
+  description = "Tailscale URL for ClerkSuite on the NAS."
+  value       = trimspace(var.nas_apartments_url) != "" ? trimspace(var.nas_apartments_url) : null
+}
+
+output "nas_tikr_url" {
+  description = "Tailscale URL for TIKR on the NAS."
+  value       = trimspace(var.nas_tikr_url) != "" ? trimspace(var.nas_tikr_url) : null
+}
+
 output "contracts_bucket_name" {
   description = "S3 bucket for shared-contracts drops (null if disabled)."
   value       = try(aws_s3_bucket.contracts[0].bucket, null)

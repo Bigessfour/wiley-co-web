@@ -37,6 +37,10 @@ using BusinessActivityLogRepository = WileyWidget.Business.Interfaces.IActivityL
 using WileyCoWeb.Api.Configuration;
 using WileyCoWeb.Api.Middleware;
 
+// Directory.Build.props sets GenerateAssemblyInfo=false, so the csproj UserSecretsId
+// is not emitted. This keeps Development user secrets (XAI_API_KEY) loading.
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsId("3f6b2f87-1c4f-4d48-9814-58a5ce7caa41")]
+
 namespace WileyCoWeb.Api;
 
 public partial class Program

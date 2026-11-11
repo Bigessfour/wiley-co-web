@@ -2,17 +2,19 @@
 
 Deployable **cost-controlled** footing for the Wiley Widget ↔ Wiley Apartments combination described in [`docs/aws-low-cost-architecture.md`](../../docs/aws-low-cost-architecture.md).
 
-This stack **does not** create Aurora, NAT gateways, App Runner, or ECS. Those stay as existing Widget resources (or a later optional module). Default resources are cheap: Budgets, one private S3 drop bucket, ECR repos, optional SSM pointers.
+This stack **does not** create Aurora, NAT gateways, App Runner, or ECS. Apartments and TIKR run on the Synology (`mr-storage`) over Tailscale. ECR repos exist so a future image push has a place to land; do not push images for the NAS path. Default resources are cheap: Budgets, one private S3 drop bucket, empty ECR repos, and SSM pointers (including the NAS URLs).
 
 ## What it creates (flags)
 
-| Flag | Default | Resource |
-| ---- | ------- | -------- |
-| `enable_budgets` | `true` | Monthly budgets at `$80` and `$100` with email alerts |
-| `enable_contracts_bucket` | `true` | Private S3 bucket + lifecycle for `shared-contracts/` drops |
-| `enable_ecr` | `true` | ECR repos for Widget API + Apartments (`force_delete` for easy destroy) |
-| `enable_publisher_user` | `false` | IAM user + S3 put policy for CI/scripts |
-| `widget_reference_data_url` | empty | Optional SSM parameter for Widget API base URL |
+| Flag                        | Default                  | Resource                                                                |
+| --------------------------- | ------------------------ | ----------------------------------------------------------------------- |
+| `enable_budgets`            | `true`                   | Monthly budgets at `$80` and `$100` with email alerts                   |
+| `enable_contracts_bucket`   | `true`                   | Private S3 bucket + lifecycle for `shared-contracts/` drops             |
+| `enable_ecr`                | `true`                   | ECR repos for Widget API + Apartments (`force_delete` for easy destroy) |
+| `enable_publisher_user`     | `false`                  | IAM user + S3 put policy for CI/scripts                                 |
+| `widget_reference_data_url` | empty                    | Optional SSM parameter for a Widget API base URL. Leave empty.          |
+| `nas_apartments_url`        | `http://mr-storage:8082` | SSM pointer to ClerkSuite on Tailscale                                  |
+| `nas_tikr_url`              | `http://mr-storage:8080` | SSM pointer to TIKR on Tailscale                                        |
 
 Tags every resource with `Project=tow-suite` for Cost Explorer.
 

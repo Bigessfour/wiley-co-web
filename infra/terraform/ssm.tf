@@ -10,6 +10,30 @@ resource "aws_ssm_parameter" "widget_reference_data_url" {
   }
 }
 
+resource "aws_ssm_parameter" "nas_apartments_url" {
+  count = trimspace(var.nas_apartments_url) != "" ? 1 : 0
+
+  name  = "/${var.name_prefix}/nas/apartments-url"
+  type  = "String"
+  value = trimspace(var.nas_apartments_url)
+
+  tags = {
+    App = "wiley-apartments"
+  }
+}
+
+resource "aws_ssm_parameter" "nas_tikr_url" {
+  count = trimspace(var.nas_tikr_url) != "" ? 1 : 0
+
+  name  = "/${var.name_prefix}/nas/tikr-url"
+  type  = "String"
+  value = trimspace(var.nas_tikr_url)
+
+  tags = {
+    App = "tikr"
+  }
+}
+
 resource "aws_ssm_parameter" "contracts_bucket" {
   count = var.enable_contracts_bucket ? 1 : 0
 

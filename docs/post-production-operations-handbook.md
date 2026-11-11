@@ -104,10 +104,7 @@ For every production API deployment, record:
 
 - Set `WILEY_WORKSPACE_API_BASE_ADDRESS` in Amplify (points client to App Runner public URL or custom domain).
 - Deploy Amplify with the env var present (amplify.yml + build already supports it for `appsettings.Workspace.local.json`).
-- Town Hub suite cards (optional until siblings are live): set Amplify branch env vars so `amplify.yml` emits `wwwroot/appsettings.TownHub.local.json` via `Scripts/generate-townhub-appsettings.cjs`:
-  - `TOWN_HUB_APARTMENTS_URL`, `TOWN_HUB_RURAL_WATER_URL`, `TOWN_HUB_TRASH_TRUCK_URL`, `TOWN_HUB_TIKR_URL`
-  - Optional `TOWN_HUB_WIDGET_URL` only if the Widget card must leave `/wiley-workspace`
-  - If none are set, the build runs `--clear` → `{}` and Production `TownHub:Apps` apply (sibling `Url`s are empty so cards stay disabled — not clickable `REPLACE-*` placeholders). Detail: `docs/town-hub.md`.
+- Town Hub suite cards: Production URLs point Apartments and TIKR at the Synology over Tailscale (`http://mr-storage:8082` and `http://mr-storage:8080`) and Trash Truck at its existing Amplify app. Rural Water stays empty until a public URL is known. Amplify `TOWN_HUB_*_URL` overrides still replace those values when set. Detail: `docs/town-hub.md`.
 - App Runner service: update runtime env/secrets via console or IaC (database-url, xai-api-key, syncfusion-license-key); trigger deploy from ECR image.
 - Post-cutover validation (council smoke, run from ops workstation or CI):
   ```powershell
