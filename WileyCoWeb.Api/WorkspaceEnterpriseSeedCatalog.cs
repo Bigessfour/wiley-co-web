@@ -7,11 +7,14 @@ internal static class WorkspaceEnterpriseSeedCatalog
 {
     public static readonly IReadOnlyList<WorkspaceEnterpriseSeed> All =
     [
+        // Minimum monthly charges from the July 1, 2026 rate change.
+        // October 26, 2026 town bill, account 213, 3,000 gallons, still at the minimum:
+        // water $58, sewage $72, garbage $30.
         new(
             "Water Utility",
             "Water",
             "Water",
-            31.25m,
+            58.00m,
             98000m,
             4500,
             1.02m,
@@ -20,7 +23,7 @@ internal static class WorkspaceEnterpriseSeedCatalog
             "Wiley Sanitation District",
             "Sewer",
             "Sewer",
-            21.50m,
+            72.00m,
             72000m,
             3200,
             1.01m,
@@ -29,7 +32,7 @@ internal static class WorkspaceEnterpriseSeedCatalog
             "Trash",
             "Trash",
             "Trash",
-            18.75m,
+            30.00m,
             54000m,
             3000,
             1.03m,

@@ -1439,6 +1439,11 @@ public partial class Program
 
 
 
+    private static string? MinimumChargeNote(string enterpriseName)
+        => enterpriseName is "Water Utility" or "Wiley Sanitation District" or "Trash"
+            ? $"Minimum monthly charge effective July 1, 2026. Seeded from {enterpriseName}."
+            : null;
+
     private static async Task SeedDevelopmentDataAsync(IServiceProvider services)
     {
         await using var scope = services.CreateAsyncScope();
@@ -1457,6 +1462,7 @@ public partial class Program
                 CurrentRate = seed.CurrentRate,
                 MonthlyExpenses = seed.MonthlyExpenses,
                 CitizenCount = seed.CustomerCount,
+                Notes = MinimumChargeNote(seed.Name),
                 IsDeleted = false
             }));
 
@@ -1477,7 +1483,7 @@ public partial class Program
                 CurrentCharge = seed.CurrentRate,
                 CustomerCount = seed.CustomerCount,
                 UpdatedBy = nameof(Program),
-                Notes = $"Seeded from {seed.Name}.",
+                Notes = MinimumChargeNote(seed.Name) ?? $"Seeded from {seed.Name}.",
                 IsActive = true
             }));
 

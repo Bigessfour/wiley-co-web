@@ -109,7 +109,7 @@ public sealed class WorkspaceReferenceDataApiTests : IClassFixture<ApiApplicatio
 
         Assert.NotNull(snapshot);
         Assert.Equal("Water Utility", snapshot.SelectedEnterprise);
-        Assert.Equal(31.25m, snapshot.CurrentRate);
+        Assert.Equal(58.00m, snapshot.CurrentRate);
         Assert.Equal(98000m, snapshot.TotalCosts);
         Assert.Equal(4500m, snapshot.ProjectedVolume);
 
