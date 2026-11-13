@@ -21,33 +21,64 @@ public static class CognitoGroupsHelper
         var groups = new List<string>();
         foreach (var claim in user.FindAll("cognito:groups"))
         {
-            if (!string.IsNullOrWhiteSpace(claim.Value))
-            {
-                groups.Add(claim.Value.Trim());
-            }
+            AddGroupValues(groups, claim.Value);
         }
 
-        if (groups.Count == 0)
+        // Hosted UI maps RoleClaim "cognito:groups" onto ClaimTypes.Role.
+        foreach (var claim in user.FindAll(ClaimTypes.Role))
         {
-            var arrayClaim = user.FindFirst("cognito:groups");
-            if (arrayClaim is not null && arrayClaim.Value.StartsWith("[", StringComparison.Ordinal))
-            {
-                try
-                {
-                    var parsed = JsonSerializer.Deserialize<string[]>(arrayClaim.Value);
-                    if (parsed is { Length: > 0 })
-                    {
-                        groups.AddRange(parsed.Where(static g => !string.IsNullOrWhiteSpace(g)).Select(static g => g.Trim()));
-                    }
-                }
-                catch (JsonException)
-                {
-                    // Fall through — Trash Truck applies the same group rules after Hosted UI sign-in.
-                }
-            }
+            AddGroupValues(groups, claim.Value);
         }
 
         return groups;
+    }
+
+    private static void AddGroupValues(List<string> groups, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith('['))
+        {
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<string[]>(trimmed);
+                if (parsed is { Length: > 0 })
+                {
+                    foreach (var group in parsed)
+                    {
+                        AddDistinct(groups, group);
+                    }
+
+                    return;
+                }
+            }
+            catch (JsonException)
+            {
+                // Keep the raw value when it is not a JSON string array.
+            }
+        }
+
+        AddDistinct(groups, trimmed);
+    }
+
+    private static void AddDistinct(List<string> groups, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var trimmed = value.Trim();
+        if (groups.Any(group => string.Equals(group, trimmed, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        groups.Add(trimmed);
     }
 
     /// <summary>Trash Truck launch segment: <c>/driver</c> or <c>/clerk</c> (default clerk when groups are unknown).</summary>

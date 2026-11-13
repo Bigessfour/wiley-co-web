@@ -23,7 +23,9 @@
 		<p class="home-hub-kicker">Town of Wiley</p>
 		<h1>Town Hub</h1>
 		<p class="home-hub-copy">
-			Single entry point for town apps. Cards open the existing UIs (local or App Runner).
+			Single entry point for town apps. Trash Truck uses this sign-in.
+			Apartments and TIKR on the office network use their own sign-in.
+			Rural Water stays closed until it has an address.
 			Summary tiles below read shared-contract reference data — full grid lives on the
 			<a href="/wiley-workspace/reference-data">Reference Data</a> workspace panel.
 		</p>
@@ -34,11 +36,24 @@
 	</div>
 
 	<div class="home-hub-grid town-hub-apps">
-		@foreach (var app in _apps)
+		@foreach (var app in VisibleApps())
 		{
 			var status = ResolveCardStatus(app);
 			var configured = !string.IsNullOrWhiteSpace(app.Url);
-			@if (configured && IsTrashTruck(app))
+			@if (!configured)
+			{
+				<div class="home-hub-card is-disabled"
+				     role="group"
+				     aria-disabled="true"
+				     aria-label="@($"{app.Title} — coming soon")">
+					<span class="home-hub-card-index">@app.Id</span>
+					<strong>@app.Title</strong>
+					<p>@app.Description</p>
+					<span class="town-hub-card-status is-empty">@TownHubCardAccess.ComingSoonLabel</span>
+					<span class="town-hub-url">@TownHubCardAccess.ComingSoonLabel</span>
+				</div>
+			}
+			else if (IsTrashTruck(app))
 			{
 				<a class="home-hub-card"
 				   href="@BuildTrashHubUrl(app.Url)"
@@ -47,11 +62,12 @@
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
+					<p class="town-hub-access-note">@TownHubCardAccess.SharedSignInNote</p>
 					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 				</a>
 			}
-			else if (configured)
+			else
 			{
 				<a class="home-hub-card"
 				   href="@app.Url"
@@ -60,22 +76,13 @@
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
+					@if (TownHubCardAccess.IsOfficeNetworkOnly(app.Url))
+					{
+						<p class="town-hub-access-note">@TownHubCardAccess.OfficeNetworkNote</p>
+					}
 					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 				</a>
-			}
-			else
-			{
-				<div class="home-hub-card is-disabled"
-				     role="group"
-				     aria-disabled="true"
-				     aria-label="@($"{app.Title} — not configured")">
-					<span class="home-hub-card-index">@app.Id</span>
-					<strong>@app.Title</strong>
-					<p>@app.Description</p>
-					<span class="town-hub-card-status is-empty">@status.Label</span>
-					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
-				</div>
 			}
 		}
 	</div>
@@ -174,6 +181,9 @@
 	private bool _loading;
 	private string? _error;
 	private ClaimsPrincipal? _user;
+	private bool _authEnabled;
+	private bool _groupsLoaded;
+	private IReadOnlyList<string> _groups = [];
 
 	protected override void OnInitialized()
 	{
@@ -183,13 +193,26 @@
 		ApplyUrlOverrides(_apps, options);
 		// Fill status match keys when omitted from a partial override file.
 		ApplyReferenceDefaults(_apps);
+		_authEnabled = Configuration.GetValue("Auth:Enabled", false);
 	}
 
 	protected override async Task OnInitializedAsync()
 	{
 		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
 		_user = authState.User;
+		_groups = CognitoGroupsHelper.GetGroups(_user);
+		_groupsLoaded = true;
 		await LoadSummaryAsync();
+	}
+
+	private IEnumerable<TownHubAppLink> VisibleApps()
+	{
+		if (_authEnabled && !_groupsLoaded)
+		{
+			return [];
+		}
+
+		return _apps.Where(app => TownHubCardAccess.IsVisible(app.Id, app.AllowedGroups, _groups, _authEnabled));
 	}
 
 	private async Task LoadSummaryAsync()

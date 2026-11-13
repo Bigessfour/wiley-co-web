@@ -12,7 +12,7 @@ Town staff use **one Cognito user pool** (`us-east-2_DmY7BCBIp`) for ClerkSuite 
 | ClerkSuite legacy (removable) | `Auth:SignInFlow=UserPassword` — direct `USER_PASSWORD_AUTH` at `/authentication/legacy-login` |
 | API JWT | Access token on `Authorization: Bearer`; audience / `client_id` = app client id |
 | Trash Truck launch | Town Hub card opens `{TrashTruckBaseUrl}/{clerk\|driver}?from=town-hub` (no `role` query) |
-| Groups | `Clerk`, `Driver`; optional `admin` → clerk UI in Trash Truck |
+| Groups | `Clerk` sees every card; `Driver` sees Trash Truck only; `admin` sees every card |
 | Global sign-out | Cognito `/logout` with `logout_uri` (see `Auth:Cognito:OAuthDomain`) |
 
 ## Clerk experience
