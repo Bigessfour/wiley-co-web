@@ -675,6 +675,8 @@ public partial class Program
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseExceptionLogging();
+        // Before auth so browser clients still receive CORS headers on 401/403 responses.
+        app.UseCors("OpenWorkspaceClient");
 
         if (app.Configuration.GetValue<bool>($"{JwtAuthenticationOptions.SectionName}:Enabled"))
         {
@@ -727,10 +729,9 @@ public partial class Program
         });
 
         app.UseXRay("WileyCoWeb.Api");
-        app.UseCors("OpenWorkspaceClient");
         MapWorkspaceSnapshotEndpoints(app);
         ReferenceDataEndpoints.Map(app);
-        app.MapHealthChecks("/health");  // Exposes deterministic license status (and other checks) at /health
+        app.MapHealthChecks("/health").AllowAnonymous();
     }
 
     private static void LogRuntimeBaseline(
@@ -804,8 +805,7 @@ public partial class Program
         }
 
         var normalizedOrigin = $"{uri.Scheme}://{uri.Authority}";
-        return allowedOrigins.Contains(normalizedOrigin)
-            || IsAllowedAmplifyPreviewOrigin(uri, allowedOrigins);
+        return allowedOrigins.Contains(normalizedOrigin);
     }
 
     private static IReadOnlySet<string> BuildAllowedWorkspaceClientOrigins(IConfiguration configuration)
@@ -830,49 +830,6 @@ public partial class Program
         }
 
         return origins;
-    }
-
-    private static bool IsAllowedAmplifyPreviewOrigin(Uri originUri, IReadOnlySet<string> allowedOrigins)
-    {
-        if (!originUri.Host.EndsWith(".amplifyapp.com", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        foreach (var allowedOrigin in allowedOrigins)
-        {
-            if (!Uri.TryCreate(allowedOrigin, UriKind.Absolute, out var allowedUri)
-                || !allowedUri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var allowedAmplifySuffix = GetAmplifyPreviewHostSuffix(allowedUri.Host);
-            if (string.IsNullOrWhiteSpace(allowedAmplifySuffix))
-            {
-                continue;
-            }
-
-            if (originUri.Host.Equals(allowedAmplifySuffix, StringComparison.OrdinalIgnoreCase)
-                || originUri.Host.EndsWith($".{allowedAmplifySuffix}", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static string? GetAmplifyPreviewHostSuffix(string host)
-    {
-        if (string.IsNullOrWhiteSpace(host)
-            || !host.EndsWith(".amplifyapp.com", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var labels = host.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return labels.Length < 3 ? null : string.Join('.', labels[^3..]);
     }
 
     private static void LogStartupKeyResolution(
@@ -1072,8 +1029,8 @@ public partial class Program
         app.MapPost("/api/ai/chat", MapWorkspaceAiChatMessageEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapPost("/api/ai/chat/reset", MapWorkspaceAiChatResetEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapGet("/api/ai/recommendations", MapWorkspaceRecommendationHistoryEndpoint).RequireWorkspaceReadAuth(config);
-        app.MapGet("/api/ai/health", MapWorkspaceAiHealthEndpoint);
-        app.MapGet("/api/jarvis/health", MapWorkspaceAiHealthEndpoint);
+        app.MapGet("/api/ai/health", MapWorkspaceAiHealthEndpoint).AllowAnonymous();
+        app.MapGet("/api/jarvis/health", MapWorkspaceAiHealthEndpoint).AllowAnonymous();
     }
 
     private static void MapQuickBooksImportEndpoints(WebApplication app)
