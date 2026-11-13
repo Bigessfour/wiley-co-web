@@ -124,6 +124,14 @@ test -d publish_output/wwwroot || fail "publish_output/wwwroot missing"
 
 if [[ "$SKIP_PLAYWRIGHT" -eq 0 ]]; then
   step "playwright-ui"
+  node -e '
+    const fs = require("fs");
+    const path = "publish_output/wwwroot/appsettings.Production.json";
+    const json = JSON.parse(fs.readFileSync(path, "utf8"));
+    json.Auth = json.Auth || {};
+    json.Auth.Enabled = false;
+    fs.writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+  '
   npm ci
   npx playwright install chromium
   npm run playwright:test:ci:smoke
