@@ -35,6 +35,8 @@ Bundled sample (`wwwroot/data/workspace-bootstrap.json`):
 
 Client formulas live in `State/RateCalculator.cs`; server-side knowledge uses the same revenue-requirement style division in `WorkspaceKnowledgeService`. This is **revenue requirement + simplified rate design**, not a full AWWA M1 cost-of-service class allocation (which needs class usage, peaking, and cost pools).
 
+Phase 0 of [docs/production-completion-plan.md](production-completion-plan.md) locked that choice on 2026-11-08. The rate packet and the break-even, rates, trends, and scenario surfaces say the same thing to clerks. Do not add a `growthRate` parameter.
+
 ## 5. Talking points for elected officials
 
 - The widget is **decision-support and transparency** on real imported ledger data and saved scenarios.

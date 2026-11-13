@@ -1,5 +1,9 @@
 # Wiley-Co UI Rebuild Plan
 
+**Historical plan. Not the ship list.** As of 2026-11-08 the ordered production work is [docs/production-completion-plan.md](production-completion-plan.md). Read [AGENTS.md](../AGENTS.md), [docs/aws-server-side-closure-plan.md](aws-server-side-closure-plan.md), and [docs/wiley-widget-functional-breakdown.md](wiley-widget-functional-breakdown.md) for current behavior.
+
+Amplify cutover (job 43, 2026-04-16) and Aurora encryption (`wiley-co-aurora-db-encrypted`) are done. Do not rebuild them. Rate math is locked to revenue-requirement decision support. Do not add a `growthRate` parameter and do not start an AWWA M1 cost-of-service study from this document.
+
 This document turns the restored Wiley Widget vision into an implementation plan for the current Blazor WebAssembly app.
 
 The AWS runtime closure sequence that connects the thin API to the live widget is tracked separately in [docs/aws-server-side-closure-plan.md](aws-server-side-closure-plan.md).

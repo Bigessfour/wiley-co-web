@@ -232,6 +232,10 @@ public sealed class WorkspaceSnapshotExportArchiveService
         writer.DrawText(snapshot.ContextSummary, writer.Layout.SectionFont, writer.Layout.AccentBrush);
         writer.Advance(writer.Layout.LineHeight * 0.5f);
         writer.DrawText($"Generated {DateTimeOffset.Now:g}", writer.Layout.SmallFont, writer.Layout.Brush);
+        writer.Advance(writer.Layout.LineHeight * 0.5f);
+        writer.DrawWrappedText(
+            "Decision support only. Break-even is total cost divided by projected volume, plus scenario dollar adders. This packet is not a formal cost-of-service study.",
+            90);
         writer.Advance(writer.Layout.LineHeight);
     }
 
