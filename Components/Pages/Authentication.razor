@@ -1,0 +1,25 @@
+@page "/authentication/{action}"
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.Extensions.Options
+@using WileyCoWeb.Services.Auth
+@inject IOptions<CognitoAuthOptions> AuthOptionsAccessor
+
+@if (AuthOptionsAccessor.Value.UsesHostedUi)
+{
+    <RemoteAuthenticatorView Action="@Action" />
+}
+else
+{
+    <section class="mx-auto max-w-md rounded-3xl wiley-border wiley-surface-1 px-6 py-8 wiley-text shadow-sm">
+        <p class="wiley-callout wiley-callout-warning text-sm">
+            Hosted UI sign-in is disabled for this build (<code>Auth:SignInFlow</code> is not <code>HostedUi</code>).
+            Use <a href="/authentication/legacy-login">legacy staff sign-in</a> when <code>UserPassword</code> is enabled.
+        </p>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public string? Action { get; set; }
+}

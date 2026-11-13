@@ -1,6 +1,6 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using WileyCoWeb.Services.Auth
-@inject CognitoAuthService AuthService
+@inject StaffAuthCoordinator StaffAuth
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 
@@ -8,7 +8,7 @@
     <Authorized>
         <div class="app-shell-auth" aria-label="Signed-in staff account">
             <span class="app-shell-auth-user">@context.User.Identity?.Name</span>
-            @if (AuthService.IsEnabled)
+            @if (StaffAuth.IsEnabled)
             {
                 <button id="app-shell-sign-out"
                         type="button"
@@ -20,11 +20,11 @@
         </div>
     </Authorized>
     <NotAuthorized>
-        @if (AuthService.IsEnabled)
+        @if (StaffAuth.IsEnabled)
         {
             <a id="app-shell-sign-in"
                class="e-control e-btn e-lib e-inherit app-shell-sign-in no-underline"
-               href="/authentication/login">
+               href="@(StaffAuth.UsesHostedUi ? "/authentication/login" : "/authentication/legacy-login")">
                 Sign in
             </a>
         }
@@ -34,12 +34,11 @@
 @code {
     private async Task SignOutAsync()
     {
-        await AuthService.SignOutAsync().ConfigureAwait(false);
-        if (AuthStateProvider is CognitoAuthenticationStateProvider cognitoAuthStateProvider)
+        await StaffAuth.SignOutAsync().ConfigureAwait(false);
+        if (!StaffAuth.UsesHostedUi && AuthStateProvider is CognitoAuthenticationStateProvider cognitoAuthStateProvider)
         {
             cognitoAuthStateProvider.NotifyAuthenticationStateChanged();
+            Navigation.NavigateTo("/authentication/legacy-login", forceLoad: false);
         }
-
-        Navigation.NavigateTo("/authentication/login", forceLoad: false);
     }
 }

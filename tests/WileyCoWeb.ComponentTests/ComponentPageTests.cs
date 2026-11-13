@@ -1226,12 +1226,15 @@ public sealed class ComponentPageTests
 		context.Services.AddSingleton<ToastService>();
 		context.Services.AddSingleton<IJSRuntime>(jsRuntime);
 		context.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new WileyCoWeb.Services.Auth.CognitoAuthOptions()));
+		context.Services.Configure<WileyCoWeb.Services.Auth.CognitoAuthOptions>(_ => { });
 		context.Services.AddScoped<WileyCoWeb.Services.Auth.CognitoTokenStore>();
 		context.Services.AddScoped(sp => new WileyCoWeb.Services.Auth.CognitoAuthService(
 			new HttpClient { BaseAddress = new Uri("https://cognito.test/") },
 			sp.GetRequiredService<WileyCoWeb.Services.Auth.CognitoTokenStore>(),
 			sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WileyCoWeb.Services.Auth.CognitoAuthOptions>>(),
 			sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<WileyCoWeb.Services.Auth.CognitoAuthService>>()));
+		context.Services.AddScoped<WileyCoWeb.Services.Auth.StaffAuthCoordinator>();
+		context.Services.AddScoped<WileyCoWeb.Services.Auth.IStaffAccessTokenProvider, WileyCoWeb.Services.Auth.StaffAccessTokenProvider>();
 		var authContext = context.AddTestAuthorization();
 		authContext.SetAuthorized("local-dev");
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));
