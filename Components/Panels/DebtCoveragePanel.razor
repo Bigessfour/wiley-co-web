@@ -3,6 +3,7 @@
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Popups
 @using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
@@ -15,8 +16,8 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <p class="wiley-eyebrow wiley-eyebrow-emerald">Debt Coverage</p>
-                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Debt service coverage ratio and covenant check</h2>
-                <p class="mt-2 max-w-3xl text-sm">Compare annual revenue against debt service, inspect covenant headroom, and tune the threshold used for the dashboard proof.</p>
+                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Can revenue cover debt payments?</h2>
+                <p class="mt-2 max-w-3xl text-sm">See whether this year’s revenue covers loan payments, and how much room is left above the required minimum.</p>
             </div>
             <div class="grid grid-cols-2 gap-3 text-right text-xs sm:grid-cols-4 lg:text-sm">
                 <div>
@@ -45,7 +46,7 @@
             <SfNumericTextBox TValue="decimal"
                               ID="debt-coverage-threshold-input"
                               Value="@CoverageThreshold"
-                              Placeholder="Covenant threshold"
+                              Placeholder="Required minimum"
                               FloatLabelType="FloatLabelType.Auto"
                               Min="0.5m"
                               Step="0.05m"
@@ -91,15 +92,15 @@
     {
         <section class="grid gap-4 md:grid-cols-3">
             <SfCard ID="debt-coverage-kpi-revenue">
-                <CardHeader Title="Annual Revenue" SubTitle="Live revenue aggregate" />
+                <CardHeader Title="Annual Revenue" SubTitle="This year’s revenue" />
                 <CardContent Content="@Snapshot.AnnualRevenue.ToString("C0")" />
             </SfCard>
             <SfCard ID="debt-coverage-kpi-debt-service">
-                <CardHeader Title="Annual Debt Service" SubTitle="Budget entries classified as debt" />
+                <CardHeader Title="Annual Debt Service" SubTitle="Payments on debt this year" />
                 <CardContent Content="@Snapshot.AnnualDebtService.ToString("C0")" />
             </SfCard>
             <SfCard ID="debt-coverage-kpi-dscr">
-                <CardHeader Title="Debt Service Coverage" SubTitle="Annual revenue divided by debt service" />
+                <CardHeader Title="Debt Service Coverage" SubTitle="Revenue compared with debt payments" />
                 <CardContent Content="@Snapshot.DebtServiceCoverageRatio.ToString("0.00x")" />
             </SfCard>
         </section>
@@ -107,8 +108,17 @@
         <section class="grid gap-4 wiley-split-wide">
             <div class="rounded-2xl wiley-surface-panel p-4">
                 <div class="flex flex-col gap-1">
-                    <p class="wiley-eyebrow wiley-eyebrow-muted">Coverage Gauge</p>
-                    <p class="text-sm wiley-text-muted">The headline DSCR compared against the selected covenant threshold.</p>
+                    <div class="flex items-center gap-2">
+                        <p class="wiley-eyebrow wiley-eyebrow-muted">Coverage Gauge</p>
+                        <SfTooltip Content="Coverage is annual revenue divided by annual debt service. The gauge compares that result with the minimum you enter."
+                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                   OpensOn="Hover Focus"
+                                   ShowTipPointer="true"
+                                   CloseDelay="200">
+                            <span tabindex="0" class="cursor-help text-xs wiley-text-muted underline decoration-dotted" aria-label="How debt coverage is calculated">How this is calculated</span>
+                        </SfTooltip>
+                    </div>
+                    <p class="text-sm wiley-text-muted">Compared with the minimum you set.</p>
                 </div>
                 <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4" role="img" aria-label="Gauge showing annual debt service coverage ratio">
                     @* AnimationDuration: smooth gauge needle transition matches the DataDashboard gauge animation baseline *@

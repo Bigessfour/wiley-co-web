@@ -1,6 +1,7 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
+@using Syncfusion.Blazor.Popups
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 @using WileyWidget.Abstractions
@@ -17,14 +18,14 @@
             </CardContent>
         </SfCard>
         <SfCard ID="kpi-coverage-ratio">
-            <CardHeader Title="Coverage Ratio" SubTitle="Revenue ÷ Costs" />
+            <CardHeader Title="Coverage Ratio" SubTitle="Times costs are covered" />
             <CardContent>
                 <p class="text-2xl font-bold @(CoverageRatio >= 1.25 ? "wiley-status-ok" : (CoverageRatio >= 1.0 ? "wiley-status-warn" : "wiley-status-bad"))">@CoverageRatio.ToString("F2")×</p>
                 <p class="mt-1 text-xs wiley-text-muted">Target ≥ 1.25×</p>
             </CardContent>
         </SfCard>
         <SfCard ID="kpi-rate-adequacy">
-            <CardHeader Title="Rate Adequacy" SubTitle="Current ÷ Break-Even" />
+            <CardHeader Title="Rate Adequacy" SubTitle="Share of the break-even rate" />
             <CardContent>
                 <p class="text-2xl font-bold @(RateAdequacy >= 100 ? "wiley-status-ok" : (RateAdequacy >= 85 ? "wiley-status-warn" : "wiley-status-bad"))">@RateAdequacy.ToString("F1")%</p>
                 <p class="mt-1 text-xs wiley-text-muted">Current @CurrentRate.ToString("C2") · Break-Even @RecommendedRate.ToString("C2")</p>
@@ -42,8 +43,14 @@
     @* ─── CIRCULAR GAUGES ────────────────────────────────────────────────────── *@
     <div class="grid gap-4 md:grid-cols-2">
         <div class="wiley-surface-panel p-4" role="img" aria-label="Coverage ratio gauge showing revenue divided by costs">
-            <p class="mb-1 text-sm font-semibold wiley-text">Coverage Ratio</p>
-            <p class="mb-2 text-xs wiley-text-muted">Revenue ÷ Costs · Target ≥ 1.25×</p>
+            <SfTooltip Content="Revenue ÷ Costs"
+                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                       OpensOn="Hover Focus"
+                       ShowTipPointer="true"
+                       CloseDelay="200">
+                <p tabindex="0" class="mb-1 text-sm font-semibold wiley-text">Coverage Ratio</p>
+            </SfTooltip>
+            <p class="mb-2 text-xs wiley-text-muted">Target ≥ 1.25×</p>
             <SfCircularGauge ID="coverage-ratio-gauge"
                              EnableGroupingSeparator="false"
                              AllowMargin="true"
@@ -69,8 +76,14 @@
             </SfCircularGauge>
         </div>
         <div class="wiley-surface-panel p-4" role="img" aria-label="Rate adequacy gauge showing current rate versus break-even rate">
-            <p class="mb-1 text-sm font-semibold wiley-text">Rate Adequacy</p>
-            <p class="mb-2 text-xs wiley-text-muted">Current ÷ Break-Even · Target ≥ 100%</p>
+            <SfTooltip Content="Current ÷ Break-Even"
+                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                       OpensOn="Hover Focus"
+                       ShowTipPointer="true"
+                       CloseDelay="200">
+                <p tabindex="0" class="mb-1 text-sm font-semibold wiley-text">Rate Adequacy</p>
+            </SfTooltip>
+            <p class="mb-2 text-xs wiley-text-muted">Target ≥ 100%</p>
             <SfCircularGauge ID="rate-adequacy-gauge"
                              EnableGroupingSeparator="false"
                              AllowMargin="true"

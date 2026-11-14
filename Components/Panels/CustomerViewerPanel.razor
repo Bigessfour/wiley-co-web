@@ -89,7 +89,7 @@
                         <div class="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-2xl border-dashed wiley-border wiley-surface-panel-secondary px-6 py-10 text-center">
                             <div>
                                 <div class="text-sm font-semibold wiley-text-muted">No utility customers found</div>
-                                <div class="mt-2 text-sm wiley-text-muted">Use QuickBooks Import to load live records, or add a customer manually to seed this workspace.</div>
+                                <div class="mt-2 text-sm wiley-text-muted">Import customers from QuickBooks, or add a customer to start the list.</div>
                             </div>
                             <div class="flex flex-wrap justify-center gap-2 text-xs wiley-text-muted">
                                 <span class="rounded-full wiley-surface-panel px-3 py-1 shadow-sm">QuickBooks Import</span>
@@ -140,7 +140,13 @@
         </div>
     }
 
-    <p class="text-xs wiley-text-muted">Customer adds, edits, and deletes save immediately to the utility-customer API and refresh the live directory for downstream workspace review.</p>
+    <SfTooltip Content="Changes are saved to the customer directory and show up in the rest of the workspace."
+               Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+               OpensOn="Hover Focus"
+               ShowTipPointer="true"
+               CloseDelay="200">
+        <p tabindex="0" class="text-xs wiley-text-muted">Adds, edits, and deletes save right away and refresh this list.</p>
+    </SfTooltip>
 
     @if (IsEditorDialogOpen())
     {

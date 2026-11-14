@@ -2,6 +2,7 @@
 @using Syncfusion.Blazor.Charts
 @using Syncfusion.Blazor.CircularGauge
 @using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Popups
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 
@@ -13,8 +14,17 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <p class="wiley-eyebrow wiley-eyebrow-cyan">Affordability Analysis</p>
-                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Monthly bill burden versus MHI</h2>
-                <p class="mt-2 max-w-3xl text-sm">Model how customer-class bills move across rate scenarios and compare the result to monthly median household income.</p>
+                <div class="mt-2 flex items-center gap-2">
+                    <h2 class="text-2xl font-semibold tracking-tight">Affordability</h2>
+                    <SfTooltip Content="Bills are estimates for each customer group under the rate options being compared, set next to median household income (MHI). This is a planning view, not a formal cost-of-service study."
+                               Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                               OpensOn="Hover Focus"
+                               ShowTipPointer="true"
+                               CloseDelay="200">
+                        <span tabindex="0" class="cursor-help text-xs underline decoration-dotted" aria-label="How affordability is estimated">How this is estimated</span>
+                    </SfTooltip>
+                </div>
+                <p class="mt-2 max-w-3xl text-sm">See whether a typical monthly bill is a small or large share of household income.</p>
             </div>
             <div class="grid grid-cols-2 gap-3 text-right text-xs sm:grid-cols-4 lg:text-sm">
                 <div>
@@ -40,16 +50,22 @@
     <section id="affordability-inputs" class="rounded-2xl wiley-surface-panel p-4">
         <p class="wiley-eyebrow wiley-eyebrow-muted">Scenario Inputs</p>
         <div class="mt-3 grid gap-4 wiley-split">
-            <SfNumericTextBox TValue="decimal"
-                              ID="affordability-monthly-mhi-input"
-                              Value="@MonthlyMhi"
-                              Placeholder="Monthly MHI"
-                              FloatLabelType="FloatLabelType.Auto"
-                              Min="1"
-                              Width="100%"
-                              Format="C0">
-                <NumericTextBoxEvents TValue="decimal" ValueChange="OnMonthlyMhiChanged" />
-            </SfNumericTextBox>
+            <SfTooltip Content="Median household income for one month. Bills are compared with this amount."
+                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                       OpensOn="Hover Focus"
+                       ShowTipPointer="true"
+                       CloseDelay="200">
+                <SfNumericTextBox TValue="decimal"
+                                  ID="affordability-monthly-mhi-input"
+                                  Value="@MonthlyMhi"
+                                  Placeholder="Monthly MHI"
+                                  FloatLabelType="FloatLabelType.Auto"
+                                  Min="1"
+                                  Width="100%"
+                                  Format="C0">
+                    <NumericTextBoxEvents TValue="decimal" ValueChange="OnMonthlyMhiChanged" />
+                </SfNumericTextBox>
+            </SfTooltip>
             <SfCard>
                 <CardHeader Title="Affordability Status" SubTitle="@AffordabilitySnapshot.Summary.RiskBand" />
                 <CardContent Content="@AffordabilitySnapshot.Summary.RiskNarrative" />
@@ -59,19 +75,19 @@
 
     <section id="affordability-kpis" class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SfCard ID="affordability-kpi-average-bill">
-            <CardHeader Title="Average Monthly Bill" SubTitle="Modeled baseline" />
+            <CardHeader Title="Average Monthly Bill" SubTitle="Typical bill" />
             <CardContent Content="@AffordabilitySnapshot.Summary.AverageMonthlyBill.ToString("C0")" />
         </SfCard>
         <SfCard ID="affordability-kpi-mhi-share">
-            <CardHeader Title="Bill % of MHI" SubTitle="Average monthly burden" />
+            <CardHeader Title="Share of household income" SubTitle="Average monthly bill" />
             <CardContent Content="@($"{AffordabilitySnapshot.Summary.AverageBillPctOfMhi:F1}%")" />
         </SfCard>
         <SfCard ID="affordability-kpi-customer-count">
-            <CardHeader Title="Customers Modeled" SubTitle="Live directory count" />
+            <CardHeader Title="Customers" SubTitle="On file" />
             <CardContent Content="@AffordabilitySnapshot.Summary.CustomerCount.ToString("N0")" />
         </SfCard>
         <SfCard ID="affordability-kpi-class-count">
-            <CardHeader Title="Class Buckets" SubTitle="Heatmap rows" />
+            <CardHeader Title="Customer groups" SubTitle="Groups compared" />
             <CardContent Content="@AffordabilitySnapshot.CustomerClasses.Count.ToString("N0")" />
         </SfCard>
     </section>
@@ -79,9 +95,9 @@
     <section id="affordability-gauge-panel" class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
             <p class="wiley-eyebrow wiley-eyebrow-muted">Affordability Gauge</p>
-            <p class="text-sm wiley-text-muted">Average monthly bill as a percentage of MHI.</p>
+            <p class="text-sm wiley-text-muted">Average monthly bill as a share of household income.</p>
         </div>
-        <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4" role="img" aria-label="Gauge showing average monthly bill as a percentage of MHI">
+        <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4" role="img" aria-label="Gauge showing the average monthly bill as a share of household income">
             @* AnimationDuration: smooth gauge needle animation consistent with DataDashboard gauge baseline *@
             <SfCircularGauge ID="affordability-gauge"
                              AllowMargin="true"
@@ -112,7 +128,7 @@
     <section id="affordability-class-chart" class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
             <p class="wiley-eyebrow wiley-eyebrow-muted">Customer Class Impact</p>
-            <p class="text-sm wiley-text-muted">Stacked monthly bill comparison across the modeled rate scenarios.</p>
+            <p class="text-sm wiley-text-muted">Monthly bills for each customer group under the rate options being compared.</p>
         </div>
         <div class="mt-3">
             @* Theme Fluent2: consistent palette; ZoomSettings: class-impact chart is analytical; selection zoom allows per-class drill-down *@
@@ -160,7 +176,7 @@
     <section id="affordability-heatmap-panel" class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
             <p class="wiley-eyebrow wiley-eyebrow-muted">Bill Burden Heatmap</p>
-            <p class="text-sm wiley-text-muted">Customer class by rate scenario, shaded by bill as a percentage of MHI.</p>
+            <p class="text-sm wiley-text-muted">Customer group by rate option, shaded by the bill’s share of household income.</p>
         </div>
 
         <div class="mt-4 overflow-auto">
@@ -195,7 +211,6 @@
         </div>
     </section>
 
-    <p class="text-xs wiley-text-muted">This first slice uses modeled class baselines and workspace customer counts. The panel can later be switched to persisted bill history without changing the dashboard shape.</p>
 </div>
 
 @code {
@@ -205,7 +220,7 @@
 
     private decimal MonthlyMhi { get; set; } = 5_500m;
     private AffordabilityDashboardSnapshot AffordabilitySnapshot { get; set; } = new(
-        new AffordabilitySummary(5_500m, 0, 0m, 0m, "Ready", "Enter a monthly MHI to see modeled affordability."),
+        new AffordabilitySummary(5_500m, 0, 0m, 0m, "Ready", "Enter monthly household income to see affordability."),
         [],
         [],
         []);

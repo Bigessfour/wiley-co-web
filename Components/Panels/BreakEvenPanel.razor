@@ -11,24 +11,32 @@
 <div id="break-even-panel" class="space-y-4">
 
     <section id="break-even-summary-panel" class="rounded-2xl border p-4 shadow-sm wiley-surface-panel">
-        <p class="wiley-eyebrow wiley-eyebrow-muted">Break-Even Summary</p>
-        <p class="mt-2 text-sm wiley-text-muted">Decision support: total cost divided by projected volume, plus scenario dollar adders. This is not a formal cost-of-service study.</p>
+        <div class="flex items-center gap-2">
+            <p class="wiley-eyebrow wiley-eyebrow-muted">Break-Even Summary</p>
+            <SfTooltip Content="Break-even rate is total cost divided by projected volume, plus any extra costs from a scenario. This is not a formal cost-of-service study."
+                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                       OpensOn="Hover Focus"
+                       ShowTipPointer="true"
+                       CloseDelay="200">
+                <span tabindex="0" class="cursor-help text-xs wiley-text-muted underline decoration-dotted" aria-label="How the break-even rate is calculated">How this is calculated</span>
+            </SfTooltip>
+        </div>
         <div id="break-even-kpi-grid" class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SfCard>
                 <CardHeader Title="Total Costs" SubTitle="@TotalCostsDisplay" />
-                <CardContent Content="Operating and capital inputs used in the current scenario." />
+                <CardContent Content="Costs in this scenario." />
             </SfCard>
             <SfCard>
                 <CardHeader Title="Projected Volume" SubTitle="@ProjectedVolumeDisplay" />
-                <CardContent Content="Illustrative service volume for the selected enterprise." />
+                <CardContent Content="Customers or units billed." />
             </SfCard>
             <SfCard>
                 <CardHeader Title="Rate Delta" SubTitle="@RateDeltaDisplay" />
-                <CardContent Content="Gap between the current rate and the break-even rate." />
+                <CardContent Content="Difference from today’s rate." />
             </SfCard>
             <SfCard>
                 <CardHeader Title="Recommended Rate" SubTitle="@BreakEvenRateDisplay" />
-                <CardContent Content="Calculated break-even rate for the current scenario." />
+                <CardContent Content="Rate that covers these costs." />
             </SfCard>
         </div>
     </section>
@@ -88,7 +96,7 @@
 
             <div id="break-even-actions" class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="relative inline-flex items-center gap-2">
-                    <SfTooltip Content="Persist these inputs as the workspace baseline for all future rate scenarios."
+                    <SfTooltip Content="Save these costs and the expected volume as the starting point for later rate work."
                                Position="Syncfusion.Blazor.Popups.Position.TopCenter"
                                OpensOn="Hover Focus"
                                ShowTipPointer="true"
@@ -97,7 +105,7 @@
                                   IsPrimary="true"
                                   Disabled="@IsSavingBaseline"
                                   OnClick="OnSaveWorkspaceBaseline">
-                            @(IsSavingBaseline ? "Saving baseline..." : "Save workspace baseline")
+                            @(IsSavingBaseline ? "Saving..." : "Save workspace baseline")
                         </SfButton>
                     </SfTooltip>
                     <div class="wiley-panel-spinner-host" style="height:20px;width:20px;">

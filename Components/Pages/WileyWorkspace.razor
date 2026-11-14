@@ -26,7 +26,7 @@
                         <p class="wiley-eyebrow wiley-eyebrow-on-dark">Wiley Widget</p>
                         <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white md:text-3xl">Utility Rate Study Workspace</h1>
                         <p class="workspace-hero-subtitle mt-2 max-w-3xl text-sm md:text-base">
-                            Focused enterprise analysis for break-even rates, scenarios, customer review, and AI guidance.
+                            Review rates, try what-if costs, and see how bills affect households.
                         </p>
                         <div id="workspace-hero-data-source" class="mt-3">
                             <span class="workspace-status-pill @(IsUsingStartupFallback ? "workspace-status-pill--warn" : "workspace-status-pill--ok")"
@@ -360,7 +360,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Break-Even</p>
                                         <h3>Core rate position</h3>
-                                        <p>Current @CurrentRateDisplay, recommended @BreakEvenRateDisplay, and delta @RateDeltaDisplay with direct baseline controls.</p>
+                                        <p>Current @CurrentRateDisplay, break-even @BreakEvenRateDisplay, difference @RateDeltaDisplay.</p>
                                         <div class="workspace-overview-card-metrics">
                                             <span>Total costs @TotalCostsDisplay</span>
                                             <span>Projected volume @ProjectedVolumeDisplay</span>
@@ -373,7 +373,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Apartment Config</p>
                                         <h3>Apartment unit mix</h3>
-                                        <p>Edit unit counts, rent assumptions, and bedroom weighting for the Apartments enterprise without leaving the workspace shell.</p>
+                                        <p>Edit unit counts, rent, and bedroom mix for the apartments.</p>
                                         <div class="workspace-overview-card-metrics">
                                             <span>Units @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount).ToString("N0")</span>
                                             <span>Revenue @ApartmentUnitTypes.Sum(unitType => unitType.UnitCount * unitType.MonthlyRent).ToString("C0")</span>
@@ -386,7 +386,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Rates</p>
                                         <h3>Editable rate controls</h3>
-                                        <p>Adjust the current rate, compare it against the recommendation, and save a point-in-time snapshot.</p>
+                                        <p>Change today’s rate, compare it with the break-even rate, and save a copy for later.</p>
                                         <div class="workspace-overview-card-metrics">
                                             <span>Current @CurrentRateDisplay</span>
                                             <span>Target @BreakEvenRateDisplay</span>
@@ -399,7 +399,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">QuickBooks Import</p>
                                         <h3>Ingest and validate source records</h3>
-                                        <p>Upload QuickBooks exports, inspect validation feedback, and stage records before commit.</p>
+                                        <p>Upload a QuickBooks file, check it, then bring the records in.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("quickbooks-import")'>Open Import</button>
                                 </article>
@@ -407,8 +407,8 @@
                                 <article id="overview-reference-data" class="workspace-overview-card">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Reference Data</p>
-                                        <h3>View shared-contract ingest</h3>
-                                        <p>Read-only ActualsSummary and OperationalEvent batches from /api/reference-data. Separate from QuickBooks import.</p>
+                                        <h3>Shared reference records</h3>
+                                        <p>Review actuals and events. This list is separate from the QuickBooks import.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("reference-data")'>Open Reference Data</button>
                                 </article>
@@ -417,7 +417,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Scenario Planner</p>
                                         <h3>Model what-if changes</h3>
-                                        <p>Stress cost assumptions, compare adjusted break-even outcomes, and persist named scenarios.</p>
+                                        <p>Add what-if costs, see the new break-even rate, and save a named set of costs.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("scenario")'>Open Scenario Planner</button>
                                 </article>
@@ -434,8 +434,8 @@
                                 <article id="overview-affordability" class="workspace-overview-card">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Affordability</p>
-                                        <h3>Bill burden versus MHI</h3>
-                                        <p>See how modeled monthly bills compare to median household income across customer classes and rate scenarios.</p>
+                                        <h3>Bills and household income</h3>
+                                        <p>See how monthly bills compare with median household income for each customer group and rate option.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("affordability")'>Open Affordability</button>
                                 </article>
@@ -443,8 +443,8 @@
                                 <article id="overview-debt-coverage" class="workspace-overview-card">
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Debt Coverage</p>
-                                        <h3>DSCR and covenant headroom</h3>
-                                        <p>Check annual revenue against debt service, compare the ratio to a covenant floor, and inspect residual headroom.</p>
+                                        <h3>Revenue and loan payments</h3>
+                                        <p>See whether yearly revenue covers loan payments, and how much room is left above the required minimum.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("debt-coverage")'>Open Debt Coverage</button>
                                 </article>
@@ -453,7 +453,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Capital Gap</p>
                                         <h3>Capital needs versus rate revenue</h3>
-                                        <p>Track capital-tagged budget items against rate revenue and watch the cumulative headroom line move as items accumulate.</p>
+                                        <p>Compare capital projects with rate revenue and see how much is left as projects add up.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("capital-gap")'>Open Capital Gap</button>
                                 </article>
@@ -475,7 +475,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Trends</p>
                                         <h3>Projected rate movement</h3>
-                                        <p>Inspect the year-by-year rate line and understand how the active assumptions move over time.</p>
+                                        <p>See how the rate changes year by year.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("trends")'>Open Trends</button>
                                 </article>
@@ -484,7 +484,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Decision Support</p>
                                         <h3>Jarvis guidance</h3>
-                                        <p>Pull context-aware recommendations tied to the current enterprise, year, and scenario state.</p>
+                                        <p>Ask for suggestions based on the service, year, and costs you are reviewing.</p>
                                     </div>
                                     <button type='button' class='workspace-card-link' @onclick='() => OpenPanel("decision-support")'>Open Decision Support</button>
                                 </article>
@@ -493,7 +493,7 @@
                                     <div class="workspace-overview-card-copy">
                                         <p class="workspace-overview-card-kicker">Data Dashboard</p>
                                         <h3>Executive visual summary</h3>
-                                        <p>KPI gauges, scenario pressure, customer mix, and trend visuals in one consolidated dashboard.</p>
+                                        <p>Coverage, rate adequacy, extra costs, customers, and trends in one place.</p>
                                         <div class="workspace-overview-card-metrics">
                                             <span>Enterprise @SelectedEnterprise</span>
                                             <span>Fiscal year @SelectedFiscalYear</span>

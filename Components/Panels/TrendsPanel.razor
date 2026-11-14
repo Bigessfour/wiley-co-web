@@ -1,4 +1,5 @@
 @using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Popups
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.State
 
@@ -9,13 +10,16 @@
            (workspace not yet loaded, or this enterprise has no projection history). *@
         <div class="wiley-empty-state" role="img" aria-label="No projection data available">
             <span class="wiley-empty-state__icon e-icons e-chart" aria-hidden="true"></span>
-            <p class="wiley-empty-state__title">No projection data</p>
+            <SfTooltip Content="Figures use total cost divided by projected volume, plus any extra scenario costs. This is not a formal cost-of-service study."
+                       Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                       OpensOn="Hover Focus"
+                       ShowTipPointer="true"
+                       CloseDelay="200">
+                <p tabindex="0" class="wiley-empty-state__title">No rate history yet</p>
+            </SfTooltip>
             <p class="wiley-empty-state__body">
-                Trend projections will appear here once the workspace has loaded rate history
-                for the selected enterprise and fiscal year. Figures are decision support:
-                total cost divided by projected volume, plus scenario dollar adders.
-                They are not a formal cost-of-service study. Try reloading the workspace or
-                changing the enterprise selection.
+                Rate history will appear here for the selected service and year.
+                Reload the page or choose a different service if this stays empty.
             </p>
         </div>
     }

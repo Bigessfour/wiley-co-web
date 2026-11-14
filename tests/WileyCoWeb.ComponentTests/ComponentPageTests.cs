@@ -228,7 +228,7 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			Assert.Contains("debt-coverage-panel", cut.Markup);
-			Assert.Contains("Debt service coverage ratio and covenant check", cut.Markup);
+			Assert.Contains("Can revenue cover debt payments?", cut.Markup);
 			Assert.NotEmpty(cut.FindComponents<SfCircularGauge>());
 			Assert.NotEmpty(cut.FindComponents<SfChart>());
 			Assert.Contains("$42,000", cut.Markup);
@@ -257,7 +257,7 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			Assert.Contains("capital-gap-panel", cut.Markup);
-			Assert.Contains("Capital needs versus rate revenue gap analysis", cut.Markup);
+			Assert.Contains("Capital needs versus rate revenue", cut.Markup);
 			// Assert on the chart container ID (rendered as an HTML attribute) rather than
 			// FindComponents<SfChart>(), which waits for Syncfusion's async JS-driven animation
 			// init to settle. On CI (headless, no Syncfusion JS runtime) that init loop never
@@ -1091,10 +1091,10 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			Assert.Contains("affordability-dashboard-panel", cut.Markup);
-			Assert.Contains("Monthly bill burden versus MHI", cut.Markup);
+			Assert.Contains("share of household income", cut.Markup);
 			Assert.Contains("affordability-monthly-mhi-input", cut.Markup);
 			Assert.Contains("Affordability Status", cut.Markup);
-			Assert.Contains("Bill % of MHI", cut.Markup);
+			Assert.Contains("Share of household income", cut.Markup);
 			Assert.Contains("Customer class", cut.Markup);
 			Assert.Contains("Manageable", cut.Markup);
 			Assert.Equal(5, cut.FindComponents<SfCard>().Count);
