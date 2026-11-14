@@ -582,6 +582,14 @@ button.home-hub-card {
   font-weight: 500;
 }
 
+.town-hub-access-note {
+  display: block;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .town-hub-actuals-entity {
   margin: 0 0 0.5rem;
 }
