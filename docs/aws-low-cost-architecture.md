@@ -10,14 +10,14 @@ Related: [`post-production-operations-handbook.md`](post-production-operations-h
 
 ## Current status (where things run today)
 
-| System                               | Today                         | Notes                                                                                          |
-| ------------------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Wiley Widget** (Blazor WASM + API) | Mac / not on the Town account | No Amplify app and no App Runner in account `818904800844`. Do not stand one up for this plan. |
-| **Colorado Rural Water**             | No stable public URL recorded | Town Hub card stays disabled.                                                                  |
-| **TIKR**                             | **NAS**                       | `http://mr-storage:8080`, SQLite.                                                              |
-| **Wiley Apartments (ClerkSuite)**    | **NAS**                       | `http://mr-storage:8082`, SQLite on the Docker volume. Deployed 2026-11-10.                    |
-| **Trash Truck**                      | **AWS Amplify**               | `d2dke4s7zyafra` on the Town account.                                                          |
-| **townofwiley.gov**                  | **AWS**                       | CloudFront + S3 + town CMS Lambdas. Already live.                                              |
+| System                               | Today                             | Notes                                                                                                                                    |
+| ------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wiley Widget** (Blazor WASM + API) | Mac API/client + **NAS Postgres** | API/client on Mac (`5231`/`5230`); DB is Synology Community PG 17 at `mr-storage:5433` (`wileyco_dev`). No Amplify/App Runner on `818…`. |
+| **Colorado Rural Water**             | No stable public URL recorded     | Town Hub card stays disabled.                                                                                                            |
+| **TIKR**                             | **NAS**                           | `http://mr-storage:8080`, SQLite.                                                                                                        |
+| **Wiley Apartments (ClerkSuite)**    | **NAS**                           | `http://mr-storage:8082`, Postgres `clerksuite` on Synology PG `:5433` (cutover 2026-11-12). SQLite kept as offline backup.               |
+| **Trash Truck**                      | **AWS Amplify**                   | `d2dke4s7zyafra` on the Town account.                                                                                                    |
+| **townofwiley.gov**                  | **AWS**                           | CloudFront + S3 + town CMS Lambdas. Already live.                                                                                        |
 
 Development Town Hub cards stay on localhost. Production cards use the NAS and Trash Truck URLs in `wwwroot/appsettings.Production.json`.
 
@@ -31,14 +31,15 @@ Development Town Hub cards stay on localhost. Production cards use the NAS and T
 
 ## Platform constraint (App Runner)
 
-AWS states **App Runner is closed to new customers after 2026-04-30**. Existing customers (including the current Wiley Widget service) can keep operating.
+AWS states **App Runner is closed to new customers after 2026-04-30**. The prior Wiley Widget App Runner service was removed with the NAS-first cutover. Do **not** recreate App Runner for Widget, TIKR, or Apartments under this plan.
 
 Implication for this suite:
 
-- **Wiley Widget:** keep the current App Runner service.
-- **TIKR / Apartments / Trash Truck:** prefer **another App Runner service in the same AWS account** only if that account remains eligible as an existing App Runner customer. If a new App Runner service cannot be created, use **Lambda** (preferred for thin APIs) or a **single small ECS Fargate** service as the fallback. Do not open a second AWS account just to get App Runner.
+- **Wiley Widget:** Mac clerk path only for now (`./Scripts/start-clerk-local.sh` against NAS native Postgres on `mr-storage:5433`). Do not put the Widget API on `mr-storage` until free RAM is measured with Apartments and TIKR stopped.
+- **TIKR / Apartments:** stay on Synology Docker + SQLite over Tailscale.
+- **Trash Truck:** keep Amplify on the Town account.
 
-Treat App Runner successor review (Fargate / other) as a standing follow-up; do not block the low-cost plan on a rewrite of Wiley Widget.
+If Widget must be hosted later, prefer **ECS Fargate behind an ALB** or **Lambda** for the thin API — revisit only when needed.
 
 ## Target account and region
 
@@ -246,9 +247,9 @@ Clerk data stays on the DS225+ (`mr-storage`) over Tailscale. AWS keeps only wha
 
 **On the NAS**
 
-- Apartments: SQLite on the Docker volume, documents at `/volume1/apartments/docs`, URL `http://mr-storage:8082`. Deploy with `Wiley_Apartments/scripts/deploy-to-nas.sh` (Tailscale SSH). Stop the container off hours; cold start is acceptable.
+- Apartments: app container on Docker; database is Synology Community PostgreSQL (`clerksuite` / `clerksuite_app` on `127.0.0.1:5433`, host network). Documents at `/volume1/apartments/docs`, URL `http://mr-storage:8082`. Deploy with `Wiley_Apartments/scripts/deploy-to-nas.sh`. SQLite under the Docker volume is offline backup only.
 - TIKR: existing Synology containers, URL `http://mr-storage:8080`.
-- Do not add a Postgres container. Do not put the SQLite file on an SMB share. Do not move the Wiley Widget API onto this host until free RAM is measured with Apartments and TIKR stopped (about 6 GB shared with mail and Drive).
+- Shared Postgres: Synology Community PostgreSQL 17 (native package, not Docker) listens on `127.0.0.1:5433`; Tailscale publishes `mr-storage:5433`. Databases: `wileyco_dev` / `wiley_app` (Widget), `clerksuite` / `clerksuite_app` (Apartments). TIKR stays on SQLite. Do not add a second Postgres container. Do not put SQLite files on an SMB share. Do not move the Wiley Widget API onto this host until free RAM is measured with Apartments and TIKR stopped (about 6 GB shared with mail and Drive).
 
 **On AWS (`tow` / `818904800844` / `us-east-2`)**
 

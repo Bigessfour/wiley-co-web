@@ -73,6 +73,11 @@ const finalWebServer = isCI
         timeout: 120_000,
         env: {
           ASPNETCORE_ENVIRONMENT: "Development",
+          // Development.json requires mr-storage and fails closed. GitHub cannot
+          // reach that host, so the CI process may boot without it. The office
+          // Mac does not set these and still refuses a missing database.
+          Database__AllowDegradedStartup: "true",
+          Database__ApplyMigrations: "false",
           ...(dotnetRoot ? { DOTNET_ROOT: dotnetRoot, PATH: pathWithDotnet } : {}),
         },
       },

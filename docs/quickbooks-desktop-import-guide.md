@@ -1,6 +1,6 @@
 # QuickBooks Desktop Import Guide
 
-This guide is the current operating procedure for moving QuickBooks Desktop ledger data into Wiley Widget and then into Aurora through the QuickBooks Import panel.
+This guide is the current operating procedure for moving QuickBooks Desktop ledger data into Wiley Widget through the QuickBooks Import panel. The database is Synology Postgres (`wileyco_dev` on `mr-storage`), not Aurora.
 
 This guide is for the recurring monthly import flow.
 
@@ -35,8 +35,8 @@ Those files belong to the broader source-data pipeline, not the clerk-facing Qui
 
 Production policy:
 
-- The App Runner image should not be treated as the storage location for recurring import files.
-- Monthly files should be uploaded through the panel, validated in preview, and then committed into Aurora.
+- Do not store recurring import files in a container image.
+- Monthly files should be uploaded through the panel, validated in preview, and then committed into `wileyco_dev`.
 
 ## Required Columns
 

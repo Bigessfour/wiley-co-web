@@ -239,10 +239,10 @@ internal sealed partial class WorkspaceReferenceDataImportService
 
     private static Enterprise CreateImportedEnterprise(EnterpriseReferenceSource source, DateTime importedAtUtc)
     {
-        return new Enterprise { Name = source.Name, CurrentRate = 0m, MonthlyExpenses = 0m, CitizenCount = Math.Max(1, source.EstimatedCitizenCount), CreatedDate = importedAtUtc, ModifiedDate = importedAtUtc, LastModified = importedAtUtc, CreatedBy = nameof(WorkspaceReferenceDataImportService), ModifiedBy = nameof(WorkspaceReferenceDataImportService), IsDeleted = false };
+        return new Enterprise { Name = source.Name, CurrentRate = 0m, MonthlyExpenses = 0m, CitizenCount = Math.Max(0, source.EstimatedCitizenCount), CreatedDate = importedAtUtc, ModifiedDate = importedAtUtc, LastModified = importedAtUtc, CreatedBy = nameof(WorkspaceReferenceDataImportService), ModifiedBy = nameof(WorkspaceReferenceDataImportService), IsDeleted = false };
     }
 
-    private static void UpdateImportedEnterprise(Enterprise enterprise, EnterpriseReferenceSource source, DateTime importedAtUtc) { enterprise.ModifiedDate = importedAtUtc; enterprise.ModifiedBy = nameof(WorkspaceReferenceDataImportService); enterprise.LastModified = importedAtUtc; enterprise.IsDeleted = false; if (enterprise.CitizenCount <= 0) { enterprise.CitizenCount = Math.Max(1, source.EstimatedCitizenCount); } }
+    private static void UpdateImportedEnterprise(Enterprise enterprise, EnterpriseReferenceSource source, DateTime importedAtUtc) { enterprise.ModifiedDate = importedAtUtc; enterprise.ModifiedBy = nameof(WorkspaceReferenceDataImportService); enterprise.LastModified = importedAtUtc; enterprise.IsDeleted = false; if (enterprise.CitizenCount <= 0 && source.EstimatedCitizenCount > 0) { enterprise.CitizenCount = source.EstimatedCitizenCount; } }
 
     private void ApplyImportedEnterpriseMetadata(Enterprise enterprise, EnterpriseReferenceSource source, string resolvedImportPath) { enterprise.Type = source.Type; enterprise.Description = Truncate($"Imported from QuickBooks reference data in {resolvedImportPath}.", 500); enterprise.Notes = Truncate(BuildEnterpriseNotes(source), 500); }
 

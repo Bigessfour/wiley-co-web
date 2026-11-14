@@ -70,7 +70,7 @@ public sealed class CapitalGapService : ICapitalGapService
         var enterpriseEntries = budgetEntries.Where(entry => MatchesEnterprise(entry, normalizedEnterprise)).ToList();
         if (enterpriseEntries.Count == 0)
         {
-            enterpriseEntries = budgetEntries;
+            throw new CapitalGapNotFoundException($"No budget entries were found for {normalizedEnterprise} FY {fiscalYear}.");
         }
 
         var capitalItems = enterpriseEntries
@@ -79,17 +79,6 @@ public sealed class CapitalGapService : ICapitalGapService
             .ThenBy(entry => entry.AccountNumber, StringComparer.OrdinalIgnoreCase)
             .ThenBy(entry => entry.Description, StringComparer.OrdinalIgnoreCase)
             .ToList();
-
-        if (capitalItems.Count == 0)
-        {
-            capitalItems = enterpriseEntries
-                .Where(entry => entry.BudgetedAmount > 0m)
-                .OrderByDescending(entry => entry.BudgetedAmount)
-                .ThenBy(entry => entry.AccountNumber, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(entry => entry.Description, StringComparer.OrdinalIgnoreCase)
-                .Take(8)
-                .ToList();
-        }
 
         if (capitalItems.Count == 0)
         {

@@ -53,7 +53,7 @@ Each app entry:
   "Id": "02",
   "Title": "Apartments",
   "Description": "ClerkSuite apartments operations.",
-  "Url": "http://localhost:8082",
+  "Url": "http://mr-storage:8082",
   "OpenInNewTab": true,
   "ReferenceEnterpriseId": "tow-apartments",
   "ReferencePublisherSystem": "wiley-apartments"
@@ -64,24 +64,25 @@ Optional status match fields: `ReferenceEnterpriseId`, `ReferencePublisherSystem
 
 ### Local defaults (dev)
 
-| App          | Default `Url`                    |
-| ------------ | -------------------------------- |
-| Wiley Widget | `/wiley-workspace` (same origin) |
-| Apartments   | `http://localhost:8082`          |
-| Rural Water  | `http://localhost:8083`          |
-| Trash Truck  | `http://localhost:8084`          |
-| TIKR         | `http://localhost:5080`          |
+Dev defaults match the NAS-first clerk path (Tailscale). Override with `appsettings.TownHub.local.json` only when you need pure-localhost sibling apps.
 
-Adjust ports to match your docker-compose / `launchSettings` if they differ. Widget shell itself is `http://localhost:5230`; API is `http://localhost:5231`.
+| App          | Default `Url`                                |
+| ------------ | -------------------------------------------- |
+| Wiley Widget | `/wiley-workspace` (same origin)             |
+| Apartments   | `http://mr-storage:8082`                     |
+| Rural Water  | empty (card disabled)                        |
+| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` |
+| TIKR         | `http://mr-storage:8080`                     |
 
-Local env override example:
+Widget shell itself is `http://localhost:5230`; API is `http://localhost:5231`. Use `./Scripts/start-clerk-local.sh` for the Mac path (API + client against NAS native Postgres on `mr-storage:5433`).
+
+Local env override example (NAS-first):
 
 ```bash
 TOWN_HUB_WIDGET_URL=/wiley-workspace \
-TOWN_HUB_APARTMENTS_URL=http://localhost:8082 \
-TOWN_HUB_RURAL_WATER_URL=http://localhost:8083 \
-TOWN_HUB_TRASH_TRUCK_URL=http://localhost:8084 \
-TOWN_HUB_TIKR_URL=http://localhost:5080 \
+TOWN_HUB_APARTMENTS_URL=http://mr-storage:8082 \
+TOWN_HUB_TRASH_TRUCK_URL=https://main.d2dke4s7zyafra.amplifyapp.com \
+TOWN_HUB_TIKR_URL=http://mr-storage:8080 \
   ./Scripts/generate-townhub-appsettings.sh
 ```
 
@@ -92,7 +93,7 @@ Clerk databases stay on the Synology (`mr-storage`) over Tailscale. Production c
 | Card         | URL                                          | Host                                     |
 | ------------ | -------------------------------------------- | ---------------------------------------- |
 | Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open         |
-| Apartments   | `http://mr-storage:8082`                     | NAS, SQLite                              |
+| Apartments   | `http://mr-storage:8082`                     | NAS, Postgres `clerksuite` on `:5433`    |
 | TIKR         | `http://mr-storage:8080`                     | NAS, SQLite                              |
 | Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app on the Town account |
 | Rural Water  | empty (card disabled)                        | No stable public URL recorded yet        |
@@ -104,7 +105,7 @@ Amplify `TOWN_HUB_*_URL` overrides still work when a card must move. Leave them 
 ## Auth
 
 - **Local:** `Auth:Enabled` = `false` → no Cognito gate (mock/open for local testing). Disabled-auth login page links to Town Hub (`/`).
-- **Production:** `Auth:Enabled` = `true` → single Cognito user pool (existing Wiley Widget config). Successful sign-in defaults to `/` (Town Hub) unless a safe `returnUrl` is present. Sibling apps may still use their own auth; hub only links out.
+- **Production (NAS-first, 2026-11):** `Auth:Enabled` = `false` until a live Cognito pool is recreated on the Town account. The prior pool `us-east-2_DmY7BCBIp` was removed with the hosted Widget cutover. Do not publish with a dead pool id. When auth returns, set `Auth:Enabled=true` and regenerate via `Scripts/generate-auth-appsettings.sh`.
 
 ## Related docs
 

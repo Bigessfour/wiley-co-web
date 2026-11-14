@@ -86,9 +86,9 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
             throw new ArgumentException("A valid fiscal year is required.", nameof(input));
         }
 
-        if (input.ProjectedVolume <= 0)
+        if (input.ProjectedVolume < 0 || input.TotalCosts < 0)
         {
-            throw new ArgumentException("Projected volume must be greater than zero.", nameof(input));
+            throw new ArgumentException("Workspace costs and volume cannot be negative.", nameof(input));
         }
 
         var normalizedEnterprise = input.SelectedEnterprise.Trim();
@@ -161,8 +161,12 @@ public sealed class WorkspaceKnowledgeService : IWorkspaceKnowledgeService
         }
 
         var operationalStatus = BuildOperationalStatus(adjustedRateGap, coverageRatio, reserveForecast.RiskAssessment);
-        var executiveSummary = BuildExecutiveSummary(normalizedEnterprise, input.SelectedFiscalYear, adjustedRateGap, netPosition, coverageRatio, scenarioCostTotal, reserveForecast.RiskAssessment);
-        var rateRationale = BuildRateRationale(normalizedEnterprise, input.SelectedFiscalYear, input.CurrentRate, adjustedBreakEvenRate, scenarioCostTotal, topVariances);
+        var executiveSummary = input.TotalCosts <= 0m || input.ProjectedVolume <= 0m
+            ? $"{normalizedEnterprise} FY {input.SelectedFiscalYear} does not have live costs and customer volume yet. Import the QuickBooks budget for costs and the QuickBooks customer list for volume before using break-even knowledge."
+            : BuildExecutiveSummary(normalizedEnterprise, input.SelectedFiscalYear, adjustedRateGap, netPosition, coverageRatio, scenarioCostTotal, reserveForecast.RiskAssessment);
+        var rateRationale = input.TotalCosts <= 0m || input.ProjectedVolume <= 0m
+            ? "The current rate can stay on file. Break-even rationale waits for a QuickBooks budget import and a QuickBooks customer import."
+            : BuildRateRationale(normalizedEnterprise, input.SelectedFiscalYear, input.CurrentRate, adjustedBreakEvenRate, scenarioCostTotal, topVariances);
 
         var insights = BuildInsights(
             adjustedBreakEvenRate,
