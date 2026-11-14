@@ -13,11 +13,22 @@ Production ready means all of the following:
 1. A clerk starts the app on the office Mac with `./Scripts/start-clerk-local.sh`. The client listens on `http://127.0.0.1:5230` and the API on `http://127.0.0.1:5231`.
 2. The database is Synology Community PostgreSQL 17 on `mr-storage:5433`, database `wileyco_dev`, user `wiley_app`.
 3. Town Hub opens Apartments and TIKR on that NAS, Trash Truck on its existing Amplify app, and Rural Water stays disabled until it has a URL.
-4. Staff login uses the existing Town pool `Townofwiley-staff` (`us-east-2_bHk9UcenK`), app client `townofwiley-staff-web`, and the existing `Staff` group. MFA stays off for now. No second pool. No Clerk or Admin groups yet. The login code names that pool. Auth stays `Enabled=false` in every Production file until this adaptation is proven. Production config must not name the removed pool `us-east-2_DmY7BCBIp`.
+4. Staff login uses the existing Town pool `Townofwiley-staff` (`us-east-2_bHk9UcenK`), app client `townofwiley-staff-web`, and the existing `Staff` group. MFA stays off for now. No second pool. No Clerk or Admin groups yet. The login code names that pool. Auth stays `Enabled=false` on the office Mac by the 2026-11-14 exception below. Physical access to the Mac plus Tailscale is the boundary. Production config must not name the removed pool `us-east-2_DmY7BCBIp`.
 5. Widget is not put back on App Runner, Aurora, or ECS.
 6. Town AWS spend stays the small footprint already described in `docs/aws-low-cost-architecture.md`: `townofwiley.gov`, Trash Truck Amplify, and the Terraform budgets, contracts bucket, and empty ECR repos. Planning figure about $1–3 per month.
 
 Work still required to meet that definition is the numbered list in `docs/production-readiness-gap-report.md`.
+
+## Ready with conditions (2026-11-14)
+
+The gap report verdict is Ready with conditions. See `docs/production-readiness-gap-report.md`. Four dated exceptions:
+
+1. Auth stays `Enabled=false` on the office Mac. Physical access to the Mac plus Tailscale is the boundary. The `Townofwiley-staff` pool is ready if login is turned on later (PRR-C3-02).
+2. The 2026-11-14 dump is the current recovery point. Full restore is blocked by `postgis`/`vector` and `CREATEDB`. The next step is already written in `docs/clerk-mac-runbook.md` (PRR-C4-01).
+3. There is no pager. The daily check is `./Scripts/status-clerk-local.sh` (PRR-C6-01).
+4. This Mac is the host. Rebuild steps are: pull the last green `main` commit and run `./Scripts/start-clerk-local.sh` (PRR-C5-01).
+
+`docs/clerk-mac-runbook.md` is sufficient for clerks and operators (PRR-C11-01). Non-blocking conditions still open: an axe walkthrough, Syncfusion license currency, budget-email delivery, and the orphan `WileyCo-*` alarms.
 
 ## Phase 0. Lock scope
 
@@ -75,10 +86,10 @@ Active operator path while Widget has no hosted compute:
 | Status / stop         | `./Scripts/status-clerk-local.sh` / `./Scripts/stop-clerk-local.sh` (stop leaves NAS Postgres running)                                                                                                                                                                                                            |
 | Reload FY2026 ledgers | `./Scripts/reload-clerk-imports.sh`                                                                                                                                                                                                                                                                               |
 | Degraded mode         | **Off** in Development (`AllowDegradedStartup=false`). API must not silently fall back to in-memory.                                                                                                                                                                                                              |
-| Production auth       | `Auth:Enabled=false` until this adaptation is proven. Login code names `Townofwiley-staff`.                                                                                                                                                                                                                       |
+| Production auth       | `Auth:Enabled=false` by the 2026-11-14 exception. Login code names `Townofwiley-staff`. Physical access plus Tailscale is the boundary.                                                                                                                                                                          |
 | Town Hub cards        | Apartments + TIKR on `mr-storage`; Trash on Amplify; Rural Water disabled.                                                                                                                                                                                                                                        |
 | Prod env overlay      | `deploy/wileytown.prod.env.example` (NAS Office/Postgres). Dev: `deploy/wileytown.dev.env.example`. Secrets stay out of git.                                                                                                                                                                                      |
 
 ### Staff login
 
-Staff login (decided 2026-11-14): use existing Town pool Townofwiley-staff (us-east-2_bHk9UcenK) + Staff group. MFA off until later. The login code names that pool and client `townofwiley-staff-web`. Auth remains disabled until this adaptation is proven. No second pool. No Clerk or Admin groups yet.
+Staff login (decided 2026-11-14): use existing Town pool Townofwiley-staff (us-east-2_bHk9UcenK) + Staff group. MFA off until later. The login code names that pool and client `townofwiley-staff-web`. Auth remains `Enabled=false` on the office Mac by the Ready with conditions exception. The pool is ready if login is turned on later. No second pool. No Clerk or Admin groups yet.
