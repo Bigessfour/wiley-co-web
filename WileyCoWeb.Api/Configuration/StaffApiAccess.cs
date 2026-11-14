@@ -6,16 +6,14 @@ namespace WileyCoWeb.Api.Configuration;
 
 /// <summary>
 /// Finance API access for a Cognito principal. A token with no <c>cognito:groups</c> claim is allowed
-/// so clerks are not locked out before groups are stamped. A token that lists groups and includes
-/// neither Clerk nor admin is forbidden.
+/// so staff are not locked out before the group is stamped. A token that lists groups and does not
+/// include Staff is forbidden.
 /// </summary>
 public sealed class StaffApiAccessRequirement : IAuthorizationRequirement;
 
 public sealed class StaffApiAccessHandler : AuthorizationHandler<StaffApiAccessRequirement>
 {
-    public const string ClerkGroup = "Clerk";
-
-    public const string AdminGroup = "admin";
+    public const string StaffGroup = "Staff";
 
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
@@ -38,8 +36,7 @@ public sealed class StaffApiAccessHandler : AuthorizationHandler<StaffApiAccessR
         }
 
         return groups.Any(group =>
-            string.Equals(group, ClerkGroup, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(group, AdminGroup, StringComparison.OrdinalIgnoreCase));
+            string.Equals(group, StaffGroup, StringComparison.OrdinalIgnoreCase));
     }
 
     public static List<string> ReadGroups(ClaimsPrincipal user)

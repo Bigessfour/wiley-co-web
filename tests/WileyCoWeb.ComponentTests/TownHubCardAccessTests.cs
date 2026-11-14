@@ -13,9 +13,9 @@ public sealed class TownHubCardAccessTests
     [InlineData("03", new[] { "Driver" }, false)]
     [InlineData("05", new[] { "Driver" }, false)]
     [InlineData("04", new[] { "Driver" }, true)]
-    [InlineData("01", new[] { "Clerk" }, true)]
-    [InlineData("04", new[] { "Clerk" }, true)]
-    [InlineData("02", new[] { "admin" }, true)]
+    [InlineData("01", new[] { "Staff" }, true)]
+    [InlineData("04", new[] { "Staff" }, true)]
+    [InlineData("02", new[] { "admin" }, false)]
     [InlineData("01", new string[] { }, true)]
     public void IsVisible_UsesCognitoGroupsWhenAuthIsEnabled(string appId, string[] groups, bool expected)
     {
@@ -45,20 +45,20 @@ public sealed class TownHubCardAccessTests
     public void GetGroups_ReadsHostedUiRoleClaims()
     {
         var identity = new ClaimsIdentity(
-            [new Claim(ClaimTypes.Role, "Clerk")],
+            [new Claim(ClaimTypes.Role, "Staff")],
             authenticationType: "test");
         var groups = CognitoGroupsHelper.GetGroups(new ClaimsPrincipal(identity));
-        Assert.Contains("Clerk", groups);
+        Assert.Contains("Staff", groups);
     }
 
     [Fact]
     public void GetGroups_ParsesJsonArrayClaim()
     {
         var identity = new ClaimsIdentity(
-            [new Claim("cognito:groups", "[\"Driver\",\"Clerk\"]")],
+            [new Claim("cognito:groups", "[\"Driver\",\"Staff\"]")],
             authenticationType: "test");
         var groups = CognitoGroupsHelper.GetGroups(new ClaimsPrincipal(identity));
         Assert.Contains("Driver", groups);
-        Assert.Contains("Clerk", groups);
+        Assert.Contains("Staff", groups);
     }
 }

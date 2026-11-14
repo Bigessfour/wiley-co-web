@@ -7,9 +7,7 @@ public static class CognitoGroupsHelper
 {
     public const string DriverGroup = "Driver";
 
-    public const string ClerkGroup = "Clerk";
-
-    public const string AdminGroup = "admin";
+    public const string StaffGroup = "Staff";
 
     public static IReadOnlyList<string> GetGroups(ClaimsPrincipal? user)
     {
@@ -85,8 +83,7 @@ public static class CognitoGroupsHelper
     public static string GetTrashTruckPathSegment(IReadOnlyList<string> groups)
     {
         if (groups.Any(static g => string.Equals(g, DriverGroup, StringComparison.OrdinalIgnoreCase))
-            && !groups.Any(static g => string.Equals(g, ClerkGroup, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(g, AdminGroup, StringComparison.OrdinalIgnoreCase)))
+            && !groups.Any(static g => string.Equals(g, StaffGroup, StringComparison.OrdinalIgnoreCase)))
         {
             return "driver";
         }
