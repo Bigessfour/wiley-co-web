@@ -34,6 +34,14 @@ test("document center exposes archived snapshot exports and live status", async 
   await expect(page.locator("#export-archived-scenario-pdf-button")).toBeVisible();
 });
 
+test("sign-in failure tells the clerk who to call", async ({ page }) => {
+  await page.goto("/authentication/login-failed");
+  await expect(page.locator("#staff-sign-in-failure")).toBeVisible();
+  await expect(page.locator("#staff-sign-in-failure")).toContainText("Sign-in did not finish");
+  await expect(page.locator("#staff-sign-in-failure")).toContainText("(719) 829-4974");
+  await expect(page.locator('a[href="mailto:clerk@townofwiley.gov"]')).toBeVisible();
+});
+
 test("town hub lists app cards and workspace entry points", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".home-hub.town-hub")).toBeVisible({ timeout: 60_000 });

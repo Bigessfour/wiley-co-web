@@ -52,7 +52,7 @@
 
             @if (!string.IsNullOrWhiteSpace(_error))
             {
-                <p class="wiley-callout wiley-callout-danger rounded-2xl px-4 py-3 text-sm" role="alert">@_error</p>
+                <SignInFailure Action="login-failed" Detail="@_error" Compact="true" />
             }
 
             <button id="staff-sign-in-submit"
