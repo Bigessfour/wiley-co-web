@@ -74,10 +74,13 @@ const finalWebServer = isCI
         env: {
           ASPNETCORE_ENVIRONMENT: "Development",
           // Development.json requires mr-storage and fails closed. GitHub cannot
-          // reach that host, so the CI process may boot without it. The office
-          // Mac does not set these and still refuses a missing database.
+          // reach that host, so this process may boot an in-memory database.
+          // Seed that fallback so panels have an enterprise and fiscal year.
+          // The office Mac does not set these. A reachable NAS is not seeded,
+          // because seeding runs only after degraded mode is already on.
           Database__AllowDegradedStartup: "true",
           Database__ApplyMigrations: "false",
+          Database__SeedDevelopmentData: "true",
           ...(dotnetRoot ? { DOTNET_ROOT: dotnetRoot, PATH: pathWithDotnet } : {}),
         },
       },
