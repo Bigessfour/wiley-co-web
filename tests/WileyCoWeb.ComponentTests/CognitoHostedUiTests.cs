@@ -41,7 +41,7 @@ public sealed class CognitoHostedUiTests
     {
         var url = CognitoHostedUi.BuildGlobalLogoutUrl(
             "https://REPLACE_WITH_COGNITO_HOSTED_UI_PREFIX.auth.us-east-2.amazoncognito.com",
-            "2m6vp91m9938jpbg2efivr2p8k",
+            "townofwiley-staff-web",
             "https://wileywidget.townofwiley.gov/");
 
         Assert.Null(url);

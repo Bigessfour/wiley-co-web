@@ -23,12 +23,12 @@ public sealed class WorkspaceApiAuthorizationTests
 {
     [Theory]
     [InlineData(new string[] { }, true)]
-    [InlineData(new[] { "Clerk" }, true)]
-    [InlineData(new[] { "admin" }, true)]
-    [InlineData(new[] { "Driver", "Clerk" }, true)]
+    [InlineData(new[] { "Staff" }, true)]
+    [InlineData(new[] { "admin" }, false)]
+    [InlineData(new[] { "Driver", "Staff" }, true)]
     [InlineData(new[] { "Driver" }, false)]
     [InlineData(new[] { "[\"Driver\"]" }, false)]
-    public void HasApiAccess_RequiresClerkOrAdminWhenGroupsArePresent(string[] groups, bool expected)
+    public void HasApiAccess_RequiresStaffWhenGroupsArePresent(string[] groups, bool expected)
     {
         var claims = groups.Select(group => new Claim("cognito:groups", group)).ToArray();
         var identity = new ClaimsIdentity(claims, authenticationType: "test");
@@ -59,12 +59,12 @@ public sealed class WorkspaceApiAuthorizationTests
     }
 
     [Fact]
-    public async Task ProtectedEndpoint_AllowsClerkGroup()
+    public async Task ProtectedEndpoint_AllowsStaffGroup()
     {
         await using var factory = new GroupProbeApiFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await EnsureDatabaseAsync(factory);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "clerk");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "staff");
 
         var response = await client.GetAsync("/api/workspace/snapshot?enterprise=Water%20Utility&fiscalYear=2026");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -180,7 +180,7 @@ public sealed class WorkspaceApiAuthorizationTests
             var group = token switch
             {
                 "driver" => "Driver",
-                "clerk" => "Clerk",
+                "staff" => "Staff",
                 "admin" => "admin",
                 _ => null
             };

@@ -8,9 +8,9 @@ public sealed class CognitoGroupsHelperTests
 {
     [Theory]
     [InlineData(new[] { "Driver" }, "driver")]
-    [InlineData(new[] { "Clerk" }, "clerk")]
+    [InlineData(new[] { "Staff" }, "clerk")]
     [InlineData(new[] { "admin" }, "clerk")]
-    [InlineData(new[] { "Driver", "Clerk" }, "clerk")]
+    [InlineData(new[] { "Driver", "Staff" }, "clerk")]
     [InlineData(new string[] { }, "clerk")]
     public void GetTrashTruckPathSegment_UsesCognitoGroups(string[] groups, string expectedSegment)
     {
@@ -21,7 +21,7 @@ public sealed class CognitoGroupsHelperTests
     [Fact]
     public void BuildTrashTruckHubUrl_IncludesFromTownHubWithoutRoleQuery()
     {
-        var url = CognitoGroupsHelper.BuildTrashTruckHubUrl("https://trash.example", ["Clerk"]);
+        var url = CognitoGroupsHelper.BuildTrashTruckHubUrl("https://trash.example", ["Staff"]);
         Assert.Equal("https://trash.example/clerk?from=town-hub", url);
         Assert.DoesNotContain("role=", url, StringComparison.Ordinal);
     }
@@ -31,12 +31,12 @@ public sealed class CognitoGroupsHelperTests
     {
         var identity = new ClaimsIdentity(
         [
-            new Claim("cognito:groups", "Clerk"),
+            new Claim("cognito:groups", "Staff"),
             new Claim("cognito:groups", "Driver"),
         ], authenticationType: "test");
         var groups = CognitoGroupsHelper.GetGroups(new ClaimsPrincipal(identity));
         Assert.Equal(2, groups.Count);
-        Assert.Contains("Clerk", groups);
+        Assert.Contains("Staff", groups);
         Assert.Contains("Driver", groups);
     }
 }

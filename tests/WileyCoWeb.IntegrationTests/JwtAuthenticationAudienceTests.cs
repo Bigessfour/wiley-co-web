@@ -11,7 +11,7 @@ public sealed class JwtAuthenticationAudienceTests
     [Fact]
     public void AudienceValidator_AcceptsClientIdClaimWhenAudiencesMissing()
     {
-        var options = new JwtAuthenticationOptions { Audience = "2m6vp91m9938jpbg2efivr2p8k" };
+        var options = new JwtAuthenticationOptions { Audience = "townofwiley-staff-web" };
         var token = new JwtSecurityToken(claims: [new Claim("client_id", options.Audience)]);
         var validationParameters = new TokenValidationParameters();
 
@@ -22,7 +22,7 @@ public sealed class JwtAuthenticationAudienceTests
     [Fact]
     public void AudienceValidator_AcceptsStandardAudience()
     {
-        var options = new JwtAuthenticationOptions { Audience = "2m6vp91m9938jpbg2efivr2p8k" };
+        var options = new JwtAuthenticationOptions { Audience = "townofwiley-staff-web" };
         var token = new JwtSecurityToken();
         var validationParameters = new TokenValidationParameters();
 

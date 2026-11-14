@@ -29,14 +29,9 @@ public static class TownHubCardAccess
             ? allowedGroups
             : DefaultGroups(appId);
 
-        if (userGroups.Any(group => string.Equals(group, CognitoGroupsHelper.AdminGroup, StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
         if (userGroups.Count == 0)
         {
-            return allowed.Any(group => string.Equals(group, CognitoGroupsHelper.ClerkGroup, StringComparison.OrdinalIgnoreCase));
+            return allowed.Any(group => string.Equals(group, CognitoGroupsHelper.StaffGroup, StringComparison.OrdinalIgnoreCase));
         }
 
         return userGroups.Any(userGroup =>
@@ -45,8 +40,8 @@ public static class TownHubCardAccess
 
     public static IReadOnlyList<string> DefaultGroups(string appId) =>
         string.Equals(appId, "04", StringComparison.Ordinal)
-            ? [CognitoGroupsHelper.ClerkGroup, CognitoGroupsHelper.DriverGroup, CognitoGroupsHelper.AdminGroup]
-            : [CognitoGroupsHelper.ClerkGroup, CognitoGroupsHelper.AdminGroup];
+            ? [CognitoGroupsHelper.StaffGroup, CognitoGroupsHelper.DriverGroup]
+            : [CognitoGroupsHelper.StaffGroup];
 
     /// <summary>
     /// Absolute http links that are not loopback. Those apps are on the office tailnet and do not share this login.
