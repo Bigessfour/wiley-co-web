@@ -4,14 +4,14 @@ Commit: `b94f834` · Branch: `main` · Auditor: Cursor agent (read-only)
 
 ## 1. Verdict
 
-Not ready. The decision dated 2026-11-14 is that clerks run Wiley Widget on this Mac against Synology Postgres, and that Amplify, App Runner, Aurora, and the old Cognito pool are gone. README, the operations handbook, and `AGENTS.md` now say that (PRR-C1-01 closed). API production settings and the main-branch deployment guard still name that removed stack. Staff login is off, so the API accepts workspace calls with no token. There is no written backup or restore test for the database the clerk actually uses, and the latest `main` CI run is red.
+Not ready. The decision dated 2026-11-14 is that clerks run Wiley Widget on this Mac against Synology Postgres, and that Amplify, App Runner, Aurora, and the old Cognito pool are gone. README, the operations handbook, and `AGENTS.md` now say that (PRR-C1-01 closed). The Amplify deployment guard is gone. API production CORS still lists the removed Amplify origins. Staff login is off, so the API accepts workspace calls with no token. There is still no restore proof for `wileyco_dev`.
 
 Counts at audit time: Blockers 3, Must 5, Should 5, Nice 1, Unverifiable 8.
 
 ## Progress after the audit
 
 - PRR-C1-01 is closed in this working tree (2026-11-14). The definition is `docs/production-completion-plan.md`.
-- PRR-C9-01 is fixed in `.github/workflows/ci.yml`: the Amplify deployment guard is gone. GitHub `main` stays red until that change is merged.
+- PRR-C9-01 is fixed in `.github/workflows/ci.yml`: the Amplify deployment guard is gone. That change is on `main`.
 - PRR-C3-01 is fixed in this working tree: client and API production auth are off, and the removed pool id is no longer in committed JSON. Staff login itself is still PRR-C3-02.
 
 Do the numbered list in section 9 in order. That is the work left to call this project production ready under the 2026-11-10 decision.
