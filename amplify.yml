@@ -89,6 +89,13 @@ frontend:
             echo "Loaded XAI_API_KEY from AWS Secrets Manager secret 'Grok' for Jarvis/Grok portal."
           fi
           export COGNITO_REGION="${COGNITO_REGION:-$(read_secret_field COGNITO_REGION)}"
+          export COGNITO_OAUTH_DOMAIN="${COGNITO_OAUTH_DOMAIN:-$(read_secret_field COGNITO_OAUTH_DOMAIN)}"
+          if [ -n "$COGNITO_OAUTH_DOMAIN" ]; then
+            echo "Applying Cognito Hosted UI domain from COGNITO_OAUTH_DOMAIN into gitignored appsettings.Auth.local.json."
+            node Scripts/apply-cognito-oauth-domain.cjs
+          else
+            echo "COGNITO_OAUTH_DOMAIN is unset. The committed OAuthDomain placeholder stays until the Cognito domain exists."
+          fi
 
           if [ -n "$COGNITO_USER_POOL_ID$COGNITO_APP_CLIENT_ID$COGNITO_REGION" ]; then
             if [ -z "$COGNITO_USER_POOL_ID" ] || [ -z "$COGNITO_APP_CLIENT_ID" ] || [ -z "$COGNITO_REGION" ]; then

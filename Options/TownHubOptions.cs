@@ -55,4 +55,10 @@ public sealed class TownHubAppLink
     /// (e.g. council-packet for Widget).
     /// </summary>
     public List<string> ReferenceSources { get; set; } = [];
+
+    /// <summary>
+    /// Cognito groups that may see this card when <c>Auth:Enabled</c> is true.
+    /// Empty uses the built-in default (<c>Clerk</c> and <c>admin</c>, plus <c>Driver</c> for Trash Truck).
+    /// </summary>
+    public List<string> AllowedGroups { get; set; } = [];
 }

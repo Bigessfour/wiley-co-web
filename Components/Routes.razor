@@ -1,7 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using WileyCoWeb.Components.Auth
 @using WileyCoWeb.Services.Auth
-@inject CognitoAuthService AuthService
+@inject StaffAuthCoordinator StaffAuth
 
 <LoggingErrorBoundary BoundaryName="Router">
     <ChildContent>
@@ -10,7 +10,7 @@
                 <Found Context="routeData">
                     <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
                         <NotAuthorized>
-                            @if (AuthService.IsEnabled && context.User.Identity?.IsAuthenticated != true)
+                            @if (StaffAuth.IsEnabled && context.User.Identity?.IsAuthenticated != true)
                             {
                                 <RedirectToLogin />
                             }

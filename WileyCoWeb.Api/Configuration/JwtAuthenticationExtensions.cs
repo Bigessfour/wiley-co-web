@@ -76,10 +76,21 @@ public static class JwtAuthenticationExtensions
                 };
             });
 
+        services.AddSingleton<IAuthorizationHandler, StaffApiAccessHandler>();
         services.AddAuthorizationBuilder()
-            .AddPolicy(WorkspaceMutatingPolicy, policy => policy.RequireAuthenticatedUser())
-            .AddPolicy(WorkspaceReadPolicy, policy => policy.RequireAuthenticatedUser());
+            .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .AddRequirements(new StaffApiAccessRequirement())
+                .Build())
+            .AddPolicy(WorkspaceMutatingPolicy, RequireStaffApiAccess)
+            .AddPolicy(WorkspaceReadPolicy, RequireStaffApiAccess);
 
         return services;
+    }
+
+    private static void RequireStaffApiAccess(AuthorizationPolicyBuilder policy)
+    {
+        policy.RequireAuthenticatedUser();
+        policy.AddRequirements(new StaffApiAccessRequirement());
     }
 }

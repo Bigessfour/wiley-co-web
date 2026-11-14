@@ -330,7 +330,42 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
     }
 
     [Fact]
-    public async Task GetScenarios_ReturnsCorsHeaders_ForAmplifyPreviewOrigin()
+    public async Task GetScenarios_ReturnsCorsHeaders_ForProductionAmplifyOrigin()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/workspace/scenarios?enterprise=Water%20Utility&fiscalYear=2026");
+        request.Headers.TryAddWithoutValidation("Origin", "https://main.d2ellat1y3ljd9.amplifyapp.com");
+
+        using var response = await client.SendAsync(request);
+
+        response.EnsureSuccessStatusCode();
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedOrigins));
+        Assert.Contains("https://main.d2ellat1y3ljd9.amplifyapp.com", allowedOrigins);
+
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credentials));
+        Assert.Contains("true", credentials, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetScenarios_ReturnsCorsHeaders_ForLocalhost()
+    {
+        await _factory.ResetDatabaseAsync();
+        using var client = _factory.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/workspace/scenarios?enterprise=Water%20Utility&fiscalYear=2026");
+        request.Headers.TryAddWithoutValidation("Origin", "http://localhost:5230");
+
+        using var response = await client.SendAsync(request);
+
+        response.EnsureSuccessStatusCode();
+        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedOrigins));
+        Assert.Contains("http://localhost:5230", allowedOrigins);
+    }
+
+    [Fact]
+    public async Task GetScenarios_DoesNotReturnCorsHeaders_ForUnlistedAmplifyPreview()
     {
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
@@ -341,11 +376,8 @@ public sealed class WorkspaceSnapshotApiTests : IClassFixture<ApiApplicationFact
         using var response = await client.SendAsync(request);
 
         response.EnsureSuccessStatusCode();
-        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedOrigins));
-        Assert.Contains("https://preview-branch.d2ellat1y3ljd9.amplifyapp.com", allowedOrigins);
-
-        Assert.True(response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credentials));
-        Assert.Contains("true", credentials, StringComparer.OrdinalIgnoreCase);
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Credentials"));
     }
 
     [Fact]

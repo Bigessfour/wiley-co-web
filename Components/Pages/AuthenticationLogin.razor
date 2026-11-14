@@ -1,7 +1,8 @@
-@page "/authentication/login"
+@page "/authentication/legacy-login"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @using Microsoft.AspNetCore.Components.Authorization
 @using WileyCoWeb.Services.Auth
+@inject StaffAuthCoordinator StaffAuth
 @inject CognitoAuthService AuthService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
@@ -15,7 +16,7 @@
         Use your Cognito staff account to load live workspace data. Anonymous API calls return 401 when JWT is enabled in production.
     </p>
 
-    @if (!AuthService.IsEnabled)
+    @if (!StaffAuth.IsEnabled)
     {
         <p class="wiley-callout wiley-callout-warning mt-6 rounded-2xl px-4 py-3 text-sm">
             Client auth is disabled for this build (`Auth:Enabled=false`). Local development keeps the workspace open without Cognito.
@@ -23,6 +24,12 @@
         <a class="wiley-button-dark mt-4" href="/">
             Open Town Hub
         </a>
+    }
+    else if (StaffAuth.UsesHostedUi)
+    {
+        <p class="wiley-callout wiley-callout-warning mt-6 rounded-2xl px-4 py-3 text-sm">
+            Redirecting to Cognito Hosted UI…
+        </p>
     }
     else
     {
@@ -45,7 +52,7 @@
 
             @if (!string.IsNullOrWhiteSpace(_error))
             {
-                <p class="wiley-callout wiley-callout-danger rounded-2xl px-4 py-3 text-sm" role="alert">@_error</p>
+                <SignInFailure Action="login-failed" Detail="@_error" Compact="true" />
             }
 
             <button id="staff-sign-in-submit"
@@ -70,6 +77,10 @@
     protected override void OnInitialized()
     {
         _returnUrl = SanitizeReturnUrl(ReturnUrl);
+        if (StaffAuth.IsEnabled && StaffAuth.UsesHostedUi)
+        {
+            StaffAuth.NavigateToLogin(_returnUrl);
+        }
     }
 
     private async Task SignInAsync()

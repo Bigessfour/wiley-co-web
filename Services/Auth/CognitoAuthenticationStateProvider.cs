@@ -43,7 +43,7 @@ public sealed class CognitoAuthenticationStateProvider : AuthenticationStateProv
             }
         }
 
-        return CreateAuthenticatedState(session.Username);
+        return CreateAuthenticatedState(session);
     }
 
     public void NotifyAuthenticationStateChanged()
@@ -59,13 +59,15 @@ public sealed class CognitoAuthenticationStateProvider : AuthenticationStateProv
         return new AuthenticationState(new ClaimsPrincipal(identity));
     }
 
-    private static AuthenticationState CreateAuthenticatedState(string username)
+    private static AuthenticationState CreateAuthenticatedState(CognitoAuthSession session)
     {
-        var identity = new ClaimsIdentity(
-        [
-            new Claim(ClaimTypes.Name, username),
-            new Claim("auth_mode", "cognito")
-        ], authenticationType: "Cognito");
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, session.Username),
+            new("auth_mode", "cognito")
+        };
+        claims.AddRange(JwtPayloadClaimReader.ReadClaims(session.IdToken));
+        var identity = new ClaimsIdentity(claims, authenticationType: "Cognito");
         return new AuthenticationState(new ClaimsPrincipal(identity));
     }
 }

@@ -1,0 +1,58 @@
+@using WileyCoWeb.Services
+
+<PageTitle>@Headline | Wiley.co</PageTitle>
+
+@if (Compact)
+{
+    <div id="staff-sign-in-failure" class="space-y-3" role="alert">
+        @if (!string.IsNullOrWhiteSpace(Detail))
+        {
+            <p class="wiley-callout wiley-callout-danger rounded-2xl px-4 py-3 text-sm">@Detail</p>
+        }
+        <p class="text-sm">
+            Try again in a few minutes. If it still fails, call @StaffSupport.DeskName at
+            <a href="tel:@StaffSupport.PhoneTel">@StaffSupport.PhoneDisplay</a>
+            or email <a href="mailto:@StaffSupport.Email">@StaffSupport.Email</a>.
+            Town Hall is at @StaffSupport.Office.
+        </p>
+        <p class="text-sm wiley-text-muted">Have your username ready. Do not send your password by email or text.</p>
+    </div>
+}
+else
+{
+    <section id="staff-sign-in-failure" class="mx-auto max-w-md rounded-3xl wiley-border wiley-surface-1 px-6 py-8 wiley-text shadow-sm" role="alert">
+        <p class="wiley-eyebrow wiley-eyebrow-muted">Town of Wiley</p>
+        <h1 class="mt-2 text-2xl font-semibold tracking-tight">@Headline</h1>
+        @if (!string.IsNullOrWhiteSpace(Detail))
+        {
+            <p class="wiley-callout wiley-callout-danger mt-4 rounded-2xl px-4 py-3 text-sm">@Detail</p>
+        }
+        <p class="mt-4 text-sm">
+            Try again in a few minutes. If it still fails, call @StaffSupport.DeskName at
+            <a href="tel:@StaffSupport.PhoneTel">@StaffSupport.PhoneDisplay</a>
+            or email <a href="mailto:@StaffSupport.Email">@StaffSupport.Email</a>.
+            Town Hall is at @StaffSupport.Office.
+        </p>
+        <p class="mt-2 text-sm wiley-text-muted">Have your username ready. Do not send your password by email or text.</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+            <a class="wiley-button-dark" href="/authentication/login">Try sign-in again</a>
+            <a class="wiley-button-ghost" href="/support">Help and who to call</a>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public bool Compact { get; set; }
+
+    [Parameter]
+    public string? Action { get; set; }
+
+    [Parameter]
+    public string? Detail { get; set; }
+
+    private string Headline =>
+        string.Equals(Action, "logout-failed", StringComparison.OrdinalIgnoreCase)
+            ? "Sign-out did not finish"
+            : "Sign-in did not finish";
+}

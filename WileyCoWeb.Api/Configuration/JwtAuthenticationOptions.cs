@@ -14,6 +14,11 @@ public sealed class JwtAuthenticationOptions
     public string Authority { get; set; } = string.Empty;
 
     /// <summary>App client audience / resource identifier.</summary>
+    /// <summary>
+    /// App client id (or resource server identifier). Validates <c>aud</c> on access tokens and
+    /// falls back to <c>client_id</c> for Cognito access tokens that omit <c>aud</c>.
+    /// Clerks should send the <strong>access token</strong> (not the ID token) on API calls.
+    /// </summary>
     public string Audience { get; set; } = "wiley-widget-api";
 
     public bool RequireHttpsMetadata { get; set; } = true;
