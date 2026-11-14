@@ -13,7 +13,6 @@ public sealed class JwtAuthenticationOptions
     /// <summary>Cognito issuer URL for Townofwiley-staff.</summary>
     public string Authority { get; set; } = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_bHk9UcenK";
 
-    /// <summary>App client audience / resource identifier.</summary>
     /// <summary>
     /// App client id (or resource server identifier). Validates <c>aud</c> on access tokens and
     /// falls back to <c>client_id</c> for Cognito access tokens that omit <c>aud</c>.
