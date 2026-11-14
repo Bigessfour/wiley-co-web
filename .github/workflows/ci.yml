@@ -34,6 +34,9 @@ jobs:
           path: ./
           extra_args: --only-verified
 
+      - name: No committed Syncfusion license key
+        run: bash ./Scripts/assert-no-syncfusion-license.sh
+
   test:
     runs-on: windows-latest
     needs: [secrets-guard]

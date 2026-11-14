@@ -77,6 +77,9 @@ HIGHRISK_PROJECTS=(
 
 STAMP_FILE="$ROOT/.local-ci-ok"
 
+step "no committed Syncfusion license key"
+bash ./Scripts/assert-no-syncfusion-license.sh
+
 step "secrets-guard (optional TruffleHog)"
 if command -v trufflehog >/dev/null 2>&1; then
   trufflehog filesystem "$ROOT" --only-verified || fail "TruffleHog found verified secrets"
