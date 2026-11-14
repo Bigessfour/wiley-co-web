@@ -2,6 +2,7 @@
 @using System.Globalization
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Popups
 @using Syncfusion.Blazor.Spinner
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
@@ -14,8 +15,8 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <p class="wiley-eyebrow wiley-eyebrow-amber">Capital Gap</p>
-                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Capital needs versus rate revenue gap analysis</h2>
-                <p class="mt-2 max-w-3xl text-sm">Tag capital budget items, compare them to annual rate revenue, and track the cumulative headroom left after each capital commitment.</p>
+                <h2 class="mt-2 text-2xl font-semibold tracking-tight">Capital needs versus rate revenue</h2>
+                <p class="mt-2 max-w-3xl text-sm">Compare capital projects with this year’s rate revenue, and see how much is left after each one.</p>
             </div>
             <div class="grid grid-cols-2 gap-3 text-right text-xs sm:grid-cols-4 lg:text-sm">
                 <div>
@@ -40,8 +41,17 @@
 
     <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-1">
-            <p class="wiley-eyebrow wiley-eyebrow-muted">Capital Gap Summary</p>
-            <p class="text-sm wiley-text-muted">Live summary of the capital-tagged budget items against the current rate-revenue base.</p>
+            <div class="flex items-center gap-2">
+                <p class="wiley-eyebrow wiley-eyebrow-muted">Capital Gap Summary</p>
+                <SfTooltip Content="The gap is yearly rate revenue minus yearly capital need. Coverage is yearly rate revenue divided by yearly capital need."
+                           Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                           OpensOn="Hover Focus"
+                           ShowTipPointer="true"
+                           CloseDelay="200">
+                    <span tabindex="0" class="cursor-help text-xs wiley-text-muted underline decoration-dotted" aria-label="How the capital gap is calculated">How this is calculated</span>
+                </SfTooltip>
+            </div>
+            <p class="text-sm wiley-text-muted">Capital projects compared with this year’s rate revenue.</p>
         </div>
         <SfCard ID="capital-gap-summary-card" class="mt-3">
             <CardHeader Title="Capital gap summary" SubTitle="@SummarySubtitle" />
@@ -80,19 +90,19 @@
     {
         <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SfCard ID="capital-gap-kpi-rate-revenue">
-                <CardHeader Title="Annual Rate Revenue" SubTitle="Live revenue aggregate" />
+                <CardHeader Title="Annual Rate Revenue" SubTitle="This year’s rate revenue" />
                 <CardContent Content="@Snapshot.AnnualRateRevenue.ToString("C0")" />
             </SfCard>
             <SfCard ID="capital-gap-kpi-capital-need">
-                <CardHeader Title="Annual Capital Need" SubTitle="Tagged capital items" />
+                <CardHeader Title="Annual Capital Need" SubTitle="Capital projects" />
                 <CardContent Content="@Snapshot.AnnualCapitalNeed.ToString("C0")" />
             </SfCard>
             <SfCard ID="capital-gap-kpi-gap">
-                <CardHeader Title="Rate Revenue Gap" SubTitle="Revenue minus capital need" />
+                <CardHeader Title="Rate Revenue Gap" SubTitle="Revenue left after capital projects" />
                 <CardContent Content="@Snapshot.RateRevenueGap.ToString("C0")" />
             </SfCard>
             <SfCard ID="capital-gap-kpi-coverage-ratio">
-                <CardHeader Title="Coverage Ratio" SubTitle="Rate revenue / capital need" />
+                <CardHeader Title="Coverage Ratio" SubTitle="How far revenue covers capital needs" />
                 <CardContent Content="@Snapshot.CapitalNeedCoverageRatio.ToString("0.00x")" />
             </SfCard>
         </section>
@@ -101,7 +111,7 @@
             <div class="rounded-2xl wiley-surface-panel p-4">
                 <div class="flex flex-col gap-1">
                     <p class="wiley-eyebrow wiley-eyebrow-muted">Capital Need Chart</p>
-                    <p class="text-sm wiley-text-muted">Stacked budgeted and actual capital amounts with a cumulative revenue-gap line.</p>
+                    <p class="text-sm wiley-text-muted">Budgeted and spent amounts, and the running gap against rate revenue.</p>
                 </div>
                 <div class="mt-3 rounded-2xl wiley-surface-panel-secondary p-4">
                     @* Theme Fluent2: chart palette aligned with app-wide Syncfusion theme *@
@@ -158,7 +168,7 @@
             <div class="rounded-2xl wiley-surface-panel p-4">
                 <div class="flex flex-col gap-1">
                     <p class="wiley-eyebrow wiley-eyebrow-muted">Capital Tagged Items</p>
-                    <p class="text-sm wiley-text-muted">The same tagged items feed the KPI strip and the cumulative line.</p>
+                    <p class="text-sm wiley-text-muted">These projects are included in the totals above.</p>
                 </div>
                 <div id="capital-gap-breakdown" class="mt-3 space-y-3">
                     @foreach (var item in CapitalItemsForChart)
@@ -204,7 +214,7 @@
     private int loadedFiscalYear;
 
     private string SummarySubtitle => Snapshot is null ? "Awaiting live capital gap data" : $"{Snapshot.SelectedEnterprise} FY {Snapshot.SelectedFiscalYear}";
-    private string SummaryContent => Snapshot is null ? "The panel will populate after the workspace loads live rate revenue and capital-tagged budget items." : Snapshot.ExecutiveSummary;
+    private string SummaryContent => Snapshot is null ? "This summary fills in after rate revenue and capital projects are loaded." : Snapshot.ExecutiveSummary;
     private string CapitalStatus => Snapshot is not null
         ? Snapshot.CapitalStatus
         : string.IsNullOrWhiteSpace(MissingDataNote) ? "Loading" : "Needs import";

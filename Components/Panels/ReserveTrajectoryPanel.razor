@@ -1,6 +1,7 @@
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Charts
+@using Syncfusion.Blazor.Popups
 @using WileyCoWeb.Contracts
 
 @* Reserve trajectory is fed from WorkspaceReserveTrajectoryData on the workspace snapshot (API WorkspaceSnapshotComposer), not a standalone REST endpoint. *@
@@ -8,21 +9,21 @@
     <section class="rounded-2xl wiley-surface-panel p-4">
         <div class="flex flex-col gap-2">
             <p class="wiley-eyebrow wiley-eyebrow-muted">Reserve Trajectory</p>
-            <p class="text-sm wiley-text-muted">A live reserve forecast with a shaded stress band and policy floor carried through the workspace snapshot.</p>
+            <p class="text-sm wiley-text-muted">Projected reserves, the range around that forecast, and the minimum the town aims to keep.</p>
         </div>
 
         <div class="mt-4 grid gap-4 md:grid-cols-3">
             <SfCard>
                 <CardHeader Title="Current Reserves" SubTitle="@CurrentReservesDisplay" />
-                <CardContent Content="The current reserve balance from the workspace forecast." />
+                <CardContent Content="Cash set aside today." />
             </SfCard>
             <SfCard>
                 <CardHeader Title="Current Reserve Months" SubTitle="@CurrentReserveMonthsDisplay" />
-                <CardContent Content="An estimated reserve coverage horizon versus the policy floor." />
+                <CardContent Content="Months of reserves compared with the minimum." />
             </SfCard>
             <SfCard>
                 <CardHeader Title="5-Year Solvency Score" SubTitle="@FiveYearSolvencyScoreDisplay" />
-                <CardContent Content="How the five-year forecast compares with the policy minimum." />
+                <CardContent Content="How the five-year forecast compares with the minimum." />
             </SfCard>
         </div>
 
@@ -122,20 +123,27 @@
                 </SfChart>
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
                     <div class="rounded-xl wiley-surface-panel-secondary px-3 py-2 text-xs wiley-text-muted">
-                        <span class="font-semibold wiley-text">Stress band:</span> Forecast plus or minus the current confidence interval.
+                        <span class="font-semibold wiley-text">Stress band:</span> The higher and lower range around the forecast.
+                        <SfTooltip Content="Forecast plus or minus the current confidence interval."
+                                   Position="Syncfusion.Blazor.Popups.Position.TopCenter"
+                                   OpensOn="Hover Focus"
+                                   ShowTipPointer="true"
+                                   CloseDelay="200">
+                            <span tabindex="0" class="cursor-help underline decoration-dotted" aria-label="How the stress band is calculated">How this is calculated</span>
+                        </SfTooltip>
                     </div>
                     <div class="wiley-callout wiley-callout-warning rounded-xl px-3 py-2 text-xs">
                         <span class="font-semibold">Policy minimum:</span> @PolicyMinimumDisplay
                     </div>
                 </div>
                 <p class="mt-2 text-xs wiley-text-muted">Risk assessment: @RiskAssessmentDisplay</p>
-                <p class="mt-3 text-xs wiley-text-muted">Latest confidence interval: @LatestConfidenceIntervalDisplay</p>
+                <p class="mt-3 text-xs wiley-text-muted">Latest range: @LatestConfidenceIntervalDisplay</p>
             </div>
         }
         else
         {
             <div class="mt-4 rounded-2xl border-dashed wiley-border wiley-surface-panel-secondary p-6 text-sm wiley-text-muted">
-                Reserve forecast data is not available yet. Once the workspace snapshot includes forecast points, the chart will appear here.
+                A reserve forecast is not available yet. The chart will appear here once a forecast is ready.
             </div>
         }
     </section>

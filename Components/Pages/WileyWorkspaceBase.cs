@@ -540,7 +540,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         IsSavingBaseline = true;
-        BaselineSaveStatus = "Saving baseline values to the workspace API...";
+        BaselineSaveStatus = "Saving these costs and volume...";
         StateHasChanged();
 
         try
@@ -615,7 +615,7 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
         }
 
         IsSavingSnapshot = true;
-        SnapshotSaveStatus = "Saving rate snapshot to Aurora...";
+        SnapshotSaveStatus = "Saving this rate...";
         StateHasChanged();
 
         try

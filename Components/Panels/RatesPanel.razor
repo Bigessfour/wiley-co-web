@@ -14,22 +14,22 @@
     <section id="rates-overview-section" class="grid gap-4 wiley-split-wide">
         <SfCard ID="rates-overview-card" CssClass="wiley-panel-card">
             <CardHeader Title="Rate Position"
-                        SubTitle="Decision support. The break-even target is total cost divided by projected volume, plus scenario dollar adders. It is not a formal cost-of-service study." />
+                        SubTitle="Compare today’s rate with the rate that covers costs." />
             <CardContent>
                 <div class="grid gap-3 md:grid-cols-3">
                     <SfCard ID="rates-kpi-current-card">
                         <CardHeader Title="Current Rate" SubTitle="@CurrentRateDisplay" />
-                        <CardContent Content="The working rate used immediately across the workspace model." />
+                        <CardContent Content="The rate in use now." />
                     </SfCard>
 
                     <SfCard ID="rates-kpi-target-card">
                         <CardHeader Title="Break-Even Rate" SubTitle="@BreakEvenRateDisplay" />
-                        <CardContent Content="The model-calculated rate needed to fully cover current costs." />
+                        <CardContent Content="The rate that covers current costs." />
                     </SfCard>
 
                     <SfCard ID="rates-kpi-delta-card">
                         <CardHeader Title="Spread" SubTitle="@RateDeltaDisplay" />
-                        <CardContent Content="Positive means the modeled charge sits above break-even; negative means it trails the target." />
+                        <CardContent Content="How far today’s rate is from break-even." />
                     </SfCard>
                 </div>
             </CardContent>
@@ -60,7 +60,7 @@
     <section id="rates-workbench-section" class="grid gap-4 wiley-split-wide">
         <SfCard ID="rates-editor-card" CssClass="wiley-panel-card">
             <CardHeader Title="Rate Workbench"
-                        SubTitle="Native Syncfusion editing, tooltip guidance, and save feedback replace the former loose helper copy." />
+                        SubTitle="Enter the current customer rate." />
             <CardContent>
                 @* Syncfusion ProgressBar replaces a passive text-only busy indicator so snapshot saves read as an intentional workflow. *@
                 <SfProgressBar ID="rates-save-progress"
@@ -77,7 +77,7 @@
                 <div class="mt-4 space-y-4">
                     @* Syncfusion NumericTextBox remains the authoritative editor, now tightened with decimal precision,
                        native formatting, and tooltip-based guidance instead of a raw paragraph beneath the control. *@
-                    <SfTooltip Content="Update the modeled current customer charge. The workspace recomputes comparison visuals as soon as the value changes."
+                    <SfTooltip Content="The rate customers pay now. The chart updates as soon as you change it. Break-even is total cost divided by projected volume, plus any extra scenario costs. This is not a formal cost-of-service study."
                                Position="Syncfusion.Blazor.Popups.Position.TopCenter"
                                OpensOn="Hover Focus"
                                ShowTipPointer="true"
@@ -98,13 +98,13 @@
                     </SfTooltip>
 
                     <SfCard ID="rates-save-card">
-                        <CardHeader Title="Snapshot"
-                                    SubTitle="Capture the current rate posture for audit, council review, and later comparison." />
+                        <CardHeader Title="Saved rate"
+                                    SubTitle="Keep this rate so you can compare it later." />
                         <CardContent>
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="flex items-center gap-2">
                                     @* The save action stays an SfButton per Syncfusion guidance; the adjacent SfSpinner makes the transition feel deliberate and enterprise-grade without inventing custom loaders. *@
-                                    <SfTooltip Content="Persist the current modeled rate as a workspace snapshot."
+                                    <SfTooltip Content="Saves the rate shown here so you can look back at it later."
                                                Position="Syncfusion.Blazor.Popups.Position.TopCenter"
                                                OpensOn="Hover Focus"
                                                ShowTipPointer="true"
@@ -113,7 +113,7 @@
                                                   IsPrimary="true"
                                                   Disabled="@IsSavingSnapshot"
                                                   OnClick="OnSaveRateSnapshot">
-                                            @(IsSavingSnapshot ? "Saving snapshot..." : "Save rate snapshot")
+                                            @(IsSavingSnapshot ? "Saving..." : "Save rate snapshot")
                                         </SfButton>
                                     </SfTooltip>
 
@@ -134,7 +134,7 @@
 
         <SfCard ID="rates-chart-card" CssClass="wiley-panel-card">
             <CardHeader Title="Rate Comparison"
-                        SubTitle="Production chart settings, built-in accessibility text, animation, and tooltips replace the former raw chart wrapper." />
+                        SubTitle="Today’s rate next to the break-even rate." />
             <CardContent>
                 <div class="space-y-4">
                     <SfCard ID="rates-chart-insight-card">
@@ -211,13 +211,13 @@
 
     private string SnapshotStatusText
         => string.IsNullOrWhiteSpace(SnapshotSaveStatus)
-            ? "Ready to capture the current modeled rate as a formal snapshot."
+            ? "Ready to save this rate."
             : SnapshotSaveStatus.Trim();
 
     private string RateAlignmentTitle
         => IsRateAtOrAboveBreakEven
-            ? "Current pricing is covering the modeled break-even line."
-            : "Current pricing is trailing the modeled break-even line.";
+            ? "Today’s rate covers costs."
+            : "Today’s rate is below the break-even rate.";
 
     private string RateAlignmentBadgeText
         => IsRateAtOrAboveBreakEven ? "Above break-even" : "Below break-even";
@@ -229,13 +229,13 @@
 
     private string RateNarrativeSubtitle
         => IsRateAtOrAboveBreakEven
-            ? $"Current pricing is {Math.Abs(RateDelta):C2} above the live target."
-            : $"Current pricing is {Math.Abs(RateDelta):C2} below the live target.";
+            ? $"Today’s rate is {Math.Abs(RateDelta):C2} above break-even."
+            : $"Today’s rate is {Math.Abs(RateDelta):C2} below break-even.";
 
     private string RateNarrativeBody
         => IsRateAtOrAboveBreakEven
-            ? "The current modeled charge is producing a positive spread relative to the break-even rate, giving the council room to discuss reserves, reinvestment, or subsidy policy with clearer context."
-            : "The current modeled charge is not yet meeting the live break-even requirement, so any policy conversation should treat the remaining spread as operating pressure that still needs to be covered.";
+            ? "Today’s rate is above the break-even rate, so there is room to talk about reserves, reinvestment, or subsidies."
+            : "Today’s rate does not yet cover costs. The remaining gap still has to be covered.";
 
     private string ChartInsightTitle
         => IsRateAtOrAboveBreakEven
@@ -243,7 +243,7 @@
             : "Break-even target remains ahead";
 
     private string ChartInsightBody
-        => $"The comparison chart is intentionally compact and high-contrast: animation makes workspace updates feel immediate, built-in chart tooltips preserve precision on hover, and data labels keep the two benchmark values readable even in quick executive walkthroughs. Current spread: {RateDeltaDisplay}.";
+        => $"Today’s rate compared with the rate that covers costs. Difference: {RateDeltaDisplay}.";
 
     private decimal GetRatePointValue(string label, decimal fallbackValue)
     {

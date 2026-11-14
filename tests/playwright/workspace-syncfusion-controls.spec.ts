@@ -90,7 +90,7 @@ test.describe("Wiley workspace Syncfusion coverage", () => {
       const mhiInput = page.getByRole("spinbutton", { name: "Monthly MHI" });
 
       await expect(panel).toBeVisible();
-      await expect(panel).toContainText("Monthly bill burden versus MHI");
+      await expect(panel).toContainText("share of household income");
       await expect(page.locator("#affordability-gauge")).toBeVisible();
       await expect(
         page.locator("#affordability-class-impact-chart"),
