@@ -8,6 +8,6 @@ test("support page tells a clerk who to call", async ({ page }) => {
   await expect(support).toContainText("(719) 829-4974");
   await expect(support.locator('a[href="mailto:clerk@townofwiley.gov"]')).toBeVisible();
   await expect(support).toContainText("office network");
-  await expect(support).toContainText("Coming soon");
+  await expect(support).toContainText("stays closed until it has an address");
   await expect(page.locator('a.app-nav-link[href="/support"]')).toBeVisible();
 });
