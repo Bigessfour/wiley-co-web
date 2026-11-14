@@ -58,6 +58,31 @@ public sealed class QuickBooksBackupImportServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_WritesTheStateFileBesideTheBackupFolder()
+    {
+        var parent = Path.Combine(Path.GetTempPath(), "wiley-qb-parent-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(parent, "backup");
+        Directory.CreateDirectory(Path.Combine(root, "CHECK LISTING- UTILITY"));
+        await File.WriteAllTextAsync(Path.Combine(root, "CHECK LISTING- UTILITY", "october.csv"), "Date,Type\n");
+
+        var service = new QuickBooksBackupImportService(
+            new RecordingImporter(),
+            Options.Create(new QuickBooksBackupImportOptions
+            {
+                Enabled = true,
+                BackupRoot = root,
+                FiscalYear = 2026
+            }),
+            NullLogger<QuickBooksBackupImportService>.Instance);
+
+        await service.ImportAsync();
+
+        Assert.True(File.Exists(Path.Combine(parent, ".wiley-qb-backup-import-state.json")));
+        Assert.False(File.Exists(Path.Combine(root, ".wiley-qb-backup-import-state.json")));
+        Directory.Delete(parent, recursive: true);
+    }
+
+    [Fact]
     public async Task ImportAsync_CommitsOnlyTheChecksThatAreNotAlreadyImported()
     {
         var root = Path.Combine(Path.GetTempPath(), "wiley-qb-backup-" + Guid.NewGuid().ToString("N"));

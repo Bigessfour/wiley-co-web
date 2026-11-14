@@ -213,7 +213,16 @@ public sealed class QuickBooksBackupImportService
             return Path.GetFullPath(settings.StateFilePath);
         }
 
-        return Path.Combine(fullRoot, ".wiley-qb-backup-import-state.json");
+        // Beside the backup folder, not inside it. A stamp inside the folder
+        // would sit on a NAS share the next scan walks.
+        var trimmed = fullRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parent = Path.GetDirectoryName(trimmed);
+        if (string.IsNullOrEmpty(parent))
+        {
+            parent = trimmed;
+        }
+
+        return Path.Combine(parent, ".wiley-qb-backup-import-state.json");
     }
 
     private static async Task<BackupImportState> ReadStateAsync(string statePath, CancellationToken cancellationToken)

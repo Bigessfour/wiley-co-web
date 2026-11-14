@@ -24,6 +24,7 @@ public partial class BreakEvenPanel : ComponentBase
     [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal>> OnProjectedVolumeChanged { get; set; }
     [Parameter] public EventCallback OnSaveWorkspaceBaseline { get; set; }
     [Parameter] public EventCallback<IReadOnlyList<ApartmentUnitTypeData>> OnApartmentUnitTypesChanged { get; set; }
+    [Parameter] public bool AnimateVisuals { get; set; } = true;
 
     public IReadOnlyList<BreakEvenQuadrantData> VisibleQuadrants => Quadrants;
 

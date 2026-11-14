@@ -87,22 +87,28 @@ public static class QuickBooksBackupImportPlanner
 
     private static string? ResolveEnterprise(string loweredPath)
     {
-        if (ContainsAny(loweredPath, "trash", "refuse", "garbage"))
+        // The fund is the folder. A utility workbook named "trash-dump" stays
+        // Water Utility; routing still moves trash rows. A general-fund file
+        // whose name contains water, trash, or wsd stays out of the import.
+        var slash = loweredPath.LastIndexOf('/');
+        var directory = slash <= 0 ? loweredPath : loweredPath[..slash];
+
+        if (ContainsAny(directory, "trash", "refuse", "garbage"))
         {
             return "Trash";
         }
 
-        if (ContainsAny(loweredPath, "brookside", "apartment"))
+        if (ContainsAny(directory, "brookside", "apartment"))
         {
             return "Apartments";
         }
 
-        if (ContainsAny(loweredPath, "wsd", "sanitation", "sewer"))
+        if (ContainsAny(directory, "wsd", "sanitation", "sewer"))
         {
             return "Wiley Sanitation District";
         }
 
-        if (ContainsAny(loweredPath, "utility", "water"))
+        if (ContainsAny(directory, "utility", "water"))
         {
             return "Water Utility";
         }

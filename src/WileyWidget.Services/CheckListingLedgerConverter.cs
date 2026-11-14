@@ -98,13 +98,19 @@ public static class CheckListingLedgerConverter
                 ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = false }
             });
 
+            var combined = new List<CheckListingRow>();
             foreach (DataTable table in dataSet.Tables)
             {
                 if (TryReadTable(table, accountPrefix, out var tableRows) && tableRows.Count > 0)
                 {
-                    rows = tableRows;
-                    return true;
+                    combined.AddRange(tableRows);
                 }
+            }
+
+            if (combined.Count > 0)
+            {
+                rows = combined;
+                return true;
             }
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
