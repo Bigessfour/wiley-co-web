@@ -64,7 +64,8 @@ Do not recreate App Runner, Aurora, or ECS for Widget.
 
 ### Monthly
 
-- Run the QuickBooks import through the upload panel.
+- Run the QuickBooks import through the upload panel. That panel is still the clerk import.
+- An operator can report new check-listing workbooks with `./Scripts/import-deb-backup.sh`. `--commit` sends the new checks through that same import. It does not replace the panel, and it does not read a company file.
 - Keep the operator, enterprise, fiscal year, filenames, and row counts.
 - Open one workspace snapshot and confirm the figures match the import.
 

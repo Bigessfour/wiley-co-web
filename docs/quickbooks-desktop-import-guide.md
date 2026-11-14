@@ -166,6 +166,14 @@ If the commit is blocked as a duplicate:
 - do not force a second import of the same file
 - use the existing data or coordinate cleanup if a correction is required
 
+## Check-listing backups
+
+The upload panel stays the way a clerk loads one QuickBooks export.
+
+`./Scripts/import-deb-backup.sh` is the operator path for the meeting workbooks on `mr-storage` at `CHECK LISTING/2026 CHECK LISTING`. It converts each check into a transaction list and sends that list through the same preview and commit used by this panel. A run with no arguments writes nothing. `./Scripts/import-deb-backup.sh --commit` writes into `wileyco_dev`.
+
+The script does not read `.qbw` or `.qbb` company files. General Fund and bank-balance workbooks are left out. A check that is already in the ledger is skipped, and the new checks in that workbook can still load. The enterprise comes from the fund folder: utility or water, sanitation or WSD, trash, or Brookside.
+
 If the preview shows the wrong enterprise context:
 
 - stop before commit

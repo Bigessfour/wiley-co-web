@@ -20,6 +20,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Content Include="Fixtures\**\*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\WileyWidget.Abstractions\WileyWidget.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\WileyWidget.Services\WileyWidget.Services.csproj" />
     </ItemGroup>

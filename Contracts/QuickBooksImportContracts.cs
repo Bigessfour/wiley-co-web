@@ -50,3 +50,21 @@ public sealed record QuickBooksImportGuidanceResponse(
 	string Answer,
 	bool UsedFallback,
 	string ContextSummary);
+
+public sealed record QuickBooksBackupImportFileResult(
+	string RelativePath,
+	string? Enterprise,
+	string Status,
+	int ImportedRows,
+	bool IsDuplicate,
+	string Message);
+
+public sealed record QuickBooksBackupImportResponse(
+	string BackupRoot,
+	int FiscalYear,
+	int ConsideredFiles,
+	int ImportedFiles,
+	int DuplicateFiles,
+	int SkippedFiles,
+	string Message,
+	IReadOnlyList<QuickBooksBackupImportFileResult> Files);

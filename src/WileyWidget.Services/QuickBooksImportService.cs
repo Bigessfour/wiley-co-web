@@ -11,7 +11,7 @@ using WileyWidget.Models.Amplify;
 
 namespace WileyWidget.Services;
 
-public sealed class QuickBooksImportService
+public sealed class QuickBooksImportService : IQuickBooksLedgerImporter
 {
 	private const string CanonicalEntity = "quickbooks-ledger";
 
