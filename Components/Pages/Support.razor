@@ -1,0 +1,29 @@
+@page "/support"
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using WileyCoWeb.Services
+
+<PageTitle>Help | Wiley.co</PageTitle>
+
+<section id="staff-support" class="mx-auto max-w-2xl rounded-3xl wiley-border wiley-surface-1 px-6 py-8 wiley-text shadow-sm">
+    <p class="wiley-eyebrow wiley-eyebrow-muted">Town of Wiley</p>
+    <h1 class="mt-2 text-2xl font-semibold tracking-tight">Who to call</h1>
+    <p class="mt-3 text-sm">
+        For Town Hub sign-in, a card that will not open, or a workspace that will not load, call
+        <a href="tel:@StaffSupport.PhoneTel">@StaffSupport.PhoneDisplay</a>
+        or email <a href="mailto:@StaffSupport.Email">@StaffSupport.Email</a>.
+        @StaffSupport.Office.
+    </p>
+    <h2 class="mt-6 text-lg font-semibold">What each card does</h2>
+    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
+        <li>Wiley Widget is this rate study. It uses the Town Hub sign-in.</li>
+        <li>Trash Truck uses the same Town Hub sign-in.</li>
+        <li>Apartments and TIKR are on the office network. Sign in again in those apps.</li>
+        <li>Rural Water stays closed until it has an address.</li>
+    </ul>
+    <p class="mt-4 text-sm wiley-text-muted">
+        Do not send a password by email or text. If the whole site is down, say so when you call. Operators check the API <code>/health</code> page.
+    </p>
+    <div class="mt-4">
+        <a class="wiley-button-dark" href="/">Back to Town Hub</a>
+    </div>
+</section>

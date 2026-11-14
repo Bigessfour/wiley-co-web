@@ -117,7 +117,7 @@ For every production API deployment, record:
 
 - Set `WILEY_WORKSPACE_API_BASE_ADDRESS` in Amplify (points client to App Runner public URL or custom domain).
 - Deploy Amplify with the env var present (amplify.yml + build already supports it for `appsettings.Workspace.local.json`).
-- Town Hub suite cards: Production URLs point Apartments and TIKR at the Synology over Tailscale (`http://mr-storage:8082` and `http://mr-storage:8080`) and Trash Truck at its existing Amplify app. Rural Water stays empty until a public URL is known. Amplify `TOWN_HUB_*_URL` overrides still replace those values when set. Detail: `docs/town-hub.md`.
+- Town Hub suite cards: Production URLs point Apartments and TIKR at the Synology over Tailscale (`http://mr-storage:8082` and `http://mr-storage:8080`). Those cards say office network only and do not claim this sign-in carries over. Trash Truck uses the shared Cognito sign-in. Rural Water with an empty URL shows Coming soon. `Clerk` and `admin` see the clerk cards; `Driver` sees Trash Truck only. Amplify `TOWN_HUB_*_URL` overrides still replace those values when set. Detail: `docs/town-hub.md`.
 - App Runner service: update runtime env/secrets via console or IaC (database-url, xai-api-key, syncfusion-license-key); trigger deploy from ECR image.
 - Post-cutover validation (council smoke, run from ops workstation or CI):
   ```powershell
@@ -395,6 +395,8 @@ Rules:
 
 ## 11. Backup, Recovery, And Restore Readiness
 
+Runbook: [backup-and-restore.md](backup-and-restore.md). File-level check: `./Scripts/backup-restore-drill.sh`. Health and the Town Hall contact: [health-and-alerting.md](health-and-alerting.md) and `/support`. Clerk page: [clerk-quick-start.md](clerk-quick-start.md).
+
 Aurora PostgreSQL is the system of record.
 
 Standing rules:
@@ -417,7 +419,7 @@ Best-practice cadence:
 - Keep operator access limited to named deployment and support owners.
 - Review alarm actions and notification recipients after team or ownership changes.
 - Keep production domain, API host, and data-store changes out of the same release window unless there is a documented rollback plan for the combined change.
-- **API JWT scaffolding:** `Authentication:Jwt:Enabled` gates mutating routes and read paths via `RequireWorkspaceReadAuth` when it is true. `/api/ai/health` stays anonymous. The clerk path keeps JWT off. Production files must not name the removed pool `us-east-2_DmY7BCBIp`. When a new Town-account pool exists, turn client `Auth:Enabled` and API `Authentication:Jwt:Enabled` on together. While JWT is off, the API accepts callers with no token, so it stays on `127.0.0.1` on the office Mac.
+- **API JWT scaffolding:** `Authentication:Jwt:Enabled` gates mutating routes and read paths via `RequireWorkspaceReadAuth` when it is true. `/api/ai/health` stays anonymous. The clerk path keeps JWT off. Production files must not name the removed pool `us-east-2_DmY7BCBIp`. When a live Town-account pool exists, turn client `Auth:Enabled` and API `Authentication:Jwt:Enabled` on together and use Hosted UI (`Auth:SignInFlow=HostedUi`, OAuth2 code + PKCE). See `docs/sso-clerksuite.md`. While JWT is off, the API accepts callers with no token, so it stays on `127.0.0.1` on the office Mac.
   - Integration tests prove 401 on protected read endpoints when JWT enabled in test factory (no token).
 - **Historical Cognito smoke tests:** these commands targeted the removed pool `us-east-2_DmY7BCBIp` and App Runner. Do not run them. The old notes said IAM user `copilot` had managed policy `WileyWidgetCopilotCognitoSmokeTest`. With `copilot` AWS credentials configured:
   - `pwsh Scripts/get-cognito-smoke-token.ps1` — returns a Bearer access token

@@ -1,9 +1,17 @@
+@using WileyCoWeb.Services.Auth
 @inject NavigationManager Navigation
+@inject StaffAuthCoordinator StaffAuth
 
 @code {
     protected override void OnInitialized()
     {
+        if (StaffAuth.IsEnabled && StaffAuth.UsesHostedUi)
+        {
+            StaffAuth.NavigateToLogin(Navigation.Uri);
+            return;
+        }
+
         var returnUrl = Uri.EscapeDataString(Navigation.Uri);
-        Navigation.NavigateTo($"/authentication/login?returnUrl={returnUrl}");
+        Navigation.NavigateTo($"/authentication/legacy-login?returnUrl={returnUrl}");
     }
 }
