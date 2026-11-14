@@ -9,9 +9,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 POOL="${COGNITO_USER_POOL_ID:-}"
 CLIENT="${COGNITO_APP_CLIENT_ID:-}"
 REGION="${COGNITO_REGION:-us-east-2}"
+OAUTH_DOMAIN="${COGNITO_OAUTH_DOMAIN:-}"
+SIGN_IN_FLOW="${COGNITO_SIGN_IN_FLOW:-HostedUi}"
 
 if [[ -z "$POOL" || -z "$CLIENT" ]]; then
-  echo "ERROR: Set COGNITO_USER_POOL_ID and COGNITO_APP_CLIENT_ID (optional COGNITO_REGION)." >&2
+  echo "ERROR: Set COGNITO_USER_POOL_ID and COGNITO_APP_CLIENT_ID (optional COGNITO_REGION, COGNITO_OAUTH_DOMAIN, COGNITO_SIGN_IN_FLOW)." >&2
   exit 1
 fi
 
@@ -22,16 +24,21 @@ node -e '
   const pool = process.env.COGNITO_USER_POOL_ID.trim();
   const client = process.env.COGNITO_APP_CLIENT_ID.trim();
   const region = (process.env.COGNITO_REGION || "us-east-2").trim();
+  const oauthDomain = (process.env.COGNITO_OAUTH_DOMAIN || "").trim();
+  const signInFlow = (process.env.COGNITO_SIGN_IN_FLOW || "HostedUi").trim();
+  const cognito = {
+    Region: region,
+    UserPoolId: pool,
+    ClientId: client,
+    Authority: `https://cognito-idp.${region}.amazonaws.com/${pool}`,
+  };
+  if (oauthDomain) cognito.OAuthDomain = oauthDomain;
   const payload = {
     Auth: {
       Enabled: true,
-      Cognito: {
-        Region: region,
-        UserPoolId: pool,
-        ClientId: client,
-        Authority: `https://cognito-idp.${region}.amazonaws.com/${pool}`
-      }
-    }
+      SignInFlow: signInFlow,
+      Cognito: cognito,
+    },
   };
   fs.writeFileSync(path, JSON.stringify(payload, null, 2) + "\n");
 ' "$ROOT/wwwroot/appsettings.Auth.local.json"

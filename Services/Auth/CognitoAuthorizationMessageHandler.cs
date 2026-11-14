@@ -7,18 +7,22 @@ namespace WileyCoWeb.Services.Auth;
 /// </summary>
 public sealed class CognitoAuthorizationMessageHandler : DelegatingHandler
 {
-    private readonly CognitoAuthService _authService;
+    private readonly CognitoAuthOptions _options;
+    private readonly IStaffAccessTokenProvider _accessTokenProvider;
 
-    public CognitoAuthorizationMessageHandler(CognitoAuthService authService)
+    public CognitoAuthorizationMessageHandler(
+        Microsoft.Extensions.Options.IOptions<CognitoAuthOptions> options,
+        IStaffAccessTokenProvider accessTokenProvider)
     {
-        _authService = authService;
+        _options = options.Value;
+        _accessTokenProvider = accessTokenProvider;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (_authService.IsEnabled)
+        if (_options.Enabled)
         {
-            var accessToken = await _authService.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+            var accessToken = await _accessTokenProvider.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(accessToken))
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);

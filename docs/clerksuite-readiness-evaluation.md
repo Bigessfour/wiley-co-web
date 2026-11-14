@@ -1,5 +1,7 @@
 # ClerkSuite production readiness and single-login evaluation
 
+**Current path (2026-11-14):** Clerks use the office Mac. The database is Postgres on the Synology. Production sign-in stays off. Amplify, App Runner, Aurora, and Cognito pool `us-east-2_DmY7BCBIp` were removed. The sections below are the 2026-11-13 evaluation. The live definition is `docs/production-completion-plan.md`.
+
 **Audience:** Mayor Stephen McKitrick, Town of Wiley clerk staff, and operators maintaining the suite.  
 **Scope:** `wiley-co-web` (Amplify Blazor WASM + App Runner API) as **Town Hub / ClerkSuite entry**, plus sibling projects reached from hub cards.  
 **Evaluation date:** 2026-11-13.  
@@ -287,3 +289,19 @@ Print this one-page script. Clerk checks **Pass / Fail** and notes.
 | Date | Change |
 | --- | --- |
 | 2026-11-13 | Initial evaluation (docs-only PR). |
+| 2026-11-14 | Merged with the Hosted UI slice. Production path is the office Mac and NAS. The removed pool is not a rollout step. |
+
+## 9. SSO slice recorded with the Hosted UI work
+
+This slice came in with the Hosted UI pull request. It names pool `us-east-2_DmY7BCBIp` and app client `2m6vp91m9938jpbg2efivr2p8k`. That pool was removed. Leave production sign-in off. The code notes below are still accurate.
+
+| Area | Status | Notes |
+|------|--------|--------|
+| ClerkSuite client — Hosted UI + PKCE | **Code ready** | `SignInFlow=HostedUi`, `RemoteAuthenticatorView`, global logout URL |
+| ClerkSuite client — legacy password | **Retained behind flag** | `UserPassword` at `/authentication/legacy-login` |
+| API JWT validation | **Code ready, off in production** | Audience + `client_id` fallback; access token expected when JWT is on |
+| Town Hub → Trash Truck card | **Ready** | No role dialog; path from `cognito:groups` |
+| Trash Truck OAuth + silent launch | **Ready in Trash_Truck#46** | Not merged at evaluation time |
+| Live SSO smoke | **Not verified** | Needs a live Town-account pool and both apps |
+
+**Rollback while auth is on:** Set `Auth:SignInFlow=UserPassword` and redeploy. Trash Truck can stay on OAuth independently.

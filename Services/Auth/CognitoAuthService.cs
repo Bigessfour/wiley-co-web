@@ -43,6 +43,12 @@ public sealed class CognitoAuthService
             throw new InvalidOperationException("Cognito staff auth is not enabled for this client build.");
         }
 
+        if (_options.UsesHostedUi)
+        {
+            throw new InvalidOperationException(
+                "Hosted UI sign-in is enabled. Use /authentication/login instead of USER_PASSWORD_AUTH.");
+        }
+
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
             throw new InvalidOperationException("Username and password are required.");

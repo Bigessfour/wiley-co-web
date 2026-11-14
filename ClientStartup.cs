@@ -232,36 +232,9 @@ namespace WileyCoWeb.Services
         {
             var cognitoAuthOptions = new CognitoAuthOptions();
             builder.Configuration.GetSection(CognitoAuthOptions.SectionName).Bind(cognitoAuthOptions);
-            builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(cognitoAuthOptions));
             var authEnabled = cognitoAuthOptions.Enabled;
 
-            builder.Services.AddAuthorizationCore(options =>
-            {
-                if (authEnabled)
-                {
-                    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-                        .RequireAuthenticatedUser()
-                        .Build();
-                }
-            });
-            builder.Services.AddScoped<CognitoTokenStore>();
-            builder.Services.AddHttpClient("CognitoIdp", client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(30);
-            });
-            builder.Services.AddScoped<CognitoAuthService>(sp =>
-            {
-                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("CognitoIdp");
-                return new CognitoAuthService(
-                    httpClient,
-                    sp.GetRequiredService<CognitoTokenStore>(),
-                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CognitoAuthOptions>>(),
-                    sp.GetRequiredService<ILogger<CognitoAuthService>>());
-            });
-            builder.Services.AddScoped<CognitoAuthenticationStateProvider>();
-            builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<CognitoAuthenticationStateProvider>());
-            builder.Services.AddCascadingAuthenticationState();
-            builder.Services.AddScoped<CognitoAuthorizationMessageHandler>();
+            ConfigureStaffAuthentication(builder);
 
             builder.Services.AddScoped(sp =>
             {
