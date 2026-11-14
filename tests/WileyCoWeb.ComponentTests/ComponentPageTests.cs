@@ -326,10 +326,9 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			Assert.Equal(2, cut.FindComponents<SfNumericTextBox<decimal>>().Count);
-			// 1 top-level rate-comparison chart + 1 chart per default quadrant (4 quadrants).
-			Assert.Equal(5, cut.FindComponents<SfChart>().Count);
+			Assert.Contains("break-even-import-note", cut.Markup);
+			Assert.Contains("Import the QuickBooks budget", cut.Markup);
 			Assert.Single(cut.FindComponents<SfGrid<ApartmentUnitTypeData>>());
-			Assert.Contains("break-even-quadrant-grid", cut.Markup);
 			Assert.Contains("apartment-config-panel", cut.Markup);
 		});
 	}

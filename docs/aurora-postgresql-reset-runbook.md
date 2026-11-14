@@ -1,6 +1,8 @@
 # Aurora PostgreSQL Reset Runbook
 
-This runbook is the approved path for wiping and reapplying the Wiley.co Aurora PostgreSQL schema from the EF Core migration set.
+**Historical (removed 2026-11).** Do not run this against a live host. Aurora is gone. Schema changes on the Synology database still use the EF migrations under `src/WileyWidget.Data/Migrations`, applied by `./Scripts/start-clerk-local.sh`.
+
+This runbook was the approved path for wiping and reapplying the Wiley.co Aurora PostgreSQL schema from the EF Core migration set.
 
 ## Canonical Schema Source
 

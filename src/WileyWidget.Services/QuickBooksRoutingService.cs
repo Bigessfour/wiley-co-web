@@ -9,6 +9,10 @@ namespace WileyWidget.Services;
 public sealed class QuickBooksRoutingService
 {
     private const string QuickBooksCanonicalEntity = "quickbooks-ledger";
+    private const string TrashAccountRuleName = "Trash account to Trash";
+    private const string TrashMemoRuleName = "Trash memo to Trash";
+    private const string TrashTargetEnterprise = "Trash";
+    private const string WaterUtilityScope = "Water Utility";
 
     private static readonly (string Pattern, string EnterpriseName)[] DefaultEnterpriseMappings =
     [
@@ -35,6 +39,7 @@ public sealed class QuickBooksRoutingService
     public async Task<QuickBooksRoutingConfigurationResponse> GetConfigurationAsync(CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureTrashRoutingRulesAsync(context, cancellationToken).ConfigureAwait(false);
         return await BuildConfigurationResponseAsync(context, "Loaded QuickBooks routing configuration.", cancellationToken).ConfigureAwait(false);
     }
 
@@ -110,6 +115,7 @@ public sealed class QuickBooksRoutingService
         ArgumentNullException.ThrowIfNull(rows);
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureTrashRoutingRulesAsync(context, cancellationToken).ConfigureAwait(false);
         var configuration = await LoadConfigurationAsync(context, cancellationToken).ConfigureAwait(false);
         return ApplyRouting(rows, fileName, selectedEnterprise, configuration);
     }
@@ -152,6 +158,7 @@ public sealed class QuickBooksRoutingService
         ArgumentNullException.ThrowIfNull(request);
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureTrashRoutingRulesAsync(context, cancellationToken).ConfigureAwait(false);
         var sourceFile = await context.SourceFiles
             .Include(item => item.LedgerEntries)
             .FirstOrDefaultAsync(item => item.Id == request.SourceFileId && item.CanonicalEntity == QuickBooksCanonicalEntity, cancellationToken)
@@ -224,6 +231,31 @@ public sealed class QuickBooksRoutingService
             ? parsedDate
             : null;
     }
+
+    private static async Task EnsureTrashRoutingRulesAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        if (await context.QuickBooksRoutingRules.AnyAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        context.QuickBooksRoutingRules.Add(CreateTrashRule(TrashAccountRuleName, "Trash", null, 10));
+        context.QuickBooksRoutingRules.Add(CreateTrashRule(TrashMemoRuleName, null, "Trash", 20));
+        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static QuickBooksRoutingRule CreateTrashRule(string name, string? accountPattern, string? memoPattern, int priority)
+        => new()
+        {
+            Name = name,
+            Description = "Utility check listings mark trash costs in the account or the memo. Those rows stay on the Trash enterprise.",
+            Priority = priority,
+            IsActive = true,
+            DefaultEnterprisePattern = WaterUtilityScope,
+            AccountPattern = accountPattern,
+            MemoPattern = memoPattern,
+            TargetEnterprise = TrashTargetEnterprise
+        };
 
     private static void ValidateConfiguration(QuickBooksRoutingConfigurationRequest request)
     {

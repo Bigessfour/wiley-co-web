@@ -1911,6 +1911,11 @@ html .e-pager .e-input-group.e-control-wrapper:not(.e-small) .e-input-group-icon
    follows the hero width instead of the window. */
 .wiley-hero .lg\:flex-row {
   flex-direction: column;
+  align-items: stretch;
+}
+
+.wiley-hero .lg\:flex-row > .grid {
+  width: 100%;
 }
 
 @container (min-width: 52rem) {
@@ -1918,6 +1923,10 @@ html .e-pager .e-input-group.e-control-wrapper:not(.e-small) .e-input-group-icon
     flex-direction: row;
     align-items: flex-end;
     justify-content: space-between;
+  }
+
+  .wiley-hero .lg\:flex-row > .grid {
+    width: auto;
   }
 
   .wiley-hero .lg\:flex-row > .grid {

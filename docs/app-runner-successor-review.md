@@ -1,11 +1,13 @@
 # App Runner Successor Review
 
-This document records the current hosting decision for Wiley Widget after AWS closed App Runner to new customers.
+**Historical (removed 2026-11).** App Runner is not the Widget host. Do not follow the "keep App Runner" decision in this file. The live path is `docs/production-completion-plan.md`.
+
+This document recorded the hosting decision for Wiley Widget after AWS closed App Runner to new customers.
 
 ## Decision Summary
 
-- Current platform: AWS App Runner remains the active production host for the thin API.
-- Near-term decision: keep App Runner in place for the current production hardening window.
+- Platform at the time of this note: AWS App Runner was the production host for the thin API. It has since been removed.
+- Near-term decision recorded here: keep App Runner in place for the production hardening window. That decision is closed.
 - Recommended successor: ECS Fargate.
 - Decision status: approved as the default migration direction unless a later requirement materially changes the API shape.
 

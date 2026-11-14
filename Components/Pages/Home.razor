@@ -16,6 +16,7 @@
 @inject SharedContractReferenceDataApiService ReferenceDataApi
 @inject ToastService ToastService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 <PageTitle>Town Hub — Town of Wiley</PageTitle>
 
 <section class="home-hub town-hub">
@@ -67,12 +68,27 @@
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 				</a>
 			}
+			else if (app.OpenInNewTab && IsAbsolute(app.Url))
+			{
+				<button type="button"
+				        class="home-hub-card"
+				        data-external-url="@app.Url"
+				        @onclick="() => OpenExternalAppAsync(app)">
+					<span class="home-hub-card-index">@app.Id</span>
+					<strong>@app.Title</strong>
+					<p>@app.Description</p>
+					@if (TownHubCardAccess.IsOfficeNetworkOnly(app.Url))
+					{
+						<p class="town-hub-access-note">@TownHubCardAccess.OfficeNetworkNote</p>
+					}
+					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
+					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
+				</button>
+			}
 			else
 			{
 				<a class="home-hub-card"
-				   href="@app.Url"
-				   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
-				   rel="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "noopener noreferrer" : null)">
+				   href="@app.Url">
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
@@ -444,6 +460,22 @@
 
 	private static bool IsTrashTruck(TownHubAppLink app) =>
 		string.Equals(app.Id, "04", StringComparison.Ordinal);
+
+	private async Task OpenExternalAppAsync(TownHubAppLink app)
+	{
+		if (string.IsNullOrWhiteSpace(app.Url) || !IsAbsolute(app.Url))
+		{
+			return;
+		}
+
+		var opened = await JS.InvokeAsync<bool>("wileyOpenExternal", app.Url);
+		if (!opened)
+		{
+			ToastService.ShowWarning(
+				app.Title,
+				$"Town Hub stayed on this page. Open {app.Url} from your browser if a new window was blocked.");
+		}
+	}
 
 	private string BuildTrashHubUrl(string? baseUrl)
 	{

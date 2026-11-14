@@ -53,7 +53,7 @@ Each app entry:
   "Id": "02",
   "Title": "Apartments",
   "Description": "ClerkSuite apartments operations.",
-  "Url": "http://localhost:8082",
+  "Url": "http://mr-storage:8082",
   "OpenInNewTab": true,
   "ReferenceEnterpriseId": "tow-apartments",
   "ReferencePublisherSystem": "wiley-apartments"
@@ -64,24 +64,25 @@ Optional status match fields: `ReferenceEnterpriseId`, `ReferencePublisherSystem
 
 ### Local defaults (dev)
 
-| App          | Default `Url`                    |
-| ------------ | -------------------------------- |
-| Wiley Widget | `/wiley-workspace` (same origin) |
-| Apartments   | `http://localhost:8082`          |
-| Rural Water  | `http://localhost:8083`          |
-| Trash Truck  | `http://localhost:8084`          |
-| TIKR         | `http://localhost:5080`          |
+Dev defaults match the NAS-first clerk path (Tailscale). Override with `appsettings.TownHub.local.json` only when you need pure-localhost sibling apps.
 
-Adjust ports to match your docker-compose / `launchSettings` if they differ. Widget shell itself is `http://localhost:5230`; API is `http://localhost:5231`.
+| App          | Default `Url`                                |
+| ------------ | -------------------------------------------- |
+| Wiley Widget | `/wiley-workspace` (same origin)             |
+| Apartments   | `http://mr-storage:8082`                     |
+| Rural Water  | empty (card disabled)                        |
+| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` |
+| TIKR         | `http://mr-storage:8080`                     |
 
-Local env override example:
+Widget shell itself is `http://localhost:5230`; API is `http://localhost:5231`. Use `./Scripts/start-clerk-local.sh` for the Mac path (API + client against NAS native Postgres on `mr-storage:5433`).
+
+Local env override example (NAS-first):
 
 ```bash
 TOWN_HUB_WIDGET_URL=/wiley-workspace \
-TOWN_HUB_APARTMENTS_URL=http://localhost:8082 \
-TOWN_HUB_RURAL_WATER_URL=http://localhost:8083 \
-TOWN_HUB_TRASH_TRUCK_URL=http://localhost:8084 \
-TOWN_HUB_TIKR_URL=http://localhost:5080 \
+TOWN_HUB_APARTMENTS_URL=http://mr-storage:8082 \
+TOWN_HUB_TRASH_TRUCK_URL=https://main.d2dke4s7zyafra.amplifyapp.com \
+TOWN_HUB_TIKR_URL=http://mr-storage:8080 \
   ./Scripts/generate-townhub-appsettings.sh
 ```
 
@@ -92,10 +93,10 @@ Clerk databases stay on the Synology (`mr-storage`) over Tailscale. Production c
 | Card         | URL                                          | What the clerk sees                       |
 | ------------ | -------------------------------------------- | ---------------------------------------- |
 | Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open         |
-| Apartments   | `http://mr-storage:8082`                     | Office network only. Sign in again there. |
-| TIKR         | `http://mr-storage:8080`                     | Office network only. Sign in again there. |
-| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Same Town Hub sign-in                     |
-| Rural Water  | empty                                        | Coming soon until it has an address      |
+| Apartments   | `http://mr-storage:8082`                     | NAS, Postgres `clerksuite` on `:5433`. Sign in again there. |
+| TIKR         | `http://mr-storage:8080`                     | NAS, SQLite. Sign in again there.                            |
+| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app. Same Town Hub sign-in.                 |
+| Rural Water  | empty (card disabled)                        | No site yet. The card stays closed.                          |
 
 `wwwroot/appsettings.Development.json` keeps `localhost` ports for Mac development. Tailscale names resolve only on the tailnet, which is the clerk path. Do not replace them with App Runner placeholders.
 
@@ -103,8 +104,10 @@ Amplify `TOWN_HUB_*_URL` overrides still work when a card must move. Leave them 
 
 ## Auth and who sees which card
 
-- **Local:** `Auth:Enabled` = `false` → no Cognito gate, and every card is shown so local testing does not depend on groups.
-- **Production:** `Auth:Enabled` = `true`. Cards follow `cognito:groups` (`AllowedGroups` on each app, or the built-in default).
+- **Local:** `Auth:Enabled` = `false` → no Cognito gate, and every card is shown so local testing does not depend on groups. The disabled-auth login page links to Town Hub (`/`).
+- **Production (NAS-first, 2026-11):** `Auth:Enabled` = `false` until a live Cognito pool exists on the Town account. The prior pool `us-east-2_DmY7BCBIp` was removed. Do not publish that pool id. When auth returns, set `Auth:Enabled=true` and regenerate via `Scripts/generate-auth-appsettings.sh`. Hosted UI is the sign-in flow (`Auth:SignInFlow=HostedUi`).
+
+When auth is on, cards follow `cognito:groups` (`AllowedGroups` on each app, or the built-in default):
 
 | Group | Cards |
 | ----- | ----- |

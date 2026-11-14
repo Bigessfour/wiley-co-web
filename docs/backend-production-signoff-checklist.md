@@ -1,6 +1,8 @@
 # Backend production sign-off checklist
 
-Use this checklist after deploying API changes to App Runner. Pair with [`docs/release-record-template.md`](release-record-template.md).
+**Historical (removed 2026-11).** Do not use this after an App Runner deploy. App Runner is gone. The live restart check is `./Scripts/status-clerk-local.sh`. See `docs/production-completion-plan.md`.
+
+This checklist was used after deploying API changes to App Runner. Pair the old record shape with [`docs/release-record-template.md`](release-record-template.md).
 
 ## Pre-deploy
 
