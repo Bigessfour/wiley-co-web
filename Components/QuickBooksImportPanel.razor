@@ -568,18 +568,35 @@
     {
         get
         {
-            var options = WorkspaceState.EnterpriseOptions
-                .Where(option => !string.IsNullOrWhiteSpace(option) && !string.Equals(option, "general_ledger", StringComparison.OrdinalIgnoreCase) && !string.Equals(option, "transaction_list", StringComparison.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(option => option, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            // The dropdown clears a bound value that is not in this list. Always include the
+            // four town enterprises so a saved target such as Apartments survives the render
+            // that happens before save. WorkspaceState starts with an empty option list.
+            var options = new List<string>();
+            AddRoutingEnterprise(options, WorkspaceEnterpriseCatalog.CanonicalEnterpriseOrder);
+            AddRoutingEnterprise(options, [GeneralFundScope]);
+            AddRoutingEnterprise(options, WorkspaceState.EnterpriseOptions);
+            return options;
+        }
+    }
 
-            if (!options.Contains(GeneralFundScope, StringComparer.OrdinalIgnoreCase))
+    private static void AddRoutingEnterprise(List<string> options, IEnumerable<string> values)
+    {
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value)
+                || string.Equals(value, "general_ledger", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "transaction_list", StringComparison.OrdinalIgnoreCase))
             {
-                options.Add(GeneralFundScope);
+                continue;
             }
 
-            return options;
+            var trimmed = value.Trim();
+            if (options.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            options.Add(trimmed);
         }
     }
 
