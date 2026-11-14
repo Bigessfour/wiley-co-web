@@ -38,6 +38,7 @@ public sealed class TelemetryStartupService : IHostedService
             var metrics = scope.ServiceProvider.GetService<WileyWidget.Services.ApplicationMetricsService>();
 
             // Apply EF Core migrations only when explicitly enabled. The production database is already provisioned.
+            var allowDegradedStartup = _configuration.GetValue<bool>("Database:AllowDegradedStartup");
             var migrationSw = Stopwatch.StartNew();
             var migrationSuccess = false;
             try
@@ -51,10 +52,17 @@ public sealed class TelemetryStartupService : IHostedService
                 else
                 {
                     Log.Information("Database migrations skipped because Database:ApplyMigrations is disabled");
+                    migrationSuccess = true;
                 }
             }
             catch (Exception migEx)
             {
+                if (!allowDegradedStartup)
+                {
+                    Log.Error(migEx, "Database migration failed and degraded startup is disabled");
+                    throw;
+                }
+
                 Log.Warning(migEx, "Database migration step encountered an issue - database may already be current");
             }
             finally
@@ -65,7 +73,18 @@ public sealed class TelemetryStartupService : IHostedService
             }
 
             // Confirm connectivity after migration
-            await context.Database.CanConnectAsync(cancellationToken).ConfigureAwait(false);
+            if (!await context.Database.CanConnectAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var message = "Database connectivity validation failed during telemetry startup.";
+                if (!allowDegradedStartup)
+                {
+                    throw new InvalidOperationException(message);
+                }
+
+                Log.Warning(message);
+                return;
+            }
+
             Log.Information("Database connectivity validated during telemetry startup");
         }
         catch (OperationCanceledException)
@@ -73,10 +92,10 @@ public sealed class TelemetryStartupService : IHostedService
             Log.Warning("Telemetry startup cancelled");
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (_configuration.GetValue<bool>("Database:AllowDegradedStartup"))
         {
             Log.Error(ex, "Error during telemetry startup");
-            // Don't throw to avoid crashing startup
+            // Don't throw when degraded startup is allowed.
         }
 
         Log.Information("Telemetry pipeline initialized successfully.");

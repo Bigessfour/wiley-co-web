@@ -2,18 +2,21 @@
 @page "/town-hub"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using System.Globalization
+@using System.Security.Claims
 @using System.Text.Json
 @using Microsoft.Extensions.Configuration
 @using Microsoft.JSInterop
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Options
+@using Microsoft.AspNetCore.Components.Authorization
 @using WileyCoWeb.Services
+@using WileyCoWeb.Services.Auth
 @inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject SharedContractReferenceDataApiService ReferenceDataApi
 @inject ToastService ToastService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-
 <PageTitle>Town Hub — Town of Wiley</PageTitle>
 
 <section class="home-hub town-hub">
@@ -21,7 +24,9 @@
 		<p class="home-hub-kicker">Town of Wiley</p>
 		<h1>Town Hub</h1>
 		<p class="home-hub-copy">
-			Single entry point for town apps. Cards open the existing UIs (local or App Runner).
+			Single entry point for town apps. Trash Truck uses this sign-in.
+			Apartments and TIKR on the office network use their own sign-in.
+			Rural Water stays closed until it has an address.
 			Summary tiles below read shared-contract reference data — full grid lives on the
 			<a href="/wiley-workspace/reference-data">Reference Data</a> workspace panel.
 		</p>
@@ -32,67 +37,71 @@
 	</div>
 
 	<div class="home-hub-grid town-hub-apps">
-		@foreach (var app in _apps)
+		@foreach (var app in VisibleApps())
 		{
 			var status = ResolveCardStatus(app);
 			var configured = !string.IsNullOrWhiteSpace(app.Url);
-			@if (configured && IsTrashTruck(app))
+			@if (!configured)
 			{
-				<button type="button" class="home-hub-card" @onclick="() => OpenTrashRoleDialog(app)">
+				<div class="home-hub-card is-disabled"
+				     role="group"
+				     aria-disabled="true"
+				     aria-label="@($"{app.Title} — coming soon")">
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
-					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
-					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
-				</button>
+					<span class="town-hub-card-status is-empty">@TownHubCardAccess.ComingSoonLabel</span>
+					<span class="town-hub-url">@TownHubCardAccess.ComingSoonLabel</span>
+				</div>
 			}
-			else if (configured)
+			else if (IsTrashTruck(app))
 			{
 				<a class="home-hub-card"
-				   href="@app.Url"
+				   href="@BuildTrashHubUrl(app.Url)"
 				   target="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "_blank" : null)"
 				   rel="@(app.OpenInNewTab && IsAbsolute(app.Url) ? "noopener noreferrer" : null)">
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
+					<p class="town-hub-access-note">@TownHubCardAccess.SharedSignInNote</p>
 					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 				</a>
 			}
-			else
+			else if (app.OpenInNewTab && IsAbsolute(app.Url))
 			{
-				<div class="home-hub-card is-disabled"
-				     role="group"
-				     aria-disabled="true"
-				     aria-label="@($"{app.Title} — not configured")">
+				<button type="button"
+				        class="home-hub-card"
+				        data-external-url="@app.Url"
+				        @onclick="() => OpenExternalAppAsync(app)">
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
-					<span class="town-hub-card-status is-empty">@status.Label</span>
+					@if (TownHubCardAccess.IsOfficeNetworkOnly(app.Url))
+					{
+						<p class="town-hub-access-note">@TownHubCardAccess.OfficeNetworkNote</p>
+					}
+					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
-				</div>
+				</button>
+			}
+			else
+			{
+				<a class="home-hub-card"
+				   href="@app.Url">
+					<span class="home-hub-card-index">@app.Id</span>
+					<strong>@app.Title</strong>
+					<p>@app.Description</p>
+					@if (TownHubCardAccess.IsOfficeNetworkOnly(app.Url))
+					{
+						<p class="town-hub-access-note">@TownHubCardAccess.OfficeNetworkNote</p>
+					}
+					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
+					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
+				</a>
 			}
 		}
 	</div>
-
-	<SfDialog @bind-Visible="_trashRoleDialogOpen"
-	          Width="28rem"
-	          IsModal="true"
-	          ShowCloseIcon="true"
-	          CssClass="town-hub-role-dialog">
-		<DialogTemplates>
-			<Header>Open Trash Truck</Header>
-			<Content>
-				<p class="town-hub-muted">
-					Town Hub is already signed in. Choose driver or clerk and the route app opens on that page.
-				</p>
-			</Content>
-		</DialogTemplates>
-		<DialogButtons>
-			<DialogButton Content="Clerk" IsPrimary="true" OnClick="OpenTrashAsClerkAsync" />
-			<DialogButton Content="Driver" OnClick="OpenTrashAsDriverAsync" />
-		</DialogButtons>
-	</SfDialog>
 
 	<section class="town-hub-summary" aria-labelledby="town-hub-summary-heading">
 		<div class="town-hub-summary-header">
@@ -187,8 +196,10 @@
 	private List<OperationalEventContract> _recentEvents = [];
 	private bool _loading;
 	private string? _error;
-	private bool _trashRoleDialogOpen;
-	private TownHubAppLink? _trashApp;
+	private ClaimsPrincipal? _user;
+	private bool _authEnabled;
+	private bool _groupsLoaded;
+	private IReadOnlyList<string> _groups = [];
 
 	protected override void OnInitialized()
 	{
@@ -198,11 +209,26 @@
 		ApplyUrlOverrides(_apps, options);
 		// Fill status match keys when omitted from a partial override file.
 		ApplyReferenceDefaults(_apps);
+		_authEnabled = Configuration.GetValue("Auth:Enabled", false);
 	}
 
 	protected override async Task OnInitializedAsync()
 	{
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		_user = authState.User;
+		_groups = CognitoGroupsHelper.GetGroups(_user);
+		_groupsLoaded = true;
 		await LoadSummaryAsync();
+	}
+
+	private IEnumerable<TownHubAppLink> VisibleApps()
+	{
+		if (_authEnabled && !_groupsLoaded)
+		{
+			return [];
+		}
+
+		return _apps.Where(app => TownHubCardAccess.IsVisible(app.Id, app.AllowedGroups, _groups, _authEnabled));
 	}
 
 	private async Task LoadSummaryAsync()
@@ -435,40 +461,31 @@
 	private static bool IsTrashTruck(TownHubAppLink app) =>
 		string.Equals(app.Id, "04", StringComparison.Ordinal);
 
-	private void OpenTrashRoleDialog(TownHubAppLink app)
+	private async Task OpenExternalAppAsync(TownHubAppLink app)
 	{
-		_trashApp = app;
-		_trashRoleDialogOpen = true;
-	}
-
-	private Task OpenTrashAsClerkAsync() => OpenTrashRoleAsync("clerk");
-
-	private Task OpenTrashAsDriverAsync() => OpenTrashRoleAsync("driver");
-
-	private async Task OpenTrashRoleAsync(string role)
-	{
-		_trashRoleDialogOpen = false;
-		var app = _trashApp;
-		if (app is null || string.IsNullOrWhiteSpace(app.Url))
+		if (string.IsNullOrWhiteSpace(app.Url) || !IsAbsolute(app.Url))
 		{
 			return;
 		}
 
-		var target = BuildTrashRoleUrl(app.Url, role);
-		if (app.OpenInNewTab && IsAbsolute(target))
+		var opened = await JS.InvokeAsync<bool>("wileyOpenExternal", app.Url);
+		if (!opened)
 		{
-			await JS.InvokeVoidAsync("open", target, "_blank", "noopener");
-			return;
+			ToastService.ShowWarning(
+				app.Title,
+				$"Town Hub stayed on this page. Open {app.Url} from your browser if a new window was blocked.");
 		}
-
-		Navigation.NavigateTo(target);
 	}
 
-	private static string BuildTrashRoleUrl(string baseUrl, string role)
+	private string BuildTrashHubUrl(string? baseUrl)
 	{
-		var path = role == "driver" ? "/driver" : "/clerk";
-		var trimmed = baseUrl.Trim().TrimEnd('/');
-		return $"{trimmed}{path}?from=town-hub&role={role}";
+		if (string.IsNullOrWhiteSpace(baseUrl))
+		{
+			return "#";
+		}
+
+		var groups = CognitoGroupsHelper.GetGroups(_user);
+		return CognitoGroupsHelper.BuildTrashTruckHubUrl(baseUrl, groups);
 	}
 
 	private static bool IsAbsolute(string url) =>

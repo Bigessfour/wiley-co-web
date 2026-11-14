@@ -444,7 +444,7 @@ internal sealed class WorkspaceSnapshotComposer
 
     private static BreakEvenQuadrantData BuildBreakEvenQuadrant(Enterprise enterprise, IReadOnlyList<ProjectionRow> projectionRows)
     {
-        var effectiveCustomers = Math.Max(1m, enterprise.EffectiveCustomerCount);
+        var effectiveCustomers = enterprise.EffectiveCustomerCount;
         var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(enterprise.MonthlyExpenses, effectiveCustomers, roundToCurrency: false);
         var monthlyRevenue = Math.Round(enterprise.MonthlyRevenue, 2, MidpointRounding.AwayFromZero);
         var monthlyBalance = Math.Round(enterprise.MonthlyBalance, 2, MidpointRounding.AwayFromZero);

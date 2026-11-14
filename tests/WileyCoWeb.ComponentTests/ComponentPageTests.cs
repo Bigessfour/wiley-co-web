@@ -326,10 +326,9 @@ public sealed class ComponentPageTests
 		cut.WaitForAssertion(() =>
 		{
 			Assert.Equal(2, cut.FindComponents<SfNumericTextBox<decimal>>().Count);
-			// 1 top-level rate-comparison chart + 1 chart per default quadrant (4 quadrants).
-			Assert.Equal(5, cut.FindComponents<SfChart>().Count);
+			Assert.Contains("break-even-import-note", cut.Markup);
+			Assert.Contains("Import the QuickBooks budget", cut.Markup);
 			Assert.Single(cut.FindComponents<SfGrid<ApartmentUnitTypeData>>());
-			Assert.Contains("break-even-quadrant-grid", cut.Markup);
 			Assert.Contains("apartment-config-panel", cut.Markup);
 		});
 	}
@@ -1226,12 +1225,15 @@ public sealed class ComponentPageTests
 		context.Services.AddSingleton<ToastService>();
 		context.Services.AddSingleton<IJSRuntime>(jsRuntime);
 		context.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new WileyCoWeb.Services.Auth.CognitoAuthOptions()));
+		context.Services.Configure<WileyCoWeb.Services.Auth.CognitoAuthOptions>(_ => { });
 		context.Services.AddScoped<WileyCoWeb.Services.Auth.CognitoTokenStore>();
 		context.Services.AddScoped(sp => new WileyCoWeb.Services.Auth.CognitoAuthService(
 			new HttpClient { BaseAddress = new Uri("https://cognito.test/") },
 			sp.GetRequiredService<WileyCoWeb.Services.Auth.CognitoTokenStore>(),
 			sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WileyCoWeb.Services.Auth.CognitoAuthOptions>>(),
 			sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<WileyCoWeb.Services.Auth.CognitoAuthService>>()));
+		context.Services.AddScoped<WileyCoWeb.Services.Auth.StaffAuthCoordinator>();
+		context.Services.AddScoped<WileyCoWeb.Services.Auth.IStaffAccessTokenProvider, WileyCoWeb.Services.Auth.StaffAccessTokenProvider>();
 		var authContext = context.AddTestAuthorization();
 		authContext.SetAuthorized("local-dev");
 		context.Services.AddScoped(_ => new WorkspacePersistenceService(jsRuntime, workspaceState));

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Mirror Wiley.co CI (.github/workflows/ci.yml) as far as macOS/local allows.
-# Skips: TruffleHog (optional), Windows runners, Amplify deployment-guard (OIDC/main only).
+# Skips: TruffleHog (optional) and Windows runners.
+# There is no Amplify deployment guard. Widget is not hosted on Amplify.
 #
 # Usage:
 #   ./Scripts/run-ci-local.sh              # pre-push gate (HighRisk + publish + Playwright CI specs)
@@ -150,5 +151,5 @@ HEAD_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 } >"$STAMP_FILE"
 
 step "done"
-echo "Local CI mirror passed (deployment-guard skipped — main/OIDC only)."
+echo "Local CI mirror passed."
 echo "Wrote $STAMP_FILE for HEAD $HEAD_SHA — git push is unlocked for this commit."

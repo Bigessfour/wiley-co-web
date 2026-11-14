@@ -34,6 +34,14 @@ test("document center exposes archived snapshot exports and live status", async 
   await expect(page.locator("#export-archived-scenario-pdf-button")).toBeVisible();
 });
 
+test("sign-in failure tells the clerk who to call", async ({ page }) => {
+  await page.goto("/authentication/login-failed");
+  await expect(page.locator("#staff-sign-in-failure")).toBeVisible();
+  await expect(page.locator("#staff-sign-in-failure")).toContainText("Sign-in did not finish");
+  await expect(page.locator("#staff-sign-in-failure")).toContainText("(719) 829-4974");
+  await expect(page.locator('a[href="mailto:clerk@townofwiley.gov"]')).toBeVisible();
+});
+
 test("town hub lists app cards and workspace entry points", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".home-hub.town-hub")).toBeVisible({ timeout: 60_000 });
@@ -53,16 +61,25 @@ test("town hub lists app cards and workspace entry points", async ({ page }) => 
   // Never ship clickable REPLACE-* placeholders (Production sibling Urls stay empty until TOWN_HUB_* overrides).
   await expect(page.locator('a.home-hub-card[href*="REPLACE-"]')).toHaveCount(0);
   await expect(page.locator(".home-hub-card a[href*='REPLACE-']")).toHaveCount(0);
+  await expect(page.getByText("already signed in")).toHaveCount(0);
+  await expect(page.locator(".home-hub-copy")).toContainText("office network");
+  await expect(page.locator(".home-hub-copy")).toContainText("own sign-in");
+  await expect(page.locator(".town-hub-access-note", { hasText: "same Town Hub sign-in" })).toBeVisible();
 
-  // Wiley Widget is the configured same-origin card; unconfigured siblings render as disabled groups.
+  // Wiley Widget is the configured same-origin card; a card with no URL is coming soon.
   await expect(page.locator('a.home-hub-card[href="/wiley-workspace"]')).toBeVisible();
+  // Apartments opens ClerkSuite in a new window. A same-page link reloads the IDE browser onto /Account/Login.
+  const apartments = page.locator('button.home-hub-card[data-external-url="http://mr-storage:8082"]');
+  await expect(apartments).toBeVisible();
+  await expect(apartments).toContainText("Apartments");
+  await expect(page.locator('a.home-hub-card[href*="8082"]')).toHaveCount(0);
   const disabledSiblings = page.locator(".home-hub-card.is-disabled");
-  // Local Development.json configures all five; Production empties 02–05. Accept either shape.
+  // Local Development.json configures all five; Production leaves Rural Water empty.
   const disabledCount = await disabledSiblings.count();
   expect(disabledCount === 0 || disabledCount >= 1).toBeTruthy();
   if (disabledCount > 0) {
     await expect(disabledSiblings.first()).toHaveAttribute("aria-disabled", "true");
-    await expect(disabledSiblings.first().locator(".town-hub-url")).toContainText("not configured");
+    await expect(disabledSiblings.first().locator(".town-hub-url")).toContainText("Coming soon");
   }
 
   await expect(page.locator('a.home-hub-primary[href="/wiley-workspace"]')).toBeVisible();
@@ -79,4 +96,31 @@ test("town hub lists app cards and workspace entry points", async ({ page }) => 
   await expect(
     page.locator('a.app-nav-link[href="/wiley-workspace/quickbooks-import"]'),
   ).toBeVisible();
+});
+
+test("apartments card keeps town hub and opens ClerkSuite separately", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".home-hub.town-hub")).toBeVisible({ timeout: 60_000 });
+
+  await page.evaluate(() => {
+    const opened: string[] = [];
+    (globalThis as unknown as { __wileyOpened: string[] }).__wileyOpened = opened;
+    globalThis.open = ((url?: string | URL) => {
+      opened.push(String(url ?? ""));
+      return {} as Window;
+    }) as typeof globalThis.open;
+  });
+
+  await page.locator('button.home-hub-card[data-external-url="http://mr-storage:8082"]').click();
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".home-hub.town-hub")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff sign-in" })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (globalThis as unknown as { __wileyOpened?: string[] }).__wileyOpened ?? [],
+      ),
+    )
+    .toContain("http://mr-storage:8082");
 });

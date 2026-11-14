@@ -1,6 +1,25 @@
 # wiley-co-web
 
-Wiley Widget for AWS
+Wiley Widget for the Town of Wiley.
+
+## Current path
+
+Locked 2026-11-14. The definition of production ready is [docs/production-completion-plan.md](docs/production-completion-plan.md). Day-to-day steps are [docs/clerk-mac-runbook.md](docs/clerk-mac-runbook.md).
+
+Clerks run this app on the office Mac against Synology Postgres. Widget has no Amplify app, App Runner service, or Aurora cluster.
+
+```bash
+./Scripts/start-clerk-local.sh          # NAS Postgres (mr-storage:5433) + API :5231 + client :5230
+./Scripts/status-clerk-local.sh
+./Scripts/stop-clerk-local.sh           # stops API/client; leaves NAS Postgres running
+```
+
+- Client `http://127.0.0.1:5230`, API `http://127.0.0.1:5231`
+- Database `wileyco_dev` on Community PostgreSQL 17 at `mr-storage:5433`
+- Staff login is off until a new Cognito pool exists on the Town account. Do not configure the removed pool `us-east-2_DmY7BCBIp`.
+- Do not recreate App Runner, Aurora, or ECS for Widget.
+
+Sections below that name those hosts are historical records.
 
 ## Town Hub (clerk starting point)
 
@@ -10,9 +29,11 @@ Card URLs come from `TownHub:Apps` in `wwwroot/appsettings.Development.json` (lo
 
 See [docs/town-hub.md](docs/town-hub.md) for full configuration examples.
 
-## Amplify Hosting
+## Historical: Amplify Hosting (removed 2026-11)
 
-This app is hosted on AWS Amplify in `us-east-2`.
+The Amplify app below was deleted. Do not deploy to it. The live path is the clerk Mac section at the top of this file.
+
+This app was hosted on AWS Amplify in `us-east-2`.
 
 - App name: `wiley-co-web`
 - App id: `d2ellat1y3ljd9`
@@ -100,15 +121,32 @@ Jarvis now follows a split transport model that matches the current xAI and Micr
 
 **Operator IAM (`copilot` user):** To grant least-privilege CLI access for inspecting the Jarvis API Gateway proxy (`w544vrvb3i`), `apigateway test-invoke`, signed `execute-api` calls, and read-only access to the App Runner xAI runtime secret, an admin can apply the JSON in [`iam/policies/wiley-copilot-jarvis-tools.json`](iam/policies/wiley-copilot-jarvis-tools.json) via [`iam/scripts/attach-wiley-copilot-jarvis-tools.sh`](iam/scripts/attach-wiley-copilot-jarvis-tools.sh). Signed invokes still require appending the statements in [`iam/policies/wiley-jarvis-api-resource-policy-copilot-statements.json`](iam/policies/wiley-jarvis-api-resource-policy-copilot-statements.json) to the API’s existing resource policy.
 
-## Aurora Database
+## Database
 
-The private Aurora PostgreSQL database is now provisioned in the dedicated `wiley-co-aurora-vpc` network and uses the canonical EF Core PostgreSQL migration under [src/WileyWidget.Data/Migrations](src/WileyWidget.Data/Migrations).
+Schema source of truth is the EF Core PostgreSQL migration set under [src/WileyWidget.Data/Migrations](src/WileyWidget.Data/Migrations). The live database is Synology Postgres, described in the clerk Mac section below.
+
+### Historical: Aurora (removed 2026-11)
+
+The private Aurora PostgreSQL database was provisioned in the dedicated `wiley-co-aurora-vpc` network. That cluster is gone. Do not recreate it. Layout and reset notes are historical: [docs/aws-aurora-private-layout.md](docs/aws-aurora-private-layout.md), [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md).
 
 - Layout note: [docs/aws-aurora-private-layout.md](docs/aws-aurora-private-layout.md)
 - Reset/apply runbook: [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md)
 - Cluster: `wiley-co-aurora-db`
 - Writer instance: `wiley-co-aurora-db-1`
 - Database name: `wileyco`
+
+### Clerk Mac local stack (NAS-first)
+
+While Widget has no hosted compute, clerks run the rate-study console on this Mac with Tailscale to NAS siblings:
+
+```bash
+./Scripts/start-clerk-local.sh          # NAS Postgres (mr-storage:5433) + API :5231 + client :5230
+./Scripts/status-clerk-local.sh
+./Scripts/reload-clerk-imports.sh       # optional FY2026 QB/reference reload
+./Scripts/stop-clerk-local.sh           # stops API/client; leaves NAS Postgres running
+```
+
+Postgres is native Synology Community PostgreSQL 17 on `mr-storage` (`wileyco_dev` / `wiley_app`), not Docker. Connection string lives in `WileyCoWeb.Api/appsettings.Development.local.json` (that file overrides API user-secrets in Development). Development sets `Database:AllowDegradedStartup=false` and `ApplyMigrations=true`. Do not run the clerk path against empty or non-NAS `appsettings.Development.local.json`. The FY2026 import pack under `Import Data/tow-october-2026/` is gitignored.
 
 ### Local API Database Secrets
 
@@ -171,7 +209,7 @@ Current data-path note:
 Reference-data note:
 
 - `Import Data/` is the repo-local bootstrap sample set used for developer and admin seeding. It contains QuickBooks-style `.csv` and `.xlsx` source files, not XAML assets.
-- Production App Runner does not bundle that folder by default. `WileyCoWeb.Api/appsettings.json` requires an explicit reference-data path in production.
+- The API does not bundle that folder. `WileyCoWeb.Api/appsettings.json` requires an explicit reference-data path when `RequireExplicitImportDataPath` is true.
 - Monthly analysis imports should use the QuickBooks Import panel and API commit flow, not the repo-local `Import Data/` folder.
 
 ## Workspace Knowledge Layer
@@ -185,9 +223,11 @@ The server-side knowledge layer is the shared calculation surface for Decision S
 
 Maintainer rule: do not reintroduce client-only financial heuristics or canned AI rationale where live knowledge is expected. New recommendation, scenario, and council-facing explanation work should extend the knowledge service and its thin API contract rather than bypassing it.
 
-## AWS Backend Validation
+## Historical: AWS backend validation (April 15, 2026)
 
-AWS CLI validation on April 15, 2026 confirms the current production support picture:
+This list is a point-in-time record. Those hosts were removed in November 2026. It is not the current production picture.
+
+AWS CLI validation on April 15, 2026 recorded this support picture:
 
 - Amplify app `d2ellat1y3ljd9` remains the static `WEB` deployment for the Blazor WebAssembly client.
 - Aurora PostgreSQL cluster `wiley-co-aurora-db` remains the system of record in private VPC `vpc-0b4e1d7362da22c17`.
@@ -204,7 +244,7 @@ AWS CLI validation on April 15, 2026 confirms the current production support pic
   - Interface VPC endpoints for `execute-api` and `xray`
 - Amplify app-level and `main` branch environment variables now include `WILEY_WORKSPACE_API_BASE_ADDRESS=https://mr7zeizxxd.us-east-2.awsapprunner.com`, and the Amplify app build spec was resynced from [amplify.yml](amplify.yml).
 
-Production implication: the missing compute host is now provisioned, but final cutover is not complete until the App Runner service finishes healthy startup validation and Amplify performs a release using the staged API base address. Until that release happens, the public client can still reflect the previous routing behavior.
+That cutover was later abandoned. The hosts in this list were removed in November 2026. Do not finish this cutover.
 
 Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with public ingress and VPC egress to Aurora. For the May 11 City Council working session, `1 vCPU / 2 GB`, minimum one warm instance, remains the safer baseline if load or export activity increases.
 
@@ -234,15 +274,16 @@ If a future alias is created in CMS and does not route, check AppSync mutation w
 
 ## Browser E2E Tests
 
-The Playwright-based browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) run directly against the hosted site.
+The Playwright-based browser suites in [tests/WileyCoWeb.E2ETests](tests/WileyCoWeb.E2ETests) run against the app under test.
 
-- `WILEYCO_E2E_BASE_URL` points the tests at the deployed app.
+- The default target is the local clerk client. Set `WILEYCO_E2E_BASE_URL` only when you have a real host.
+- The old Amplify and `wileywidget.townofwiley.gov` hosts were removed in November 2026. Do not point tests at them.
 - The suites use ordinary Playwright assertions and do not require a visual-regression service.
 
-Example PowerShell invocation:
+Example, after `./Scripts/start-clerk-local.sh`:
 
-```powershell
-$env:WILEYCO_E2E_BASE_URL = 'https://main.d2ellat1y3ljd9.amplifyapp.com'
+```bash
+export WILEYCO_E2E_BASE_URL=http://127.0.0.1:5230
 dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "FullyQualifiedName~Visual_WorkspaceOverview_MatchesBaseline"
 ```
 
@@ -256,7 +297,7 @@ dotnet test tests/WileyCoWeb.E2ETests/WileyCoWeb.E2ETests.csproj --filter "Fully
 This workspace now carries a separate Node-based Playwright setup for the VS Code Playwright extension and agent workflows.
 
 - `playwright.config.ts` defines Chromium and WebKit projects, HTML plus JSON reporters, retry-time tracing, and a managed local `dotnet run` web server whenever the effective base URL is the local default `http://localhost:5230`.
-- `npm run playwright:test:hosted` runs the Node Playwright suite against the three verified live hosts: `https://main.d2ellat1y3ljd9.amplifyapp.com`, `https://wileywidget.townofwiley.gov`, and `https://www.wileywidget.townofwiley.gov`.
+- `npm run playwright:test:hosted` is for a live host you pass in. The November 2026 Amplify and `wileywidget.townofwiley.gov` targets are gone. Use `http://127.0.0.1:5230` on the clerk Mac.
 - `npm run playwright:test:ci` runs the full local Node Playwright suite with `--project=chromium --project=webkit` so CI covers both engines.
 - `npm run playwright:test:docker-proof` builds the Ubuntu 24.04 Playwright container and runs the same CI path inside Docker Desktop before you push.
 - `.vscode/tasks.json` exposes the same workflow as the `playwright: test hosted` task and writes per-host JSON artifacts under `TestResults/playwright-hosted`.
@@ -274,11 +315,13 @@ The managed local `dotnet run` path in `playwright.config.ts` remains available 
 
 If you want the Node Playwright setup to target a non-local site instead, set `WILEYCO_E2E_BASE_URL` to that host before running Playwright. The config skips the managed `dotnet run` server whenever the effective base URL is not the local default.
 
-Do not use the bare Amplify default app domain `https://d2ellat1y3ljd9.amplifyapp.com` as a hosted regression target. The current Amplify app serves the production branch from `https://main.d2ellat1y3ljd9.amplifyapp.com`, while the bare default domain returns `404` even at `/`. If you want the bare default domain to land on production, that redirect needs to be configured in Amplify hosting or by making the custom domain canonical there; it is not controlled by the repo build spec.
+The Amplify app `d2ellat1y3ljd9` and `wileywidget.townofwiley.gov` were removed in November 2026. Do not use either as a regression target.
 
-## Observability (AWS X-Ray + CloudWatch Logs)
+## Historical: Observability (AWS X-Ray + CloudWatch Logs)
 
-The thin API host uses AWS-native observability tools.
+These notes describe the removed App Runner host. They are not the monitoring path for the clerk Mac.
+
+The thin API host used AWS-native observability tools.
 
 **Distributed Tracing — AWS X-Ray**
 All incoming requests are traced via `AWSXRayRecorder.Handlers.AspNetCore`. Credentials are resolved automatically from the IAM execution role (Amplify/ECS task role) — no connection string required. Traces are visible in the [AWS X-Ray console](https://console.aws.amazon.com/xray/home).
@@ -317,7 +360,7 @@ Restart VS Code after changing `launchctl` values so GUI-launched tools pick the
 
 The workspace MCP config points `Syncfusion_API_Key_Path` at `/Users/stephenmckitrick/.config/syncfusion/documentsdk.key`, so keep the API key in that file as a single line of text.
 
-## Amplify CLI Reference
+## Historical: Amplify CLI reference
 
 ### Local Amplify CLI
 

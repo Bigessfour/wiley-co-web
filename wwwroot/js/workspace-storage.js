@@ -85,6 +85,14 @@ globalThis.wileyDownloads = {
   },
 };
 
+// Opens a suite app without assigning location on this document.
+// Cursor's simple browser follows <a target="_blank"> in the same pane, which
+// reloads Town Hub into ClerkSuite's sign-in page.
+globalThis.wileyOpenExternal = function (url) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  return !!opened;
+};
+
 globalThis.wileyFocus = {
   _previous: null,
   remember: function () {

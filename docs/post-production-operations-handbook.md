@@ -1,78 +1,89 @@
 # Post-Production Operations Handbook
 
-This handbook is the primary day-two operations document for Wiley Widget after production deployment.
+This handbook is the day-two operations document for Wiley Widget.
+
+The live path is the office Mac plus Synology Postgres, defined in `docs/production-completion-plan.md` (2026-11-14). Amplify app `d2ellat1y3ljd9`, App Runner, Aurora, and Cognito pool `us-east-2_DmY7BCBIp` were removed. Sections and linked runbooks that still give commands for those hosts are historical.
 
 Use this document for:
 
-- normal production releases
-- post-release validation
-- monitoring and alert triage
-- Jarvis and data-import operational checks
-- release evidence and rollback planning
+- starting and checking the clerk Mac path
+- QuickBooks import checks
+- what to record when the running commit changes
 
-Use the linked specialist runbooks for narrow tasks:
+Use these for the live path:
 
-- database recovery: `docs/aurora-postgresql-reset-runbook.md`
+- definition of ready: `docs/production-completion-plan.md`
+- clerk and operator steps: `docs/clerk-mac-runbook.md`
+- where the suite runs: `docs/aws-low-cost-architecture.md` (the NAS-first cutover sketch)
+- Town Hub card URLs: `docs/town-hub.md`
 - recurring clerk imports: `docs/quickbooks-desktop-import-guide.md`
-- current AWS deployment state and infrastructure decisions: `docs/aws-server-side-closure-plan.md`
-- release evidence: `docs/release-record-template.md`
-- secret and runtime configuration changes: `docs/secrets-and-config-rotation-runbook.md`
-- incident severity and escalation guidance: `docs/incident-response-matrix.md`
-- hosting successor decision: `docs/app-runner-successor-review.md`
-- ownership and review cadence: `docs/operations-governance-and-review-cadence.md`
 
-## 1. Production Scope
+These are historical records of the removed host. Do not follow them to deploy:
 
-The live production path currently depends on these services:
+- `docs/aurora-postgresql-reset-runbook.md`
+- `docs/aws-server-side-closure-plan.md`
+- `docs/aws-aurora-private-layout.md`
+- `docs/app-runner-successor-review.md`
+- `docs/secrets-and-config-rotation-runbook.md` (App Runner secret rotation)
+- `docs/backend-production-signoff-checklist.md`
 
-- Amplify hosts the static Blazor WebAssembly client.
-- App Runner hosts the thin ASP.NET Core API.
-- Aurora PostgreSQL is the system of record.
-- Secrets Manager holds runtime secrets for database access, Syncfusion, and fallback xAI; primary xAI key now in SSM Parameter Store (path `/wiley-widget/xai-api-key` or configured via `XAI:ParameterName`; App Runner instance role `WileyWidgetAppRunnerInstanceRole` requires `ssm:GetParameter` + `ssm:GetParameters` on the param ARN — or bind SSM param directly to runtime env `XAI_API_KEY`).
-- API Gateway `w544vrvb3i` is the xAI proxy path used by Jarvis.
-- CloudWatch Logs and CloudWatch Alarms are the current operational monitoring surfaces.
+`docs/incident-response-matrix.md` still uses App Runner examples. Until it is rewritten, treat severity names as the process and ignore the host names.
 
-Current platform note:
+## 1. Production scope
 
-- App Runner remains the active production host.
-- AWS states App Runner is closed to new customers after April 30, 2026, while existing customers can continue operating normally.
-- Treat App Runner as the current production platform, but keep the successor review active as a standing infrastructure follow-up.
+The live path is:
 
-## 2. Operating Principles
+- Blazor client on the office Mac at `http://127.0.0.1:5230`, started by `./Scripts/start-clerk-local.sh`
+- API on the same Mac at `http://127.0.0.1:5231`
+- Synology Community PostgreSQL 17 at `mr-storage:5433`, database `wileyco_dev`
+- Town Hub links: Apartments `http://mr-storage:8082`, TIKR `http://mr-storage:8080`, Trash Truck on its existing Amplify app, Rural Water disabled
+- Staff login off until a new Cognito pool exists on the Town account
 
-- Do not treat repository history as the operating handbook. Use this document first.
-- Do not treat the App Runner image as storage for recurring import files.
-- Do not rotate secrets or change runtime endpoints without a corresponding App Runner deployment or service update.
-- Do not accept deterministic or legacy Jarvis fallback as normal production success for council-facing use.
-- Do not make production changes without capturing release evidence and a rollback target.
+Do not recreate App Runner, Aurora, or ECS for Widget.
 
-## 3. Daily, Weekly, And Monthly Cadence
+## 2. Operating principles
+
+- Follow this handbook and `docs/production-completion-plan.md`. Do not treat the historical AWS pages as the current deploy path.
+- Do not put recurring import files in a container image. Clerks import through the QuickBooks panel.
+- Do not point Production auth settings at Cognito pool `us-east-2_DmY7BCBIp`.
+- Do not accept a Jarvis fallback as a normal council answer.
+- Record the git commit when the Mac processes are restarted onto a new build.
+
+## 3. Daily, weekly, and monthly cadence
 
 ### Daily
 
-- Confirm `/health` returns healthy from the public App Runner hostname.
-- Review active CloudWatch alarms for App Runner, Aurora, and Jarvis/xAI diagnostics.
-- Review recent application logs for `Workspace AI request completed` events with unusual failure codes or elevated elapsed time.
+- Run `./Scripts/status-clerk-local.sh`.
+- Confirm `http://127.0.0.1:5231/health` returns healthy and the Water Utility snapshot probe returns 200.
+- If either check fails, restart with `./Scripts/start-clerk-local.sh`. That script leaves NAS Postgres running.
 
 ### Weekly
 
-- Review App Runner request latency and 5xx trends.
-- Review Aurora CPU and connection trends.
-- Review Jarvis completion outcomes by `AnswerSource`, `UsedFallback`, and `FailureCode`.
-- Confirm the current release record is complete for the latest production deployment.
+- Confirm Tailscale still reaches `mr-storage:5433`.
+- Read `/tmp/wiley-clerk-local/api.log` (or the directory in `WILEY_CLERK_STATE_DIR`) for repeated Jarvis or database errors.
 
 ### Monthly
 
-- Execute the normal QuickBooks import flow through the upload panel.
-- Retain import evidence: operator, enterprise, fiscal year, filenames, counts, and follow-up validation results.
-- Reconfirm that workspace snapshot, workspace knowledge, `/api/ai/health`, and one non-onboarding Jarvis turn still reflect current live data.
-- Review runtime sizing and alarm thresholds against the last month of traffic and import activity.
+- Run the QuickBooks import through the upload panel.
+- Keep the operator, enterprise, fiscal year, filenames, and row counts.
+- Open one workspace snapshot and confirm the figures match the import.
 
-## 4. Normal Release Workflow
+## 4. How a new build reaches the clerk Mac
 
 ### Current release path
 
-The current API release path is image-based:
+There is no hosted deploy.
+
+1. Merge to `main` only through a pull request whose CI is green.
+2. On the office Mac, pull that commit.
+3. Run `./Scripts/stop-clerk-local.sh`, then `./Scripts/start-clerk-local.sh`.
+4. Record the date, the operator, the commit SHA, `/health`, and the snapshot probe.
+
+Rollback is the previous git commit, restarted with the same two scripts. Database schema changes still need a backup before migrate. The 2026-11-14 dump and the unfinished restore are in `docs/clerk-mac-runbook.md`.
+
+### Historical: App Runner image release (removed 2026-11)
+
+The old API release path was image-based:
 
 - build the API image from `WileyCoWeb.Api/Dockerfile`
 - push the image to `570912405222.dkr.ecr.us-east-2.amazonaws.com/wiley-widget-api`
@@ -84,7 +95,9 @@ AWS App Runner deployment note:
 - With automatic deployment enabled, a new image push is enough to start rollout.
 - Manual deployment should only be used when the repository has a deployable version that should not wait on the normal trigger.
 
-### Release evidence to capture
+The subsections from here through the old rollback steps record the removed App Runner release. Do not run them.
+
+### Historical: release evidence to capture
 
 For every production API deployment, record:
 
@@ -104,7 +117,7 @@ For every production API deployment, record:
 
 - Set `WILEY_WORKSPACE_API_BASE_ADDRESS` in Amplify (points client to App Runner public URL or custom domain).
 - Deploy Amplify with the env var present (amplify.yml + build already supports it for `appsettings.Workspace.local.json`).
-- Town Hub suite cards: Production URLs point Apartments and TIKR at the Synology over Tailscale (`http://mr-storage:8082` and `http://mr-storage:8080`) and Trash Truck at its existing Amplify app. Rural Water stays empty until a public URL is known. Amplify `TOWN_HUB_*_URL` overrides still replace those values when set. Detail: `docs/town-hub.md`.
+- Town Hub suite cards: Production URLs point Apartments and TIKR at the Synology over Tailscale (`http://mr-storage:8082` and `http://mr-storage:8080`). Those cards say office network only and do not claim this sign-in carries over. Trash Truck uses the shared Cognito sign-in. Rural Water with an empty URL shows Coming soon. `Clerk` and `admin` see the clerk cards; `Driver` sees Trash Truck only. Amplify `TOWN_HUB_*_URL` overrides still replace those values when set. Detail: `docs/town-hub.md`.
 - App Runner service: update runtime env/secrets via console or IaC (database-url, xai-api-key, syncfusion-license-key); trigger deploy from ECR image.
 - Post-cutover validation (council smoke, run from ops workstation or CI):
   ```powershell
@@ -135,9 +148,13 @@ Best-practice release policy:
 - record the immutable image digest in the release record
 - use the immutable tag or digest as the rollback target
 
-## 5. Post-Deploy Validation
+## 5. Post-restart validation
 
-After every production deployment, validate in this order:
+After `./Scripts/start-clerk-local.sh`, the script already probes `/health` and the Water Utility snapshot. Confirm both succeeded, then open `http://127.0.0.1:5230` and check Town Hub.
+
+### Historical: App Runner post-deploy validation
+
+After every production deployment, the old order was:
 
 1. App Runner service status and latest deployment operation.
 2. Public `/health` endpoint.
@@ -154,11 +171,13 @@ Minimum success criteria:
 - Jarvis returns a non-onboarding response without timeout
 - Jarvis evidence shows `UsedFallback=false` for at least one normal validation turn when the release is intended to improve live chat quality
 
-## 6. Rollback Guidance
+## 6. Rollback
 
-Rollback must be prepared before release, not invented during incident response.
+On the clerk Mac, check out the previous commit and run `./Scripts/stop-clerk-local.sh` then `./Scripts/start-clerk-local.sh`. If that commit included a database migration, restore the NAS backup taken before the migrate. That backup procedure is not written yet.
 
-Current best-practice rollback path:
+### Historical: App Runner rollback
+
+The old rollback path was:
 
 - identify the previous known-good image digest or immutable version tag
 - redeploy that image to the App Runner service
@@ -376,6 +395,8 @@ Rules:
 
 ## 11. Backup, Recovery, And Restore Readiness
 
+Runbook: [backup-and-restore.md](backup-and-restore.md). File-level check: `./Scripts/backup-restore-drill.sh`. Health and the Town Hall contact: [health-and-alerting.md](health-and-alerting.md) and `/support`. Clerk page: [clerk-quick-start.md](clerk-quick-start.md).
+
 Aurora PostgreSQL is the system of record.
 
 Standing rules:
@@ -398,13 +419,9 @@ Best-practice cadence:
 - Keep operator access limited to named deployment and support owners.
 - Review alarm actions and notification recipients after team or ownership changes.
 - Keep production domain, API host, and data-store changes out of the same release window unless there is a documented rollback plan for the combined change.
-- **API JWT:** When `Authentication:Jwt:Enabled` is true, a fallback policy requires an authenticated Cognito user on every endpoint. Named read and mutating policies do the same. `/health`, `/api/ai/health`, and `/api/jarvis/health` stay anonymous for probes. A token that includes `cognito:groups` and lists neither `Clerk` nor `admin` is forbidden (403). A token with no groups claim is still accepted until groups are stamped on the pool. Missing or invalid tokens are 401. Production values (Town of Wiley Cognito):
-  - `Authentication__Jwt__Enabled=true`
-  - `Authentication__Jwt__Authority=https://cognito-idp.us-east-2.amazonaws.com/us-east-2_DmY7BCBIp`
-  - `Authentication__Jwt__Audience=2m6vp91m9938jpbg2efivr2p8k` (web app client)
-  - **Blazor staff auth (Phase 1):** Production `wwwroot/appsettings.Production.json` sets `Auth:Enabled=true` with the same pool/client. Clerks sign in at `/authentication/login` (Cognito `USER_PASSWORD_AUTH`); the client attaches `Authorization: Bearer` on workspace API calls. Optional override: `Scripts/generate-auth-appsettings.sh` writes `wwwroot/appsettings.Auth.local.json` from `COGNITO_USER_POOL_ID` / `COGNITO_APP_CLIENT_ID` / `COGNITO_REGION`. App client must allow `USER_PASSWORD_AUTH` and must not use a client secret. When JWT is disabled (local dev / integration tests), endpoints remain open and identity falls back to `X-Wiley-User-*` headers only — never rely on those headers in production with JWT disabled on a public host.
+- **API JWT:** When `Authentication:Jwt:Enabled` is true, a fallback policy requires an authenticated Cognito user on every endpoint. Named read and mutating policies do the same. `/health`, `/api/ai/health`, and `/api/jarvis/health` stay anonymous for probes. A token that includes `cognito:groups` and lists neither `Clerk` nor `admin` is forbidden (403). A token with no groups claim is still accepted until groups are stamped on the pool. Missing or invalid tokens are 401. Production keeps JWT off and must not name the removed pool `us-east-2_DmY7BCBIp`. When a live Town-account pool exists, turn client `Auth:Enabled` and API JWT on together and use Hosted UI (`Auth:SignInFlow=HostedUi`). See `docs/sso-clerksuite.md`. While JWT is off, the API accepts callers with no token, so it stays on `127.0.0.1` on the office Mac.
   - Integration tests prove 401 with no token and 403 for a Driver-only principal. CORS reflects localhost and the configured production origins only (`WorkspaceClientOrigins`). An Amplify preview host is allowed only when that exact origin is listed. The Blazor client does not POST NAS credentials; Apartments and TIKR are links, and database passwords stay in API configuration.
-- **Copilot / operator Cognito smoke tests:** IAM user `copilot` has managed policy `WileyWidgetCopilotCognitoSmokeTest` (Cognito admin auth on pool `us-east-2_DmY7BCBIp` + read secret `wiley-widget/temp/copilot-cognito-smoke`). With `copilot` AWS credentials configured:
+- **Historical Cognito smoke tests:** these commands targeted the removed pool `us-east-2_DmY7BCBIp` and App Runner. Do not run them. The old notes said IAM user `copilot` had managed policy `WileyWidgetCopilotCognitoSmokeTest`. With `copilot` AWS credentials configured:
   - `pwsh Scripts/get-cognito-smoke-token.ps1` — returns a Bearer access token
   - `pwsh Scripts/smoke-test-jarvis-production.ps1` — exercises `/api/ai/health` and `/api/ai/chat` on App Runner
   - Requires the current API image (Jarvis routes + JWT). Rotate the smoke-test Cognito password via Secrets Manager after use.
