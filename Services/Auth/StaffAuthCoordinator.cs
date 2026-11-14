@@ -36,13 +36,12 @@ public sealed class StaffAuthCoordinator
 
         if (UsesHostedUi)
         {
-            if (!string.IsNullOrWhiteSpace(_options.Cognito.OAuthDomain))
+            var logoutUrl = CognitoHostedUi.BuildGlobalLogoutUrl(
+                _options.Cognito.OAuthDomain,
+                _options.Cognito.ClientId,
+                ResolvePostLogoutRedirectUri());
+            if (logoutUrl is not null)
             {
-                var clientId = Uri.EscapeDataString(_options.Cognito.ClientId.Trim());
-                var logoutUri = ResolvePostLogoutRedirectUri();
-                var encodedLogout = Uri.EscapeDataString(logoutUri);
-                var domain = _options.Cognito.OAuthDomain.Trim().TrimEnd('/');
-                var logoutUrl = $"{domain}/logout?client_id={clientId}&logout_uri={encodedLogout}";
                 _navigation.NavigateTo(logoutUrl, forceLoad: true);
                 return Task.CompletedTask;
             }
