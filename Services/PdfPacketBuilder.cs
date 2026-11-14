@@ -285,7 +285,7 @@ public sealed class PdfPacketBuilder
 
     private static void RenderAssumptionsAppendix(PageState state)
     {
-        state.EnsureSpace(SectionGap + LineH * 5);
+        state.EnsureSpace(SectionGap + LineH * 6);
         state.DrawSectionHeading("Assumptions & Data Sources");
 
         foreach (var line in BuildAssumptionsAppendixLines())
@@ -357,6 +357,7 @@ public sealed class PdfPacketBuilder
     private static IEnumerable<string> BuildAssumptionsAppendixLines()
     {
         yield return "Data source: Live Aurora ledger_entries after QuickBooks import";
+        yield return "Scope: Decision support. Break-even is total cost divided by projected volume, plus scenario dollar adders. This packet is not a formal cost-of-service study.";
         yield return "AI grounding: Semantic Kernel + WorkspaceKnowledgeService (as of 2026-05-11)";
         yield return "Allocation model: Pro-rata by direct benefit (Field) + equal split (Clerk)";
     }

@@ -1494,7 +1494,7 @@ class AIManifestGenerator:
 
         return {
             "$schema": (
-                "https://raw.githubusercontent.com/Bigessfour/Wiley-Widget/main/"
+                "https://raw.githubusercontent.com/Bigessfour/wiley-co-web/main/"
                 "schemas/ai-manifest-schema.json"
             ),
             "manifest_version": "2.1",

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Mirror Wiley.co CI (.github/workflows/ci.yml) as far as macOS/local allows.
-# Skips: TruffleHog (optional), Windows runners, Amplify deployment-guard (OIDC/main only).
+# Skips: TruffleHog (optional) and Windows runners.
+# There is no Amplify deployment guard. Widget is not hosted on Amplify.
 #
 # Usage:
 #   ./Scripts/run-ci-local.sh              # pre-push gate (HighRisk + publish + Playwright CI specs)
@@ -124,6 +125,14 @@ test -d publish_output/wwwroot || fail "publish_output/wwwroot missing"
 
 if [[ "$SKIP_PLAYWRIGHT" -eq 0 ]]; then
   step "playwright-ui"
+  node -e '
+    const fs = require("fs");
+    const path = "publish_output/wwwroot/appsettings.Production.json";
+    const json = JSON.parse(fs.readFileSync(path, "utf8"));
+    json.Auth = json.Auth || {};
+    json.Auth.Enabled = false;
+    fs.writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
+  '
   npm ci
   npx playwright install chromium
   npm run playwright:test:ci:smoke
@@ -142,5 +151,5 @@ HEAD_SHA="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 } >"$STAMP_FILE"
 
 step "done"
-echo "Local CI mirror passed (deployment-guard skipped — main/OIDC only)."
+echo "Local CI mirror passed."
 echo "Wrote $STAMP_FILE for HEAD $HEAD_SHA — git push is unlocked for this commit."

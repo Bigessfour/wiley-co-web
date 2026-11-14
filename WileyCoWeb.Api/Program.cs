@@ -51,7 +51,7 @@ public partial class Program
     {
         request => string.IsNullOrWhiteSpace(request.SelectedEnterprise) ? "A workspace enterprise is required." : null,
         request => request.SelectedFiscalYear <= 0 ? "A valid fiscal year is required." : null,
-        request => request.ProjectedVolume <= 0 ? "Projected volume must be greater than zero." : null,
+        request => request.ProjectedVolume < 0 ? "Projected volume cannot be negative." : null,
         request => request.CurrentRate < 0 || request.TotalCosts < 0 ? "Workspace baseline values cannot be negative." : null
     };
     // Slice 4a: EnterpriseValidator / BudgetDataValidator (FluentValidation) exist in Models/Validators but are not wired into the API pipeline.
@@ -89,8 +89,10 @@ public partial class Program
             });
             if (builder.Environment.IsDevelopment())
             {
-                builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
+                // CreateBuilder already loaded user-secrets. Re-add Development.local AFTER secrets
+                // so the gitignored clerk file wins over a stale user-secret connection string.
                 builder.Configuration.AddUserSecrets<Program>(optional: true);
+                builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
             }
 
             bootstrapLoggerFactory = CreateStartupLoggerFactory();
@@ -1439,6 +1441,11 @@ public partial class Program
 
 
 
+    private static string MinimumChargeNote(string enterpriseName)
+        => enterpriseName is "Water Utility" or "Wiley Sanitation District" or "Trash"
+            ? "Minimum monthly charge effective July 1, 2026. Total costs and customer count are not loaded. Import the QuickBooks budget and customer list."
+            : "Current rate, costs, and unit count are not loaded. Import the QuickBooks budget and customer list.";
+
     private static async Task SeedDevelopmentDataAsync(IServiceProvider services)
     {
         await using var scope = services.CreateAsyncScope();
@@ -1457,6 +1464,7 @@ public partial class Program
                 CurrentRate = seed.CurrentRate,
                 MonthlyExpenses = seed.MonthlyExpenses,
                 CitizenCount = seed.CustomerCount,
+                Notes = MinimumChargeNote(seed.Name),
                 IsDeleted = false
             }));
 
@@ -1477,7 +1485,7 @@ public partial class Program
                 CurrentCharge = seed.CurrentRate,
                 CustomerCount = seed.CustomerCount,
                 UpdatedBy = nameof(Program),
-                Notes = $"Seeded from {seed.Name}.",
+                Notes = MinimumChargeNote(seed.Name),
                 IsActive = true
             }));
 
@@ -2300,7 +2308,8 @@ public partial class Program
     {
         enterprise.CurrentRate = decimal.Round(request.CurrentRate, 2, MidpointRounding.AwayFromZero);
         enterprise.MonthlyExpenses = decimal.Round(request.TotalCosts, 2, MidpointRounding.AwayFromZero);
-        enterprise.CitizenCount = Math.Max(1, decimal.ToInt32(decimal.Round(request.ProjectedVolume, 0, MidpointRounding.AwayFromZero)));
+        var projectedCustomers = decimal.ToInt32(decimal.Round(request.ProjectedVolume, 0, MidpointRounding.AwayFromZero));
+        enterprise.CitizenCount = Math.Max(0, projectedCustomers);
         enterprise.LastModified = DateTime.UtcNow;
     }
 

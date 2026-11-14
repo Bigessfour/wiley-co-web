@@ -1,6 +1,8 @@
 # Council readiness (May 2026)
 
-This runbook turns static “looks stuck” observations into **checklist evidence** for the Wiley Widget workspace (`wileywidget.townofwiley.gov` and Amplify hosts).
+**Historical (removed 2026-11).** `wileywidget.townofwiley.gov` and the Amplify hosts in this runbook do not serve Widget. Run the same UI checks against `http://127.0.0.1:5230` after `./Scripts/start-clerk-local.sh`.
+
+This runbook turned static “looks stuck” observations into checklist evidence for the Wiley Widget workspace on those hosts.
 
 ## 1. Prove Blazor vs static HTML vs API
 
@@ -34,6 +36,8 @@ Bundled sample (`wwwroot/data/workspace-bootstrap.json`):
 - Total costs **$412,500**, projected volume **14,500** units → break-even rate = `412500 / 14500` ≈ **$28.4483**/unit (UI rounds for display). Scenario line items add **$252,000** → adjusted costs **$664,500** → **$45.8276**/unit at the same volume.
 
 Client formulas live in `State/RateCalculator.cs`; server-side knowledge uses the same revenue-requirement style division in `WorkspaceKnowledgeService`. This is **revenue requirement + simplified rate design**, not a full AWWA M1 cost-of-service class allocation (which needs class usage, peaking, and cost pools).
+
+Phase 0 of [docs/production-completion-plan.md](production-completion-plan.md) locked that choice on 2026-11-08. The rate packet and the break-even, rates, trends, and scenario surfaces say the same thing to clerks. Do not add a `growthRate` parameter.
 
 ## 5. Talking points for elected officials
 

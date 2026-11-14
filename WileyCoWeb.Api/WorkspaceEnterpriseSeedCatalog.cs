@@ -7,42 +7,46 @@ internal static class WorkspaceEnterpriseSeedCatalog
 {
     public static readonly IReadOnlyList<WorkspaceEnterpriseSeed> All =
     [
+        // Adopted minimum monthly charges from the July 1, 2026 rate change.
+        // October 26, 2026 town bill, account 213, 3,000 gallons, still at the minimum:
+        // water $58, sewage $72, garbage $30.
+        // Costs, customer counts, and profit targets stay empty until a QuickBooks import.
         new(
             "Water Utility",
             "Water",
             "Water",
-            31.25m,
-            98000m,
-            4500,
-            1.02m,
-            2.00m),
+            58.00m,
+            0m,
+            0,
+            0m,
+            0m),
         new(
             "Wiley Sanitation District",
             "Sewer",
             "Sewer",
-            21.50m,
-            72000m,
-            3200,
-            1.01m,
-            1.00m),
+            72.00m,
+            0m,
+            0,
+            0m,
+            0m),
         new(
             "Trash",
             "Trash",
             "Trash",
-            18.75m,
-            54000m,
-            3000,
-            1.03m,
-            3.00m),
+            30.00m,
+            0m,
+            0,
+            0m,
+            0m),
         new(
             "Apartments",
             "Apartments",
             "Apartments",
-            725.00m,
-            14500m,
-            24,
-            1.04m,
-            4.00m)
+            0m,
+            0m,
+            0,
+            0m,
+            0m)
     ];
 
     public static bool TryGet(string? enterpriseName, out WorkspaceEnterpriseSeed seed)

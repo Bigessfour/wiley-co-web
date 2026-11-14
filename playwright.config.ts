@@ -73,6 +73,14 @@ const finalWebServer = isCI
         timeout: 120_000,
         env: {
           ASPNETCORE_ENVIRONMENT: "Development",
+          // Development.json requires mr-storage and fails closed. GitHub cannot
+          // reach that host, so this process may boot an in-memory database.
+          // Seed that fallback so panels have an enterprise and fiscal year.
+          // The office Mac does not set these. A reachable NAS is not seeded,
+          // because seeding runs only after degraded mode is already on.
+          Database__AllowDegradedStartup: "true",
+          Database__ApplyMigrations: "false",
+          Database__SeedDevelopmentData: "true",
           ...(dotnetRoot ? { DOTNET_ROOT: dotnetRoot, PATH: pathWithDotnet } : {}),
         },
       },

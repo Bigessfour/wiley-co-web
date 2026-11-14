@@ -1,6 +1,8 @@
 # AWS Server-Side Closure Plan
 
-This plan records the current AWS and server-side state for Wiley Widget, the remaining pre-meeting hardening items, and the post-release infrastructure follow-up described in [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md).
+**Historical (removed 2026-11).** Amplify, App Runner, and Aurora in this plan are gone. Do not execute remaining cutover steps. The live path is `docs/production-completion-plan.md`.
+
+This plan recorded the AWS and server-side state for Wiley Widget, the remaining pre-meeting hardening items, and the post-release infrastructure follow-up described in [docs/wileyco-ui-rebuild-plan.md](docs/wileyco-ui-rebuild-plan.md).
 
 ## Objective
 

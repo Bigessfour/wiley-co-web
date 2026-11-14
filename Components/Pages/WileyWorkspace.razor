@@ -53,7 +53,7 @@
                         <span class="wiley-eyebrow wiley-eyebrow-on-dark">Selected enterprise</span>
                     </div>
                     <div class="workspace-kpi-strip grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <div class="workspace-kpi-tile @(IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
+                        <div class="workspace-kpi-tile @(SelectedBaselineNeedsImport ? string.Empty : IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
                             <div class="workspace-kpi-label">Current Rate</div>
                             <div class="workspace-kpi-value">@CurrentRateDisplay</div>
                         </div>
@@ -61,7 +61,7 @@
                             <div class="workspace-kpi-label">Break-Even</div>
                             <div class="workspace-kpi-value workspace-kpi-value--break-even">@BreakEvenRateDisplay</div>
                         </div>
-                        <div class="workspace-kpi-tile @(IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
+                        <div class="workspace-kpi-tile @(SelectedBaselineNeedsImport ? string.Empty : IsSelectedRateAtOrAboveBreakEven ? "workspace-kpi-tile--ok" : "workspace-kpi-tile--warn")">
                             <div class="workspace-kpi-label">Variance</div>
                             <div class="workspace-kpi-value">@RateDeltaDisplay</div>
                         </div>
@@ -80,7 +80,11 @@
                             <div class="workspace-quad-card @GetHeroQuadrantAccentClass(quadrant)">
                                 <div class="text-sm font-semibold text-white">@GetHeroBreakEvenLabel(quadrant)</div>
                                 <div class="workspace-kpi-label mt-1">Break-even</div>
-                                <div class="workspace-kpi-value workspace-kpi-value--break-even text-lg">@quadrant.BreakEvenRate.ToString("C2")</div>
+                                <div class="workspace-kpi-value workspace-kpi-value--break-even text-lg">@FormatQuadrantBreakEven(quadrant)</div>
+                                @if (QuadrantNeedsQuickBooksImport(quadrant))
+                                {
+                                    <div class="workspace-quad-secondary">@QuickBooksImportNotes.BudgetAndCustomers</div>
+                                }
                                 <div class="workspace-quad-secondary">vs current @quadrant.CurrentRate.ToString("C2")</div>
                             </div>
                         }

@@ -145,7 +145,7 @@ public partial class Enterprise : ISoftDeletable
     private int _citizenCount;
 
     [Required(ErrorMessage = "Citizen count is required")]
-    [Range(1, int.MaxValue, ErrorMessage = "Citizen count must be at least 1")]
+    [Range(0, int.MaxValue, ErrorMessage = "Citizen count cannot be negative")]
     [GridDisplay(4, 80, DecimalDigits = 0)]
     public int CitizenCount
     {
