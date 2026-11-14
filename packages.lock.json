@@ -25,6 +25,16 @@
           "Microsoft.JSInterop.WebAssembly": "9.0.14"
         }
       },
+      "Microsoft.AspNetCore.Components.WebAssembly.Authentication": {
+        "type": "Direct",
+        "requested": "[9.0.14, )",
+        "resolved": "9.0.14",
+        "contentHash": "Q8Kw6UwbXJGNMQD3w7xZWgo9I4IzBBvdBmjRsmK18rTWiWWHwr6+F4PjuVJMOVIb1a5h7T7UTzFbrxDHQ6w4nQ==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Components.Authorization": "9.0.14",
+          "Microsoft.AspNetCore.Components.Web": "9.0.14"
+        }
+      },
       "Microsoft.AspNetCore.Components.WebAssembly.DevServer": {
         "type": "Direct",
         "requested": "[9.0.14, )",
