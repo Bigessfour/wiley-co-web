@@ -1,5 +1,7 @@
 # Incident Response Matrix
 
+**Host names in the examples are historical (removed 2026-11).** Use the severity rules. For the live Mac and NAS path, follow `docs/clerk-mac-runbook.md`. Definition: `docs/production-completion-plan.md`.
+
 Use this matrix when production behavior is degraded, incorrect, unavailable, or risky.
 
 This is not a substitute for technical diagnosis. It is the first-response framework that keeps the team organized and reduces panic-driven mistakes.

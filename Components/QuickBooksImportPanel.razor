@@ -35,7 +35,7 @@
 
             <div class="grid gap-3 md:grid-cols-2">
                 @* IDs: match the automation selectors used in QB import E2E specs *@
-                <SfDropDownList ID="qb-enterprise-select" TValue="string" TItem="string" DataSource="@WorkspaceState.EnterpriseOptions" @bind-Value="WorkspaceState.SelectedEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
+                <SfDropDownList ID="qb-enterprise-select" TValue="string" TItem="string" DataSource="@ImportEnterpriseOptions" @bind-Value="importEnterprise" Placeholder="Enterprise" FloatLabelType="FloatLabelType.Auto" AllowFiltering="true" FilterType="Syncfusion.Blazor.DropDowns.FilterType.Contains" IgnoreCase="true" ShowClearButton="true" PopupHeight="240px" Width="100%" />
                 <SfDropDownList ID="qb-fiscal-year-select" TValue="int" TItem="int" DataSource="@WorkspaceState.FiscalYearOptions" @bind-Value="WorkspaceState.SelectedFiscalYear" Placeholder="Fiscal Year" FloatLabelType="FloatLabelType.Auto" ShowClearButton="false" PopupHeight="240px" Width="100%" />
             </div>
 
@@ -174,7 +174,7 @@
                             <CardContent Content="Rows or file-level duplicates detected from the file hash." />
                         </SfCard>
                         <SfCard>
-                            <CardHeader Title="Enterprise" SubTitle="@WorkspaceState.SelectedEnterprise" />
+                            <CardHeader Title="Enterprise" SubTitle="@importEnterprise" />
                             <CardContent Content="The active enterprise and fiscal year drive import context." />
                         </SfCard>
                     </div>
@@ -458,7 +458,7 @@
     <DialogTemplates>
         <Content>
             <div class="space-y-3">
-                <p>This will commit @RowCountDisplay rows for @WorkspaceState.SelectedEnterprise FY @WorkspaceState.SelectedFiscalYear.</p>
+                <p>This will commit @RowCountDisplay rows for @importEnterprise FY @WorkspaceState.SelectedFiscalYear.</p>
                 <p class="text-sm wiley-text-muted">QuickBooks actuals remain canonical. The import is blocked only if the same file has already been imported.</p>
             </div>
         </Content>
@@ -558,11 +558,47 @@
 
     private bool CanAskAssistant => PreviewResponse is not null && !string.IsNullOrWhiteSpace(AssistantQuestion) && !IsBusy && !IsAskingAssistant;
 
-    private IReadOnlyList<string> RoutingEnterpriseOptions => WorkspaceState.EnterpriseOptions
-        .Where(option => !string.IsNullOrWhiteSpace(option) && !string.Equals(option, "general_ledger", StringComparison.OrdinalIgnoreCase) && !string.Equals(option, "transaction_list", StringComparison.OrdinalIgnoreCase))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(option => option, StringComparer.OrdinalIgnoreCase)
-        .ToList();
+    private const string GeneralFundScope = "General Fund";
+
+    private string importEnterprise = string.Empty;
+
+    private IReadOnlyList<string> ImportEnterpriseOptions => RoutingEnterpriseOptions;
+
+    private IReadOnlyList<string> RoutingEnterpriseOptions
+    {
+        get
+        {
+            // The dropdown clears a bound value that is not in this list. Always include the
+            // four town enterprises so a saved target such as Apartments survives the render
+            // that happens before save. WorkspaceState starts with an empty option list.
+            var options = new List<string>();
+            AddRoutingEnterprise(options, WorkspaceEnterpriseCatalog.CanonicalEnterpriseOrder);
+            AddRoutingEnterprise(options, [GeneralFundScope]);
+            AddRoutingEnterprise(options, WorkspaceState.EnterpriseOptions);
+            return options;
+        }
+    }
+
+    private static void AddRoutingEnterprise(List<string> options, IEnumerable<string> values)
+    {
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value)
+                || string.Equals(value, "general_ledger", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "transaction_list", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var trimmed = value.Trim();
+            if (options.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            options.Add(trimmed);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -574,6 +610,14 @@
         if (WorkspaceState is null)
         {
             throw new InvalidOperationException("WorkspaceState is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(importEnterprise)
+            || !ImportEnterpriseOptions.Contains(importEnterprise, StringComparer.OrdinalIgnoreCase))
+        {
+            importEnterprise = ImportEnterpriseOptions.Contains(WorkspaceState.SelectedEnterprise, StringComparer.OrdinalIgnoreCase)
+                ? WorkspaceState.SelectedEnterprise
+                : ImportEnterpriseOptions.FirstOrDefault() ?? GeneralFundScope;
         }
     }
 
@@ -740,7 +784,7 @@
             ImportProgress = 90;
             await InvokeAsync(StateHasChanged);
 
-            var result = await ImportApi.CommitAsync(selectedFileBytes!, SelectedFileName, WorkspaceState.SelectedEnterprise, WorkspaceState.SelectedFiscalYear).ConfigureAwait(false);
+            var result = await ImportApi.CommitAsync(selectedFileBytes!, SelectedFileName, importEnterprise, WorkspaceState.SelectedFiscalYear).ConfigureAwait(false);
 
             var previewRowsSnapshot = PreviewRows.ToList();
 
@@ -801,7 +845,7 @@
             ImportProgress = 60;
             await InvokeAsync(StateHasChanged);
 
-            var preview = await ImportApi.PreviewAsync(selectedFileBytes!, SelectedFileName, WorkspaceState.SelectedEnterprise, WorkspaceState.SelectedFiscalYear).ConfigureAwait(false);
+            var preview = await ImportApi.PreviewAsync(selectedFileBytes!, SelectedFileName, importEnterprise, WorkspaceState.SelectedFiscalYear).ConfigureAwait(false);
             PreviewResponse = preview;
             PreviewRows.Clear();
             PreviewRows.AddRange(preview.Rows);

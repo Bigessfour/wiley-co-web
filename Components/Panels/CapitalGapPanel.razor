@@ -187,7 +187,7 @@
     else
     {
         <section class="rounded-2xl border-dashed wiley-border wiley-surface-2 p-6 text-sm wiley-text-muted">
-            Capital gap data is not available yet.
+            @(string.IsNullOrWhiteSpace(MissingDataNote) ? "Capital gap data is not available yet." : MissingDataNote)
         </section>
     }
 </section>
@@ -199,12 +199,15 @@
     private CapitalGapResponse? Snapshot { get; set; }
     private bool IsLoading { get; set; } = true;
     private string? ErrorMessage { get; set; }
+    private string? MissingDataNote { get; set; }
     private string? loadedEnterprise;
     private int loadedFiscalYear;
 
     private string SummarySubtitle => Snapshot is null ? "Awaiting live capital gap data" : $"{Snapshot.SelectedEnterprise} FY {Snapshot.SelectedFiscalYear}";
     private string SummaryContent => Snapshot is null ? "The panel will populate after the workspace loads live rate revenue and capital-tagged budget items." : Snapshot.ExecutiveSummary;
-    private string CapitalStatus => Snapshot is null ? "Loading" : Snapshot.CapitalStatus;
+    private string CapitalStatus => Snapshot is not null
+        ? Snapshot.CapitalStatus
+        : string.IsNullOrWhiteSpace(MissingDataNote) ? "Loading" : "Needs import";
     private string CapitalItemCountDisplay => Snapshot?.CapitalItems.Count.ToString("N0") ?? "0";
     private IReadOnlyList<CapitalGapItemPoint> CapitalItemsForChart => Snapshot?.CapitalItems ?? [];
 
@@ -212,8 +215,8 @@
     {
         if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
         {
-            ErrorMessage = "A workspace enterprise and fiscal year are required to load capital gap data.";
-            ToastService.ShowWarning("Capital Gap", ErrorMessage);
+            ErrorMessage = null;
+            MissingDataNote = QuickBooksImportNotes.CapitalGap;
             Snapshot = null;
             IsLoading = false;
             return;
@@ -226,6 +229,7 @@
 
         IsLoading = true;
         ErrorMessage = null;
+        MissingDataNote = null;
 
         try
         {
@@ -233,9 +237,16 @@
             loadedEnterprise = Snapshot.SelectedEnterprise;
             loadedFiscalYear = Snapshot.SelectedFiscalYear;
         }
+        catch (Exception ex) when (QuickBooksImportNotes.IsMissingQuickBooksData(ex))
+        {
+            ErrorMessage = null;
+            MissingDataNote = QuickBooksImportNotes.CapitalGap;
+            Snapshot = null;
+        }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            MissingDataNote = null;
             Snapshot = null;
             ToastService.ShowError("Capital Gap failed to load", ex.Message);
         }

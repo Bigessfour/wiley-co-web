@@ -66,8 +66,9 @@ public sealed class GlobalExceptionHandlerTests : IClassFixture<ApiApplicationFa
         await _factory.ResetDatabaseAsync();
         using var client = _factory.CreateClient();
 
-        // Baseline update with invalid (zero volume triggers validation returning 400)
-        var badBaseline = new WorkspaceBaselineUpdateRequest("Water Utility", 2026, 55.25m, 13250m, 0m);
+        // Zero volume is a valid empty baseline before QuickBooks import.
+        // A negative volume is the invalid case and must come back as 400.
+        var badBaseline = new WorkspaceBaselineUpdateRequest("Water Utility", 2026, 55.25m, 13250m, -1m);
 
         var response = await client.PutAsJsonAsync("/api/workspace/baseline", badBaseline, _jsonOptions);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

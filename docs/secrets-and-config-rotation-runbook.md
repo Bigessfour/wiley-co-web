@@ -1,6 +1,8 @@
 # Secrets And Configuration Rotation Runbook
 
-This runbook is the approved process for changing production runtime secrets or App Runner configuration values.
+**Historical (removed 2026-11).** These steps rotate secrets on App Runner. That service is gone. On the clerk Mac, database and xAI secrets stay in uncommitted local config and user secrets. See `docs/production-completion-plan.md`.
+
+This runbook was the approved process for changing production runtime secrets or App Runner configuration values.
 
 Use this for:
 

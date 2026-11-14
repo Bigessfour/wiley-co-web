@@ -155,14 +155,33 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     protected decimal ScenarioAdjustedDelta => WorkspaceState.AdjustedRateDelta;
     protected decimal ScenarioCostTotal => WorkspaceState.ScenarioCostTotal;
 
-    protected string CurrentRateDisplay => CurrentRate.ToString("C2", WorkspaceUiCulture);
-    protected string BreakEvenRateDisplay => RecommendedRate.ToString("C2", WorkspaceUiCulture);
-    protected string RateDeltaDisplay => WorkspaceState.RateDelta.ToString("C2", WorkspaceUiCulture);
+    protected bool SelectedBaselineNeedsImport => TotalCosts <= 0m || ProjectedVolume <= 0m;
+    protected string CurrentRateDisplay => CurrentRate <= 0m
+        ? "Needs QuickBooks import"
+        : CurrentRate.ToString("C2", WorkspaceUiCulture);
+    protected string BreakEvenRateDisplay => SelectedBaselineNeedsImport
+        ? "Needs QuickBooks import"
+        : RecommendedRate.ToString("C2", WorkspaceUiCulture);
+    protected string RateDeltaDisplay => SelectedBaselineNeedsImport
+        ? "Needs QuickBooks import"
+        : WorkspaceState.RateDelta.ToString("C2", WorkspaceUiCulture);
     protected string ScenarioAdjustedRateDisplay => WorkspaceState.AdjustedRecommendedRate.ToString("C2", WorkspaceUiCulture);
     protected string ScenarioAdjustedDeltaDisplay => WorkspaceState.AdjustedRateDelta.ToString("C2", WorkspaceUiCulture);
     protected string ScenarioCostTotalDisplay => WorkspaceState.ScenarioCostTotal.ToString("C0", WorkspaceUiCulture);
-    protected string TotalCostsDisplay => TotalCosts.ToString("C0", WorkspaceUiCulture);
-    protected string ProjectedVolumeDisplay => ProjectedVolume.ToString("N0", WorkspaceUiCulture);
+    protected string TotalCostsDisplay => TotalCosts <= 0m
+        ? "Needs QuickBooks import"
+        : TotalCosts.ToString("C0", WorkspaceUiCulture);
+    protected string ProjectedVolumeDisplay => ProjectedVolume <= 0m
+        ? "Needs QuickBooks import"
+        : ProjectedVolume.ToString("N0", WorkspaceUiCulture);
+
+    protected static bool QuadrantNeedsQuickBooksImport(BreakEvenQuadrantData quadrant)
+        => quadrant.MonthlyExpenses <= 0m || quadrant.EffectiveCustomerCount <= 0m;
+
+    protected static string FormatQuadrantBreakEven(BreakEvenQuadrantData quadrant)
+        => QuadrantNeedsQuickBooksImport(quadrant)
+            ? "Needs QuickBooks import"
+            : quadrant.BreakEvenRate.ToString("C2");
     protected double GaugeMaximum => (double)Math.Max(RecommendedRate, CurrentRate) * 1.5d;
     protected WorkspaceReserveTrajectoryData? ReserveTrajectory => WorkspaceState.ReserveTrajectory;
     protected double GaugeCurrentRateValue => (double)CurrentRate;

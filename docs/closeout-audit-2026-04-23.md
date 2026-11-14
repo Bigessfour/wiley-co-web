@@ -1,6 +1,8 @@
 # Wiley Widget Closeout Audit - 2026-04-23
 
-This closeout audit records what is complete, what validated locally, and what still must be finalized before Wiley Widget can be treated as fully closed out for production support.
+**Historical point-in-time audit.** Hosts named here were removed in November 2026. It is not the current readiness list. See `docs/production-readiness-gap-report.md`.
+
+This closeout audit records what was complete on this date, what validated locally, and what still had to be finalized before Wiley Widget could be treated as fully closed out for production support.
 
 ## Audit Scope
 

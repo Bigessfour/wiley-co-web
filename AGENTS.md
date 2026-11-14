@@ -4,7 +4,7 @@ This file applies to **Grok CLI**, **Cursor**, and any other coding agent workin
 
 ## What this project is
 
-- **Blazor WebAssembly client** (`WileyCoWeb.csproj`) + **ASP.NET Core API** (`WileyCoWeb.Api/`) on AWS (Amplify + App Runner + Aurora PostgreSQL).
+- **Blazor WebAssembly client** (`WileyCoWeb.csproj`) + **ASP.NET Core API** (`WileyCoWeb.Api/`). The live path is the office Mac (`./Scripts/start-clerk-local.sh`) against Synology Postgres on `mr-storage:5433`. Amplify, App Runner, and Aurora for Widget were removed in November 2026. Do not recreate them. Definition: `docs/production-completion-plan.md`.
 - **Not** a WinForms desktop app. Do not assume desktop UI patterns.
 - Solution entry: `WileyCoWeb.slnx`. Shared domain libraries under `src/WileyWidget.*`.
 - Council-facing municipal finance / utility rate studies for the **Town of Wiley**.

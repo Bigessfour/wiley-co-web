@@ -54,8 +54,12 @@ public static class EnterpriseRateService
 
     public static decimal CalculateMonthlyRevenue(decimal currentRate, decimal projectedVolume)
     {
-        var effectiveVolume = Math.Max(1m, projectedVolume);
-        return Math.Round(currentRate * effectiveVolume, 2, MidpointRounding.AwayFromZero);
+        if (projectedVolume <= 0m)
+        {
+            return 0m;
+        }
+
+        return Math.Round(currentRate * projectedVolume, 2, MidpointRounding.AwayFromZero);
     }
 
     public static decimal CalculateMonthlyBalance(decimal monthlyRevenue, decimal totalCosts)

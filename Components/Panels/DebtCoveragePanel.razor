@@ -183,7 +183,7 @@
     else
     {
         <section class="rounded-2xl border-dashed wiley-border wiley-surface-panel-secondary p-6 text-sm wiley-text-muted">
-            Debt coverage data is not available yet.
+            @(string.IsNullOrWhiteSpace(MissingDataNote) ? "Debt coverage data is not available yet." : MissingDataNote)
         </section>
     }
 </section>
@@ -195,13 +195,16 @@
     private DebtCoverageResponse? Snapshot { get; set; }
     private bool IsLoading { get; set; } = true;
     private string? ErrorMessage { get; set; }
+    private string? MissingDataNote { get; set; }
     private decimal CoverageThreshold { get; set; }
     private string? loadedEnterprise;
     private int loadedFiscalYear;
 
     private string SummarySubtitle => Snapshot is null ? "Awaiting live debt coverage data" : $"{Snapshot.SelectedEnterprise} FY {Snapshot.SelectedFiscalYear}";
     private string SummaryContent => Snapshot is null ? "The panel will populate after the workspace loads live revenue and debt-service aggregates." : Snapshot.ExecutiveSummary;
-    private string CoverageStatus => Snapshot is null ? "Loading" : EvaluateCoverageStatus(Snapshot.DebtServiceCoverageRatio, CoverageThreshold);
+    private string CoverageStatus => Snapshot is not null
+        ? EvaluateCoverageStatus(Snapshot.DebtServiceCoverageRatio, CoverageThreshold)
+        : string.IsNullOrWhiteSpace(MissingDataNote) ? "Loading" : "Needs import";
     private double GaugeMaximum => Snapshot is null ? 3.0d : (double)Math.Max(3m, Math.Max(Snapshot.DebtServiceCoverageRatio, CoverageThreshold) + 0.5m);
     private double[] WaterfallSumIndexes => Snapshot is null ? [] : [Snapshot.WaterfallPoints.Count - 1d];
 
@@ -209,8 +212,8 @@
     {
         if (string.IsNullOrWhiteSpace(SelectedEnterprise) || SelectedFiscalYear <= 0)
         {
-            ErrorMessage = "A workspace enterprise and fiscal year are required to load debt coverage.";
-            ToastService.ShowWarning("Debt Coverage", ErrorMessage);
+            ErrorMessage = null;
+            MissingDataNote = QuickBooksImportNotes.DebtCoverage;
             Snapshot = null;
             IsLoading = false;
             return;
@@ -223,18 +226,34 @@
 
         IsLoading = true;
         ErrorMessage = null;
+        MissingDataNote = null;
 
         try
         {
             var response = await DebtCoverageApiService.GetAsync(new DebtCoverageRequest(SelectedEnterprise, SelectedFiscalYear));
-            Snapshot = response;
-            CoverageThreshold = response.CovenantThreshold;
-            loadedEnterprise = response.SelectedEnterprise;
-            loadedFiscalYear = response.SelectedFiscalYear;
+            if (response.AnnualRevenue <= 0m)
+            {
+                Snapshot = null;
+                MissingDataNote = QuickBooksImportNotes.DebtCoverage;
+            }
+            else
+            {
+                Snapshot = response;
+                CoverageThreshold = response.CovenantThreshold;
+                loadedEnterprise = response.SelectedEnterprise;
+                loadedFiscalYear = response.SelectedFiscalYear;
+            }
+        }
+        catch (Exception ex) when (QuickBooksImportNotes.IsMissingQuickBooksData(ex))
+        {
+            ErrorMessage = null;
+            MissingDataNote = QuickBooksImportNotes.DebtCoverage;
+            Snapshot = null;
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            MissingDataNote = null;
             Snapshot = null;
             ToastService.ShowError("Debt Coverage failed to load", ex.Message);
         }
