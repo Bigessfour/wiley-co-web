@@ -376,6 +376,8 @@ Rules:
 
 ## 11. Backup, Recovery, And Restore Readiness
 
+Runbook: [backup-and-restore.md](backup-and-restore.md). File-level check: `./Scripts/backup-restore-drill.sh`. Health and the Town Hall contact: [health-and-alerting.md](health-and-alerting.md) and `/support`. Clerk page: [clerk-quick-start.md](clerk-quick-start.md).
+
 Aurora PostgreSQL is the system of record.
 
 Standing rules:
