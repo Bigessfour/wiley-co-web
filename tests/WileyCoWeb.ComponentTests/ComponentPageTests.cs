@@ -275,15 +275,74 @@ public sealed class ComponentPageTests
 	public void WileyWorkspace_JarvisLauncher_OpensFloatingDock()
 	{
 		using var context = CreateContext();
+		var layout = new WorkspaceLayoutContext();
 
-		var cut = context.RenderComponent<WileyWorkspace>();
+		var cut = context.RenderComponent<WileyWorkspace>(parameters => parameters
+			.AddCascadingValue(layout));
 
 		cut.Find("#workspace-jarvis-launcher").Click();
 
 		cut.WaitForAssertion(() =>
 		{
+			Assert.True(layout.IsJarvisOpen);
+			Assert.Empty(cut.FindAll("#workspace-jarvis-launcher"));
 			Assert.Contains("workspace-jarvis-rail", cut.Markup);
 			Assert.Single(cut.FindComponents<JarvisChatPanel>());
+		});
+	}
+
+	[Fact]
+	public void ReferenceDataPanel_IngestsEmbeddedOctoberExamples()
+	{
+		var posts = new List<string>();
+		using var context = CreateContext(configureServices: services =>
+		{
+			services.AddScoped(_ => new SharedContractReferenceDataApiService(new HttpClient(new RoutedHttpMessageHandler(request =>
+			{
+				var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+				if (request.Method == HttpMethod.Post
+				    && path.EndsWith("/api/reference-data/actuals", StringComparison.OrdinalIgnoreCase))
+				{
+					posts.Add("actuals");
+					return Task.FromResult(CreateJsonResponse(
+						HttpStatusCode.Accepted,
+						new ReferenceDataIngestAcceptedResponse(Guid.NewGuid(), "actuals-summary", DateTimeOffset.UtcNow.ToString("O"))));
+				}
+
+				if (request.Method == HttpMethod.Post
+				    && path.EndsWith("/api/reference-data/events", StringComparison.OrdinalIgnoreCase))
+				{
+					posts.Add("events");
+					return Task.FromResult(CreateJsonResponse(
+						HttpStatusCode.Accepted,
+						new ReferenceDataIngestAcceptedResponse(Guid.NewGuid(), "operational-events", DateTimeOffset.UtcNow.ToString("O"))));
+				}
+
+				if (request.Method == HttpMethod.Get)
+				{
+					return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+					{
+						Content = new StringContent("[]", Encoding.UTF8, "application/json")
+					});
+				}
+
+				return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+			}))
+			{
+				BaseAddress = new Uri("https://example.test/")
+			}));
+		});
+
+		var cut = context.RenderComponent<SharedContractReferenceDataPanel>();
+		cut.WaitForAssertion(() => Assert.Contains("Ingest Oct 2026 examples", cut.Markup));
+
+		cut.FindAll("button").First(button => button.TextContent.Contains("Ingest Oct 2026 examples", StringComparison.Ordinal)).Click();
+
+		cut.WaitForAssertion(() =>
+		{
+			Assert.DoesNotContain("Could not ingest", cut.Markup);
+			Assert.Contains("actuals", posts);
+			Assert.Contains("events", posts);
 		});
 	}
 

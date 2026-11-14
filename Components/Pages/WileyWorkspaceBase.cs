@@ -59,7 +59,16 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
     [Inject]
     protected IJSRuntime JSRuntime { get; set; } = default!;
 
+    private const int BreakEvenVisualDelayMs = 200;
+
     private DotNetObjectReference<WileyWorkspaceBase>? _networkStatusRef;
+    private CancellationTokenSource? breakEvenVisualCts;
+    private int breakEvenVisualVersion;
+    private decimal? pendingTotalCosts;
+    private decimal? pendingProjectedVolume;
+    private bool workspaceDisposed;
+
+    protected bool AnimateBreakEvenVisuals { get; private set; } = true;
 
     private bool persistenceInitialized;
     private bool isRefreshingScenarioCatalog;
@@ -768,14 +777,64 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
             "rate-packet-zip");
     }
 
-    protected void HandleTotalCostsChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
+    protected Task HandleTotalCostsChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
     {
-        WorkspaceState.SetTotalCosts(args.Value);
+        pendingTotalCosts = args.Value;
+        return ScheduleBreakEvenVisualApplyAsync();
     }
 
-    protected void HandleProjectedVolumeChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
+    protected Task HandleProjectedVolumeChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
     {
-        WorkspaceState.SetProjectedVolume(args.Value);
+        pendingProjectedVolume = args.Value;
+        return ScheduleBreakEvenVisualApplyAsync();
+    }
+
+    private async Task ScheduleBreakEvenVisualApplyAsync()
+    {
+        var version = ++breakEvenVisualVersion;
+        breakEvenVisualCts?.Cancel();
+        breakEvenVisualCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        breakEvenVisualCts = cts;
+
+        try
+        {
+            await Task.Delay(BreakEvenVisualDelayMs, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (workspaceDisposed || version != breakEvenVisualVersion)
+        {
+            return;
+        }
+
+        // Turn animation off in the same render that publishes the new numbers.
+        // An earlier render would push the old TotalCosts back into the numeric box.
+        AnimateBreakEvenVisuals = false;
+        if (pendingTotalCosts is decimal costs)
+        {
+            pendingTotalCosts = null;
+            WorkspaceState.SetTotalCosts(costs);
+        }
+
+        if (pendingProjectedVolume is decimal volume)
+        {
+            pendingProjectedVolume = null;
+            WorkspaceState.SetProjectedVolume(volume);
+        }
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
+        if (workspaceDisposed || version != breakEvenVisualVersion)
+        {
+            return;
+        }
+
+        AnimateBreakEvenVisuals = true;
+        await InvokeAsync(StateHasChanged);
     }
 
     protected void HandleCurrentRateChanged(Syncfusion.Blazor.Inputs.ChangeEventArgs<decimal> args)
@@ -834,6 +893,10 @@ public partial class WileyWorkspaceBase : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        workspaceDisposed = true;
+        breakEvenVisualCts?.Cancel();
+        breakEvenVisualCts?.Dispose();
+        breakEvenVisualCts = null;
         WorkspaceState.Changed -= HandleWorkspaceStateChanged;
         WorkspacePersistenceService.Dispose();
 

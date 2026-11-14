@@ -10,11 +10,7 @@ public sealed class SharedContractReferenceDataApiService(
     HttpClient httpClient,
     ILogger<SharedContractReferenceDataApiService>? logger = null)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = false
-    };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<IReadOnlyList<ReferenceDataActualsDocument>> GetActualsAsync(
         CancellationToken cancellationToken = default)

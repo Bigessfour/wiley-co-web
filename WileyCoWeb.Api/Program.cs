@@ -641,6 +641,9 @@ public partial class Program
         builder.Services.AddSingleton<QuickBooksExcelParser>();
         builder.Services.AddSingleton<QuickBooksRoutingService>();
         builder.Services.AddSingleton<QuickBooksImportService>();
+        builder.Services.AddSingleton<IQuickBooksLedgerImporter>(sp => sp.GetRequiredService<QuickBooksImportService>());
+        builder.Services.Configure<QuickBooksBackupImportOptions>(builder.Configuration.GetSection(QuickBooksBackupImportOptions.SectionName));
+        builder.Services.AddSingleton<QuickBooksBackupImportService>();
         builder.Services.AddSingleton<QuickBooksImportAssistantService>();
         builder.Services.AddSingleton<IWorkspaceAiKernelProvider, WorkspaceAiKernelProvider>();
         builder.Services.AddSingleton<WorkspaceAiAssistantService>();
@@ -1040,6 +1043,7 @@ public partial class Program
         var config = app.Configuration;
         app.MapPost("/api/imports/quickbooks/preview", MapQuickBooksPreviewEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapPost("/api/imports/quickbooks/commit", MapQuickBooksCommitEndpoint).RequireWorkspaceMutatingAuth(config);
+        app.MapPost("/api/imports/quickbooks/from-backup", MapQuickBooksBackupImportEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapPost("/api/imports/quickbooks/assistant", MapQuickBooksAssistantEndpoint).RequireWorkspaceMutatingAuth(config);
         app.MapGet("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationEndpoint).RequireWorkspaceReadAuth(config);
         app.MapPut("/api/imports/quickbooks/routing", MapQuickBooksRoutingConfigurationUpdateEndpoint).RequireWorkspaceMutatingAuth(config);
@@ -1092,6 +1096,24 @@ public partial class Program
         return commitResult.IsDuplicate
             ? Results.Conflict(commitResult)
             : Results.Ok(commitResult);
+    }
+
+    private static async Task<IResult> MapQuickBooksBackupImportEndpoint(HttpRequest request, QuickBooksBackupImportService backupImportService, CancellationToken cancellationToken)
+    {
+        var commit = string.Equals(request.Query["commit"], "true", StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            var response = await backupImportService.ImportAsync(commit, cancellationToken).ConfigureAwait(false);
+            return Results.Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(ex.Message);
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            return Results.BadRequest(ex.Message);
+        }
     }
 
     private static async Task<IResult> MapQuickBooksAssistantEndpoint(HttpRequest request, QuickBooksImportAssistantService assistantService, CancellationToken cancellationToken)

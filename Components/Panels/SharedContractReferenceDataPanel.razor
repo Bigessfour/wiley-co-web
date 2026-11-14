@@ -1,12 +1,9 @@
 @namespace WileyCoWeb.Components.Panels
-@using System.Net.Http.Json
 @using System.Text.Json
 @using WileyCoWeb.Contracts
 @using WileyCoWeb.Services
 @inject SharedContractReferenceDataApiService ReferenceDataApi
 @inject ToastService ToastService
-@inject HttpClient Http
-@inject NavigationManager Navigation
 @implements IDisposable
 
 <section id="shared-contract-reference-data-panel" class="space-y-4" aria-live="polite">
@@ -167,9 +164,6 @@
 </section>
 
 @code {
-    private const string ActualsExamplePath = "shared-contracts/examples/actuals-summary-utility-oct-2026.json";
-    private const string EventsExamplePath = "shared-contracts/examples/operational-events-oct-2026-checks.json";
-
     private static readonly JsonSerializerOptions FixtureJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -221,7 +215,7 @@
     }
 
     /// <summary>
-    /// Prompt 4 UI path: load fixtures from wwwroot (copied from shared-contracts/examples) and POST to reference-data.
+    /// Prompt 4 UI path: load the October examples embedded in the app and POST them to reference-data.
     /// Prefer <c>Scripts/ingest-shared-contracts.sh</c> for CLI / drop-folder workflows.
     /// </summary>
     private async Task IngestOctoberExamplesAsync()
@@ -235,16 +229,14 @@
         ErrorMessage = null;
         try
         {
-            // Fixture files are on the WASM host; default HttpClient BaseAddress is the API.
-            var actualsUri = new Uri(new Uri(Navigation.BaseUri), ActualsExamplePath);
-            var actuals = await Http.GetFromJsonAsync<ActualsSummaryContract>(actualsUri, FixtureJsonOptions, _lifetime.Token)
-                ?? throw new InvalidOperationException($"Could not load {ActualsExamplePath}.");
+            var actuals = JsonSerializer.Deserialize<ActualsSummaryContract>(
+                    ReadEmbeddedExample("actuals-summary-utility-oct-2026.json"),
+                    FixtureJsonOptions)
+                ?? throw new InvalidOperationException("Could not read the October actuals example.");
 
             await ReferenceDataApi.PostActualsAsync(actuals, _lifetime.Token);
 
-            var eventsUri = new Uri(new Uri(Navigation.BaseUri), EventsExamplePath);
-            await using var eventsStream = await Http.GetStreamAsync(eventsUri, _lifetime.Token);
-            using var eventsDoc = await JsonDocument.ParseAsync(eventsStream, cancellationToken: _lifetime.Token);
+            using var eventsDoc = JsonDocument.Parse(ReadEmbeddedExample("operational-events-oct-2026-checks.json"));
             if (!eventsDoc.RootElement.TryGetProperty("items", out var itemsElement))
             {
                 throw new InvalidOperationException("Events fixture is missing items[] (PayloadBatch envelope).");
@@ -268,12 +260,28 @@
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-            ToastService.ShowError("Reference data", "Could not ingest shared-contract examples.");
+            ToastService.ShowError("Reference data", $"Could not ingest shared-contract examples. {ex.Message}");
         }
         finally
         {
             IsIngesting = false;
         }
+    }
+
+    private static string ReadEmbeddedExample(string fileName)
+    {
+        var assembly = typeof(SharedContractReferenceDataPanel).Assembly;
+        var resourceName = assembly.GetManifestResourceNames()
+            .FirstOrDefault(name => name.EndsWith(fileName, StringComparison.Ordinal));
+        if (resourceName is null)
+        {
+            throw new InvalidOperationException($"The example file {fileName} is not included in the app.");
+        }
+
+        using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"The example file {fileName} could not be opened.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     private static string FormatAccepted(string acceptedAt)
