@@ -67,7 +67,7 @@
             <button id="app-shell-theme-toggle"
                     type="button"
                     class="e-control e-btn e-lib e-inherit app-shell-theme-toggle"
-                    aria-label="Toggle dark or light theme (current: light)"
+                    aria-label="@($"Toggle dark or light theme (current: {_currentTheme})")"
                     title="Toggle theme"
                     @onclick="ToggleThemeAsync">
                 <span aria-hidden="true">🌓</span>

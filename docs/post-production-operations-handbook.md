@@ -64,7 +64,8 @@ Do not recreate App Runner, Aurora, or ECS for Widget.
 
 ### Monthly
 
-- Run the QuickBooks import through the upload panel.
+- Run the QuickBooks import through the upload panel. That panel is still the clerk import.
+- An operator can report new check-listing workbooks with `./Scripts/import-deb-backup.sh`. `--commit` sends the new checks through that same import. It does not replace the panel, and it does not read a company file.
 - Keep the operator, enterprise, fiscal year, filenames, and row counts.
 - Open one workspace snapshot and confirm the figures match the import.
 
@@ -395,22 +396,17 @@ Rules:
 
 ## 11. Backup, Recovery, And Restore Readiness
 
-Runbook: [backup-and-restore.md](backup-and-restore.md). File-level check: `./Scripts/backup-restore-drill.sh`. Health and the Town Hall contact: [health-and-alerting.md](health-and-alerting.md) and `/support`. Clerk page: [clerk-quick-start.md](clerk-quick-start.md).
+The live Wiley Widget database is `wileyco_dev` on Synology Postgres at `mr-storage:5433`. Clerk steps and the one manual dump are in `docs/clerk-mac-runbook.md`. Do not restore over `wileyco_dev`.
 
-Aurora PostgreSQL is the system of record.
+`docs/backup-and-restore.md` and `./Scripts/backup-restore-drill.sh` check a throwaway SQLite file. They do not dump or restore `wileyco_dev`. A scheduled NAS backup and a restore that can create `postgis` and `vector` are still open. Health and the Town Hall contact: [health-and-alerting.md](health-and-alerting.md) and `/support`. Clerk page: [clerk-quick-start.md](clerk-quick-start.md).
+
+The Aurora cluster and App Runner restore steps in `docs/backup-and-restore.md` and `docs/aurora-postgresql-reset-runbook.md` are historical. Do not treat Aurora as the system of record.
 
 Standing rules:
 
-- take and retain appropriate recovery points before destructive schema or data operations
-- treat the encrypted Aurora cluster as the only live target
-- use the existing Aurora runbook for reset or migration alignment
-- keep one tested non-destructive migration path available when direct TCP access is unavailable
-
-Best-practice cadence:
-
-- verify restore readiness quarterly
-- retain evidence of the last successful restore or recovery exercise
-- update the runbook when the recovery path changes
+- take a recovery point before a destructive schema or data change
+- keep the live target on `mr-storage`, not a removed cluster
+- record the date, the operator, and the check that was opened
 
 ## 12. Security And Access
 

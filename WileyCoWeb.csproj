@@ -179,6 +179,11 @@
       WriteOnlyWhenDifferent="true" />
   </Target>
 
+  <ItemGroup>
+    <EmbeddedResource Include="shared-contracts/examples/actuals-summary-utility-oct-2026.json" />
+    <EmbeddedResource Include="shared-contracts/examples/operational-events-oct-2026-checks.json" />
+  </ItemGroup>
+
   <!-- Prompt 4: mirror shared-contracts examples into wwwroot for optional UI ingest. -->
   <Target Name="CopySharedContractExamplesToWwwroot" BeforeTargets="PrepareForBuild">
     <ItemGroup>

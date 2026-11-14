@@ -121,7 +121,7 @@
         <p class="wiley-eyebrow wiley-eyebrow-muted">Break-Even Visuals</p>
         <div class="mt-3 grid gap-4 wiley-split-wide">
             <div id="break-even-gauge-card" class="rounded-2xl wiley-border p-3">
-                <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="700" Width="100%" Height="260px">
+                <SfCircularGauge ID="break-even-rate-gauge" Title="Rate gauge" EnableGroupingSeparator="true" AllowMargin="true" AnimationDuration="@(AnimateVisuals ? 700 : 0)" Width="100%" Height="260px">
                     <CircularGaugeAxes>
                         <CircularGaugeAxis Minimum="0" Maximum="@GaugeMaximum" StartAngle="210" EndAngle="150" Radius="80%">
                             <CircularGaugeAxisLineStyle Width="8" Color="#e2e8f0" />
@@ -139,7 +139,7 @@
             </div>
 
             <div id="break-even-chart-card" class="rounded-2xl wiley-border p-3">
-                <SfChart ID="break-even-rate-comparison-chart" Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="true" UseGroupingSeparator="true" Width="100%" Height="260px" Theme="Syncfusion.Blazor.Theme.Fluent2">
+                <SfChart ID="break-even-rate-comparison-chart" Title="Current vs Break-Even Rate" AccessibilityDescription="Bar chart comparing current rate and break-even rate." EnableAnimation="@AnimateVisuals" UseGroupingSeparator="true" Width="100%" Height="260px" Theme="Syncfusion.Blazor.Theme.Fluent2">
                     <ChartArea>
                         <ChartAreaBorder Width="0"></ChartAreaBorder>
                     </ChartArea>
@@ -240,7 +240,7 @@
                             <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Rate Adequacy</p>
                             <SfCircularGauge ID="@GetQuadrantGaugeId(quadrant)"
                                              AllowMargin="true"
-                                             AnimationDuration="700"
+                                             AnimationDuration="@(AnimateVisuals ? 700 : 0)"
                                              Width="100%"
                                              Height="160px"
                                              Background="transparent">
@@ -279,7 +279,7 @@
                             <SfChart ID="@GetQuadrantChartId(quadrant)"
                                      Title="@($"{quadrant.EnterpriseName} break-even")"
                                      AccessibilityDescription="@($"Line chart showing revenue, expenses, and break-even for {quadrant.EnterpriseName}.")"
-                                     EnableAnimation="true"
+                                     EnableAnimation="@AnimateVisuals"
                                      UseGroupingSeparator="true"
                                      Width="100%"
                                      Height="300px"

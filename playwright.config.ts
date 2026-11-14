@@ -8,11 +8,23 @@ const isCI = process.env.CI === "true";
  * CI starts Kestrel on 127.0.0.1:5231 only. On Linux, `localhost` often resolves to ::1 first, so
  * `http://localhost:5230` → `http://localhost:5231` misses the IPv4 listener and the shell never loads.
  */
-const loopbackClientBaseURL = "http://127.0.0.1:5230";
+function envPort(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 && parsed < 65536 ? parsed : fallback;
+}
+
+/** Clerk app keeps 5230/5231. Local CI sets the next pair so it tests this commit. */
+const ciClientPort = envPort("WILEY_CI_CLIENT_PORT", 5230);
+const ciApiPort = envPort("WILEY_CI_API_PORT", ciClientPort + 1);
+const loopbackClientBaseURL = `http://127.0.0.1:${ciClientPort}`;
 const defaultLocalBaseURL = isCI
   ? loopbackClientBaseURL
   : "http://localhost:5230";
-const defaultLocalApiURL = "http://127.0.0.1:5231";
+const defaultLocalApiURL = `http://127.0.0.1:${ciApiPort}`;
 
 /** CI: comma/space-separated subset, e.g. `chromium` or `chromium,webkit`. Default: both. */
 function ciBrowserProjectNames(): ("chromium" | "webkit")[] {
@@ -66,7 +78,7 @@ const pathWithDotnet = dotnetRoot
 const finalWebServer = isCI
   ? [
       {
-        command: "dotnet ./WileyCoWeb.Api.dll --urls http://127.0.0.1:5231",
+        command: `dotnet ./WileyCoWeb.Api.dll --urls http://127.0.0.1:${ciApiPort}`,
         cwd: "./api_output",
         url: `${defaultLocalApiURL}/health`,
         reuseExistingServer: true,
@@ -85,7 +97,7 @@ const finalWebServer = isCI
         },
       },
       {
-        command: `node ./Scripts/serve-wwwroot.mjs --root ${ciWwwroot} --port 5230`,
+        command: `node ./Scripts/serve-wwwroot.mjs --root ${ciWwwroot} --port ${ciClientPort}`,
         url: defaultLocalBaseURL,
         reuseExistingServer: true,
         timeout: 60_000,

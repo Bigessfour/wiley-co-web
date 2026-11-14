@@ -197,14 +197,16 @@ The current clerk-facing QuickBooks import path is the QuickBooks Import panel i
 - Supported upload types: `.csv`, `.xlsx`, `.xls`
 - Target table: `ledger_entries` through the thin API import endpoints
 
-Use [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md) for the operating procedure, required columns, export rules, and the guardrails the town clerk needs to follow before importing into Aurora through Wiley Widget.
+Use [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md) for the operating procedure, required columns, export rules, and the guardrails the town clerk needs to follow before importing into `wileyco_dev` on `mr-storage`.
+
+The upload panel is still the clerk import. `./Scripts/import-deb-backup.sh` is the operator path: it turns new check-listing workbooks into that same import. It does not read a QuickBooks company file. A run with no arguments writes nothing. `--commit` writes.
 
 Current data-path note:
 
-- QuickBooks Desktop imports persist into `import_batches`, `source_files`, and `ledger_entries`.
+- QuickBooks Desktop imports persist into `import_batches`, `source_files`, and `ledger_entries` on Synology Postgres.
 - Reserve and historical-ledger analytics read from `ledger_entries`.
 - Workspace baseline, top-variance, and scenario composition still depend on `Enterprises`, `BudgetEntries`, `MunicipalAccounts`, and `BudgetSnapshots`.
-- Rebuilding Aurora with only import-pipeline tables is not sufficient for the full workspace analysis surface.
+- Import-pipeline tables alone are not the full workspace analysis surface.
 
 Reference-data note:
 
@@ -250,14 +252,19 @@ Runtime sizing used for the first App Runner deployment: `0.5 vCPU / 1 GB` with 
 
 ## Post-Production Operations
 
-The repository now separates day-two operations guidance from release-status notes.
+Day-to-day operation is the office Mac and Synology Postgres. Use these:
 
-- Use [docs/post-production-operations-handbook.md](docs/post-production-operations-handbook.md) as the primary day-two production handbook for releases, rollback planning, monitoring, incident first response, data operations, and release evidence.
-- Use [docs/post-production-documentation-review.md](docs/post-production-documentation-review.md) for the documentation inventory, identified gaps, and the recommended follow-on doc set for release records, incident response, and secret rotation.
-- Use [docs/release-record-template.md](docs/release-record-template.md) for every production release, even small ones.
-- Use [docs/secrets-and-config-rotation-runbook.md](docs/secrets-and-config-rotation-runbook.md) when rotating runtime secrets or changing App Runner configuration.
-- Use [docs/incident-response-matrix.md](docs/incident-response-matrix.md) to classify production incidents and keep first response disciplined.
-- Keep [docs/aws-server-side-closure-plan.md](docs/aws-server-side-closure-plan.md), [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md), and [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md) as the authoritative specialist documents linked from the handbook.
+- [docs/production-completion-plan.md](docs/production-completion-plan.md) for the definition of production ready
+- [docs/clerk-mac-runbook.md](docs/clerk-mac-runbook.md) for start, stop, and backup steps
+- [docs/post-production-operations-handbook.md](docs/post-production-operations-handbook.md) for the operator cadence
+- [docs/quickbooks-desktop-import-guide.md](docs/quickbooks-desktop-import-guide.md) for the clerk import panel
+
+These pages describe the removed Amplify, App Runner, and Aurora hosts. Do not use them to deploy or restore:
+
+- [docs/secrets-and-config-rotation-runbook.md](docs/secrets-and-config-rotation-runbook.md)
+- [docs/incident-response-matrix.md](docs/incident-response-matrix.md)
+- [docs/aws-server-side-closure-plan.md](docs/aws-server-side-closure-plan.md)
+- [docs/aurora-postgresql-reset-runbook.md](docs/aurora-postgresql-reset-runbook.md)
 
 ## Town Email Alias Routing
 

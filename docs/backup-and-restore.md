@@ -1,16 +1,18 @@
 # Backup and restore
 
-Two data planes. Aurora holds the Wiley Widget workspace. The NAS holds ClerkSuite apartments (SQLite) and the document vault.
+Wiley Widget's database is Synology Postgres `wileyco_dev` at `mr-storage:5433`. The clerk dump note is `docs/clerk-mac-runbook.md`. Do not restore over `wileyco_dev`.
 
-Do not restore either plane during a council meeting. Stop writes first. Do not copy the live SQLite file over SMB while the container is running.
+The NAS also holds ClerkSuite apartments (SQLite) and the document vault. Do not restore during a council meeting. Stop writes first. Do not copy the live SQLite file over SMB while the container is running.
 
 ## What was tested here
 
-`Scripts/backup-restore-drill.sh` builds a throwaway SQLite file, copies it, deletes the row, copies the backup back, and checks the row. That is the file-level procedure. It does not touch Aurora or the NAS.
+`Scripts/backup-restore-drill.sh` builds a throwaway SQLite file, copies it, deletes the row, copies the backup back, and checks the row. That procedure does not dump `wileyco_dev` and does not touch the NAS.
 
-Aurora point-in-time restore and a DSM restore onto the live volume were not run. Those need the `steve` profile (session was expired) and a maintenance window.
+A DSM restore onto the live volume was not run.
 
-## Aurora (Wiley Widget)
+## Historical: Aurora (removed)
+
+Amplify, App Runner, and Aurora were removed. Do not run these commands against a live Widget database. The old cluster record was:
 
 | Item | Value |
 | --- | --- |

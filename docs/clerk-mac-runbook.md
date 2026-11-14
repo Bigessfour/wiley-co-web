@@ -14,6 +14,8 @@ Support contact: `steve.mckitrick@townofwiley.gov`.
 
 Monthly QuickBooks import: `docs/quickbooks-desktop-import-guide.md`.
 
+A new backup of Deb's PC can send new ledger spreadsheets through that same import. The company file is not read. See "Deb's backup" below.
+
 ## For the operator
 
 Start, check, and stop:
@@ -60,3 +62,16 @@ There is no pager. The daily check is `./Scripts/status-clerk-local.sh`. If it f
 That dump is not yet a passed restore test. `wiley_app` cannot `CREATE DATABASE` on the NAS, so the dump was not restored there. A local Postgres restore stopped because this Mac does not have the `postgis` and `vector` extensions the dump creates.
 
 Until a scheduled NAS backup exists, the recovery point is this one manual dump. Do not treat that as an ongoing backup. Next step is a Synology backup of the database directory, or a role that can create a scratch database on `mr-storage`, then one restore that can run `CREATE EXTENSION postgis` and `CREATE EXTENSION vector`. Do not restore over `wileyco_dev`.
+
+### Check listings and Deb's backup
+
+The files that change are the meeting workbooks under `CHECK LISTING/2026 CHECK LISTING` on `mr-storage`. Those are check listings (check number, date, payee, amount, and what it was for), not the QuickBooks company file. The company files on the share were last saved in March 2025, and Deb's PC backup does not contain one.
+
+`./Scripts/import-deb-backup.sh` copies those workbooks, turns each check into the transaction list the QuickBooks import already accepts, and reports what would load. General Fund and bank balances are left out. A check that is already in the ledger is skipped, and the new checks in that same workbook can still load.
+
+```bash
+./Scripts/import-deb-backup.sh
+./Scripts/import-deb-backup.sh --commit
+```
+
+The first command writes nothing. `--commit` writes into `wileyco_dev`. The manual import panel is unchanged. The start script does not run this. `--install` checks every 15 minutes and still only reports until someone runs `--commit`.

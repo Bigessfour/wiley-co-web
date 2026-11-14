@@ -56,9 +56,34 @@
 
     protected override void OnParametersSet()
     {
+        if (SameUnitTypes(editableUnitTypes, UnitTypes))
+        {
+            return;
+        }
+
         editableUnitTypes = UnitTypes
             .Select(unitType => new ApartmentUnitTypeData(unitType.Id, unitType.Name, unitType.BedroomCount, unitType.UnitCount, unitType.MonthlyRent))
             .ToList();
+    }
+
+    private static bool SameUnitTypes(
+        IReadOnlyList<ApartmentUnitTypeData> current,
+        IReadOnlyList<ApartmentUnitTypeData> next)
+    {
+        if (current.Count != next.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < current.Count; index++)
+        {
+            if (current[index] != next[index])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private decimal TotalUnits => editableUnitTypes.Sum(unitType => unitType.UnitCount);

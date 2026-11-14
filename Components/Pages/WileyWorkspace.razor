@@ -1,6 +1,7 @@
 @page "/wiley-workspace"
 @page "/wiley-workspace/{Panel?}"
 
+@using Microsoft.JSInterop
 @using Syncfusion.Blazor.Buttons
 @using Syncfusion.Blazor.Cards
 @using Syncfusion.Blazor.DropDowns
@@ -170,7 +171,7 @@
                     ID="workspace-main-splitter"
                     Height="calc(100vh - 26rem)"
                     Width="100%"
-                    EnablePersistence="true"
+                    EnablePersistence="false"
                     CssClass="workspace-splitter">
             <SplitterEvents Collapsed="HandleSplitterCollapsed" Expanded="HandleSplitterExpanded" />
             <SplitterPanes>
@@ -526,6 +527,7 @@
                                                         ApartmentUnitTypes="@ApartmentUnitTypes"
                                                         OnTotalCostsChanged="HandleTotalCostsChanged"
                                                         OnProjectedVolumeChanged="HandleProjectedVolumeChanged"
+                                                        AnimateVisuals="@AnimateBreakEvenVisuals"
                                                         OnSaveWorkspaceBaseline="SaveWorkspaceBaselineAsync"
                                                         OnApartmentUnitTypesChanged="HandleApartmentUnitTypesChanged" />
                                         break;
@@ -626,8 +628,7 @@
 
                 @* Jarvis Rail – pane 2: AI chat, starts collapsed *@
                 <SplitterPane Size="340px" Min="48px" Max="520px" Resizable="true" Collapsible="true"
-                              Collapsed="@(!IsJarvisOpen)"
-                              CollapsedChanged="HandleJarvisPaneCollapsedChanged">
+                              @bind-Collapsed="JarvisCollapsed">
                     <ContentTemplate>
                         <div id="workspace-jarvis-rail" class="workspace-pane-jarvis flex flex-col h-full">
                             <div class="workspace-jarvis-rail-header flex items-center gap-3 border-b px-4 py-3 flex-shrink-0 wiley-surface-panel-secondary">
@@ -1169,32 +1170,57 @@
 
 @code {
     private SfSplitter? _workspaceSplitter;
+    private bool _jarvisCollapsed = true;
 
-    /// <summary>
-    /// Toggles the Jarvis AI chat pane by flipping the layout context flag.
-    /// The pane itself is now declaratively bound to IsJarvisOpen (official
-    /// Syncfusion controlled-state pattern for SplitterPane), so no imperative
-    /// Expand/Collapse calls are needed. This eliminates the previous race
-    /// condition that caused the launcher click to appear as a no-op.
-    /// </summary>
-    private void ToggleJarvisAsync()
+    private bool JarvisCollapsed
     {
-        // ToggleJarvis() calls LayoutContext.SetJarvisOpen(!current) which fires
-        // OnChange — any subscriber (e.g. a decision-support badge) re-renders.
-        // The SplitterPane for Jarvis (pane 2) reacts automatically via its
-        // Collapsed binding.
-        ToggleJarvis();
+        get => _jarvisCollapsed;
+        set
+        {
+            if (_jarvisCollapsed == value)
+            {
+                return;
+            }
+
+            _jarvisCollapsed = value;
+            LayoutContext?.SetJarvisOpen(!value);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _jarvisCollapsed = !IsJarvisOpen;
+        base.OnInitialized();
     }
 
     /// <summary>
-    /// Keeps the layout context in sync when the user manually collapses or
-    /// expands the Jarvis rail via the splitter handle. Called from the
-    /// CollapsedChanged event on the Jarvis SplitterPane.
+    /// Opens or closes the Jarvis rail. Two-way <c>Collapsed</c> binding is what
+    /// Syncfusion applies after the first render. <c>ExpandAsync</c> /
+    /// <c>CollapseAsync</c> move the pane when that binding does not.
     /// </summary>
-    private void HandleJarvisPaneCollapsedChanged(bool collapsed)
+    private async Task ToggleJarvisAsync()
     {
-        LayoutContext?.SetJarvisOpen(!collapsed);
-        StateHasChanged();
+        JarvisCollapsed = !JarvisCollapsed;
+        if (_workspaceSplitter is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (JarvisCollapsed)
+            {
+                await _workspaceSplitter.CollapseAsync(2);
+            }
+            else
+            {
+                await _workspaceSplitter.ExpandAsync(2);
+            }
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException)
+        {
+            // Component tests have no splitter script. The bound flag still updates.
+        }
     }
 
     /// <summary>
@@ -1205,13 +1231,6 @@
     /// </summary>
     private void HandleSplitterCollapsed(Syncfusion.Blazor.Layouts.ExpandedEventArgs args)
     {
-        if (args.Index.Contains(2) && IsJarvisOpen)
-        {
-            // Jarvis pane was closed externally (drag handle) — sync the context.
-            LayoutContext?.SetJarvisOpen(false);
-            StateHasChanged();
-        }
-
         if (args.Index.Contains(0) && !IsContextRailCollapsed)
         {
             // Context rail pane was collapsed — notify the context so panels can
@@ -1227,12 +1246,6 @@
     /// </summary>
     private void HandleSplitterExpanded(Syncfusion.Blazor.Layouts.ExpandedEventArgs args)
     {
-        if (args.Index.Contains(2) && !IsJarvisOpen)
-        {
-            LayoutContext?.SetJarvisOpen(true);
-            StateHasChanged();
-        }
-
         if (args.Index.Contains(0) && IsContextRailCollapsed)
         {
             NotifyContextRailExpanded();

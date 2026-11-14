@@ -138,6 +138,17 @@ if [[ "$SKIP_PLAYWRIGHT" -eq 0 ]]; then
   '
   npm ci
   npx playwright install chromium
+  # The clerk app stays on 5230/5231. Reusing it would test that process, not this commit.
+  # The Blazor client calls the API at the same host, port + 1.
+  if lsof -nP -iTCP:5230 -sTCP:LISTEN >/dev/null 2>&1 || lsof -nP -iTCP:5231 -sTCP:LISTEN >/dev/null 2>&1; then
+    if lsof -nP -iTCP:5240 -sTCP:LISTEN >/dev/null 2>&1 || lsof -nP -iTCP:5241 -sTCP:LISTEN >/dev/null 2>&1; then
+      fail "Playwright ports 5240 and 5241 are already in use"
+    fi
+    export WILEY_CI_CLIENT_PORT=5240
+    export WILEY_CI_API_PORT=5241
+    export WILEYCO_E2E_BASE_URL="http://127.0.0.1:5240"
+    echo "Clerk ports are in use. Playwright will use ${WILEYCO_E2E_BASE_URL} and API port 5241."
+  fi
   npm run playwright:test:ci:smoke
   npm run playwright:test:ci:highrisk
   node ./Scripts/assert-playwright-results.mjs

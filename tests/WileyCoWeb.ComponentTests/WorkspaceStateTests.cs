@@ -100,6 +100,25 @@ public sealed class WorkspaceStateTests
 	}
 
 	[Fact]
+	public void SetTotalCosts_ZeroVolume_KeepsTheQuadrantUnpublished()
+	{
+		var state = new WorkspaceState();
+		state.ApplyBootstrap(WorkspaceTestData.CreateWaterUtilityBootstrap(
+			WorkspaceTestData.BasePlanningScenario,
+			WorkspaceTestData.WaterCurrentRate,
+			totalCosts: 0m,
+			projectedVolume: 0m,
+			DateTime.UtcNow.ToString("O")));
+
+		state.SetTotalCosts(250_000m);
+
+		var water = state.BreakEvenQuadrants.Single(quadrant => quadrant.EnterpriseName == WorkspaceTestData.WaterUtility);
+		Assert.Equal(250_000m, water.MonthlyExpenses);
+		Assert.Equal(0m, water.EffectiveCustomerCount);
+		Assert.Equal(0m, water.BreakEvenRate);
+	}
+
+	[Fact]
 	public void SetStartupSource_UpdatesStartupStatusAndFallbackFlag()
 	{
 		var state = new WorkspaceState();

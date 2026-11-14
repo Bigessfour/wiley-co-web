@@ -775,14 +775,18 @@ public sealed class WorkspaceState
 
     private BreakEvenQuadrantData RecalculateBreakEvenQuadrant(BreakEvenQuadrantData quadrant)
     {
-        var effectiveCustomerCount = Math.Max(1m, quadrant.EffectiveCustomerCount);
+        // Keep a zero customer count. Coercing it to 1 publishes a huge break-even
+        // rate and mounts the animated quadrant charts for an enterprise that has no volume.
+        var effectiveCustomerCount = quadrant.EffectiveCustomerCount;
         var breakEvenRate = EnterpriseRateService.CalculateBreakEvenRate(
             quadrant.MonthlyExpenses,
             effectiveCustomerCount,
             roundToCurrency: false);
         var monthlyRevenue = EnterpriseRateService.CalculateMonthlyRevenue(quadrant.CurrentRate, effectiveCustomerCount);
         var monthlyBalance = EnterpriseRateService.CalculateMonthlyBalance(monthlyRevenue, quadrant.MonthlyExpenses);
-        var seriesPoints = RecalculateBreakEvenSeriesPoints(quadrant.SeriesPoints, quadrant.CurrentRate, breakEvenRate);
+        var seriesPoints = effectiveCustomerCount > 0m
+            ? RecalculateBreakEvenSeriesPoints(quadrant.SeriesPoints, quadrant.CurrentRate, breakEvenRate)
+            : quadrant.SeriesPoints.ToList();
 
         return new BreakEvenQuadrantData(
             quadrant.EnterpriseName,
