@@ -396,7 +396,7 @@ Rules:
 
 ## 11. Backup, Recovery, And Restore Readiness
 
-The live Wiley Widget database is `wileyco_dev` on Synology Postgres at `mr-storage:5433`. Clerk steps and the one manual dump are in `docs/clerk-mac-runbook.md`. Do not restore over `wileyco_dev`.
+The live Wiley Widget database is `wileyco_dev` on Synology Postgres at `mr-storage:5433`. The dated dump and the restore steps are in `docs/clerk-mac-runbook.md` under Backup proof. Do not restore over `wileyco_dev`.
 
 `docs/backup-and-restore.md` and `./Scripts/backup-restore-drill.sh` check a throwaway SQLite file. They do not dump or restore `wileyco_dev`. A scheduled NAS backup and a restore that can create `postgis` and `vector` are still open. Health and the Town Hall contact: [health-and-alerting.md](health-and-alerting.md) and `/support`. Clerk page: [clerk-quick-start.md](clerk-quick-start.md).
 
