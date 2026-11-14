@@ -15,6 +15,8 @@ wwwroot/shared-contracts/
 !.cursor/hooks.json
 !.cursor/hooks/
 !.cursor/hooks/**
+!.cursor/skills/
+!.cursor/skills/**
 bin/
 obj/
 wwwroot/appsettings.json
@@ -90,6 +92,8 @@ playwright-live-*.json
 CRAP-Analysis-Report.md
 crap_results_updated.csv
 Import Data/seed-pass-*/
+# Clerk FY2026 / NAS ledger packs — municipal financials; keep local-only
+Import Data/tow-october-2026/
 pids
 *.pid
 *.seed

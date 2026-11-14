@@ -157,6 +157,12 @@
             <p class="text-sm wiley-text-muted">Normalized to $/customer · Water · Sewer · Trash · Apartments</p>
         </div>
 
+        @if (VisibleQuadrants.Count == 0)
+        {
+            <section id="break-even-import-note" class="rounded-2xl border-dashed wiley-border wiley-surface-panel-secondary p-6 text-sm wiley-text-muted">
+                @QuickBooksImportNotes.BudgetAndCustomers
+            </section>
+        }
         <div id="break-even-quadrant-grid" class="grid gap-4 lg:grid-cols-2 auto-rows-fr">
             @foreach (var quadrant in VisibleQuadrants)
             {
@@ -198,7 +204,7 @@
                                        CloseDelay="200">
                                 <div class="rounded-xl wiley-border wiley-surface-panel p-2 shadow-sm">
                                     <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Break-Even</p>
-                                    <p class="mt-0.5 text-sm font-bold wiley-text">@quadrant.BreakEvenRate.ToString("C2")</p>
+                                    <p class="mt-0.5 text-sm font-bold wiley-text">@(QuadrantNeedsQuickBooksImport(quadrant) ? "Needs QuickBooks import" : quadrant.BreakEvenRate.ToString("C2"))</p>
                                 </div>
                             </SfTooltip>
                             <SfTooltip Content="Net surplus or deficit per customer per month at current rate."
@@ -208,14 +214,20 @@
                                        CloseDelay="200">
                                 <div class="rounded-xl wiley-border wiley-surface-panel p-2 shadow-sm">
                                     <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Balance</p>
-                                    <p class="mt-0.5 text-sm font-bold @(quadrant.MonthlyBalance >= 0 ? "wiley-status-ok" : "wiley-status-bad")">
-                                        @quadrant.MonthlyBalance.ToString("C0")
+                                    <p class="mt-0.5 text-sm font-bold @(QuadrantNeedsQuickBooksImport(quadrant) ? "wiley-text-muted" : quadrant.MonthlyBalance >= 0 ? "wiley-status-ok" : "wiley-status-bad")">
+                                        @(QuadrantNeedsQuickBooksImport(quadrant) ? "Needs QuickBooks import" : quadrant.MonthlyBalance.ToString("C0"))
                                     </p>
                                 </div>
                             </SfTooltip>
                         </div>
 
 
+                        @if (QuadrantNeedsQuickBooksImport(quadrant))
+                        {
+                            <p class="text-sm wiley-text-muted">@QuickBooksImportNotes.BudgetAndCustomers</p>
+                        }
+                        else
+                        {
                         <div class="flex flex-col items-center gap-1">
                             <p class="text-[10px] font-semibold uppercase tracking-wide wiley-text-muted">Rate Adequacy</p>
                             <SfCircularGauge ID="@GetQuadrantGaugeId(quadrant)"
@@ -310,6 +322,7 @@
                                 </ChartSeriesCollection>
                             </SfChart>
                         </div>
+                        }
 
                     </div>
                 </section>

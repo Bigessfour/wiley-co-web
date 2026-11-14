@@ -12,7 +12,6 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write # required for GitHub OIDC — deployment-guard assumes role via federation
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -392,39 +391,3 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: warn
-
-  deployment-guard:
-    runs-on: ubuntu-latest
-    needs: [build-and-publish, playwright-ui]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::570912405222:role/wiley-co-github-ci
-          aws-region: us-east-2
-
-      - name: Fail if latest Amplify main job is unhealthy
-        run: |
-          set -euo pipefail
-          latest_status="$(aws amplify list-jobs --app-id d2ellat1y3ljd9 --branch-name main --max-items 1 --query 'jobSummaries[0].status' --output text)"
-          if [ -z "$latest_status" ] || [ "$latest_status" = "None" ]; then
-            echo "Unable to resolve the latest Amplify main job status."
-            exit 1
-          fi
-          echo "Latest Amplify main job status: $latest_status"
-          if [ "$latest_status" = "FAILED" ] || [ "$latest_status" = "CANCELLED" ]; then
-            echo "Amplify main latest job is $latest_status. Failing deployment guard."
-            exit 1
-          fi
-
-      - name: Fail if live Syncfusion settings endpoint returns 404
-        run: |
-          set -euo pipefail
-          status_code="$(curl -s -o /dev/null -w '%{http_code}' https://wileywidget.townofwiley.gov/appsettings.Syncfusion.local.json)"
-          echo "Live appsettings.Syncfusion.local.json status: $status_code"
-          if [ "$status_code" = "404" ]; then
-            echo "Live endpoint returned 404 for appsettings.Syncfusion.local.json. Failing deployment guard."
-            exit 1
-          fi

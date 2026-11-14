@@ -1,6 +1,8 @@
 # Council readiness (May 2026)
 
-This runbook turns static “looks stuck” observations into **checklist evidence** for the Wiley Widget workspace (`wileywidget.townofwiley.gov` and Amplify hosts).
+**Historical (removed 2026-11).** `wileywidget.townofwiley.gov` and the Amplify hosts in this runbook do not serve Widget. Run the same UI checks against `http://127.0.0.1:5230` after `./Scripts/start-clerk-local.sh`.
+
+This runbook turned static “looks stuck” observations into checklist evidence for the Wiley Widget workspace on those hosts.
 
 ## 1. Prove Blazor vs static HTML vs API
 

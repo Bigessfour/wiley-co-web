@@ -9,7 +9,7 @@ namespace WileyWidget.Models.Validators
             RuleFor(x => x.Name).NotEmpty();
             RuleFor(x => x.CurrentRate).GreaterThan(0);
             RuleFor(x => x.MonthlyExpenses).GreaterThanOrEqualTo(0);
-            RuleFor(x => x.CitizenCount).GreaterThan(0);
+            RuleFor(x => x.CitizenCount).GreaterThanOrEqualTo(0);
         }
     }
 }

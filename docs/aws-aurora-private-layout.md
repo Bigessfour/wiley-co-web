@@ -1,6 +1,8 @@
 # AWS Aurora Private Layout
 
-This note records the private AWS footprint used for the Wiley.co database and the schema deployment target.
+**Historical (removed 2026-11).** This VPC and Aurora cluster are not the live database. The live database is Synology Postgres on `mr-storage:5433`. See `docs/production-completion-plan.md`.
+
+This note records the private AWS footprint that was used for the Wiley.co database.
 
 ## Network footprint
 
