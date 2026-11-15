@@ -90,13 +90,13 @@ TOWN_HUB_TIKR_URL=http://mr-storage:8080 \
 
 Clerk databases stay on the Synology (`mr-storage`) over Tailscale. Production card URLs:
 
-| Card         | URL                                          | What the clerk sees                       |
-| ------------ | -------------------------------------------- | ---------------------------------------- |
-| Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open         |
-| Apartments   | `http://mr-storage:8082`                     | NAS, Postgres `clerksuite` on `:5433`. Sign in again there. |
-| TIKR         | `http://mr-storage:8080`                     | NAS, SQLite. Sign in again there.                            |
-| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app. Same Town Hub sign-in.                 |
-| Rural Water  | empty (card disabled)                        | No site yet. The card stays closed.                          |
+| Card         | URL                                          | What the clerk sees                                         |
+| ------------ | -------------------------------------------- | ----------------------------------------------------------- |
+| Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open                            |
+| Apartments   | `http://mr-storage:8082`                     | NAS, Postgres `clerksuite` on `:5433`. Uses the ClerkSuite login. |
+| TIKR         | `http://mr-storage:8080`                     | NAS web app. No sign-in.                                    |
+| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app. Same Town Hub sign-in.                |
+| Rural Water  | empty (card disabled)                        | No site yet. The card stays closed.                         |
 
 `wwwroot/appsettings.Development.json` keeps `localhost` ports for Mac development. Tailscale names resolve only on the tailnet, which is the clerk path. Do not replace them with App Runner placeholders.
 
@@ -105,18 +105,17 @@ Amplify `TOWN_HUB_*_URL` overrides still work when a card must move. Leave them 
 ## Auth and who sees which card
 
 - **Local:** `Auth:Enabled` = `false` → no Cognito gate, and every card is shown so local testing does not depend on groups. The disabled-auth login page links to Town Hub (`/`).
-- **Production (NAS-first, 2026-11):** `Auth:Enabled` = `false` until a live Cognito pool exists on the Town account. The prior pool `us-east-2_DmY7BCBIp` was removed. Do not publish that pool id. When auth returns, set `Auth:Enabled=true` and regenerate via `Scripts/generate-auth-appsettings.sh`. Hosted UI is the sign-in flow (`Auth:SignInFlow=HostedUi`).
+- **Production (NAS-first, 2026-11):** `Auth:Enabled` stays `false` on the office Mac. Physical access plus Tailscale is the boundary. The `Townofwiley-staff` pool is ready if login is turned on later. The prior pool `us-east-2_DmY7BCBIp` was removed. Do not publish that pool id. If login is turned on later, set client `Auth:Enabled=true` and API JWT on together and use Hosted UI (`Auth:SignInFlow=HostedUi`).
 
-When auth is on, cards follow `cognito:groups` (`AllowedGroups` on each app, or the built-in default):
+When auth is on, cards follow `cognito:groups` and the Hosted UI role claim (`AllowedGroups` on each app, or the built-in default):
 
-| Group | Cards |
-| ----- | ----- |
-| `Clerk` | Wiley Widget, Apartments, Rural Water, Trash Truck, TIKR |
-| `Driver` | Trash Truck only |
-| `admin` | All cards |
-| Signed in, no groups claim | Same as `Clerk`, so a token that has not been stamped yet does not blank the hub |
+| Group                      | Cards                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `Staff`                    | Wiley Widget, Apartments, Rural Water, Trash Truck, TIKR                         |
+| `Driver`                   | Trash Truck only                                                                 |
+| Signed in, no groups claim | Same as `Staff`, so a token that has not been stamped yet does not blank the hub |
 
-Trash Truck opens `{url}/clerk` or `{url}/driver` from those groups and says it uses this sign-in. Apartments and TIKR on `http://` hosts other than localhost say **office network only** and tell the clerk to sign in again. They do not share the Town Hub login. Rural Water with an empty URL is a closed **Coming soon** card.
+Trash Truck opens `{url}/clerk` or `{url}/driver` from those groups and says it uses this sign-in. Apartments uses the ClerkSuite login. TIKR on an `http://` host other than localhost says **office network only** and does not ask for a password. Rural Water with an empty URL is a closed **Coming soon** card.
 
 ## Related docs
 

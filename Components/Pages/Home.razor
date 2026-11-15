@@ -25,7 +25,7 @@
 		<h1>Town Hub</h1>
 		<p class="home-hub-copy">
 			Single entry point for town apps. Trash Truck uses this sign-in.
-			Apartments and TIKR on the office network use their own sign-in.
+			Apartments uses the ClerkSuite login. TIKR opens with no sign-in.
 			Rural Water stays closed until it has an address.
 			Summary tiles below read shared-contract reference data — full grid lives on the
 			<a href="/wiley-workspace/reference-data">Reference Data</a> workspace panel.
@@ -77,9 +77,9 @@
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
-					@if (TownHubCardAccess.IsOfficeNetworkOnly(app.Url))
+					@if (!string.IsNullOrEmpty(AccessNote(app)))
 					{
-						<p class="town-hub-access-note">@TownHubCardAccess.OfficeNetworkNote</p>
+						<p class="town-hub-access-note">@AccessNote(app)</p>
 					}
 					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
@@ -92,9 +92,9 @@
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
-					@if (TownHubCardAccess.IsOfficeNetworkOnly(app.Url))
+					@if (!string.IsNullOrEmpty(AccessNote(app)))
 					{
-						<p class="town-hub-access-note">@TownHubCardAccess.OfficeNetworkNote</p>
+						<p class="town-hub-access-note">@AccessNote(app)</p>
 					}
 					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
@@ -460,6 +460,19 @@
 
 	private static bool IsTrashTruck(TownHubAppLink app) =>
 		string.Equals(app.Id, "04", StringComparison.Ordinal);
+
+	private static string AccessNote(TownHubAppLink app)
+	{
+		if (string.Equals(app.Id, "05", StringComparison.Ordinal))
+			return "No sign-in. Office network only.";
+
+		if (string.Equals(app.Id, "02", StringComparison.Ordinal))
+			return "Uses the ClerkSuite login. Office network only.";
+
+		return TownHubCardAccess.IsOfficeNetworkOnly(app.Url)
+			? TownHubCardAccess.OfficeNetworkNote
+			: string.Empty;
+	}
 
 	private async Task OpenExternalAppAsync(TownHubAppLink app)
 	{

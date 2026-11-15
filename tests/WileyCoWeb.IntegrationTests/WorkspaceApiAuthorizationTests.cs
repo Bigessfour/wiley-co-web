@@ -35,6 +35,15 @@ public sealed class WorkspaceApiAuthorizationTests
         Assert.Equal(expected, StaffApiAccessHandler.HasApiAccess(new ClaimsPrincipal(identity)));
     }
 
+    [Theory]
+    [InlineData("Staff", true)]
+    [InlineData("Driver", false)]
+    public void HasApiAccess_ReadsHostedUiRoleClaims(string role, bool expected)
+    {
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], authenticationType: "test");
+        Assert.Equal(expected, StaffApiAccessHandler.HasApiAccess(new ClaimsPrincipal(identity)));
+    }
+
     [Fact]
     public async Task ProtectedEndpoint_Returns401_WhenJwtEnabled_AndNoToken()
     {

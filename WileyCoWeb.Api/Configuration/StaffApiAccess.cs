@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 namespace WileyCoWeb.Api.Configuration;
 
 /// <summary>
-/// Finance API access for a Cognito principal. A token with no <c>cognito:groups</c> claim is allowed
+/// Finance API access for a Cognito principal. Groups come from <c>cognito:groups</c> and from
+/// <c>ClaimTypes.Role</c>, which Hosted UI uses for the same claim. A token with no groups is allowed
 /// so staff are not locked out before the group is stamped. A token that lists groups and does not
 /// include Staff is forbidden.
 /// </summary>
@@ -43,6 +44,12 @@ public sealed class StaffApiAccessHandler : AuthorizationHandler<StaffApiAccessR
     {
         var groups = new List<string>();
         foreach (var claim in user.FindAll("cognito:groups"))
+        {
+            AddGroupValues(groups, claim.Value);
+        }
+
+        // Hosted UI maps RoleClaim "cognito:groups" onto ClaimTypes.Role.
+        foreach (var claim in user.FindAll(ClaimTypes.Role))
         {
             AddGroupValues(groups, claim.Value);
         }
