@@ -62,8 +62,8 @@ test("town hub lists app cards and workspace entry points", async ({ page }) => 
   await expect(page.locator('a.home-hub-card[href*="REPLACE-"]')).toHaveCount(0);
   await expect(page.locator(".home-hub-card a[href*='REPLACE-']")).toHaveCount(0);
   await expect(page.getByText("already signed in")).toHaveCount(0);
-  await expect(page.locator(".home-hub-copy")).toContainText("office network");
   await expect(page.locator(".home-hub-copy")).toContainText("ClerkSuite login");
+  await expect(page.locator(".town-hub-access-note", { hasText: "Office network only" })).toHaveCount(2);
   await expect(page.locator(".town-hub-access-note", { hasText: "same Town Hub sign-in" })).toBeVisible();
 
   // Wiley Widget is the configured same-origin card; a card with no URL is coming soon.
