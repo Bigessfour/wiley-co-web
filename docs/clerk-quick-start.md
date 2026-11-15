@@ -12,13 +12,13 @@ If sign-in stops, the page tells you to call Town Hall. You can also open **Help
 
 ## Cards
 
-| Card | What it is | Sign-in |
-| --- | --- | --- |
-| Wiley Widget | Water rate study in this app | Town Hub sign-in |
-| Trash Truck | Routes | Same Town Hub sign-in |
-| Apartments | Apartment operations | Office network only. Sign in again there. |
-| TIKR | TIKR | Office network only. Sign in again there. |
-| Rural Water | Not open yet | Coming soon |
+| Card         | What it is                   | Sign-in                                         |
+| ------------ | ---------------------------- | ----------------------------------------------- |
+| Wiley Widget | Water rate study in this app | Town Hub sign-in                                |
+| Trash Truck  | Routes                       | Same Town Hub sign-in                           |
+| Apartments   | Apartment operations         | Office network only. Uses the ClerkSuite login. |
+| TIKR         | Town documents and deadlines | Office network only. No sign-in.                |
+| Rural Water  | Not open yet                 | Coming soon                                     |
 
 Drivers see Trash Truck. Clerks and admins see the rest. Apartments and TIKR need the office network (Tailscale or the town LAN). They are not on the public internet.
 
