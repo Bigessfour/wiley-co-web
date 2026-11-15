@@ -98,6 +98,28 @@ globalThis.wileyDownloads = {
 // Opens a suite app without assigning location on this document.
 // Cursor's simple browser follows <a target="_blank"> in the same pane, which
 // reloads Town Hub into ClerkSuite's sign-in page.
+// Starts the staff hosted-UI session. Child apps reuse that cookie with prompt=none.
+globalThis.wileyTownSignIn = async function (domain, clientId, redirectUri) {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const url = new URL("/oauth2/authorize", domain);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", "openid email");
+  url.searchParams.set("code_challenge", challenge);
+  url.searchParams.set("code_challenge_method", "S256");
+  window.location.assign(url.toString());
+};
+
 globalThis.wileyOpenExternal = function (url) {
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   return !!opened;

@@ -6,7 +6,7 @@ public sealed class AffordabilityAnalysisService
 {
     private static readonly IReadOnlyList<AffordabilityCustomerClassDefinition> DefaultClassDefinitions =
     [
-        new("Residential", 0.66m, 128m, "#0ea5e9"),
+        new("Residential", 0.66m, AdoptedResidentialBill.TotalDue, "#0ea5e9"),
         new("Multi-Family", 0.12m, 96m, "#22c55e"),
         new("Commercial", 0.17m, 214m, "#f59e0b"),
         new("Industrial", 0.05m, 468m, "#ef4444")
