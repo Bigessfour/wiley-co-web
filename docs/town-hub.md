@@ -53,7 +53,7 @@ Each app entry:
   "Id": "02",
   "Title": "Apartments",
   "Description": "ClerkSuite apartments operations.",
-  "Url": "http://mr-storage:8082",
+  "Url": "https://mr-storage.tail57aa13.ts.net:8443",
   "OpenInNewTab": true,
   "ReferenceEnterpriseId": "tow-apartments",
   "ReferencePublisherSystem": "wiley-apartments"
@@ -69,7 +69,7 @@ Dev defaults match the NAS-first clerk path (Tailscale). Override with `appsetti
 | App          | Default `Url`                                |
 | ------------ | -------------------------------------------- |
 | Wiley Widget | `/wiley-workspace` (same origin)             |
-| Apartments   | `http://mr-storage:8082`                     |
+| Apartments   | `https://mr-storage.tail57aa13.ts.net:8443`                     |
 | Rural Water  | empty (card disabled)                        |
 | Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` |
 | TIKR         | `http://mr-storage:8080`                     |
@@ -80,7 +80,7 @@ Local env override example (NAS-first):
 
 ```bash
 TOWN_HUB_WIDGET_URL=/wiley-workspace \
-TOWN_HUB_APARTMENTS_URL=http://mr-storage:8082 \
+TOWN_HUB_APARTMENTS_URL=https://mr-storage.tail57aa13.ts.net:8443 \
 TOWN_HUB_TRASH_TRUCK_URL=https://main.d2dke4s7zyafra.amplifyapp.com \
 TOWN_HUB_TIKR_URL=http://mr-storage:8080 \
   ./Scripts/generate-townhub-appsettings.sh
@@ -93,7 +93,7 @@ Clerk databases stay on the Synology (`mr-storage`) over Tailscale. Production c
 | Card         | URL                                          | What the clerk sees                                         |
 | ------------ | -------------------------------------------- | ----------------------------------------------------------- |
 | Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open                            |
-| Apartments   | `http://mr-storage:8082`                     | NAS, Postgres `clerksuite` on `:5433`. Uses the ClerkSuite login. |
+| Apartments   | `https://mr-storage.tail57aa13.ts.net:8443`                     | NAS, Postgres `clerksuite` on `:5433`. Uses the ClerkSuite login. |
 | TIKR         | `http://mr-storage:8080`                     | NAS web app. No sign-in.                                    |
 | Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app. Same Town Hub sign-in.                |
 | Rural Water  | empty (card disabled)                        | No site yet. The card stays closed.                         |

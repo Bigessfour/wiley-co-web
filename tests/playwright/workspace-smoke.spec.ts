@@ -69,7 +69,7 @@ test("town hub lists app cards and workspace entry points", async ({ page }) => 
   // Wiley Widget is the configured same-origin card; a card with no URL is coming soon.
   await expect(page.locator('a.home-hub-card[href="/wiley-workspace"]')).toBeVisible();
   // Apartments opens ClerkSuite in a new window. A same-page link reloads the IDE browser onto /Account/Login.
-  const apartments = page.locator('button.home-hub-card[data-external-url="http://mr-storage:8082"]');
+  const apartments = page.locator('button.home-hub-card[data-external-url="https://mr-storage.tail57aa13.ts.net:8443"]');
   await expect(apartments).toBeVisible();
   await expect(apartments).toContainText("Apartments");
   await expect(page.locator('a.home-hub-card[href*="8082"]')).toHaveCount(0);
@@ -111,7 +111,7 @@ test("apartments card keeps town hub and opens ClerkSuite separately", async ({ 
     }) as typeof globalThis.open;
   });
 
-  await page.locator('button.home-hub-card[data-external-url="http://mr-storage:8082"]').click();
+  await page.locator('button.home-hub-card[data-external-url="https://mr-storage.tail57aa13.ts.net:8443"]').click();
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator(".home-hub.town-hub")).toBeVisible();
@@ -122,5 +122,5 @@ test("apartments card keeps town hub and opens ClerkSuite separately", async ({ 
         () => (globalThis as unknown as { __wileyOpened?: string[] }).__wileyOpened ?? [],
       ),
     )
-    .toContain("http://mr-storage:8082");
+    .toContain("https://mr-storage.tail57aa13.ts.net:8443");
 });
