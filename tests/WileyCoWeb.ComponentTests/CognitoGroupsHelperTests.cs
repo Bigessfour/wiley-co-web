@@ -27,6 +27,28 @@ public sealed class CognitoGroupsHelperTests
     }
 
     [Fact]
+    public void BuildTrashTruckHubUrl_DriverOnPhoneUsesIndependentLogin()
+    {
+        var url = CognitoGroupsHelper.BuildTrashTruckHubUrl("https://trash.example/", ["Driver"], mobileDevice: true);
+        Assert.Equal("https://trash.example/login?for=driver", url);
+        Assert.DoesNotContain("from=town-hub", url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildTrashTruckHubUrl_DriverAtADeskUsesTownHubSignIn()
+    {
+        var url = CognitoGroupsHelper.BuildTrashTruckHubUrl("https://trash.example", ["Driver"], mobileDevice: false);
+        Assert.Equal("https://trash.example/driver?from=town-hub", url);
+    }
+
+    [Fact]
+    public void UsesIndependentTrashLogin_StaffOnAPhoneStillUsesTownHub()
+    {
+        Assert.False(CognitoGroupsHelper.UsesIndependentTrashLogin(["Staff", "Driver"], mobileDevice: true));
+        Assert.True(CognitoGroupsHelper.UsesIndependentTrashLogin(["Driver"], mobileDevice: true));
+    }
+
+    [Fact]
     public void GetGroups_ReadsMultipleClaims()
     {
         var identity = new ClaimsIdentity(

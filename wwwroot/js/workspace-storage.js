@@ -61,6 +61,16 @@ globalThis.wileyLayout = (function () {
       _dotNetRef = null;
       _debounceHandle = null;
     },
+
+    /** Phone, or a viewport the driver would use on a handset. A desk browser is not a phone. */
+    isPhone: function () {
+      const ua = globalThis.navigator?.userAgent || "";
+      if (/iPhone|iPod|Windows Phone|Android.+Mobile/i.test(ua)) {
+        return true;
+      }
+
+      return globalThis.matchMedia("(max-width: 640px)").matches;
+    },
   };
 })();
 

@@ -91,9 +91,30 @@ public static class CognitoGroupsHelper
         return "clerk";
     }
 
-    public static string BuildTrashTruckHubUrl(string baseUrl, IReadOnlyList<string> groups)
+    /// <summary>
+    /// A driver on a phone signs in on Trash Truck. Everyone else opens Trash Truck
+    /// through the Town Hub handoff so the shared sign-in can apply.
+    /// </summary>
+    public static bool UsesIndependentTrashLogin(IReadOnlyList<string> groups, bool mobileDevice)
+    {
+        if (!mobileDevice)
+        {
+            return false;
+        }
+
+        var driver = groups.Any(static g => string.Equals(g, DriverGroup, StringComparison.OrdinalIgnoreCase));
+        var staff = groups.Any(static g => string.Equals(g, StaffGroup, StringComparison.OrdinalIgnoreCase));
+        return driver && !staff;
+    }
+
+    public static string BuildTrashTruckHubUrl(string baseUrl, IReadOnlyList<string> groups, bool mobileDevice = false)
     {
         var trimmed = baseUrl.Trim().TrimEnd('/');
+        if (UsesIndependentTrashLogin(groups, mobileDevice))
+        {
+            return $"{trimmed}/login?for=driver";
+        }
+
         var segment = GetTrashTruckPathSegment(groups);
         return $"{trimmed}/{segment}?from=town-hub";
     }
