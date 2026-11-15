@@ -24,7 +24,8 @@
 		<p class="home-hub-kicker">Town of Wiley</p>
 		<h1>Town Hub</h1>
 		<p class="home-hub-copy">
-			Single entry point for town apps. Trash Truck uses this sign-in.
+			Single entry point for town apps. Trash Truck uses the Town Hub sign-in.
+			A driver on a phone signs in on Trash Truck.
 			Apartments uses the ClerkSuite login. TIKR opens with no sign-in.
 			Rural Water stays closed until it has an address.
 			Summary tiles below read shared-contract reference data — full grid lives on the
@@ -63,7 +64,7 @@
 					<span class="home-hub-card-index">@app.Id</span>
 					<strong>@app.Title</strong>
 					<p>@app.Description</p>
-					<p class="town-hub-access-note">@TownHubCardAccess.SharedSignInNote</p>
+					<p class="town-hub-access-note">@TrashAccessNote()</p>
 					<span class="town-hub-card-status @(status.HasData ? "is-live" : "is-empty")">@status.Label</span>
 					<span class="town-hub-url">@DisplayUrl(app.Url)</span>
 				</a>
@@ -200,6 +201,7 @@
 	private bool _authEnabled;
 	private bool _groupsLoaded;
 	private IReadOnlyList<string> _groups = [];
+	private bool _driverPhone;
 
 	protected override void OnInitialized()
 	{
@@ -218,6 +220,15 @@
 		_user = authState.User;
 		_groups = CognitoGroupsHelper.GetGroups(_user);
 		_groupsLoaded = true;
+		try
+		{
+			_driverPhone = await JS.InvokeAsync<bool>("wileyLayout.isPhone");
+		}
+		catch (JSException)
+		{
+			_driverPhone = false;
+		}
+
 		await LoadSummaryAsync();
 	}
 
@@ -461,6 +472,11 @@
 	private static bool IsTrashTruck(TownHubAppLink app) =>
 		string.Equals(app.Id, "04", StringComparison.Ordinal);
 
+	private string TrashAccessNote() =>
+		CognitoGroupsHelper.UsesIndependentTrashLogin(_groups, _driverPhone)
+			? TownHubCardAccess.DriverPhoneSignInNote
+			: TownHubCardAccess.SharedSignInNote;
+
 	private static string AccessNote(TownHubAppLink app)
 	{
 		if (string.Equals(app.Id, "05", StringComparison.Ordinal))
@@ -498,7 +514,7 @@
 		}
 
 		var groups = CognitoGroupsHelper.GetGroups(_user);
-		return CognitoGroupsHelper.BuildTrashTruckHubUrl(baseUrl, groups);
+		return CognitoGroupsHelper.BuildTrashTruckHubUrl(baseUrl, groups, _driverPhone);
 	}
 
 	private static bool IsAbsolute(string url) =>

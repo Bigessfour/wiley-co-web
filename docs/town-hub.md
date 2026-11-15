@@ -69,7 +69,7 @@ Dev defaults match the NAS-first clerk path (Tailscale). Override with `appsetti
 | App          | Default `Url`                                |
 | ------------ | -------------------------------------------- |
 | Wiley Widget | `/wiley-workspace` (same origin)             |
-| Apartments   | `https://mr-storage.tail57aa13.ts.net:8443`                     |
+| Apartments   | `https://mr-storage.tail57aa13.ts.net:8443`  |
 | Rural Water  | empty (card disabled)                        |
 | Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` |
 | TIKR         | `http://mr-storage:8080`                     |
@@ -90,13 +90,13 @@ TOWN_HUB_TIKR_URL=http://mr-storage:8080 \
 
 Clerk databases stay on the Synology (`mr-storage`) over Tailscale. Production card URLs:
 
-| Card         | URL                                          | What the clerk sees                                         |
-| ------------ | -------------------------------------------- | ----------------------------------------------------------- |
-| Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open                            |
-| Apartments   | `https://mr-storage.tail57aa13.ts.net:8443`                     | NAS, Postgres `clerksuite` on `:5433`. Uses the ClerkSuite login. |
-| TIKR         | `http://mr-storage:8080`                     | NAS web app. No sign-in.                                    |
-| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app. Same Town Hub sign-in.                |
-| Rural Water  | empty (card disabled)                        | No site yet. The card stays closed.                         |
+| Card         | URL                                          | What the clerk sees                                                 |
+| ------------ | -------------------------------------------- | ------------------------------------------------------------------- |
+| Wiley Widget | `/wiley-workspace`                           | This app, when the shell is open                                    |
+| Apartments   | `https://mr-storage.tail57aa13.ts.net:8443`  | NAS, Postgres `clerksuite` on `:5433`. Uses the ClerkSuite login.   |
+| TIKR         | `http://mr-storage:8080`                     | NAS web app. No sign-in.                                            |
+| Trash Truck  | `https://main.d2dke4s7zyafra.amplifyapp.com` | Existing Amplify app. Town Hub sign-in, except a driver on a phone. |
+| Rural Water  | empty (card disabled)                        | No site yet. The card stays closed.                                 |
 
 `wwwroot/appsettings.Development.json` keeps `localhost` ports for Mac development. Tailscale names resolve only on the tailnet, which is the clerk path. Do not replace them with App Runner placeholders.
 
@@ -115,7 +115,7 @@ When auth is on, cards follow `cognito:groups` and the Hosted UI role claim (`Al
 | `Driver`                   | Trash Truck only                                                                 |
 | Signed in, no groups claim | Same as `Staff`, so a token that has not been stamped yet does not blank the hub |
 
-Trash Truck opens `{url}/clerk` or `{url}/driver` from those groups and says it uses this sign-in. Apartments uses the ClerkSuite login. TIKR on an `http://` host other than localhost says **office network only** and does not ask for a password. Rural Water with an empty URL is a closed **Coming soon** card.
+Trash Truck opens `{url}/clerk?from=town-hub` or `{url}/driver?from=town-hub` from those groups. That is the Town Hub sign-in. A driver on a phone opens `{url}/login?for=driver` and signs in on Trash Truck. Apartments uses the ClerkSuite login. TIKR on an `http://` host other than localhost says **office network only** and does not ask for a password. Rural Water with an empty URL is a closed **Coming soon** card.
 
 ## Related docs
 

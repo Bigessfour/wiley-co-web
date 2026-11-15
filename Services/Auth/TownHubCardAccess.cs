@@ -10,7 +10,9 @@ public static class TownHubCardAccess
     public const string OfficeNetworkNote =
         "Office network only. Sign in again in that app. Town Hub sign-in does not carry over.";
 
-    public const string SharedSignInNote = "Uses the same Town Hub sign-in.";
+    public const string SharedSignInNote = "Uses the Town Hub sign-in.";
+
+    public const string DriverPhoneSignInNote = "Phone uses the Trash Truck login.";
 
     public const string ComingSoonLabel = "Coming soon";
 
