@@ -94,6 +94,39 @@
             </div>
         </div>
 
+        <section id="adopted-residential-bill" class="rounded-2xl border px-5 py-4 shadow-sm wiley-surface-panel" aria-label="October 2026 residential utility bill">
+            <p class="wiley-eyebrow wiley-eyebrow-muted">Current residential bill</p>
+            <p class="mt-1 text-sm wiley-text-muted">
+                Town bill @AdoptedResidentialBill.BillDate.ToString("MMMM d, yyyy").
+                @AdoptedResidentialBill.UsageGallons.ToString("N0") gallons is still the water minimum.
+                Service @AdoptedResidentialBill.ServiceFrom.ToString("M/d/yyyy")–@AdoptedResidentialBill.ServiceTo.ToString("M/d/yyyy").
+                Due @AdoptedResidentialBill.DueDate.ToString("M/d/yyyy").
+            </p>
+            <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div>
+                    <div class="workspace-kpi-label">Water</div>
+                    <div class="text-lg font-semibold wiley-text">@AdoptedResidentialBill.Water.ToString("C2")</div>
+                </div>
+                <div>
+                    <div class="workspace-kpi-label">Sewage</div>
+                    <div class="text-lg font-semibold wiley-text">@AdoptedResidentialBill.Sewage.ToString("C2")</div>
+                </div>
+                <div>
+                    <div class="workspace-kpi-label">Garbage</div>
+                    <div class="text-lg font-semibold wiley-text">@AdoptedResidentialBill.Garbage.ToString("C2")</div>
+                </div>
+                <div>
+                    <div class="workspace-kpi-label">Due on receipt</div>
+                    <div class="text-lg font-semibold wiley-text">@AdoptedResidentialBill.TotalDue.ToString("C2")</div>
+                </div>
+                <div>
+                    <div class="workspace-kpi-label">After due date</div>
+                    <div class="text-lg font-semibold wiley-text">@AdoptedResidentialBill.AfterDueDatePay.ToString("C2")</div>
+                    <div class="text-xs wiley-text-muted">Penalty @AdoptedResidentialBill.LatePenalty.ToString("C2")</div>
+                </div>
+            </div>
+        </section>
+
         <div id="workspace-document-center" class="rounded-2xl border px-5 py-3 shadow-sm wiley-surface-panel">
             <details id="workspace-document-center-details"
                      class="workspace-document-center-details"

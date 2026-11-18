@@ -34,6 +34,10 @@
 		<div class="home-hub-actions">
 			<a class="home-hub-primary" href="/wiley-workspace">Open Wiley Widget workspace</a>
 			<a class="home-hub-secondary" href="/wiley-workspace/reference-data">Full reference data</a>
+			@if (!_authEnabled)
+			{
+				<button type="button" class="home-hub-secondary" @onclick="StartTownSignInAsync">Town sign-in</button>
+			}
 		</div>
 	</div>
 
@@ -489,6 +493,18 @@
 			? TownHubCardAccess.OfficeNetworkNote
 			: string.Empty;
 	}
+
+	private async Task StartTownSignInAsync()
+	{
+		var origin = Navigation.BaseUri.TrimEnd('/');
+		await JS.InvokeVoidAsync(
+			"wileyTownSignIn",
+			"https://tow-gov-staff.auth.us-east-2.amazoncognito.com",
+			CognitoStaffWebClientId,
+			origin + "/authentication/sso-complete");
+	}
+
+	private const string CognitoStaffWebClientId = "258binbcvsms0rfqj5g20qakki";
 
 	private async Task OpenExternalAppAsync(TownHubAppLink app)
 	{
